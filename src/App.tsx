@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-
 import Sidebar from "./components/Sidebar"
 import ModGrid from "./components/ModGrid"
 import ModDetail from "./components/ModDetail"
+import GlossaryPage from "./components/GlossaryPage"
 import type { ModStatus, Stats } from "./shared_types"
 import "./index.css"
 
@@ -75,8 +76,34 @@ function App() {
      * @param dryRun - Whether to perform a dry run without actual translation.
      */
     const handleTranslate = async (modId: string, provider: string, dryRun: boolean) => {
-        alert(`Triggering ${dryRun ? "Dry Run" : "Translation"} for ${modId} via ${provider}...`)
-        // In a full implementation, this would call /api/translate/estimate or trigger a background task.
+        try {
+            const res = await fetch(`${API_BASE}/translate`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mod_id: modId, provider, dry_run: dryRun }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                alert(`Translation failed: ${data.detail || "Unknown error"}`)
+                return
+            }
+            if (dryRun) {
+                if (data.total_strings === 0) {
+                    alert("All strings are already translated.")
+                    return
+                }
+                const estimates = Object.entries(data.estimates || {})
+                    .map(([lang, est]: [string, any]) => `${lang}: ~$${est.estimated_cost_usd}`)
+                    .join(", ")
+                alert(`Dry run for ${data.total_strings} strings via ${data.provider}\n\n${estimates}`)
+            } else {
+                alert(`Translated ${data.translated} strings.${data.suggestions > 0 ? ` ${data.suggestions} glossary term suggestions pending review.` : ""}`)
+                fetchMods()
+            }
+        } catch (err) {
+            console.error("Translation failed:", err)
+            alert("Translation failed. Check console for details.")
+        }
     }
 
     return (
@@ -145,23 +172,7 @@ function App() {
                             }
                         />
 
-                        <Route
-                            path="/glossary"
-                            element={
-                                <div className="glossary-view">
-                                    <div className="dashboard-header">
-                                        <div className="title-group">
-                                            <h1>Terminology Glossary</h1>
-                                            <p>Canonical translations for game-specific terms</p>
-                                        </div>
-                                        <button className="btn btn-primary">+ Add Entry</button>
-                                    </div>
-                                    <div className="glass-card" style={{ padding: "2rem", textAlign: "center", color: "var(--text-dim)" }}>
-                                        Glossary management interface under development.
-                                    </div>
-                                </div>
-                            }
-                        />
+                        <Route path="/glossary" element={<GlossaryPage />} />
 
                         <Route
                             path="/settings"
