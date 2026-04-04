@@ -45,3 +45,42 @@ def test_build_style_examples_section():
     assert "Deal damage to an enemy." in section
     assert "Attack is increased." in section
     assert "## Style Reference" in section
+
+
+from translator.claude_provider import _build_character_context_section
+
+
+def test_build_character_context_section_full():
+    ctx = {"source_game": "Library of Ruina", "character_name": "Roland", "background": "A cynical fixer."}
+    section = _build_character_context_section(ctx)
+    assert "## Character Background" in section
+    assert "**Roland**" in section
+    assert "**Library of Ruina**" in section
+    assert "A cynical fixer." in section
+
+
+def test_build_character_context_section_partial_no_game():
+    ctx = {"source_game": "", "character_name": "Roland", "background": "A cynical fixer."}
+    section = _build_character_context_section(ctx)
+    assert "## Character Background" in section
+    assert "**Roland**" in section
+    assert "Library of Ruina" not in section
+    assert "A cynical fixer." in section
+
+
+def test_build_character_context_section_only_background():
+    ctx = {"source_game": "", "character_name": "", "background": "A mysterious warrior."}
+    section = _build_character_context_section(ctx)
+    assert "## Character Background" in section
+    assert "A mysterious warrior." in section
+
+
+def test_build_character_context_section_empty():
+    ctx = {"source_game": "", "character_name": "", "background": ""}
+    section = _build_character_context_section(ctx)
+    assert section == ""
+
+
+def test_build_character_context_section_none():
+    section = _build_character_context_section(None)
+    assert section == ""

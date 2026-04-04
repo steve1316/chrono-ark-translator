@@ -80,6 +80,31 @@ def _build_style_examples_section(examples: dict[str, list[tuple[str, str]]]) ->
     return "\n".join(lines)
 
 
+def _build_character_context_section(ctx: dict | None) -> str:
+    """Format character context as a prompt section. Returns empty string if no context."""
+    if not ctx:
+        return ""
+    name = ctx.get("character_name", "").strip()
+    game = ctx.get("source_game", "").strip()
+    background = ctx.get("background", "").strip()
+    if not name and not game and not background:
+        return ""
+
+    lines = ["## Character Background", ""]
+    if name and game:
+        lines.append(f"This mod implements **{name}** from **{game}**.")
+    elif name:
+        lines.append(f"This mod implements **{name}**.")
+    elif game:
+        lines.append(f"This mod implements a character from **{game}**.")
+    if background:
+        lines.append("")
+        lines.append(background)
+    lines.append("")
+    lines.append("Use this context to inform your translation choices — match the character's established tone, personality, and terminology from their source game.")
+    return "\n".join(lines)
+
+
 class ClaudeProvider(TranslationProvider):
     """Translation provider using Anthropic's Claude API."""
 
