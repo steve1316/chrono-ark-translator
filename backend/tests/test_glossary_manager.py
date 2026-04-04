@@ -69,7 +69,7 @@ def test_glossary_prompt_format():
             "Armor": {"category": "mechanics", "key": "", "source_mappings": {}},
         }
     }
-    prompt = get_glossary_prompt(glossary)
+    prompt = get_glossary_prompt(glossary, allowed_categories=["skills", "mechanics"])
     assert "**Fire Bolt**" in prompt
     assert "**Armor**" in prompt
     assert "Korean: 화염구" in prompt

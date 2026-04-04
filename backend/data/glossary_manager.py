@@ -187,18 +187,23 @@ def add_glossary_term(
     return glossary
 
 
-def get_glossary_prompt(glossary: dict) -> str:
+def get_glossary_prompt(glossary: dict, allowed_categories: list[str] | None = None) -> str:
     """
     Format the glossary as context for an LLM translation prompt.
 
     Args:
         glossary: The glossary dictionary.
+        allowed_categories: If provided, only include terms from these categories.
+            Defaults to config.GLOSSARY_CATEGORIES.
 
     Returns:
         Formatted string suitable for use as LLM system prompt context.
     """
     if not glossary.get("terms"):
         return ""
+
+    if allowed_categories is None:
+        allowed_categories = config.GLOSSARY_CATEGORIES
 
     lines = [
         "## Game Terminology Glossary",
@@ -207,13 +212,18 @@ def get_glossary_prompt(glossary: dict) -> str:
         "",
     ]
 
-    # Group by category.
+    # Group by category, filtering to allowed categories.
     by_category: dict[str, list[tuple[str, dict]]] = {}
     for english_term, info in glossary["terms"].items():
         cat = info.get("category", "other")
+        if allowed_categories and cat not in allowed_categories:
+            continue
         if cat not in by_category:
             by_category[cat] = []
         by_category[cat].append((english_term, info))
+
+    if not by_category:
+        return ""
 
     for category, terms in sorted(by_category.items()):
         lines.append(f"### {category.title()}")

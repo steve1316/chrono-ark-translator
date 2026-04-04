@@ -34,6 +34,12 @@ TRANSLATION_PROVIDER = os.environ.get("CATL_TRANSLATION_PROVIDER", "claude")
 # Number of strings to send per LLM API batch request.
 BATCH_SIZE = int(os.environ.get("CATL_BATCH_SIZE", "20"))
 
+# Glossary categories to include in the translation prompt.
+# Only these categories from the base glossary are sent to the LLM.
+GLOSSARY_CATEGORIES = os.environ.get(
+    "CATL_GLOSSARY_CATEGORIES", "buffs,characters"
+).split(",")
+
 # ── Game Selection ─────────────────────────────────────────────────────────────
 
 # Active game adapter ID. See games/ directory for available adapters.
