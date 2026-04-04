@@ -331,7 +331,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 method: "POST",
             })
             if (res.ok) {
-                setStrings((prev) => prev.map((s) => ({ ...s, english: "", is_translated: false, original_english: "" })))
+                setStrings((prev) => prev.map((s) => ({ ...s, english: "", is_translated: false })))
                 fetchExportStatus()
             } else {
                 const error = await res.json()
