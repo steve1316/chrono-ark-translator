@@ -75,7 +75,7 @@ function App() {
      * @param provider - The AI provider to use.
      * @param dryRun - Whether to perform a dry run without actual translation.
      */
-    const handleTranslate = async (modId: string, provider: string, dryRun: boolean): Promise<{ success: boolean; message: string }> => {
+    const handleTranslate = async (modId: string, provider: string, dryRun: boolean): Promise<{ success: boolean; message: string; translations?: Record<string, string> }> => {
         try {
             const res = await fetch(`${API_BASE}/translate`, {
                 method: "POST",
@@ -97,7 +97,7 @@ function App() {
             } else {
                 fetchMods()
                 const msg = `Translated ${data.translated} strings.${data.suggestions > 0 ? ` ${data.suggestions} glossary term suggestions pending review.` : ""}`
-                return { success: true, message: msg }
+                return { success: true, message: msg, translations: data.translations }
             }
         } catch (err) {
             console.error("Translation failed:", err)

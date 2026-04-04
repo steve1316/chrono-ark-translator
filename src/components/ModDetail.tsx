@@ -7,7 +7,7 @@ import TranslationConfirmModal from "./TranslationConfirmModal"
 
 interface ModDetailProps {
     onBack: () => void
-    onTranslate: (provider: string, dryRun: boolean, modId: string) => Promise<{ success: boolean; message: string }>
+    onTranslate: (provider: string, dryRun: boolean, modId: string) => Promise<{ success: boolean; message: string; translations?: Record<string, string> }>
 }
 
 const API_BASE = "http://localhost:8000/api"
@@ -182,7 +182,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 body: JSON.stringify({ key, english: newValue }),
             })
             if (res.ok) {
-                // Update local state.
                 setStrings((prev) => prev.map((s) => (s.key === key ? { ...s, english: newValue, is_translated: !!newValue } : s)))
                 fetchExportStatus()
             }
@@ -603,22 +602,28 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                         </tr>
                     </thead>
                     <tbody>
-                        {processedStrings.map((s) => (
-                            <tr key={s.key}>
-                                <td>
-                                    <span className={`status-badge ${s.is_translated ? "status-translated" : "status-missing"}`}>{s.is_translated ? "OK" : "MISSING"}</span>
-                                </td>
-                                <td className="key-cell" title={s.key} style={{ maxWidth: columnWidths.key }}>
-                                    {s.key}
-                                </td>
-                                <td className="source-cell" style={{ maxWidth: columnWidths.source }}>
-                                    {s.source}
-                                </td>
-                                <td className="english-cell" style={{ maxWidth: columnWidths.english, position: "relative" }}>
-                                    <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
-                                </td>
-                            </tr>
-                        ))}
+                        {processedStrings.map((s) => {
+                            const hasOverride = s.english !== s.original_english
+                            return (
+                                <tr key={s.key} style={hasOverride ? { backgroundColor: "rgba(255, 220, 40, 0.15)" } : undefined}>
+                                    <td>
+                                        <span className={`status-badge ${s.is_translated ? "status-translated" : "status-missing"}`}>{s.is_translated ? "OK" : "MISSING"}</span>
+                                    </td>
+                                    <td className="key-cell" title={s.key} style={{ maxWidth: columnWidths.key }}>
+                                        {s.key}
+                                    </td>
+                                    <td className="source-cell" style={{ maxWidth: columnWidths.source }}>
+                                        {s.source}
+                                    </td>
+                                    <td className="english-cell" style={{ maxWidth: columnWidths.english, position: "relative" }}>
+                                        {hasOverride && (
+                                            <div className="prev-translation">{s.original_english || "(no previous translation)"}</div>
+                                        )}
+                                        <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
+                                    </td>
+                                </tr>
+                            )
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -642,7 +647,18 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                         const result = await onTranslate(pendingProvider, false, modId!)
                         setTranslating(false)
                         setTranslateBanner({ type: result.success ? "success" : "error", message: result.message })
-                        if (result.success) fetchModDetail()
+                        if (result.success && result.translations) {
+                            setStrings(prev => prev.map(s => {
+                                if (s.key in result.translations!) {
+                                    return { ...s, english: result.translations![s.key], is_translated: true }
+                                }
+                                return s
+                            }))
+                            fetchExportStatus()
+                            fetchSuggestions()
+                        } else if (result.success) {
+                            fetchModDetail()
+                        }
                     }}
                     onCancel={() => setTranslationPreview(null)}
                 />

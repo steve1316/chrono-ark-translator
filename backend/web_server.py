@@ -131,6 +131,12 @@ async def get_mod_detail(mod_id: str):
         except Exception:
             pass
 
+    # Capture original CSV English values before applying overrides.
+    original_english_map = {
+        key: loc_str.translations.get("English", "")
+        for key, loc_str in strings.items()
+    }
+
     # Apply saved translations so user edits (including clears) are respected.
     for key, english in translations.items():
         if key in strings:
@@ -151,6 +157,7 @@ async def get_mod_detail(mod_id: str):
         if english:
             translated_keys.append(key)
 
+        has_override = key in translations
         results.append({
             "key": key,
             "type": loc_str.type,
@@ -158,7 +165,8 @@ async def get_mod_detail(mod_id: str):
             "source": source_text,
             "source_lang": source_lang,
             "english": english,
-            "is_translated": bool(english)
+            "is_translated": bool(english),
+            "original_english": original_english_map.get(key, "") if has_override else english,
         })
 
     # Replace (not just add) the translated list so clears are reflected.
@@ -492,6 +500,7 @@ async def translate_mod(req: TranslationRequest):
         "status": "success",
         "translated": len(all_translations),
         "suggestions": len(all_suggestions),
+        "translations": all_translations,
     }
 
 

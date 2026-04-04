@@ -21,6 +21,7 @@ export type LocString = {
     source_lang: string | null
     english: string
     is_translated: boolean
+    original_english: string
 }
 
 export type Stats = {
