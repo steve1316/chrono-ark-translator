@@ -31,6 +31,7 @@ class TranslationProvider(ABC):
         game_context: str = "",
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
+        character_context: dict | None = None,
     ) -> tuple[dict[str, str], list[dict]]:
         """
         Translate a batch of strings to English.
@@ -56,6 +57,7 @@ class TranslationProvider(ABC):
         game_context: str = "",
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
+        character_context: dict | None = None,
     ) -> tuple[str, str]:
         """
         Build the system and user prompts without sending to the API.

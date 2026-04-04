@@ -11,7 +11,7 @@ from typing import Optional
 
 import config
 from translator.base import TranslationProvider
-from translator.claude_provider import _build_style_examples_section
+from translator.claude_provider import _build_style_examples_section, _build_character_context_section
 
 
 _SYSTEM_PROMPT_TEMPLATE = """You are a professional game translator specializing in translating {source_lang} text into English for the game {game_context}.
@@ -23,6 +23,8 @@ _SYSTEM_PROMPT_TEMPLATE = """You are a professional game translator specializing
 {style_examples_section}
 
 {glossary_section}
+
+{character_context_section}
 
 ## Output Format
 
@@ -74,6 +76,7 @@ class OpenAIProvider(TranslationProvider):
         game_context: str = "",
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
+        character_context: dict | None = None,
     ) -> tuple[str, str]:
         glossary_section = glossary_prompt if glossary_prompt else "No glossary available."
         rules = format_rules or []
@@ -81,6 +84,7 @@ class OpenAIProvider(TranslationProvider):
             f"{i+1}. **{rule}**" for i, rule in enumerate(rules)
         ) if rules else ""
         style_examples_section = _build_style_examples_section(style_examples or {})
+        character_context_section = _build_character_context_section(character_context)
 
         system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
             source_lang=source_lang,
@@ -88,6 +92,7 @@ class OpenAIProvider(TranslationProvider):
             format_rules_section=format_rules_section,
             style_examples_section=style_examples_section,
             glossary_section=glossary_section,
+            character_context_section=character_context_section,
         )
 
         user_lines = [f"Translate the following {source_lang} strings to English:\n"]
@@ -107,6 +112,7 @@ class OpenAIProvider(TranslationProvider):
         game_context: str = "",
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
+        character_context: dict | None = None,
     ) -> tuple[dict[str, str], list[dict]]:
         from openai import OpenAI, RateLimitError, APIError
 
@@ -120,6 +126,7 @@ class OpenAIProvider(TranslationProvider):
             game_context=game_context,
             format_rules=format_rules,
             style_examples=style_examples,
+            character_context=character_context,
         )
 
         max_retries = 3
@@ -193,12 +200,14 @@ class OpenAIProvider(TranslationProvider):
         game_context = kwargs.get("game_context", "")
         format_rules = kwargs.get("format_rules")
         style_examples = kwargs.get("style_examples")
+        character_context = kwargs.get("character_context")
 
         system_prompt, user_message = self.build_prompt(
             entries, source_lang, glossary_prompt,
             game_context=game_context,
             format_rules=format_rules,
             style_examples=style_examples,
+            character_context=character_context,
         )
         full_prompt = system_prompt + user_message
 

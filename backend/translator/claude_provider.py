@@ -23,6 +23,8 @@ _SYSTEM_PROMPT_TEMPLATE = """You are a professional game translator specializing
 
 {glossary_section}
 
+{character_context_section}
+
 ## Output Format
 
 Return a valid JSON object with this structure:
@@ -124,6 +126,7 @@ class ClaudeProvider(TranslationProvider):
         game_context: str = "",
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
+        character_context: dict | None = None,
     ) -> tuple[str, str]:
         glossary_section = glossary_prompt if glossary_prompt else "No glossary available."
         rules = format_rules or []
@@ -131,6 +134,7 @@ class ClaudeProvider(TranslationProvider):
             f"{i+1}. **{rule}**" for i, rule in enumerate(rules)
         ) if rules else ""
         style_examples_section = _build_style_examples_section(style_examples or {})
+        character_context_section = _build_character_context_section(character_context)
 
         system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
             source_lang=source_lang,
@@ -138,6 +142,7 @@ class ClaudeProvider(TranslationProvider):
             format_rules_section=format_rules_section,
             style_examples_section=style_examples_section,
             glossary_section=glossary_section,
+            character_context_section=character_context_section,
         )
 
         user_lines = [f"Translate the following {source_lang} strings to English:\n"]
@@ -157,6 +162,7 @@ class ClaudeProvider(TranslationProvider):
         game_context: str = "",
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
+        character_context: dict | None = None,
     ) -> tuple[dict[str, str], list[dict]]:
         import anthropic
 
@@ -170,6 +176,7 @@ class ClaudeProvider(TranslationProvider):
             game_context=game_context,
             format_rules=format_rules,
             style_examples=style_examples,
+            character_context=character_context,
         )
 
         max_retries = 3
@@ -250,6 +257,7 @@ class ClaudeProvider(TranslationProvider):
         game_context: str = "",
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
+        character_context: dict | None = None,
     ) -> dict:
         # Build the actual prompt to get a realistic character count
         system_prompt, user_message = self.build_prompt(
@@ -257,6 +265,7 @@ class ClaudeProvider(TranslationProvider):
             game_context=game_context,
             format_rules=format_rules,
             style_examples=style_examples,
+            character_context=character_context,
         )
         full_prompt = system_prompt + user_message
 
