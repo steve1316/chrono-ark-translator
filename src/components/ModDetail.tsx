@@ -320,6 +320,29 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    const handleClearTranslations = async () => {
+        if (!modId) return
+        if (!window.confirm("Are you sure you want to clear all English translations? This will allow all rows to be sent to the AI provider.")) {
+            return
+        }
+
+        try {
+            const res = await fetch(`${API_BASE}/mods/${modId}/clear-translations`, {
+                method: "POST",
+            })
+            if (res.ok) {
+                setStrings((prev) => prev.map((s) => ({ ...s, english: "", is_translated: false, original_english: "" })))
+                fetchExportStatus()
+            } else {
+                const error = await res.json()
+                alert(`Failed to clear translations: ${error.detail || "Unknown error"}`)
+            }
+        } catch (err) {
+            console.error("Failed to clear translations:", err)
+            alert("Failed to clear translations. Check console for details.")
+        }
+    }
+
     if (loading) {
         return (
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
@@ -378,6 +401,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 <div className="mod-actions">
                     <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleClearCache}>
                         Clear Cache
+                    </button>
+                    <button className="btn btn-outline" style={{ color: "#ffaa44", borderColor: "rgba(255, 170, 68, 0.3)" }} onClick={handleClearTranslations}>
+                        Clear English
                     </button>
                     <button
                         className="btn btn-outline"

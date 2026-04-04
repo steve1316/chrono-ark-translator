@@ -232,6 +232,40 @@ async def sync_mod(mod_id: str):
         "unchanged": len(diff.unchanged_keys)
     }
 
+@app.post("/api/mods/{mod_id}/clear-translations")
+async def clear_translations(mod_id: str):
+    """Clear all English translations so every row is sent to the AI provider."""
+    mods = _adapter.scan_mods()
+    matching = [m for m in mods if m.mod_id == mod_id]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Mod not found")
+
+    strings, _ = _adapter.extract_strings(matching[0].path)
+
+    # Write empty overrides for every key that has an English value in the CSV
+    # so the original CSV values don't show through.
+    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
+    translations_path.parent.mkdir(parents=True, exist_ok=True)
+    overrides = {}
+    for key, loc_str in strings.items():
+        if loc_str.translations.get("English", ""):
+            overrides[key] = ""
+
+    # Also clear any previously saved translations.
+    if translations_path.exists():
+        with open(translations_path, "r", encoding="utf-8") as f:
+            existing = json.load(f)
+        for key in existing:
+            overrides[key] = ""
+
+    with open(translations_path, "w", encoding="utf-8") as f:
+        json.dump(overrides, f, indent=2, ensure_ascii=False)
+
+    tracker = ProgressTracker()
+    tracker.set_translated(mod_id, [])
+
+    return {"status": "success"}
+
 @app.post("/api/mods/{mod_id}/clear")
 async def clear_mod_cache(mod_id: str):
     """Delete all extracted strings, translations, and progress for a mod."""
