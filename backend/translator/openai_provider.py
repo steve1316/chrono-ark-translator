@@ -2,7 +2,7 @@
 OpenAI GPT translation provider.
 
 Translates source language text to English using the OpenAI API
-with glossary enforcement and game-specific style rules.
+with glossary enforcement, style examples, and term suggestion.
 """
 
 import json
@@ -11,49 +11,92 @@ from typing import Optional
 
 import config
 from translator.base import TranslationProvider
+from translator.claude_provider import _build_style_examples_section
 
 
-# System prompt template for consistent game translation.
-# Game context and format rules are injected by the caller from the active GameAdapter.
 _SYSTEM_PROMPT_TEMPLATE = """You are a professional game translator specializing in translating {source_lang} text into English for the game {game_context}.
 
 ## Translation Rules
 
 {format_rules_section}
 
+{style_examples_section}
+
 {glossary_section}
 
 ## Output Format
 
-Return a valid JSON object mapping each key to its English translation. Example:
+Return a valid JSON object with this structure:
 ```json
 {{
-  "Buff/B_Example_Name": "Example Buff",
-  "Buff/B_Example_Description": "Deals &a damage to all enemies."
+  "translations": {{
+    "Buff/B_Example_Name": "Example Buff",
+    "Buff/B_Example_Description": "Deals &a damage to all enemies."
+  }},
+  "suggested_terms": [
+    {{
+      "english": "Term Name",
+      "source": "원본 텍스트",
+      "source_lang": "{source_lang}",
+      "category": "characters|skills|buffs|items|mechanics",
+      "reason": "Brief reason why this should be a glossary term"
+    }}
+  ]
 }}
 ```
 
-Translate ONLY the values. Keys must remain unchanged."""
+Translate ONLY the values. Keys must remain unchanged.
+
+For suggested_terms: identify any recurring proper nouns, character names, skill names, status effects, or game-specific terms that should be added to the glossary for consistency. Only suggest terms that:
+- Appear in multiple strings or are clearly important named entities
+- Are NOT already in the glossary above
+- Are proper nouns, skill/buff/item names, or game mechanics
+
+If no terms to suggest, return an empty array."""
 
 
 class OpenAIProvider(TranslationProvider):
     """Translation provider using OpenAI's GPT API."""
 
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o"):
-        """
-        Initialize the OpenAI provider.
-
-        Args:
-            api_key: OpenAI API key. Defaults to config value.
-            model: GPT model to use.
-        """
         self._api_key = api_key or config.OPENAI_API_KEY
         self._model = model
 
     @property
     def name(self) -> str:
-        """Human-readable provider name."""
         return f"OpenAI ({self._model})"
+
+    def build_prompt(
+        self,
+        entries: list[tuple[str, str]],
+        source_lang: str,
+        glossary_prompt: str,
+        game_context: str = "",
+        format_rules: list[str] | None = None,
+        style_examples: dict[str, list[tuple[str, str]]] | None = None,
+    ) -> tuple[str, str]:
+        glossary_section = glossary_prompt if glossary_prompt else "No glossary available."
+        rules = format_rules or []
+        format_rules_section = "\n".join(
+            f"{i+1}. **{rule}**" for i, rule in enumerate(rules)
+        ) if rules else ""
+        style_examples_section = _build_style_examples_section(style_examples or {})
+
+        system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
+            source_lang=source_lang,
+            game_context=game_context or "a video game",
+            format_rules_section=format_rules_section,
+            style_examples_section=style_examples_section,
+            glossary_section=glossary_section,
+        )
+
+        user_lines = [f"Translate the following {source_lang} strings to English:\n"]
+        for key, source_text in entries:
+            user_lines.append(f"**{key}**: {source_text}")
+        user_lines.append("\nReturn a JSON object with \"translations\" and \"suggested_terms\".")
+        user_message = "\n".join(user_lines)
+
+        return system_prompt, user_message
 
     def translate_batch(
         self,
@@ -62,55 +105,22 @@ class OpenAIProvider(TranslationProvider):
         glossary_prompt: str,
         game_context: str = "",
         format_rules: list[str] | None = None,
-    ) -> dict[str, str]:
-        """
-        Translate a batch of strings using OpenAI GPT.
-
-        Args:
-            entries: List of (key, source_text) tuples.
-            source_lang: Source language name.
-            glossary_prompt: Formatted glossary context.
-            game_context: Game description for the system prompt.
-            format_rules: Game-specific formatting preservation rules.
-
-        Returns:
-            Dictionary mapping key to English translation.
-        """
+        style_examples: dict[str, list[tuple[str, str]]] | None = None,
+    ) -> tuple[dict[str, str], list[dict]]:
         from openai import OpenAI, RateLimitError, APIError
 
         if not self._api_key:
-            raise ValueError(
-                "OpenAI API key not set. Set CATL_OPENAI_API_KEY env var."
-            )
+            raise ValueError("OpenAI API key not set. Set CATL_OPENAI_API_KEY env var.")
 
         client = OpenAI(api_key=self._api_key)
 
-        glossary_section = glossary_prompt if glossary_prompt else "No glossary available."
-
-        # Build numbered format rules section.
-        rules = format_rules or []
-        format_rules_section = "\n".join(
-            f"{i+1}. **{rule}**"
-            for i, rule in enumerate(rules)
-        ) if rules else ""
-
-        system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
-            source_lang=source_lang,
-            game_context=game_context or "a video game",
-            format_rules_section=format_rules_section,
-            glossary_section=glossary_section,
+        system_prompt, user_message = self.build_prompt(
+            entries, source_lang, glossary_prompt,
+            game_context=game_context,
+            format_rules=format_rules,
+            style_examples=style_examples,
         )
 
-        # Build the user message.
-        user_lines = [f"Translate the following {source_lang} strings to English:\n"]
-        for key, source_text in entries:
-            user_lines.append(f"**{key}**: {source_text}")
-        user_lines.append(
-            "\nReturn a JSON object mapping each key to its English translation."
-        )
-        user_message = "\n".join(user_lines)
-
-        # Call with retry logic.
         max_retries = 3
         for attempt in range(max_retries):
             try:
@@ -123,9 +133,7 @@ class OpenAIProvider(TranslationProvider):
                     max_tokens=4096,
                     temperature=0.3,
                 )
-
-                response_text = response.choices[0].message.content
-                return self._parse_response(response_text, entries)
+                return self._parse_response(response.choices[0].message.content, entries)
 
             except RateLimitError:
                 wait_time = 2 ** attempt * 5
@@ -134,27 +142,15 @@ class OpenAIProvider(TranslationProvider):
             except APIError as e:
                 if attempt == max_retries - 1:
                     print(f"  API error after {max_retries} retries: {e}")
-                    return {}
+                    return {}, []
                 wait_time = 2 ** attempt * 2
                 time.sleep(wait_time)
 
-        return {}
+        return {}, []
 
     def _parse_response(
-        self,
-        response_text: str,
-        entries: list[tuple[str, str]],
-    ) -> dict[str, str]:
-        """
-        Parse the LLM response to extract key→translation mappings.
-
-        Args:
-            response_text: Raw LLM response text.
-            entries: Original entries for key validation.
-
-        Returns:
-            Dictionary mapping key to English translation.
-        """
+        self, response_text: str, entries: list[tuple[str, str]],
+    ) -> tuple[dict[str, str], list[dict]]:
         text = response_text.strip()
         if text.startswith("```json"):
             text = text[7:]
@@ -168,30 +164,33 @@ class OpenAIProvider(TranslationProvider):
             result = json.loads(text)
             if isinstance(result, dict):
                 expected_keys = {k for k, _ in entries}
-                return {
+
+                if "translations" in result and isinstance(result["translations"], dict):
+                    translations = {
+                        k: v for k, v in result["translations"].items()
+                        if k in expected_keys and isinstance(v, str)
+                    }
+                    suggestions = result.get("suggested_terms", [])
+                    if not isinstance(suggestions, list):
+                        suggestions = []
+                    return translations, suggestions
+
+                translations = {
                     k: v for k, v in result.items()
                     if k in expected_keys and isinstance(v, str)
                 }
+                return translations, []
+
         except json.JSONDecodeError:
             print(f"  Warning: Failed to parse LLM response as JSON")
 
-        return {}
+        return {}, []
 
     def estimate_cost(self, entries: list[tuple[str, str]]) -> dict:
-        """
-        Estimate the cost of translating the given entries.
-
-        Args:
-            entries: List of (key, source_text) tuples.
-
-        Returns:
-            Cost estimation dictionary.
-        """
         total_chars = sum(len(text) for _, text in entries)
         estimated_input_tokens = int(total_chars * 1.5) + 500
         estimated_output_tokens = int(total_chars * 0.8)
 
-        # GPT-4o pricing (approximate per 1M tokens).
         input_cost_per_m = 2.5
         output_cost_per_m = 10.0
 

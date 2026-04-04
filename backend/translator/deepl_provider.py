@@ -44,22 +44,17 @@ class DeepLProvider(TranslationProvider):
         glossary_prompt: str,
         game_context: str = "",
         format_rules: list[str] | None = None,
-    ) -> dict[str, str]:
+        style_examples: dict[str, list[tuple[str, str]]] | None = None,
+    ) -> tuple[dict[str, str], list[dict]]:
         """
         Translate a batch of strings using DeepL.
 
-        Note: The glossary_prompt, game_context, and format_rules are
-        ignored since DeepL uses its own glossary system.
-
-        Args:
-            entries: List of (key, source_text) tuples.
-            source_lang: Source language name.
-            glossary_prompt: Ignored for DeepL (uses built-in glossary).
-            game_context: Ignored for DeepL.
-            format_rules: Ignored for DeepL.
+        Note: glossary_prompt, game_context, format_rules, and style_examples
+        are ignored since DeepL uses its own glossary system and doesn't
+        support custom prompts. DeepL cannot suggest glossary terms.
 
         Returns:
-            Dictionary mapping key to English translation.
+            Tuple of (translations dict, empty suggestions list).
         """
         import deepl
 
@@ -92,7 +87,7 @@ class DeepLProvider(TranslationProvider):
         except deepl.DeepLException as e:
             print(f"  DeepL API error: {e}")
 
-        return results
+        return results, []
 
     def estimate_cost(self, entries: list[tuple[str, str]]) -> dict:
         """

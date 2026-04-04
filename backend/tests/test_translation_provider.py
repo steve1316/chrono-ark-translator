@@ -1,0 +1,47 @@
+import json
+
+from translator.claude_provider import ClaudeProvider, _build_style_examples_section
+
+
+def test_parse_response_new_format():
+    provider = ClaudeProvider.__new__(ClaudeProvider)
+    entries = [("Buff/B_Test_Name", "테스트")]
+    response = json.dumps({
+        "translations": {"Buff/B_Test_Name": "Test"},
+        "suggested_terms": [
+            {"english": "Dark Mage", "source": "흑마법사", "source_lang": "Korean", "category": "characters", "reason": "Recurring name"}
+        ]
+    })
+    translations, suggestions = provider._parse_response(response, entries)
+    assert translations == {"Buff/B_Test_Name": "Test"}
+    assert len(suggestions) == 1
+    assert suggestions[0]["english"] == "Dark Mage"
+
+
+def test_parse_response_old_flat_format_fallback():
+    """If the AI returns the old flat format, still parse translations."""
+    provider = ClaudeProvider.__new__(ClaudeProvider)
+    entries = [("Buff/B_Test_Name", "테스트")]
+    response = json.dumps({"Buff/B_Test_Name": "Test"})
+    translations, suggestions = provider._parse_response(response, entries)
+    assert translations == {"Buff/B_Test_Name": "Test"}
+    assert suggestions == []
+
+
+def test_parse_response_with_markdown_code_block():
+    provider = ClaudeProvider.__new__(ClaudeProvider)
+    entries = [("Skill/S_1_Name", "스킬")]
+    response = '```json\n{"translations": {"Skill/S_1_Name": "Skill"}, "suggested_terms": []}\n```'
+    translations, suggestions = provider._parse_response(response, entries)
+    assert translations == {"Skill/S_1_Name": "Skill"}
+
+
+def test_build_style_examples_section():
+    examples = {
+        "skills": [("적에게 피해를 줍니다.", "Deal damage to an enemy.")],
+        "buffs": [("공격력 증가", "Attack is increased.")],
+    }
+    section = _build_style_examples_section(examples)
+    assert "Deal damage to an enemy." in section
+    assert "Attack is increased." in section
+    assert "## Style Reference" in section

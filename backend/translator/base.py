@@ -30,7 +30,8 @@ class TranslationProvider(ABC):
         glossary_prompt: str,
         game_context: str = "",
         format_rules: list[str] | None = None,
-    ) -> dict[str, str]:
+        style_examples: dict[str, list[tuple[str, str]]] | None = None,
+    ) -> tuple[dict[str, str], list[dict]]:
         """
         Translate a batch of strings to English.
 
@@ -38,15 +39,32 @@ class TranslationProvider(ABC):
             entries: List of (key, source_text) tuples to translate.
             source_lang: Name of the source language (e.g., "Chinese").
             glossary_prompt: Formatted glossary context for the LLM.
-            game_context: Game description for the system prompt
-                (e.g., '"Chrono Ark", a roguelike deck-building RPG').
-            format_rules: Game-specific formatting preservation rules
-                for the system prompt.
+            game_context: Game description for the system prompt.
+            format_rules: Game-specific formatting preservation rules.
+            style_examples: Dict of category -> [(source, english)] pairs for few-shot.
 
         Returns:
-            Dictionary mapping key to English translation.
+            Tuple of (translations dict, suggested_terms list).
         """
         ...
+
+    def build_prompt(
+        self,
+        entries: list[tuple[str, str]],
+        source_lang: str,
+        glossary_prompt: str,
+        game_context: str = "",
+        format_rules: list[str] | None = None,
+        style_examples: dict[str, list[tuple[str, str]]] | None = None,
+    ) -> tuple[str, str]:
+        """
+        Build the system and user prompts without sending to the API.
+
+        Returns:
+            Tuple of (system_prompt, user_message). Providers that don't use
+            custom prompts (e.g. DeepL) return empty strings.
+        """
+        return "", ""
 
     @abstractmethod
     def estimate_cost(self, entries: list[tuple[str, str]]) -> dict:
