@@ -261,7 +261,10 @@ async def clear_translations(mod_id: str):
     with open(translations_path, "w", encoding="utf-8") as f:
         json.dump(overrides, f, indent=2, ensure_ascii=False)
 
+    # Re-run update so total_keys / hashes stay correct for the dashboard,
+    # then mark every key as untranslated.
     tracker = ProgressTracker()
+    tracker.update(mod_id, strings, _adapter.source_languages)
     tracker.set_translated(mod_id, [])
 
     return {"status": "success"}
