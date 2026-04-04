@@ -429,6 +429,12 @@ th {
     background: rgba(255, 255, 255, 0.05);
 }
 
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 @keyframes pulse {
     0% {
         opacity: 1;

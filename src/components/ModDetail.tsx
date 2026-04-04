@@ -8,7 +8,7 @@ import TranslationConfirmModal from "./TranslationConfirmModal"
 
 interface ModDetailProps {
     onBack: () => void
-    onTranslate: (provider: string, dryRun: boolean, modId: string) => void
+    onTranslate: (provider: string, dryRun: boolean, modId: string) => Promise<{ success: boolean; message: string }>
 }
 
 const API_BASE = "http://localhost:8000/api"
@@ -60,9 +60,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     const [newTermSource, setNewTermSource] = useState("")
     const [newTermLang, setNewTermLang] = useState("Chinese")
     const [newTermCategory, setNewTermCategory] = useState("custom")
+    const [translating, setTranslating] = useState(false)
+    const [translateBanner, setTranslateBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
     const handleTranslateClick = async (provider: string) => {
         if (!modId) return
+        setTranslateBanner(null)
         try {
             const res = await fetch(`${API_BASE}/translate/preview`, {
                 method: "POST",
@@ -70,15 +73,19 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 body: JSON.stringify({ mod_id: modId, provider }),
             })
             const data = await res.json()
+            if (!res.ok) {
+                setTranslateBanner({ type: "error", message: data.detail || "Failed to fetch translation preview." })
+                return
+            }
             if (data.total_strings === 0) {
-                alert("All strings are already translated.")
+                setTranslateBanner({ type: "success", message: "All strings are already translated." })
                 return
             }
             setPendingProvider(provider)
             setTranslationPreview(data)
         } catch (err) {
             console.error("Failed to fetch translation preview:", err)
-            alert("Failed to fetch translation preview. Check console for details.")
+            setTranslateBanner({ type: "error", message: "Failed to reach the server for translation preview." })
         }
     }
 
@@ -123,26 +130,26 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
-    useEffect(() => {
-        const fetchModDetail = async () => {
-            if (!modId) return
-            setLoading(true)
-            try {
-                const res = await fetch(`${API_BASE}/mods/${modId}`)
-                const data = await res.json()
-                setStrings(data.strings)
-                setModName(data.name ?? "")
-                setModAuthor(data.author ?? "")
-                setModPreviewImage(data.preview_image ?? null)
-                setModUrl(data.url ?? null)
-                setDuplicateFiles(data.duplicate_files ?? [])
-            } catch (err) {
-                console.error("Failed to fetch mod detail:", err)
-            } finally {
-                setLoading(false)
-            }
+    const fetchModDetail = async () => {
+        if (!modId) return
+        setLoading(true)
+        try {
+            const res = await fetch(`${API_BASE}/mods/${modId}`)
+            const data = await res.json()
+            setStrings(data.strings)
+            setModName(data.name ?? "")
+            setModAuthor(data.author ?? "")
+            setModPreviewImage(data.preview_image ?? null)
+            setModUrl(data.url ?? null)
+            setDuplicateFiles(data.duplicate_files ?? [])
+        } catch (err) {
+            console.error("Failed to fetch mod detail:", err)
+        } finally {
+            setLoading(false)
         }
+    }
 
+    useEffect(() => {
         fetchModDetail()
         fetchExportStatus()
         fetchSuggestions()
@@ -411,10 +418,17 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             </span>
                         </button>
                     )}
-                    <button className="btn btn-outline" onClick={() => onTranslate("claude", true, modId)}>
+                    <button className="btn btn-outline" disabled={translating} onClick={async () => {
+                        if (!modId) return
+                        setTranslateBanner(null)
+                        setTranslating(true)
+                        const result = await onTranslate("claude", true, modId)
+                        setTranslating(false)
+                        setTranslateBanner({ type: result.success ? "success" : "error", message: result.message })
+                    }}>
                         Dry Run
                     </button>
-                    <button className="btn btn-primary" onClick={() => handleTranslateClick("claude")}>
+                    <button className="btn btn-primary" onClick={() => handleTranslateClick("claude")} disabled={translating}>
                         Translate (Claude)
                     </button>
                     <button className="btn btn-primary" onClick={handleExport} disabled={exporting || !hasExportChanges} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -423,6 +437,52 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     </button>
                 </div>
             </div>
+
+            {translating && (
+                <div className="glass-card" style={{
+                    padding: "1.25rem 1.5rem",
+                    marginBottom: "1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "1rem",
+                    background: "rgba(125,211,252,0.08)",
+                    border: "1px solid rgba(125,211,252,0.25)",
+                }}>
+                    <div style={{
+                        width: "20px", height: "20px",
+                        border: "3px solid rgba(125,211,252,0.3)",
+                        borderTop: "3px solid var(--accent-primary)",
+                        borderRadius: "50%",
+                        animation: "spin 1s linear infinite",
+                    }} />
+                    <span style={{ color: "var(--text-main)" }}>Translating... waiting for provider response</span>
+                </div>
+            )}
+
+            {translateBanner && (
+                <div className="glass-card" style={{
+                    padding: "1rem 1.5rem",
+                    marginBottom: "1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: translateBanner.type === "error" ? "rgba(248,113,113,0.1)" : "rgba(52,211,153,0.1)",
+                    border: `1px solid ${translateBanner.type === "error" ? "rgba(248,113,113,0.3)" : "rgba(52,211,153,0.3)"}`,
+                }}>
+                    <span style={{
+                        color: translateBanner.type === "error" ? "#f87171" : "#34d399",
+                        whiteSpace: "pre-wrap",
+                    }}>
+                        {translateBanner.message}
+                    </span>
+                    <button
+                        onClick={() => setTranslateBanner(null)}
+                        style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", fontSize: "1.2rem", padding: "0 0.25rem" }}
+                    >
+                        &times;
+                    </button>
+                </div>
+            )}
 
             <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
                 <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
@@ -590,9 +650,14 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
             {translationPreview && (
                 <TranslationConfirmModal
                     preview={translationPreview}
-                    onConfirm={() => {
+                    onConfirm={async () => {
                         setTranslationPreview(null)
-                        onTranslate(pendingProvider, false, modId!)
+                        setTranslateBanner(null)
+                        setTranslating(true)
+                        const result = await onTranslate(pendingProvider, false, modId!)
+                        setTranslating(false)
+                        setTranslateBanner({ type: result.success ? "success" : "error", message: result.message })
+                        if (result.success) fetchModDetail()
                     }}
                     onCancel={() => setTranslationPreview(null)}
                 />

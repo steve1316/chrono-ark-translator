@@ -75,7 +75,7 @@ function App() {
      * @param provider - The AI provider to use.
      * @param dryRun - Whether to perform a dry run without actual translation.
      */
-    const handleTranslate = async (modId: string, provider: string, dryRun: boolean) => {
+    const handleTranslate = async (modId: string, provider: string, dryRun: boolean): Promise<{ success: boolean; message: string }> => {
         try {
             const res = await fetch(`${API_BASE}/translate`, {
                 method: "POST",
@@ -84,25 +84,24 @@ function App() {
             })
             const data = await res.json()
             if (!res.ok) {
-                alert(`Translation failed: ${data.detail || "Unknown error"}`)
-                return
+                return { success: false, message: data.detail || "Unknown error" }
             }
             if (dryRun) {
                 if (data.total_strings === 0) {
-                    alert("All strings are already translated.")
-                    return
+                    return { success: true, message: "All strings are already translated." }
                 }
                 const estimates = Object.entries(data.estimates || {})
                     .map(([lang, est]: [string, any]) => `${lang}: ~$${est.estimated_cost_usd}`)
                     .join(", ")
-                alert(`Dry run for ${data.total_strings} strings via ${data.provider}\n\n${estimates}`)
+                return { success: true, message: `Dry run for ${data.total_strings} strings via ${data.provider}\n\n${estimates}` }
             } else {
-                alert(`Translated ${data.translated} strings.${data.suggestions > 0 ? ` ${data.suggestions} glossary term suggestions pending review.` : ""}`)
                 fetchMods()
+                const msg = `Translated ${data.translated} strings.${data.suggestions > 0 ? ` ${data.suggestions} glossary term suggestions pending review.` : ""}`
+                return { success: true, message: msg }
             }
         } catch (err) {
             console.error("Translation failed:", err)
-            alert("Translation failed. Check console for details.")
+            return { success: false, message: "Translation failed. Could not reach the server." }
         }
     }
 
