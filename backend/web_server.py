@@ -67,7 +67,6 @@ class SuggestionAction(BaseModel):
 class TranslationRequest(BaseModel):
     mod_id: str
     provider: Optional[str] = None
-    dry_run: bool = False
 
 class TranslationUpdate(BaseModel):
     key: str
@@ -430,6 +429,7 @@ async def preview_translation(req: TranslationRequest):
 
     batch_size = config.BATCH_SIZE
     previews = {}
+    estimates = {}
     total_batches = 0
     for lang, entries in by_lang.items():
         glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
@@ -449,6 +449,15 @@ async def preview_translation(req: TranslationRequest):
             "strings_in_language": len(entries),
             "batches": num_batches,
         }
+        estimates[lang] = provider.estimate_cost(
+            entries,
+            source_lang=lang,
+            glossary_prompt=glossary_prompt,
+            game_context=game_context,
+            format_rules=format_rules,
+            style_examples=style_examples,
+            character_context=character_context,
+        )
 
     return {
         "total_strings": len(untranslated),
@@ -456,6 +465,7 @@ async def preview_translation(req: TranslationRequest):
         "batch_size": batch_size,
         "provider": provider.name,
         "previews": previews,
+        "estimates": estimates,
     }
 
 
@@ -488,8 +498,6 @@ async def translate_mod(req: TranslationRequest):
     provider = _get_provider(provider_name)
 
     if not untranslated:
-        if req.dry_run:
-            return {"total_strings": 0, "provider": provider.name, "estimates": {}}
         return {"status": "complete", "message": "All strings already translated", "translated": 0, "suggestions": 0}
 
     # Load merged glossary.
@@ -501,28 +509,6 @@ async def translate_mod(req: TranslationRequest):
     character_context = char_ctx if any(char_ctx.values()) else None
     format_rules = _adapter.get_format_preservation_rules()
     style_examples = _adapter.get_style_examples()
-
-    if req.dry_run:
-        by_lang: dict[str, list] = {}
-        for key, loc_str in untranslated.items():
-            lang = _adapter.detect_source_language(loc_str)
-            if lang:
-                if lang not in by_lang:
-                    by_lang[lang] = []
-                by_lang[lang].append((key, loc_str.translations.get(lang, "")))
-        estimates = {}
-        for lang, entries in by_lang.items():
-            glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
-            estimates[lang] = provider.estimate_cost(
-                entries,
-                source_lang=lang,
-                glossary_prompt=glossary_prompt,
-                game_context=game_context,
-                format_rules=format_rules,
-                style_examples=style_examples,
-                character_context=character_context,
-            )
-        return {"total_strings": len(untranslated), "provider": provider.name, "estimates": estimates}
 
     # Translate.
     tm = TranslationMemory()

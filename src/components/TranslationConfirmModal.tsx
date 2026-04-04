@@ -7,12 +7,21 @@ interface LanguagePreview {
     batches: number
 }
 
+interface CostEstimate {
+    estimated_input_tokens: number
+    estimated_output_tokens: number
+    estimated_cost_usd: number
+    model: string
+    note: string
+}
+
 interface TranslationPreview {
     total_strings: number
     total_batches: number
     batch_size: number
     provider: string
     previews: Record<string, LanguagePreview>
+    estimates?: Record<string, CostEstimate>
 }
 
 interface TranslationConfirmModalProps {
@@ -26,6 +35,10 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
     const [activeLang, setActiveLang] = useState(languages[0] || "")
     const [activeTab, setActiveTab] = useState<"system" | "user">("system")
     const langPreview = preview.previews[activeLang]
+
+    const totalCost = preview.estimates
+        ? Object.values(preview.estimates).reduce((sum, est) => sum + est.estimated_cost_usd, 0)
+        : null
 
     return (
         <div
@@ -51,6 +64,19 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                         <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Batches</span>
                         <div style={{ fontWeight: 600 }}>{preview.total_batches} (size {preview.batch_size})</div>
                     </div>
+                    {totalCost !== null && (
+                        <div>
+                            <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Estimated Cost</span>
+                            <div style={{ fontWeight: 600, color: "var(--accent-primary)" }}>
+                                ~${totalCost.toFixed(4)}
+                                {Object.keys(preview.estimates!).length > 1 && (
+                                    <span style={{ fontSize: "0.8rem", color: "var(--text-dim)", fontWeight: 400, marginLeft: "0.5rem" }}>
+                                        ({Object.entries(preview.estimates!).map(([lang, est]) => `${lang}: ~$${est.estimated_cost_usd.toFixed(4)}`).join(", ")})
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {languages.length > 1 && (

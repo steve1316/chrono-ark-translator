@@ -73,32 +73,21 @@ function App() {
      * Triggers the translation process for a mod.
      * @param modId - The ID of the mod to translate.
      * @param provider - The AI provider to use.
-     * @param dryRun - Whether to perform a dry run without actual translation.
      */
-    const handleTranslate = async (modId: string, provider: string, dryRun: boolean): Promise<{ success: boolean; message: string; translations?: Record<string, string> }> => {
+    const handleTranslate = async (modId: string, provider: string): Promise<{ success: boolean; message: string; translations?: Record<string, string> }> => {
         try {
             const res = await fetch(`${API_BASE}/translate`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ mod_id: modId, provider, dry_run: dryRun }),
+                body: JSON.stringify({ mod_id: modId, provider }),
             })
             const data = await res.json()
             if (!res.ok) {
                 return { success: false, message: data.detail || "Unknown error" }
             }
-            if (dryRun) {
-                if (data.total_strings === 0) {
-                    return { success: true, message: "All strings are already translated." }
-                }
-                const estimates = Object.entries(data.estimates || {})
-                    .map(([lang, est]: [string, any]) => `${lang}: ~$${est.estimated_cost_usd}`)
-                    .join(", ")
-                return { success: true, message: `Dry run for ${data.total_strings} strings via ${data.provider}\n\n${estimates}` }
-            } else {
-                fetchMods()
-                const msg = `Translated ${data.translated} strings.${data.suggestions > 0 ? ` ${data.suggestions} glossary term suggestions pending review.` : ""}`
-                return { success: true, message: msg, translations: data.translations }
-            }
+            fetchMods()
+            const msg = `Translated ${data.translated} strings.${data.suggestions > 0 ? ` ${data.suggestions} glossary term suggestions pending review.` : ""}`
+            return { success: true, message: msg, translations: data.translations }
         } catch (err) {
             console.error("Translation failed:", err)
             return { success: false, message: "Translation failed. Could not reach the server." }
@@ -136,7 +125,7 @@ function App() {
                             }
                         />
 
-                        <Route path="/mods/:modId" element={<ModDetail onBack={() => navigate("/dashboard")} onTranslate={(provider, dryRun, modId) => handleTranslate(modId, provider, dryRun)} />} />
+                        <Route path="/mods/:modId" element={<ModDetail onBack={() => navigate("/dashboard")} onTranslate={(provider, modId) => handleTranslate(modId, provider)} />} />
 
                         <Route
                             path="/statistics"

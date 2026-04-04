@@ -7,7 +7,7 @@ import TranslationConfirmModal from "./TranslationConfirmModal"
 
 interface ModDetailProps {
     onBack: () => void
-    onTranslate: (provider: string, dryRun: boolean, modId: string) => Promise<{ success: boolean; message: string; translations?: Record<string, string> }>
+    onTranslate: (provider: string, modId: string) => Promise<{ success: boolean; message: string; translations?: Record<string, string> }>
 }
 
 const API_BASE = "http://localhost:8000/api"
@@ -512,16 +512,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     </div>
 
                     <div className="mod-actions-group">
-                        <button className="btn btn-outline" disabled={translating} onClick={async () => {
-                            if (!modId) return
-                            setTranslateBanner(null)
-                            setTranslating(true)
-                            const result = await onTranslate("claude", true, modId)
-                            setTranslating(false)
-                            setTranslateBanner({ type: result.success ? "success" : "error", message: result.message })
-                        }}>
-                            Dry Run
-                        </button>
                         <button className="btn btn-primary" onClick={() => handleTranslateClick("claude")} disabled={translating}>
                             Translate (Claude)
                         </button>
@@ -802,7 +792,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                         setTranslationPreview(null)
                         setTranslateBanner(null)
                         setTranslating(true)
-                        const result = await onTranslate(pendingProvider, false, modId!)
+                        const result = await onTranslate(pendingProvider, modId!)
                         setTranslating(false)
                         setTranslateBanner({ type: result.success ? "success" : "error", message: result.message })
                         if (result.success && result.translations) {
