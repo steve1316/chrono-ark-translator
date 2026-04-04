@@ -61,6 +61,13 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     const [newTermCategory, setNewTermCategory] = useState("custom")
     const [translating, setTranslating] = useState(false)
     const [translateBanner, setTranslateBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
+    const [characterContext, setCharacterContext] = useState<{
+        source_game: string
+        character_name: string
+        background: string
+    }>({ source_game: "", character_name: "", background: "" })
+    const [showCharacterContext, setShowCharacterContext] = useState(false)
+    const [characterContextSaved, setCharacterContextSaved] = useState(false)
 
     const handleTranslateClick = async (provider: string) => {
         if (!modId) return
@@ -129,6 +136,19 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    const fetchCharacterContext = async () => {
+        if (!modId) return
+        try {
+            const res = await fetch(`${API_BASE}/mods/${modId}/character-context`)
+            if (res.ok) {
+                const data = await res.json()
+                setCharacterContext(data)
+            }
+        } catch {
+            // Ignore.
+        }
+    }
+
     const fetchModDetail = async () => {
         if (!modId) return
         setLoading(true)
@@ -152,6 +172,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         fetchModDetail()
         fetchExportStatus()
         fetchSuggestions()
+        fetchCharacterContext()
     }, [modId])
 
     /**
@@ -357,6 +378,23 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    const handleSaveCharacterContext = async () => {
+        if (!modId) return
+        try {
+            const res = await fetch(`${API_BASE}/mods/${modId}/character-context`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(characterContext),
+            })
+            if (res.ok) {
+                setCharacterContextSaved(true)
+                setTimeout(() => setCharacterContextSaved(false), 2000)
+            }
+        } catch (err) {
+            console.error("Failed to save character context:", err)
+        }
+    }
+
     if (loading) {
         return (
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
@@ -448,6 +486,20 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                 </span>
                             </button>
                         )}
+                        <button
+                            className="btn btn-outline"
+                            onClick={() => { setShowCharacterContext(!showCharacterContext); if (!showCharacterContext) fetchCharacterContext() }}
+                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)", position: "relative" }}
+                        >
+                            Character Context
+                            {(characterContext.source_game || characterContext.character_name || characterContext.background) && (
+                                <span style={{
+                                    position: "absolute", top: "-4px", right: "-4px",
+                                    width: "8px", height: "8px", borderRadius: "50%",
+                                    background: "#81e6d9",
+                                }} />
+                            )}
+                        </button>
                     </div>
 
                     <div className="mod-actions-group">
@@ -612,6 +664,54 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+
+            {showCharacterContext && (
+                <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1rem" }}>
+                    <h3 style={{ marginTop: 0, marginBottom: "0.5rem" }}>Character Context</h3>
+                    <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: 0, marginBottom: "1rem" }}>
+                        This context is included in the translation prompt to help the AI understand the character's lore.
+                    </p>
+                    <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem" }}>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Source Game</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Library of Ruina"
+                                value={characterContext.source_game}
+                                onChange={(e) => setCharacterContext(prev => ({ ...prev, source_game: e.target.value }))}
+                                style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", boxSizing: "border-box" }}
+                            />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Character Name</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Roland"
+                                value={characterContext.character_name}
+                                onChange={(e) => setCharacterContext(prev => ({ ...prev, character_name: e.target.value }))}
+                                style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", boxSizing: "border-box" }}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Background</label>
+                        <textarea
+                            placeholder="Describe the character's personality, role in their source game, and any lore that would help with translation..."
+                            value={characterContext.background}
+                            onChange={(e) => setCharacterContext(prev => ({ ...prev, background: e.target.value }))}
+                            rows={4}
+                            style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
+                        />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem", alignItems: "center", gap: "0.75rem" }}>
+                        {characterContextSaved && <span style={{ color: "#34d399", fontSize: "0.85rem" }}>Saved!</span>}
+                        <button className="btn btn-primary" onClick={handleSaveCharacterContext}
+                            style={{ background: "rgba(129,230,217,0.15)", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)" }}>
+                            Save Context
+                        </button>
+                    </div>
                 </div>
             )}
 
