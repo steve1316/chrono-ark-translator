@@ -92,7 +92,8 @@ class OpenAIProvider(TranslationProvider):
 
         user_lines = [f"Translate the following {source_lang} strings to English:\n"]
         for key, source_text in entries:
-            user_lines.append(f"**{key}**: {source_text}")
+            escaped = source_text.replace("\n", "\\n")
+            user_lines.append(f"**{key}**: {escaped}")
         user_lines.append("\nReturn a JSON object with \"translations\" and \"suggested_terms\".")
         user_message = "\n".join(user_lines)
 
@@ -167,7 +168,7 @@ class OpenAIProvider(TranslationProvider):
 
                 if "translations" in result and isinstance(result["translations"], dict):
                     translations = {
-                        k: v for k, v in result["translations"].items()
+                        k: v.replace("\\n", "\n") for k, v in result["translations"].items()
                         if k in expected_keys and isinstance(v, str)
                     }
                     suggestions = result.get("suggested_terms", [])
@@ -176,7 +177,7 @@ class OpenAIProvider(TranslationProvider):
                     return translations, suggestions
 
                 translations = {
-                    k: v for k, v in result.items()
+                    k: v.replace("\\n", "\n") for k, v in result.items()
                     if k in expected_keys and isinstance(v, str)
                 }
                 return translations, []

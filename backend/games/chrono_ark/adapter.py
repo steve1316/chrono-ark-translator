@@ -79,7 +79,7 @@ class ChronoArkAdapter(GameAdapter):
             'Match the tone and style of the base game: The game uses a fantasy/adventure tone with concise, punchy skill descriptions. Character dialogue is conversational.',
             'Use consistent terminology: Always use the exact English terms from the glossary below. Do NOT paraphrase or use synonyms for glossary terms.',
             'Keep translations concise: Skill and buff descriptions should be brief and clear. Avoid overly formal or wordy translations.',
-            'Preserve line breaks: If the source text has line breaks (\\n), keep them in the same positions.',
+            'Preserve line breaks: Source text uses literal `\\n` to represent line breaks. Keep every `\\n` in the translated output in the same positions. Do NOT remove or merge lines.',
         ]
 
     def get_style_examples(self) -> dict[str, list[tuple[str, str]]]:
