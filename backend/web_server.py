@@ -268,13 +268,13 @@ async def estimate_translation(req: TranslationRequest):
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
     merged = merge_glossaries(base_glossary, mod_glossary)
-    glossary_prompt = get_glossary_prompt(merged)
     game_context = _adapter.get_translation_context()
     format_rules = _adapter.get_format_preservation_rules()
     style_examples = _adapter.get_style_examples()
 
     estimates = {}
     for lang, entries in by_lang.items():
+        glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
         estimates[lang] = provider.estimate_cost(
             entries,
             source_lang=lang,
@@ -325,8 +325,6 @@ async def preview_translation(req: TranslationRequest):
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
     merged = merge_glossaries(base_glossary, mod_glossary)
-    glossary_prompt = get_glossary_prompt(merged)
-
     game_context = _adapter.get_translation_context()
     format_rules = _adapter.get_format_preservation_rules()
     style_examples = _adapter.get_style_examples()
@@ -343,6 +341,7 @@ async def preview_translation(req: TranslationRequest):
     previews = {}
     total_batches = 0
     for lang, entries in by_lang.items():
+        glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
         num_batches = (len(entries) + batch_size - 1) // batch_size
         total_batches += num_batches
         first_batch = entries[:batch_size]
@@ -405,8 +404,6 @@ async def translate_mod(req: TranslationRequest):
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
     merged = merge_glossaries(base_glossary, mod_glossary)
-    glossary_prompt = get_glossary_prompt(merged)
-
     game_context = _adapter.get_translation_context()
     format_rules = _adapter.get_format_preservation_rules()
     style_examples = _adapter.get_style_examples()
@@ -421,6 +418,7 @@ async def translate_mod(req: TranslationRequest):
                 by_lang[lang].append((key, loc_str.translations.get(lang, "")))
         estimates = {}
         for lang, entries in by_lang.items():
+            glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
             estimates[lang] = provider.estimate_cost(
                 entries,
                 source_lang=lang,
@@ -447,6 +445,7 @@ async def translate_mod(req: TranslationRequest):
     batch_size = config.BATCH_SIZE
     try:
         for lang, entries in by_lang.items():
+            glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
             for i in range(0, len(entries), batch_size):
                 batch = entries[i : i + batch_size]
                 translations, suggestions = provider.translate_batch(

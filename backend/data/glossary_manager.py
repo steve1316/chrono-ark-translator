@@ -187,7 +187,11 @@ def add_glossary_term(
     return glossary
 
 
-def get_glossary_prompt(glossary: dict, allowed_categories: list[str] | None = None) -> str:
+def get_glossary_prompt(
+    glossary: dict,
+    allowed_categories: list[str] | None = None,
+    source_lang: str | None = None,
+) -> str:
     """
     Format the glossary as context for an LLM translation prompt.
 
@@ -195,6 +199,8 @@ def get_glossary_prompt(glossary: dict, allowed_categories: list[str] | None = N
         glossary: The glossary dictionary.
         allowed_categories: If provided, only include terms from these categories.
             Defaults to config.GLOSSARY_CATEGORIES.
+        source_lang: If provided, only include mappings for this language.
+            This significantly reduces prompt size.
 
     Returns:
         Formatted string suitable for use as LLM system prompt context.
@@ -218,6 +224,13 @@ def get_glossary_prompt(glossary: dict, allowed_categories: list[str] | None = N
         cat = info.get("category", "other")
         if allowed_categories and cat not in allowed_categories:
             continue
+
+        mappings = info.get("source_mappings", {})
+        if source_lang:
+            # Only include terms that have a mapping for the source language.
+            if source_lang not in mappings:
+                continue
+
         if cat not in by_category:
             by_category[cat] = []
         by_category[cat].append((english_term, info))
@@ -230,9 +243,12 @@ def get_glossary_prompt(glossary: dict, allowed_categories: list[str] | None = N
         for english_term, info in sorted(terms, key=lambda x: x[0]):
             mappings = info.get("source_mappings", {})
             if mappings:
-                mapping_str = ", ".join(
-                    f"{lang}: {text}" for lang, text in mappings.items()
-                )
+                if source_lang and source_lang in mappings:
+                    mapping_str = f"{source_lang}: {mappings[source_lang]}"
+                else:
+                    mapping_str = ", ".join(
+                        f"{lang}: {text}" for lang, text in mappings.items()
+                    )
                 lines.append(f"- **{english_term}** ← {mapping_str}")
             else:
                 lines.append(f"- **{english_term}**")
