@@ -181,6 +181,21 @@ class ProgressTracker:
 
         return diff
 
+    def set_translated(self, mod_id: str, keys: list[str]) -> None:
+        """
+        Replace the translated key list entirely.
+
+        Unlike mark_translated (which only adds), this sets the exact list
+        so that cleared translations are properly removed.
+
+        Args:
+            mod_id: The mod's Workshop ID.
+            keys: Complete list of keys that are currently translated.
+        """
+        snapshot = self._load_snapshot(mod_id)
+        snapshot["translated"] = sorted(keys)
+        self._save_snapshot(mod_id, snapshot)
+
     def mark_translated(self, mod_id: str, keys: list[str]) -> None:
         """
         Mark keys as having completed translations.
@@ -192,6 +207,20 @@ class ProgressTracker:
         snapshot = self._load_snapshot(mod_id)
         translated = set(snapshot.get("translated", []))
         translated.update(keys)
+        snapshot["translated"] = sorted(translated)
+        self._save_snapshot(mod_id, snapshot)
+
+    def unmark_translated(self, mod_id: str, keys: list[str]) -> None:
+        """
+        Remove keys from the translated list (e.g. when a translation is cleared).
+
+        Args:
+            mod_id: The mod's Workshop ID.
+            keys: List of localization keys to remove from translated.
+        """
+        snapshot = self._load_snapshot(mod_id)
+        translated = set(snapshot.get("translated", []))
+        translated -= set(keys)
         snapshot["translated"] = sorted(translated)
         self._save_snapshot(mod_id, snapshot)
 

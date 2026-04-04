@@ -131,12 +131,25 @@ async def get_mod_detail(mod_id: str):
         except Exception:
             pass
 
-    # Build result list
+    # Apply saved translations so user edits (including clears) are respected.
+    for key, english in translations.items():
+        if key in strings:
+            strings[key].translations["English"] = english
+
+    # Update progress tracker so dashboard stats reflect this mod's strings.
+    tracker = ProgressTracker()
+    tracker.update(mod_id, strings, _adapter.source_languages)
+
+    # Build result list and collect actually-translated keys.
+    translated_keys = []
     results = []
     for key, loc_str in strings.items():
         source_lang = _adapter.detect_source_language(loc_str)
         source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
-        english = loc_str.translations.get("English", "") or translations.get(key, "")
+        english = loc_str.translations.get("English", "")
+
+        if english:
+            translated_keys.append(key)
 
         results.append({
             "key": key,
@@ -147,6 +160,9 @@ async def get_mod_detail(mod_id: str):
             "english": english,
             "is_translated": bool(english)
         })
+
+    # Replace (not just add) the translated list so clears are reflected.
+    tracker.set_translated(mod_id, translated_keys)
 
     has_preview = _find_mod_preview_image(mod_path) is not None
     return {
@@ -177,7 +193,10 @@ async def update_string(mod_id: str, update: TranslationUpdate):
 
     # Update progress tracker
     tracker = ProgressTracker()
-    tracker.mark_translated(mod_id, [update.key])
+    if update.english:
+        tracker.mark_translated(mod_id, [update.key])
+    else:
+        tracker.unmark_translated(mod_id, [update.key])
 
     return {"status": "success"}
 
