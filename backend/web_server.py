@@ -14,7 +14,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 # Add current directory to path for imports
@@ -91,7 +91,7 @@ async def get_mods():
     results = []
     for mod in mods:
         status = tracker.get_status(mod.mod_id)
-        has_preview = _find_mod_preview_image(mod.path) is not None
+        preview_img = _find_mod_preview_image(mod.path)
         results.append({
             "id": mod.mod_id,
             "name": mod.name,
@@ -104,7 +104,7 @@ async def get_mods():
             "percentage": status["percentage"],
             "last_updated": status["last_updated"],
             "url": _adapter.get_mod_url(mod.mod_id),
-            "preview_image": f"/api/mods/{mod.mod_id}/preview" if has_preview else None,
+            "preview_image": f"/workshop/{mod.mod_id}/{preview_img.name}" if preview_img else None,
         })
     return results
 
@@ -164,13 +164,13 @@ async def get_mod_detail(mod_id: str):
     # Replace (not just add) the translated list so clears are reflected.
     tracker.set_translated(mod_id, translated_keys)
 
-    has_preview = _find_mod_preview_image(mod_path) is not None
+    preview_img = _find_mod_preview_image(mod_path)
     return {
         "id": mod_id,
         "name": matching[0].name,
         "author": matching[0].author,
         "url": _adapter.get_mod_url(mod_id),
-        "preview_image": f"/api/mods/{mod_id}/preview" if has_preview else None,
+        "preview_image": f"/workshop/{mod_id}/{preview_img.name}" if preview_img else None,
         "strings": results,
         "duplicate_files": duplicate_files,
     }
@@ -664,15 +664,6 @@ def _find_mod_preview_image(mod_path: Path) -> Optional[Path]:
     return None
 
 
-@app.get("/api/mods/{mod_id}/preview")
-async def get_mod_preview(mod_id: str):
-    """Serve the mod's preview image from its workshop folder."""
-    mod_path = _find_mod_path(mod_id)
-    img = _find_mod_preview_image(mod_path)
-    if not img:
-        raise HTTPException(status_code=404, detail="No preview image found")
-    return FileResponse(img, media_type=f"image/{img.suffix.lstrip('.').replace('jpg', 'jpeg')}")
-
 
 @app.get("/api/glossary")
 async def get_glossary():
@@ -784,6 +775,14 @@ async def get_stats():
         "global_progress": round((total_translated / total_strings * 100), 2) if total_strings > 0 else 0,
         "total_strings": total_strings
     }
+
+# Mount the workshop directory as static files so preview images are served
+# directly without going through a Python endpoint for each request.
+# This must be after all route definitions since mounts take priority over
+# routes defined after them.
+_workshop_path = getattr(_adapter, '_WORKSHOP_PATH', None)
+if _workshop_path and Path(_workshop_path).exists():
+    app.mount("/workshop", StaticFiles(directory=str(_workshop_path)), name="workshop")
 
 if __name__ == "__main__":
     import uvicorn
