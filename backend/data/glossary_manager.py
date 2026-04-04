@@ -3,7 +3,8 @@ Glossary manager for consistent English terminology.
 
 Builds and maintains a glossary of official English game terms extracted
 from the base game's localization files. The glossary maps source language
-terms to their canonical English translations.
+terms to their canonical English translations. Supports per-mod glossaries
+that overlay the base game glossary.
 """
 
 import json
@@ -15,46 +16,67 @@ from models import LocString
 
 
 # Common game terms to auto-extract from the base game.
-# These are patterns to look for in name-type keys.
 _NAME_KEY_SUFFIXES = ("_Name", "_name")
+
+# Keyword key prefixes that contain game mechanic terms.
+_KEYWORD_PREFIXES = ("SkillKeyword/", "Battle/Keyword/")
+
+# Universal game mechanic terms to seed into the base glossary.
+MECHANIC_SEED_TERMS = {
+    "Debuff": "A negative status effect",
+    "Buff": "A positive status effect",
+    "Weakening": "Reduces target's damage",
+    "Armor Reduced": "Lowers target's defense",
+    "Damage": "Amount of harm dealt",
+    "Accuracy": "Chance to hit",
+    "Critical Chance": "Chance for critical hit",
+    "Overload": "Exceeding action limit",
+    "Swiftness": "Ignores action counts",
+    "Action Count": "Number of actions per turn",
+    "Defense": "Damage reduction stat",
+    "HP": "Health points",
+    "Shield": "Temporary damage absorption",
+    "Apply": "Inflict a status effect",
+    "Deal": "Inflict damage",
+    "Restore": "Recover HP or resource",
+    "Increase": "Raise a stat value",
+    "Decrease": "Lower a stat value",
+    "Remove": "Clear a status effect",
+    "Penetration": "Ignore defense",
+    "Exhaust": "Card is removed after use",
+    "Dispose": "Card is removed from deck",
+}
 
 
 def build_glossary_from_base_game(
     base_strings: dict[str, LocString],
     term_categories: dict[str, str],
     source_languages: list[str],
+    keyword_prefixes: list[str] | None = None,
 ) -> dict[str, dict]:
     """
     Auto-build a glossary from the base game's localization data.
 
-    Extracts name entries (keys ending in _Name or _name) and creates
-    source→English mappings for all available source languages.
+    Extracts name entries (keys ending in _Name or _name), keyword entries
+    (matching keyword_prefixes), and seeds universal mechanic terms.
 
     Args:
         base_strings: Dictionary of base game LocString objects.
-        term_categories: Category name → key prefix mappings
-            (e.g., {"buffs": "Buff/", "characters": "Character/"}).
-        source_languages: List of source language names to include
-            in the glossary mappings.
+        term_categories: Category name -> key prefix mappings.
+        source_languages: List of source language names to include.
+        keyword_prefixes: Optional list of key prefixes for mechanic keywords.
 
     Returns:
-        Glossary dictionary with structure:
-        {
-            "terms": {
-                "English Term": {
-                    "category": "buffs",
-                    "key": "Buff/B_Example_Name",
-                    "source_mappings": {"Chinese": "中文名", "Korean": "한국어명", ...}
-                }
-            }
-        }
+        Glossary dictionary.
     """
-    glossary = {"terms": {}}
+    glossary: dict[str, dict] = {"terms": {}}
+    kw_prefixes = keyword_prefixes or list(_KEYWORD_PREFIXES)
 
     for key, loc_str in base_strings.items():
-        # Only extract name entries for the glossary.
         is_name_key = any(key.endswith(suffix) for suffix in _NAME_KEY_SUFFIXES)
-        if not is_name_key:
+        is_keyword = any(key.startswith(p) for p in kw_prefixes) and is_name_key
+
+        if not is_name_key and not is_keyword:
             continue
 
         english = loc_str.translations.get("English", "").strip()
@@ -62,11 +84,14 @@ def build_glossary_from_base_game(
             continue
 
         # Determine the category.
-        category = "other"
-        for cat_name, prefix in term_categories.items():
-            if key.startswith(prefix):
-                category = cat_name
-                break
+        if is_keyword:
+            category = "mechanics"
+        else:
+            category = "other"
+            for cat_name, prefix in term_categories.items():
+                if key.startswith(prefix):
+                    category = cat_name
+                    break
 
         # Build source language mappings.
         source_mappings = {}
@@ -80,6 +105,15 @@ def build_glossary_from_base_game(
             "key": key,
             "source_mappings": source_mappings,
         }
+
+    # Add seed mechanic terms (don't overwrite existing entries).
+    for term in MECHANIC_SEED_TERMS:
+        if term not in glossary["terms"]:
+            glossary["terms"][term] = {
+                "category": "mechanics",
+                "key": "",
+                "source_mappings": {},
+            }
 
     return glossary
 
@@ -157,10 +191,6 @@ def get_glossary_prompt(glossary: dict) -> str:
     """
     Format the glossary as context for an LLM translation prompt.
 
-    Creates a structured text block listing all canonical English terms
-    with their source language equivalents, so the LLM can use them
-    consistently during translation.
-
     Args:
         glossary: The glossary dictionary.
 
@@ -201,6 +231,58 @@ def get_glossary_prompt(glossary: dict) -> str:
     return "\n".join(lines)
 
 
+def load_mod_glossary(mod_id: str, storage_path: Optional[Path] = None) -> dict:
+    """
+    Load a mod-specific glossary.
+
+    Args:
+        mod_id: The mod's Workshop ID.
+        storage_path: Base storage path. Defaults to config.STORAGE_PATH.
+
+    Returns:
+        Glossary dictionary, or empty structure if none exists.
+    """
+    if storage_path is None:
+        storage_path = config.STORAGE_PATH
+    path = storage_path / "mods" / mod_id / "glossary.json"
+    if not path.exists():
+        return {"terms": {}}
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_mod_glossary(mod_id: str, glossary: dict, storage_path: Optional[Path] = None) -> None:
+    """
+    Save a mod-specific glossary.
+
+    Args:
+        mod_id: The mod's Workshop ID.
+        glossary: The glossary dictionary to save.
+        storage_path: Base storage path. Defaults to config.STORAGE_PATH.
+    """
+    if storage_path is None:
+        storage_path = config.STORAGE_PATH
+    path = storage_path / "mods" / mod_id / "glossary.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(glossary, f, indent=2, ensure_ascii=False)
+
+
+def merge_glossaries(base: dict, mod: dict) -> dict:
+    """
+    Merge base game and mod glossaries. Mod terms override base on collision.
+
+    Args:
+        base: The base game glossary.
+        mod: The mod-specific glossary.
+
+    Returns:
+        Merged glossary dictionary.
+    """
+    merged_terms = {**base.get("terms", {}), **mod.get("terms", {})}
+    return {"terms": merged_terms}
+
+
 def print_glossary(glossary: dict) -> None:
     """
     Print the glossary in a human-readable format.
@@ -213,7 +295,6 @@ def print_glossary(glossary: dict) -> None:
         print("Glossary is empty.")
         return
 
-    # Group by category.
     by_category: dict[str, list[str]] = {}
     for english_term, info in terms.items():
         cat = info.get("category", "other")

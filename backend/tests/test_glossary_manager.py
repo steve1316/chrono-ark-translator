@@ -1,0 +1,119 @@
+import json
+from pathlib import Path
+
+from data.glossary_manager import (
+    build_glossary_from_base_game,
+    load_glossary,
+    save_glossary,
+    add_glossary_term,
+    get_glossary_prompt,
+    load_mod_glossary,
+    save_mod_glossary,
+    merge_glossaries,
+    MECHANIC_SEED_TERMS,
+)
+
+
+def test_build_glossary_extracts_name_keys(sample_base_strings, glossary_categories):
+    glossary = build_glossary_from_base_game(
+        sample_base_strings, glossary_categories, ["Korean", "Chinese"],
+    )
+    terms = glossary["terms"]
+    assert "Armor Increased" in terms
+    assert "Fire Bolt" in terms
+    assert "Lucy" in terms
+    # Description keys should NOT be extracted.
+    assert "Defense is increased." not in terms
+
+
+def test_build_glossary_extracts_keyword_entries(sample_base_strings, glossary_categories):
+    glossary = build_glossary_from_base_game(
+        sample_base_strings, glossary_categories, ["Korean", "Chinese"],
+        keyword_prefixes=["SkillKeyword/", "Battle/Keyword/"],
+    )
+    terms = glossary["terms"]
+    assert "Swiftness" in terms
+    assert terms["Swiftness"]["category"] == "mechanics"
+
+
+def test_build_glossary_includes_seed_terms(sample_base_strings, glossary_categories):
+    glossary = build_glossary_from_base_game(
+        sample_base_strings, glossary_categories, ["Korean", "Chinese"],
+    )
+    terms = glossary["terms"]
+    # Seed terms should be present.
+    for term in ["Debuff", "Damage", "Accuracy"]:
+        assert term in terms
+        assert terms[term]["category"] == "mechanics"
+
+
+def test_save_and_load_glossary(tmp_storage):
+    glossary = {"terms": {"Test": {"category": "custom", "key": "", "source_mappings": {}}}}
+    path = tmp_storage / "glossary.json"
+    save_glossary(glossary, path)
+    loaded = load_glossary(path)
+    assert loaded["terms"]["Test"]["category"] == "custom"
+
+
+def test_add_glossary_term():
+    glossary = {"terms": {}}
+    add_glossary_term(glossary, "Fire Bolt", {"Korean": "화염구"}, category="skills")
+    assert "Fire Bolt" in glossary["terms"]
+    assert glossary["terms"]["Fire Bolt"]["source_mappings"]["Korean"] == "화염구"
+
+
+def test_glossary_prompt_format():
+    glossary = {
+        "terms": {
+            "Fire Bolt": {"category": "skills", "key": "", "source_mappings": {"Korean": "화염구"}},
+            "Armor": {"category": "mechanics", "key": "", "source_mappings": {}},
+        }
+    }
+    prompt = get_glossary_prompt(glossary)
+    assert "**Fire Bolt**" in prompt
+    assert "**Armor**" in prompt
+    assert "Korean: 화염구" in prompt
+
+
+# --- Per-mod glossary tests (Task 3) ---
+
+def test_load_mod_glossary_empty(tmp_storage):
+    result = load_mod_glossary("12345", tmp_storage)
+    assert result == {"terms": {}}
+
+
+def test_save_and_load_mod_glossary(tmp_storage):
+    glossary = {"terms": {"Dark Mage": {"category": "characters", "key": "", "source_mappings": {"Chinese": "黑魔法师"}}}}
+    save_mod_glossary("12345", glossary, tmp_storage)
+    loaded = load_mod_glossary("12345", tmp_storage)
+    assert "Dark Mage" in loaded["terms"]
+
+
+def test_merge_glossaries_mod_overrides_base():
+    base = {"terms": {"Fire": {"category": "mechanics", "key": "", "source_mappings": {}}}}
+    mod = {"terms": {"Fire": {"category": "skills", "key": "Skill/Fire_Name", "source_mappings": {"Korean": "불"}}}}
+    merged = merge_glossaries(base, mod)
+    assert merged["terms"]["Fire"]["category"] == "skills"
+    assert merged["terms"]["Fire"]["source_mappings"]["Korean"] == "불"
+
+
+def test_merge_glossaries_combines_both():
+    base = {"terms": {"Armor": {"category": "mechanics", "key": "", "source_mappings": {}}}}
+    mod = {"terms": {"Dark Mage": {"category": "characters", "key": "", "source_mappings": {}}}}
+    merged = merge_glossaries(base, mod)
+    assert "Armor" in merged["terms"]
+    assert "Dark Mage" in merged["terms"]
+
+
+def test_delete_mod_glossary_term(tmp_storage):
+    glossary = {"terms": {
+        "A": {"category": "c", "key": "", "source_mappings": {}},
+        "B": {"category": "c", "key": "", "source_mappings": {}},
+    }}
+    save_mod_glossary("12345", glossary, tmp_storage)
+    loaded = load_mod_glossary("12345", tmp_storage)
+    del loaded["terms"]["A"]
+    save_mod_glossary("12345", loaded, tmp_storage)
+    reloaded = load_mod_glossary("12345", tmp_storage)
+    assert "A" not in reloaded["terms"]
+    assert "B" in reloaded["terms"]
