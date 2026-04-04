@@ -390,33 +390,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             />
                         )}
                         <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                                <h1>{modName || modId}</h1>
-                                {modUrl && (
-                                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                                        <a
-                                            href={modUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="btn btn-outline"
-                                            title="Open mod page"
-                                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "12px" }}
-                                        >
-                                            <FaSteam />
-                                            <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>Steam Workshop</span>
-                                        </a>
-                                        <button
-                                            className="btn btn-outline"
-                                            onClick={handleOpenFolder}
-                                            title="Open local folder"
-                                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", borderRadius: "12px" }}
-                                        >
-                                            <FaFolderOpen />
-                                            <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>Local Folder</span>
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
+                            <h1>{modName || modId}</h1>
                             {modAuthor && <p style={{ color: "var(--text-dim)", marginTop: "0.25rem" }}>by {modAuthor}</p>}
                             <p>{processedStrings.length} total strings found</p>
                         </div>
@@ -424,6 +398,28 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 </div>
 
                 <div className="mod-actions">
+                    {modUrl && (
+                        <a
+                            href={modUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-outline"
+                            title="Open mod page"
+                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "12px" }}
+                        >
+                            <FaSteam />
+                            <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>Steam Workshop</span>
+                        </a>
+                    )}
+                    <button
+                        className="btn btn-outline"
+                        onClick={handleOpenFolder}
+                        title="Open local folder"
+                        style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", borderRadius: "12px" }}
+                    >
+                        <FaFolderOpen />
+                        <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>Local Folder</span>
+                    </button>
                     <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleClearCache}>
                         Clear Cache
                     </button>

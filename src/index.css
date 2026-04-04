@@ -92,8 +92,9 @@ body {
 
 .dashboard-header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
     margin-bottom: 3rem;
 }
 
@@ -278,8 +279,8 @@ body {
 
 .mod-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.75rem;
-    margin-top: auto;
 }
 
 /* --- Table Styles --- */
