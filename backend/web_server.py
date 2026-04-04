@@ -24,8 +24,14 @@ import config
 from games.registry import get_adapter
 from games.base import GameAdapter
 from data.progress_tracker import ProgressTracker
-from data.glossary_manager import load_glossary, save_glossary, add_glossary_term
+from data.glossary_manager import (
+    load_glossary, save_glossary, add_glossary_term, get_glossary_prompt,
+    load_mod_glossary, save_mod_glossary, merge_glossaries,
+)
 from data.translation_memory import TranslationMemory
+from data.suggestion_manager import (
+    load_suggestions, add_suggestions, remove_suggestions, clear_suggestions,
+)
 from main import _get_provider, _save_extracted_strings
 
 # Initialize the active game adapter.
@@ -47,6 +53,15 @@ app.add_middleware(
 class GlossaryTerm(BaseModel):
     source: str
     english: str
+
+class ModGlossaryTerm(BaseModel):
+    english: str
+    source_mappings: dict[str, str] = {}
+    category: str = "custom"
+
+class SuggestionAction(BaseModel):
+    terms: list[str] = []
+    all: bool = False
 
 class TranslationRequest(BaseModel):
     mod_id: str
@@ -104,7 +119,7 @@ async def get_mod_detail(mod_id: str):
     mod_path = matching[0].path
 
     # Extract current strings
-    strings = _adapter.extract_strings(mod_path)
+    strings, duplicate_files = _adapter.extract_strings(mod_path)
 
     # Load existing translations if any
     translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
@@ -140,7 +155,8 @@ async def get_mod_detail(mod_id: str):
         "author": matching[0].author,
         "url": _adapter.get_mod_url(mod_id),
         "preview_image": f"/api/mods/{mod_id}/preview" if has_preview else None,
-        "strings": results
+        "strings": results,
+        "duplicate_files": duplicate_files,
     }
 
 @app.post("/api/mods/{mod_id}/strings")
@@ -174,7 +190,7 @@ async def sync_mod(mod_id: str):
         raise HTTPException(status_code=404, detail="Mod not found")
     mod_path = matching[0].path
 
-    strings = _adapter.extract_strings(mod_path)
+    strings, _ = _adapter.extract_strings(mod_path)
     output_path = config.STORAGE_PATH / "mods" / mod_id / "source.json"
     _save_extracted_strings(strings, output_path)
 
@@ -212,7 +228,7 @@ async def estimate_translation(req: TranslationRequest):
         raise HTTPException(status_code=404, detail="Mod not found")
     mod_path = matching[0].path
 
-    strings = _adapter.extract_strings(mod_path)
+    strings, _ = _adapter.extract_strings(mod_path)
     untranslated = _adapter.get_untranslated(strings)
 
     if not untranslated:
@@ -238,6 +254,176 @@ async def estimate_translation(req: TranslationRequest):
         "provider": provider.name,
         "estimates": estimates
     }
+
+
+@app.post("/api/translate/preview")
+async def preview_translation(req: TranslationRequest):
+    """Preview the translation prompt that will be sent to the provider."""
+    mods = _adapter.scan_mods()
+    matching = [m for m in mods if m.mod_id == req.mod_id]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Mod not found")
+    mod_path = matching[0].path
+
+    strings, _ = _adapter.extract_strings(mod_path)
+    untranslated = _adapter.get_untranslated(strings)
+
+    if not untranslated:
+        return {"total_strings": 0, "message": "All strings already translated", "previews": {}}
+
+    provider_name = req.provider or config.TRANSLATION_PROVIDER
+    provider = _get_provider(provider_name)
+
+    base_glossary = load_glossary()
+    mod_glossary = load_mod_glossary(req.mod_id)
+    merged = merge_glossaries(base_glossary, mod_glossary)
+    glossary_prompt = get_glossary_prompt(merged)
+
+    game_context = _adapter.get_translation_context()
+    format_rules = _adapter.get_format_preservation_rules()
+    style_examples = _adapter.get_style_examples()
+
+    by_lang: dict[str, list] = {}
+    for key, loc_str in untranslated.items():
+        lang = _adapter.detect_source_language(loc_str)
+        if lang:
+            if lang not in by_lang:
+                by_lang[lang] = []
+            by_lang[lang].append((key, loc_str.translations.get(lang, "")))
+
+    batch_size = config.BATCH_SIZE
+    previews = {}
+    total_batches = 0
+    for lang, entries in by_lang.items():
+        num_batches = (len(entries) + batch_size - 1) // batch_size
+        total_batches += num_batches
+        first_batch = entries[:batch_size]
+        system_prompt, user_message = provider.build_prompt(
+            first_batch, lang, glossary_prompt,
+            game_context=game_context,
+            format_rules=format_rules,
+            style_examples=style_examples,
+        )
+        previews[lang] = {
+            "system_prompt": system_prompt,
+            "user_message": user_message,
+            "strings_in_language": len(entries),
+            "batches": num_batches,
+        }
+
+    return {
+        "total_strings": len(untranslated),
+        "total_batches": total_batches,
+        "batch_size": batch_size,
+        "provider": provider.name,
+        "previews": previews,
+    }
+
+
+@app.post("/api/translate")
+async def translate_mod(req: TranslationRequest):
+    """Trigger translation for a mod."""
+    mods = _adapter.scan_mods()
+    matching = [m for m in mods if m.mod_id == req.mod_id]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Mod not found")
+    mod_path = matching[0].path
+
+    strings, _ = _adapter.extract_strings(mod_path)
+    untranslated = _adapter.get_untranslated(strings)
+
+    provider_name = req.provider or config.TRANSLATION_PROVIDER
+    provider = _get_provider(provider_name)
+
+    if not untranslated:
+        if req.dry_run:
+            return {"total_strings": 0, "provider": provider.name, "estimates": {}}
+        return {"status": "complete", "message": "All strings already translated", "translated": 0, "suggestions": 0}
+
+    # Load merged glossary.
+    base_glossary = load_glossary()
+    mod_glossary = load_mod_glossary(req.mod_id)
+    merged = merge_glossaries(base_glossary, mod_glossary)
+    glossary_prompt = get_glossary_prompt(merged)
+
+    game_context = _adapter.get_translation_context()
+    format_rules = _adapter.get_format_preservation_rules()
+    style_examples = _adapter.get_style_examples()
+
+    if req.dry_run:
+        by_lang: dict[str, list] = {}
+        for key, loc_str in untranslated.items():
+            lang = _adapter.detect_source_language(loc_str)
+            if lang:
+                if lang not in by_lang:
+                    by_lang[lang] = []
+                by_lang[lang].append((key, loc_str.translations.get(lang, "")))
+        estimates = {}
+        for lang, entries in by_lang.items():
+            estimates[lang] = provider.estimate_cost(entries)
+        return {"total_strings": len(untranslated), "provider": provider.name, "estimates": estimates}
+
+    # Translate.
+    tm = TranslationMemory()
+    all_translations: dict[str, str] = {}
+    all_suggestions: list[dict] = []
+
+    by_lang: dict[str, list] = {}
+    for key, loc_str in untranslated.items():
+        lang = _adapter.detect_source_language(loc_str)
+        if lang:
+            if lang not in by_lang:
+                by_lang[lang] = []
+            by_lang[lang].append((key, loc_str.translations.get(lang, "")))
+
+    batch_size = config.BATCH_SIZE
+    for lang, entries in by_lang.items():
+        for i in range(0, len(entries), batch_size):
+            batch = entries[i : i + batch_size]
+            translations, suggestions = provider.translate_batch(
+                batch, lang, glossary_prompt,
+                game_context=game_context,
+                format_rules=format_rules,
+                style_examples=style_examples,
+            )
+            all_translations.update(translations)
+            all_suggestions.extend(suggestions)
+
+            for key, english in translations.items():
+                source_text = next((t for k, t in batch if k == key), "")
+                if source_text and english:
+                    tm.store(source_text, english, lang)
+
+    # Save translations.
+    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
+    translations_path.parent.mkdir(parents=True, exist_ok=True)
+
+    existing = {}
+    if translations_path.exists():
+        with open(translations_path, "r", encoding="utf-8") as f:
+            existing = json.load(f)
+    existing.update(all_translations)
+
+    with open(translations_path, "w", encoding="utf-8") as f:
+        json.dump(existing, f, indent=2, ensure_ascii=False)
+
+    # Update progress.
+    tracker = ProgressTracker()
+    tracker.mark_translated(req.mod_id, list(all_translations.keys()))
+
+    # Save TM.
+    tm.save()
+
+    # Store suggestions.
+    if all_suggestions:
+        add_suggestions(req.mod_id, all_suggestions)
+
+    return {
+        "status": "success",
+        "translated": len(all_translations),
+        "suggestions": len(all_suggestions),
+    }
+
 
 def _get_mod_csv_paths(mod_path: Path) -> list[Path]:
     """Collect all CSV file paths for a mod (Localization/ and top-level Lang*)."""
@@ -343,7 +529,7 @@ async def export_mod(mod_id: str):
         raise HTTPException(status_code=400, detail="No translations to export")
 
     # Extract current strings from the mod.
-    strings = _adapter.extract_strings(mod_path)
+    strings, variant_files = _adapter.extract_strings(mod_path)
 
     # Apply translations to the English column.
     applied = 0
@@ -382,6 +568,34 @@ async def export_mod(mod_id: str):
         _adapter.export_strings(output_path, entries)
         files_written.append(csv_filename)
 
+    # Consolidate: delete variant files.
+    files_removed = []
+    if variant_files:
+        for variant_rel in variant_files:
+            variant_path = mod_path / variant_rel
+            if variant_path.exists():
+                variant_path.unlink()
+                files_removed.append(variant_rel)
+
+        # Clean up empty backup directories.
+        for subdir in mod_path.iterdir():
+            if subdir.is_dir() and subdir.name not in ("Localization", "Assemblies"):
+                try:
+                    if not any(subdir.iterdir()):
+                        subdir.rmdir()
+                except (OSError, StopIteration):
+                    pass
+
+        loc_dir = mod_path / "Localization"
+        if loc_dir.exists():
+            for subdir in loc_dir.iterdir():
+                if subdir.is_dir():
+                    try:
+                        if not any(subdir.iterdir()):
+                            subdir.rmdir()
+                    except (OSError, StopIteration):
+                        pass
+
     # Save snapshot hash so export-status knows we're in sync.
     snapshot_hash = _compute_export_snapshot(mod_id, mod_path)
     _save_last_export_hash(mod_id, snapshot_hash)
@@ -390,6 +604,7 @@ async def export_mod(mod_id: str):
         "status": "success",
         "applied": applied,
         "files_written": files_written,
+        "files_removed": files_removed,
     }
 
 
@@ -424,6 +639,77 @@ async def update_glossary(term: GlossaryTerm):
     add_glossary_term(glossary, term.english, {"custom": term.source})
     save_glossary(glossary)
     return {"status": "success"}
+
+@app.get("/api/mods/{mod_id}/glossary")
+async def get_mod_glossary(mod_id: str):
+    """Get a mod's glossary terms."""
+    return load_mod_glossary(mod_id)
+
+
+@app.post("/api/mods/{mod_id}/glossary")
+async def update_mod_glossary(mod_id: str, term: ModGlossaryTerm):
+    """Add or update a term in a mod's glossary."""
+    glossary = load_mod_glossary(mod_id)
+    add_glossary_term(glossary, term.english, term.source_mappings, term.category)
+    save_mod_glossary(mod_id, glossary)
+    return {"status": "success"}
+
+
+@app.delete("/api/mods/{mod_id}/glossary/{term}")
+async def delete_mod_glossary_term(mod_id: str, term: str):
+    """Remove a term from a mod's glossary."""
+    glossary = load_mod_glossary(mod_id)
+    if term in glossary.get("terms", {}):
+        del glossary["terms"][term]
+        save_mod_glossary(mod_id, glossary)
+    return {"status": "success"}
+
+
+@app.get("/api/mods/{mod_id}/glossary/merged")
+async def get_merged_glossary(mod_id: str):
+    """Get the merged base + mod glossary."""
+    base = load_glossary()
+    mod = load_mod_glossary(mod_id)
+    return merge_glossaries(base, mod)
+
+
+@app.get("/api/mods/{mod_id}/glossary/suggestions")
+async def get_suggestions(mod_id: str):
+    """Get pending glossary term suggestions."""
+    return load_suggestions(mod_id)
+
+
+@app.post("/api/mods/{mod_id}/glossary/suggestions/accept")
+async def accept_suggestions(mod_id: str, action: SuggestionAction):
+    """Accept suggestions into the mod glossary."""
+    suggestions = load_suggestions(mod_id)
+    glossary = load_mod_glossary(mod_id)
+
+    terms_to_accept = {s["english"] for s in suggestions} if action.all else set(action.terms)
+
+    for suggestion in suggestions:
+        if suggestion.get("english") in terms_to_accept:
+            add_glossary_term(
+                glossary,
+                suggestion["english"],
+                {suggestion.get("source_lang", "unknown"): suggestion.get("source", "")},
+                suggestion.get("category", "custom"),
+            )
+
+    save_mod_glossary(mod_id, glossary)
+    remove_suggestions(mod_id, list(terms_to_accept))
+    return {"status": "success", "accepted": len(terms_to_accept)}
+
+
+@app.post("/api/mods/{mod_id}/glossary/suggestions/dismiss")
+async def dismiss_suggestions(mod_id: str, action: SuggestionAction):
+    """Dismiss (remove) suggestions without adding to glossary."""
+    if action.all:
+        clear_suggestions(mod_id)
+    else:
+        remove_suggestions(mod_id, action.terms)
+    return {"status": "success"}
+
 
 @app.get("/api/stats")
 async def get_stats():
