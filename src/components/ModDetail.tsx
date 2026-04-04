@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react"
 import { useParams } from "react-router-dom"
-import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook } from "react-icons/fa"
+import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook, FaFolderOpen } from "react-icons/fa"
 import type { LocString, TermSuggestion } from "../shared_types"
 import GlossarySuggestionModal from "./GlossarySuggestionModal"
 import TranslationConfirmModal from "./TranslationConfirmModal"
@@ -343,6 +343,19 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    const handleOpenFolder = async () => {
+        if (!modId) return
+        try {
+            const res = await fetch(`${API_BASE}/mods/${modId}/open`, { method: "POST" })
+            if (!res.ok) {
+                const error = await res.json()
+                alert(`Failed to open folder: ${error.detail || "Unknown error"}`)
+            }
+        } catch (err) {
+            console.error("Failed to open folder:", err)
+        }
+    }
+
     if (loading) {
         return (
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
@@ -379,17 +392,28 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                                 <h1>{modName || modId}</h1>
                                 {modUrl && (
-                                    <a
-                                        href={modUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="btn btn-outline"
-                                        title="Open mod page"
-                                        style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "12px" }}
-                                    >
-                                        <FaSteam />
-                                        <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>Steam Workshop</span>
-                                    </a>
+                                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                                        <a
+                                            href={modUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="btn btn-outline"
+                                            title="Open mod page"
+                                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "12px" }}
+                                        >
+                                            <FaSteam />
+                                            <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>Steam Workshop</span>
+                                        </a>
+                                        <button
+                                            className="btn btn-outline"
+                                            onClick={handleOpenFolder}
+                                            title="Open local folder"
+                                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", borderRadius: "12px" }}
+                                        >
+                                            <FaFolderOpen />
+                                            <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>Local Folder</span>
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                             {modAuthor && <p style={{ color: "var(--text-dim)", marginTop: "0.25rem" }}>by {modAuthor}</p>}

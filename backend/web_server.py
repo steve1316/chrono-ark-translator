@@ -283,6 +283,20 @@ async def clear_mod_cache(mod_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
 
+@app.post("/api/mods/{mod_id}/open")
+async def open_mod_folder(mod_id: str):
+    """Open the mod's directory in the system file explorer."""
+    mod_path = _find_mod_path(mod_id)
+    if not mod_path.exists():
+        raise HTTPException(status_code=404, detail="Mod directory not found")
+
+    try:
+        # Use os.startfile on Windows for the most native experience.
+        os.startfile(mod_path)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to open folder: {str(e)}")
+
 @app.post("/api/translate/estimate")
 async def estimate_translation(req: TranslationRequest):
     """Estimate cost and time for translating a mod."""
