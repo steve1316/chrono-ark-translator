@@ -82,6 +82,24 @@ class ChronoArkAdapter(GameAdapter):
             'Preserve line breaks: If the source text has line breaks (\\n), keep them in the same positions.',
         ]
 
+    def get_style_examples(self) -> dict[str, list[tuple[str, str]]]:
+        return {
+            "skills": [
+                ("적 전체에게 &a의 피해를 줍니다. 약화 1을 부여합니다.", "Deal &a damage to all enemies. Apply 1 Weakening."),
+                ("아군 한명의 HP를 &a만큼 회복합니다.", "Restore &a HP to an ally."),
+                ("적 하나에게 &a의 피해를 줍니다. 이 스킬은 방어력을 무시합니다.", "Deal &a damage to an enemy. This skill ignores Defense."),
+            ],
+            "buffs": [
+                ("다음 공격에 의한 받는 피해가 30% 증가합니다.", "Damage taken from the next attack is increased by 30%."),
+                ("매 턴 시작 시 HP를 &a만큼 회복합니다.", "Restore &a HP at the start of each turn."),
+                ("공격력이 &a만큼 증가합니다.", "Attack is increased by &a."),
+            ],
+            "items": [
+                ("공격 시 100%를 초과하는 명중률은 치명타 확률로 변환됩니다.", "When attacking, any Accuracy exceeding 100% is converted into Critical Chance."),
+                ("전투 시작 시 모든 아군의 방어력이 &a 증가합니다.", "At the start of battle, all allies gain &a Defense."),
+            ],
+        }
+
     def scan_mods(self, search_path: Optional[Path] = None) -> list[ModInfo]:
         workshop_path = search_path or self._WORKSHOP_PATH
         return mod_scanner.scan_workshop(
@@ -90,20 +108,19 @@ class ChronoArkAdapter(GameAdapter):
             skip_dlls=self._SKIP_DLLS,
         )
 
-    def extract_strings(self, mod_path: Path) -> dict[str, LocString]:
-        strings = csv_extractor.extract_mod_strings(mod_path)
+    def extract_strings(self, mod_path: Path) -> tuple[dict[str, LocString], list[str]]:
+        strings, variants = csv_extractor.extract_mod_strings(mod_path)
         if not strings:
             # No CSV localization files — try gdata JSON + DLL extraction.
             strings = gdata_extractor.extract_mod_gdata_strings(mod_path)
             dll_strings = dll_extractor.extract_mod_dll_loc_strings(
                 mod_path, self._SKIP_DLLS,
             )
-            # Merge DLL strings, preferring gdata entries on key collisions
-            # since gdata has richer structure.
             for key, loc_str in dll_strings.items():
                 if key not in strings:
                     strings[key] = loc_str
-        return strings
+            variants = []
+        return strings, variants
 
     def extract_base_game_strings(self, game_path: Optional[Path] = None) -> dict[str, LocString]:
         path = game_path or self._BASE_GAME_PATH

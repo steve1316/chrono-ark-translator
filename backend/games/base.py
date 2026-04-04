@@ -72,13 +72,28 @@ class GameAdapter(ABC):
         ...
 
     @abstractmethod
+    def get_style_examples(self) -> dict[str, list[tuple[str, str]]]:
+        """
+        Return curated source->English translation examples for few-shot prompting.
+
+        Returns:
+            Dict mapping category name to list of (source_text, english_text) pairs.
+        """
+        ...
+
+    @abstractmethod
     def scan_mods(self, search_path: Optional[Path] = None) -> list[ModInfo]:
         """Discover all installed mods/projects for this game."""
         ...
 
     @abstractmethod
-    def extract_strings(self, mod_path: Path) -> dict[str, LocString]:
-        """Extract all localization strings from a mod/project directory."""
+    def extract_strings(self, mod_path: Path) -> tuple[dict[str, LocString], list[str]]:
+        """
+        Extract all localization strings from a mod/project directory.
+
+        Returns:
+            Tuple of (strings dict, list of variant/duplicate file paths).
+        """
         ...
 
     @abstractmethod
