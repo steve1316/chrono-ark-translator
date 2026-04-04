@@ -280,7 +280,19 @@ body {
 .mod-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.75rem;
+}
+
+.mod-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.mod-actions-group + .mod-actions-group {
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--glass-border);
 }
 
 /* --- Table Styles --- */
@@ -376,7 +388,7 @@ th {
 
 .source-cell,
 .english-cell {
-    white-space: normal;
+    white-space: pre-wrap;
     overflow-wrap: break-word;
     min-width: 150px;
 }

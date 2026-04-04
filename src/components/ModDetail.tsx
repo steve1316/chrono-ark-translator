@@ -390,7 +390,31 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             />
                         )}
                         <div>
-                            <h1>{modName || modId}</h1>
+                            <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem" }}>
+                                <h1>{modName || modId}</h1>
+                                {modUrl && (
+                                    <a
+                                        href={modUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title="Open on Steam Workshop"
+                                        style={{ color: "var(--text-dim)", fontSize: "1.3rem", transition: "color 0.2s", display: "flex" }}
+                                        onMouseEnter={e => (e.currentTarget.style.color = "#66c0f4")}
+                                        onMouseLeave={e => (e.currentTarget.style.color = "var(--text-dim)")}
+                                    >
+                                        <FaSteam />
+                                    </a>
+                                )}
+                                <button
+                                    onClick={handleOpenFolder}
+                                    title="Open local folder"
+                                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-dim)", fontSize: "1.3rem", transition: "color 0.2s", display: "flex", padding: 0 }}
+                                    onMouseEnter={e => (e.currentTarget.style.color = "var(--accent-primary)")}
+                                    onMouseLeave={e => (e.currentTarget.style.color = "var(--text-dim)")}
+                                >
+                                    <FaFolderOpen />
+                                </button>
+                            </div>
                             {modAuthor && <p style={{ color: "var(--text-dim)", marginTop: "0.25rem" }}>by {modAuthor}</p>}
                             <p>{processedStrings.length} total strings found</p>
                         </div>
@@ -398,76 +422,62 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 </div>
 
                 <div className="mod-actions">
-                    {modUrl && (
-                        <a
-                            href={modUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-outline"
-                            title="Open mod page"
-                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "12px" }}
-                        >
-                            <FaSteam />
-                            <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>Steam Workshop</span>
-                        </a>
-                    )}
-                    <button
-                        className="btn btn-outline"
-                        onClick={handleOpenFolder}
-                        title="Open local folder"
-                        style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 1rem", borderRadius: "12px" }}
-                    >
-                        <FaFolderOpen />
-                        <span style={{ fontSize: "0.9rem", fontWeight: 500 }}>Local Folder</span>
-                    </button>
-                    <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleClearCache}>
-                        Clear Cache
-                    </button>
-                    <button className="btn btn-outline" style={{ color: "#ffaa44", borderColor: "rgba(255, 170, 68, 0.3)" }} onClick={handleClearTranslations}>
-                        Clear English
-                    </button>
-                    <button
-                        className="btn btn-outline"
-                        onClick={() => { setShowGlossaryPanel(!showGlossaryPanel); if (!showGlossaryPanel) fetchModGlossary() }}
-                        style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-                    >
-                        <FaBook /> Mod Glossary ({Object.keys(modGlossary).length})
-                    </button>
-                    {suggestions.length > 0 && (
+                    <div className="mod-actions-group">
                         <button
                             className="btn btn-outline"
-                            onClick={() => setShowSuggestionModal(true)}
-                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--accent-secondary)", borderColor: "rgba(187,154,247,0.3)", position: "relative" }}
+                            onClick={() => { setShowGlossaryPanel(!showGlossaryPanel); if (!showGlossaryPanel) fetchModGlossary() }}
+                            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
                         >
-                            <FaBook /> Suggestions
-                            <span style={{
-                                position: "absolute", top: "-6px", right: "-6px",
-                                background: "var(--accent-secondary)", color: "#fff",
-                                borderRadius: "50%", width: "20px", height: "20px",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: "0.7rem", fontWeight: 700,
-                            }}>
-                                {suggestions.length}
-                            </span>
+                            <FaBook /> Mod Glossary ({Object.keys(modGlossary).length})
                         </button>
-                    )}
-                    <button className="btn btn-outline" disabled={translating} onClick={async () => {
-                        if (!modId) return
-                        setTranslateBanner(null)
-                        setTranslating(true)
-                        const result = await onTranslate("claude", true, modId)
-                        setTranslating(false)
-                        setTranslateBanner({ type: result.success ? "success" : "error", message: result.message })
-                    }}>
-                        Dry Run
-                    </button>
-                    <button className="btn btn-primary" onClick={() => handleTranslateClick("claude")} disabled={translating}>
-                        Translate (Claude)
-                    </button>
-                    <button className="btn btn-primary" onClick={handleExport} disabled={exporting || !hasExportChanges} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <FaFileExport />
-                        {exporting ? "Syncing..." : "Sync Changes"}
-                    </button>
+                        {suggestions.length > 0 && (
+                            <button
+                                className="btn btn-outline"
+                                onClick={() => setShowSuggestionModal(true)}
+                                style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--accent-secondary)", borderColor: "rgba(187,154,247,0.3)", position: "relative" }}
+                            >
+                                <FaBook /> Suggestions
+                                <span style={{
+                                    position: "absolute", top: "-6px", right: "-6px",
+                                    background: "var(--accent-secondary)", color: "#fff",
+                                    borderRadius: "50%", width: "20px", height: "20px",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontSize: "0.7rem", fontWeight: 700,
+                                }}>
+                                    {suggestions.length}
+                                </span>
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="mod-actions-group">
+                        <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleClearCache}>
+                            Clear Cache
+                        </button>
+                        <button className="btn btn-outline" style={{ color: "#ffaa44", borderColor: "rgba(255, 170, 68, 0.3)" }} onClick={handleClearTranslations}>
+                            Clear English
+                        </button>
+                    </div>
+
+                    <div className="mod-actions-group">
+                        <button className="btn btn-outline" disabled={translating} onClick={async () => {
+                            if (!modId) return
+                            setTranslateBanner(null)
+                            setTranslating(true)
+                            const result = await onTranslate("claude", true, modId)
+                            setTranslating(false)
+                            setTranslateBanner({ type: result.success ? "success" : "error", message: result.message })
+                        }}>
+                            Dry Run
+                        </button>
+                        <button className="btn btn-primary" onClick={() => handleTranslateClick("claude")} disabled={translating}>
+                            Translate (Claude)
+                        </button>
+                        <button className="btn btn-primary" onClick={handleExport} disabled={exporting || !hasExportChanges} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <FaFileExport />
+                            {exporting ? "Syncing..." : "Sync Changes"}
+                        </button>
+                    </div>
                 </div>
             </div>
 
