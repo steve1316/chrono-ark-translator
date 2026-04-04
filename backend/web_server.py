@@ -32,6 +32,7 @@ from data.translation_memory import TranslationMemory
 from data.suggestion_manager import (
     load_suggestions, add_suggestions, remove_suggestions, clear_suggestions,
 )
+from data.character_context import load_character_context, save_character_context
 from main import _get_provider, _save_extracted_strings
 
 # Initialize the active game adapter.
@@ -71,6 +72,11 @@ class TranslationRequest(BaseModel):
 class TranslationUpdate(BaseModel):
     key: str
     english: str
+
+class CharacterContext(BaseModel):
+    source_game: str = ""
+    character_name: str = ""
+    background: str = ""
 
 # --- API Endpoints ---
 
@@ -349,6 +355,8 @@ async def estimate_translation(req: TranslationRequest):
     mod_glossary = load_mod_glossary(req.mod_id)
     merged = merge_glossaries(base_glossary, mod_glossary)
     game_context = _adapter.get_translation_context()
+    char_ctx = load_character_context(req.mod_id)
+    character_context = char_ctx if any(char_ctx.values()) else None
     format_rules = _adapter.get_format_preservation_rules()
     style_examples = _adapter.get_style_examples()
 
@@ -362,6 +370,7 @@ async def estimate_translation(req: TranslationRequest):
             game_context=game_context,
             format_rules=format_rules,
             style_examples=style_examples,
+            character_context=character_context,
         )
 
     return {
@@ -406,6 +415,8 @@ async def preview_translation(req: TranslationRequest):
     mod_glossary = load_mod_glossary(req.mod_id)
     merged = merge_glossaries(base_glossary, mod_glossary)
     game_context = _adapter.get_translation_context()
+    char_ctx = load_character_context(req.mod_id)
+    character_context = char_ctx if any(char_ctx.values()) else None
     format_rules = _adapter.get_format_preservation_rules()
     style_examples = _adapter.get_style_examples()
 
@@ -430,6 +441,7 @@ async def preview_translation(req: TranslationRequest):
             game_context=game_context,
             format_rules=format_rules,
             style_examples=style_examples,
+            character_context=character_context,
         )
         previews[lang] = {
             "system_prompt": system_prompt,
@@ -485,6 +497,8 @@ async def translate_mod(req: TranslationRequest):
     mod_glossary = load_mod_glossary(req.mod_id)
     merged = merge_glossaries(base_glossary, mod_glossary)
     game_context = _adapter.get_translation_context()
+    char_ctx = load_character_context(req.mod_id)
+    character_context = char_ctx if any(char_ctx.values()) else None
     format_rules = _adapter.get_format_preservation_rules()
     style_examples = _adapter.get_style_examples()
 
@@ -506,6 +520,7 @@ async def translate_mod(req: TranslationRequest):
                 game_context=game_context,
                 format_rules=format_rules,
                 style_examples=style_examples,
+                character_context=character_context,
             )
         return {"total_strings": len(untranslated), "provider": provider.name, "estimates": estimates}
 
@@ -533,6 +548,7 @@ async def translate_mod(req: TranslationRequest):
                     game_context=game_context,
                     format_rules=format_rules,
                     style_examples=style_examples,
+                    character_context=character_context,
                 )
                 all_translations.update(translations)
                 all_suggestions.extend(suggestions)
@@ -766,6 +782,19 @@ def _find_mod_preview_image(mod_path: Path) -> Optional[Path]:
             return img
     return None
 
+
+
+@app.get("/api/mods/{mod_id}/character-context")
+async def get_character_context(mod_id: str):
+    """Return saved character context for a mod."""
+    return load_character_context(mod_id)
+
+
+@app.post("/api/mods/{mod_id}/character-context")
+async def set_character_context(mod_id: str, ctx: CharacterContext):
+    """Save character context for a mod."""
+    save_character_context(mod_id, ctx.model_dump())
+    return {"status": "saved"}
 
 
 @app.get("/api/glossary")
