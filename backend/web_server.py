@@ -266,6 +266,19 @@ async def preview_translation(req: TranslationRequest):
     mod_path = matching[0].path
 
     strings, _ = _adapter.extract_strings(mod_path)
+
+    # Apply saved translations so user edits (including clears) are respected.
+    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
+    if translations_path.exists():
+        try:
+            with open(translations_path, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            for key, english in saved.items():
+                if key in strings:
+                    strings[key].translations["English"] = english
+        except Exception:
+            pass
+
     untranslated = _adapter.get_untranslated(strings)
 
     if not untranslated:
@@ -330,6 +343,19 @@ async def translate_mod(req: TranslationRequest):
     mod_path = matching[0].path
 
     strings, _ = _adapter.extract_strings(mod_path)
+
+    # Apply saved translations so user edits (including clears) are respected.
+    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
+    if translations_path.exists():
+        try:
+            with open(translations_path, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            for key, english in saved.items():
+                if key in strings:
+                    strings[key].translations["English"] = english
+        except Exception:
+            pass
+
     untranslated = _adapter.get_untranslated(strings)
 
     provider_name = req.provider or config.TRANSLATION_PROVIDER
