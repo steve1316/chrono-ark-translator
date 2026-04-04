@@ -30,3 +30,31 @@ export type Stats = {
     global_progress: number
     total_strings: number
 }
+
+export type GlossaryTerm = {
+    category: string
+    key: string
+    source_mappings: Record<string, string>
+}
+
+export type Glossary = {
+    terms: Record<string, GlossaryTerm>
+}
+
+export type TermSuggestion = {
+    english: string
+    source: string
+    source_lang: string
+    category: string
+    reason: string
+}
+
+export type ModDetail = {
+    id: string
+    name: string
+    author: string
+    url: string | null
+    preview_image: string | null
+    strings: LocString[]
+    duplicate_files: string[]
+}
