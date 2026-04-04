@@ -89,7 +89,7 @@ def classify_mod(
 
     # Sample CSV content to check English population and count entries.
     if info.has_loc_files:
-        strings = extract_mod_strings(mod_path)
+        strings, _ = extract_mod_strings(mod_path)
         info.entry_count = len(strings)
 
         # Check if any entries have English text.

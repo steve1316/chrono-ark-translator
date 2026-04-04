@@ -13,6 +13,25 @@ from typing import Optional
 from models import LocString
 
 
+# Canonical CSV filenames for Chrono Ark.
+_CANONICAL_NAMES = {"LangDataDB.csv", "LangSystemDB.csv", "LangDialogueDB.csv", "LangRecordsDB.csv"}
+
+# Directory names that indicate backups.
+_BACKUP_DIR_PATTERNS = {"langbackup", "备份", "备份2", "备份3", "备份4", "备份5"}
+
+# Regex to strip variant suffixes from filenames.
+_VARIANT_SUFFIX_RE = re.compile(
+    r"( - 副本"            # Chinese "copy"
+    r"| \(\d+\)"           # " (1)", " (2)"
+    r"|（\d+）"            # fullwidth parens
+    r"|_v[\d.]+"           # "_v0.6.13"
+    r"|_copy"              # "_copy"
+    r"| copy"              # " copy"
+    r")(?=\.csv$)",
+    re.IGNORECASE,
+)
+
+
 def _is_valid_key(key: str) -> bool:
     """Check if a string looks like a valid localization key."""
     if not key or " " in key:
@@ -159,40 +178,133 @@ def extract_base_game_strings(
     return all_strings
 
 
-def extract_mod_strings(mod_path: Path) -> dict[str, LocString]:
+def find_all_csv_files(mod_path: Path) -> list[Path]:
+    """
+    Recursively find all CSV files in a mod directory.
+
+    Searches Localization/ subdirectory, top-level Lang*.csv, and any
+    variant/backup files in subdirectories.
+    """
+    found = []
+    loc_dir = mod_path / "Localization"
+
+    # Localization/ directory (including subdirs for backups).
+    if loc_dir.exists():
+        for csv_file in loc_dir.rglob("*.csv"):
+            found.append(csv_file)
+
+    # Top-level Lang*.csv files.
+    for csv_file in mod_path.glob("Lang*.csv"):
+        if csv_file not in found:
+            found.append(csv_file)
+
+    # Check known backup directory patterns at top level.
+    for subdir in mod_path.iterdir():
+        if subdir.is_dir() and subdir.name != "Localization":
+            dir_lower = subdir.name.lower()
+            is_backup = any(p in dir_lower for p in _BACKUP_DIR_PATTERNS)
+            if is_backup:
+                for csv_file in subdir.rglob("*.csv"):
+                    if csv_file not in found:
+                        found.append(csv_file)
+
+    return found
+
+
+def classify_csv_file(csv_path: Path, loc_dir: Path) -> tuple[str, bool]:
+    """
+    Classify a CSV file as canonical or variant, and determine its canonical name.
+
+    Args:
+        csv_path: Path to the CSV file.
+        loc_dir: Path to the Localization/ directory (or mod root).
+
+    Returns:
+        Tuple of (canonical_filename, is_canonical).
+    """
+    filename = csv_path.name
+
+    # Check if in a backup directory.
+    in_backup = False
+    for part in csv_path.parts:
+        part_lower = part.lower()
+        if any(p in part_lower for p in _BACKUP_DIR_PATTERNS):
+            in_backup = True
+            break
+
+    # Strip variant suffixes to find canonical name.
+    canonical = _VARIANT_SUFFIX_RE.sub("", filename)
+
+    # If the file is a direct canonical name in the expected dir, it's canonical.
+    is_canonical = (
+        canonical == filename
+        and not in_backup
+        and canonical in _CANONICAL_NAMES
+    )
+
+    # Top-level file when Localization/ version exists is a variant.
+    if is_canonical and csv_path.parent != loc_dir:
+        loc_version = loc_dir / canonical
+        if loc_version.exists() and csv_path != loc_version:
+            is_canonical = False
+
+    return canonical, is_canonical
+
+
+def extract_mod_strings(mod_path: Path) -> tuple[dict[str, LocString], list[str]]:
     """
     Extract localization strings from a mod directory.
 
-    Searches for CSV files in:
-    1. The mod's Localization/ subdirectory.
-    2. Any top-level Lang*.csv files.
+    Scans for all CSV files (including variants/duplicates), deduplicates
+    by key (canonical files win), and reports variant files.
 
     Args:
         mod_path: Path to the mod's root directory.
 
     Returns:
-        Dictionary mapping localization key to LocString object.
+        Tuple of (strings dict, list of variant file relative paths).
     """
-    all_strings: dict[str, LocString] = {}
-    csv_files_found = []
+    all_csv_files = find_all_csv_files(mod_path)
+    if not all_csv_files:
+        return {}, []
 
-    # Check the Localization subdirectory.
     loc_dir = mod_path / "Localization"
-    if loc_dir.exists():
-        for csv_file in loc_dir.glob("*.csv"):
-            csv_files_found.append(csv_file)
+    if not loc_dir.exists():
+        loc_dir = mod_path
 
-    # Check for top-level Lang*.csv files.
-    for csv_file in mod_path.glob("Lang*.csv"):
-        if csv_file not in csv_files_found:
-            csv_files_found.append(csv_file)
+    # Classify files and separate canonical from variants.
+    canonical_files: list[Path] = []
+    variant_files: list[Path] = []
 
-    for csv_file in csv_files_found:
+    for csv_file in all_csv_files:
+        _, is_canonical = classify_csv_file(csv_file, loc_dir)
+        if is_canonical:
+            canonical_files.append(csv_file)
+        else:
+            variant_files.append(csv_file)
+
+    # Parse variants first so canonical can overwrite on collision.
+    all_strings: dict[str, LocString] = {}
+
+    for csv_file in variant_files:
+        entries = _parse_csv_content(csv_file)
+        for entry in entries:
+            if entry.key not in all_strings:
+                all_strings[entry.key] = entry
+
+    for csv_file in canonical_files:
         entries = _parse_csv_content(csv_file)
         for entry in entries:
             all_strings[entry.key] = entry
 
-    return all_strings
+    variant_rel_paths = []
+    for v in variant_files:
+        try:
+            variant_rel_paths.append(str(v.relative_to(mod_path)))
+        except ValueError:
+            variant_rel_paths.append(str(v))
+
+    return all_strings, variant_rel_paths
 
 
 def detect_source_language(
