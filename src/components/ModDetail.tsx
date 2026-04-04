@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, forwardRef } from "react"
 import { useParams } from "react-router-dom"
 import { TableVirtuoso } from "react-virtuoso"
-import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport } from "react-icons/fa"
-import type { LocString } from "../shared_types"
+import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook } from "react-icons/fa"
+import type { LocString, TermSuggestion } from "../shared_types"
+import GlossarySuggestionModal from "./GlossarySuggestionModal"
+import TranslationConfirmModal from "./TranslationConfirmModal"
 
 interface ModDetailProps {
     onBack: () => void
@@ -46,6 +48,39 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     })
 
     const [hasExportChanges, setHasExportChanges] = useState(false)
+    const [duplicateFiles, setDuplicateFiles] = useState<string[]>([])
+    const [showDuplicateDetails, setShowDuplicateDetails] = useState(false)
+    const [suggestions, setSuggestions] = useState<TermSuggestion[]>([])
+    const [showSuggestionModal, setShowSuggestionModal] = useState(false)
+    const [modGlossary, setModGlossary] = useState<Record<string, { category: string; source_mappings: Record<string, string> }>>({})
+    const [translationPreview, setTranslationPreview] = useState<any>(null)
+    const [pendingProvider, setPendingProvider] = useState<string>("")
+    const [showGlossaryPanel, setShowGlossaryPanel] = useState(false)
+    const [newTermEnglish, setNewTermEnglish] = useState("")
+    const [newTermSource, setNewTermSource] = useState("")
+    const [newTermLang, setNewTermLang] = useState("Chinese")
+    const [newTermCategory, setNewTermCategory] = useState("custom")
+
+    const handleTranslateClick = async (provider: string) => {
+        if (!modId) return
+        try {
+            const res = await fetch(`${API_BASE}/translate/preview`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mod_id: modId, provider }),
+            })
+            const data = await res.json()
+            if (data.total_strings === 0) {
+                alert("All strings are already translated.")
+                return
+            }
+            setPendingProvider(provider)
+            setTranslationPreview(data)
+        } catch (err) {
+            console.error("Failed to fetch translation preview:", err)
+            alert("Failed to fetch translation preview. Check console for details.")
+        }
+    }
 
     const resizingRef = useRef<{ field: string; startX: number; startWidth: number } | null>(null)
 
@@ -62,6 +97,32 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    const fetchSuggestions = async () => {
+        if (!modId) return
+        try {
+            const res = await fetch(`${API_BASE}/mods/${modId}/glossary/suggestions`)
+            if (res.ok) {
+                const data = await res.json()
+                setSuggestions(data)
+            }
+        } catch {
+            // Ignore.
+        }
+    }
+
+    const fetchModGlossary = async () => {
+        if (!modId) return
+        try {
+            const res = await fetch(`${API_BASE}/mods/${modId}/glossary`)
+            if (res.ok) {
+                const data = await res.json()
+                setModGlossary(data.terms || {})
+            }
+        } catch {
+            // Ignore.
+        }
+    }
+
     useEffect(() => {
         const fetchModDetail = async () => {
             if (!modId) return
@@ -74,6 +135,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 setModAuthor(data.author ?? "")
                 setModPreviewImage(data.preview_image ?? null)
                 setModUrl(data.url ?? null)
+                setDuplicateFiles(data.duplicate_files ?? [])
             } catch (err) {
                 console.error("Failed to fetch mod detail:", err)
             } finally {
@@ -83,6 +145,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
 
         fetchModDetail()
         fetchExportStatus()
+        fetchSuggestions()
     }, [modId])
 
     /**
@@ -209,7 +272,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
      */
     const handleExport = async () => {
         if (!modId) return
-        if (!window.confirm("This will overwrite the mod's CSV files with your translations. Continue?")) {
+        const dupeWarning = duplicateFiles.length > 0
+            ? `\n\nThis will also consolidate ${duplicateFiles.length} duplicate file(s):\n${duplicateFiles.join("\n")}\n\nDuplicate files will be deleted after merging.`
+            : ""
+        if (!window.confirm(`This will overwrite the mod's CSV files with your translations.${dupeWarning} Continue?`)) {
             return
         }
 
@@ -218,7 +284,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
             const res = await fetch(`${API_BASE}/mods/${modId}/export`, { method: "POST" })
             if (res.ok) {
                 const data = await res.json()
-                alert(`Synced ${data.applied} translations to ${data.files_written.length} file(s): ${data.files_written.join(", ")}`)
+                const removedMsg = data.files_removed?.length
+                    ? `\nConsolidated ${data.files_removed.length} duplicate file(s).`
+                    : ""
+                alert(`Synced ${data.applied} translations to ${data.files_written.length} file(s): ${data.files_written.join(", ")}${removedMsg}`)
                 fetchExportStatus()
             } else {
                 const error = await res.json()
@@ -317,10 +386,35 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleClearCache}>
                         Clear Cache
                     </button>
+                    <button
+                        className="btn btn-outline"
+                        onClick={() => { setShowGlossaryPanel(!showGlossaryPanel); if (!showGlossaryPanel) fetchModGlossary() }}
+                        style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+                    >
+                        <FaBook /> Mod Glossary ({Object.keys(modGlossary).length})
+                    </button>
+                    {suggestions.length > 0 && (
+                        <button
+                            className="btn btn-outline"
+                            onClick={() => setShowSuggestionModal(true)}
+                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--accent-secondary)", borderColor: "rgba(187,154,247,0.3)", position: "relative" }}
+                        >
+                            <FaBook /> Suggestions
+                            <span style={{
+                                position: "absolute", top: "-6px", right: "-6px",
+                                background: "var(--accent-secondary)", color: "#fff",
+                                borderRadius: "50%", width: "20px", height: "20px",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: "0.7rem", fontWeight: 700,
+                            }}>
+                                {suggestions.length}
+                            </span>
+                        </button>
+                    )}
                     <button className="btn btn-outline" onClick={() => onTranslate("claude", true, modId)}>
                         Dry Run
                     </button>
-                    <button className="btn btn-primary" onClick={() => onTranslate("claude", false, modId)}>
+                    <button className="btn btn-primary" onClick={() => handleTranslateClick("claude")}>
                         Translate (Claude)
                     </button>
                     <button className="btn btn-primary" onClick={handleExport} disabled={exporting || !hasExportChanges} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -358,6 +452,86 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     </div>
                 </div>
             </div>
+
+            {showGlossaryPanel && (
+                <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1rem" }}>
+                    <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>Mod Glossary Terms</h3>
+                    <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+                        <input type="text" placeholder="English term" value={newTermEnglish} onChange={(e) => setNewTermEnglish(e.target.value)}
+                            style={{ padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", flex: 1, minWidth: "120px" }} />
+                        <input type="text" placeholder="Source text" value={newTermSource} onChange={(e) => setNewTermSource(e.target.value)}
+                            style={{ padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", flex: 1, minWidth: "120px" }} />
+                        <select value={newTermLang} onChange={(e) => setNewTermLang(e.target.value)}
+                            style={{ padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)" }}>
+                            <option value="Chinese">Chinese</option>
+                            <option value="Korean">Korean</option>
+                            <option value="Japanese">Japanese</option>
+                        </select>
+                        <select value={newTermCategory} onChange={(e) => setNewTermCategory(e.target.value)}
+                            style={{ padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)" }}>
+                            <option value="custom">Custom</option>
+                            <option value="characters">Characters</option>
+                            <option value="skills">Skills</option>
+                            <option value="buffs">Buffs</option>
+                            <option value="items">Items</option>
+                            <option value="mechanics">Mechanics</option>
+                        </select>
+                        <button className="btn btn-primary" disabled={!newTermEnglish.trim()} onClick={async () => {
+                            await fetch(`${API_BASE}/mods/${modId}/glossary`, {
+                                method: "POST", headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ english: newTermEnglish, source_mappings: { [newTermLang]: newTermSource }, category: newTermCategory }),
+                            })
+                            setNewTermEnglish(""); setNewTermSource("")
+                            fetchModGlossary()
+                        }}>Add</button>
+                    </div>
+                    {Object.keys(modGlossary).length === 0 ? (
+                        <p style={{ color: "var(--text-dim)", textAlign: "center" }}>No mod-specific glossary terms yet. Add terms above or accept AI suggestions.</p>
+                    ) : (
+                        <div style={{ maxHeight: "300px", overflow: "auto" }}>
+                            {Object.entries(modGlossary).sort(([a], [b]) => a.localeCompare(b)).map(([english, info]) => (
+                                <div key={english} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--glass-border)" }}>
+                                    <div>
+                                        <span style={{ fontWeight: 500 }}>{english}</span>
+                                        <span style={{ color: "var(--text-dim)", marginLeft: "0.75rem", fontSize: "0.85rem" }}>
+                                            {Object.entries(info.source_mappings || {}).map(([lang, text]) => `${lang}: ${text}`).join(", ")}
+                                        </span>
+                                        <span style={{ marginLeft: "0.75rem", fontSize: "0.75rem", padding: "0.1rem 0.4rem", borderRadius: "4px", background: "rgba(138,180,248,0.15)", color: "var(--accent-primary)", textTransform: "capitalize" }}>
+                                            {info.category}
+                                        </span>
+                                    </div>
+                                    <button className="btn btn-outline" style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
+                                        onClick={async () => {
+                                            await fetch(`${API_BASE}/mods/${modId}/glossary/${encodeURIComponent(english)}`, { method: "DELETE" })
+                                            fetchModGlossary()
+                                        }}>Remove</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {duplicateFiles.length > 0 && (
+                <div className="glass-card" style={{ padding: "1rem 1.5rem", marginBottom: "1rem", borderLeft: "3px solid var(--accent-secondary)" }}>
+                    <div
+                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                        onClick={() => setShowDuplicateDetails(!showDuplicateDetails)}
+                    >
+                        <span style={{ color: "var(--accent-secondary)" }}>
+                            Found {duplicateFiles.length} duplicate localization file{duplicateFiles.length > 1 ? "s" : ""}. These will be consolidated when you sync.
+                        </span>
+                        <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>{showDuplicateDetails ? "Hide" : "Show details"}</span>
+                    </div>
+                    {showDuplicateDetails && (
+                        <ul style={{ margin: "0.75rem 0 0 1rem", color: "var(--text-dim)", fontSize: "0.9rem" }}>
+                            {duplicateFiles.map((f) => (
+                                <li key={f}>{f}</li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            )}
 
             <div className="glass-card string-table-container">
                 <TableVirtuoso
@@ -397,12 +571,32 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             {s.source}
                         </td>
                         <td className="english-cell" style={{ maxWidth: columnWidths.english, position: "relative" }}>
-                            <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={s.is_translated ? "" : "Pending translation..."} />
+                            <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
                         </td>
                     </>
                 )}
             />
             </div>
+
+            {showSuggestionModal && (
+                <GlossarySuggestionModal
+                    modId={modId!}
+                    suggestions={suggestions}
+                    onClose={() => setShowSuggestionModal(false)}
+                    onUpdated={() => { fetchSuggestions() }}
+                />
+            )}
+
+            {translationPreview && (
+                <TranslationConfirmModal
+                    preview={translationPreview}
+                    onConfirm={() => {
+                        setTranslationPreview(null)
+                        onTranslate(pendingProvider, false, modId!)
+                    }}
+                    onCancel={() => setTranslationPreview(null)}
+                />
+            )}
         </div>
     )
 }
