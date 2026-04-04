@@ -154,7 +154,8 @@ async def get_mod_detail(mod_id: str):
         source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
         english = loc_str.translations.get("English", "")
 
-        if english:
+        is_done = bool(english) or not source_text.strip()
+        if is_done:
             translated_keys.append(key)
 
         has_override = key in translations
@@ -165,7 +166,7 @@ async def get_mod_detail(mod_id: str):
             "source": source_text,
             "source_lang": source_lang,
             "english": english,
-            "is_translated": bool(english),
+            "is_translated": is_done,
             "original_english": original_english_map.get(key, "") if has_override else english,
         })
 
@@ -201,11 +202,23 @@ async def update_string(mod_id: str, update: TranslationUpdate):
 
     # Update progress tracker
     tracker = ProgressTracker()
-    if update.english:
-        tracker.mark_translated(mod_id, [update.key])
-    else:
-        tracker.unmark_translated(mod_id, [update.key])
-
+    
+    # We need to know if the source is empty to decide if it stays "translated"
+    mods = _adapter.scan_mods()
+    matching = [m for m in mods if m.mod_id == mod_id]
+    if matching:
+        strings, _ = _adapter.extract_strings(matching[0].path)
+        if update.key in strings:
+            loc_str = strings[update.key]
+            source_lang = _adapter.detect_source_language(loc_str)
+            source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
+            
+            is_done = bool(update.english) or not source_text.strip()
+            if is_done:
+                tracker.mark_translated(mod_id, [update.key])
+            else:
+                tracker.unmark_translated(mod_id, [update.key])
+    
     return {"status": "success"}
 
 @app.post("/api/mods/{mod_id}/sync")
@@ -261,11 +274,19 @@ async def clear_translations(mod_id: str):
     with open(translations_path, "w", encoding="utf-8") as f:
         json.dump(overrides, f, indent=2, ensure_ascii=False)
 
-    # Re-run update so total_keys / hashes stay correct for the dashboard,
-    # then mark every key as untranslated.
+    # Re-run update so total_keys / hashes stay correct for the dashboard.
     tracker = ProgressTracker()
     tracker.update(mod_id, strings, _adapter.source_languages)
-    tracker.set_translated(mod_id, [])
+    
+    # Mark untranslated everything EXCEPT keys with empty sources.
+    done_keys = []
+    for key, loc_str in strings.items():
+        source_lang = _adapter.detect_source_language(loc_str)
+        source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
+        if not source_text.strip():
+            done_keys.append(key)
+    
+    tracker.set_translated(mod_id, done_keys)
 
     return {"status": "success"}
 

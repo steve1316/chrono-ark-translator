@@ -149,10 +149,20 @@ class ProgressTracker:
 
         diff = ProgressDiff()
 
-        # Build new hash map.
+        # Build new hash map and detect empty sources.
         new_hashes = {}
+        empty_source_keys = set()
         for key, loc_str in current_strings.items():
             new_hashes[key] = self._hash_source_text(loc_str, langs)
+            
+            # If no source language has content, it's an empty source string.
+            has_source = False
+            for lang in langs:
+                if lang in loc_str.translations and loc_str.translations[lang].strip():
+                    has_source = True
+                    break
+            if not has_source:
+                empty_source_keys.add(key)
 
         # Compare.
         current_keys = set(new_hashes.keys())
@@ -173,7 +183,7 @@ class ProgressTracker:
         # Save the updated snapshot.
         new_snapshot = {
             "hashes": new_hashes,
-            "translated": sorted(old_translated & current_keys),
+            "translated": sorted((old_translated & current_keys) | empty_source_keys),
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "total_keys": len(current_keys),
         }
@@ -236,7 +246,22 @@ class ProgressTracker:
         """
         snapshot = self._load_snapshot(mod_id)
         total = snapshot.get("total_keys", 0)
-        translated = len(snapshot.get("translated", []))
+        translated_set = set(snapshot.get("translated", []))
+        
+        # Also count keys that have empty source hashes.
+        # This fixes the dashboard for mods that haven't been re-scanned
+        # since the empty-source logic was added.
+        hashes = snapshot.get("hashes", {})
+        empty_hashes = {
+            hashlib.sha256(("|" * i).encode("utf-8")).hexdigest()
+            for i in range(5) # Covers up to 5 source languages
+        }
+        
+        for key, h in hashes.items():
+            if h in empty_hashes:
+                translated_set.add(key)
+        
+        translated = len(translated_set)
         untranslated = total - translated
         percentage = (translated / total * 100) if total > 0 else 0.0
 

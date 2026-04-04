@@ -182,7 +182,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 body: JSON.stringify({ key, english: newValue }),
             })
             if (res.ok) {
-                setStrings((prev) => prev.map((s) => (s.key === key ? { ...s, english: newValue, is_translated: !!newValue } : s)))
+                setStrings((prev) => prev.map((s) => (s.key === key ? { ...s, english: newValue, is_translated: !!newValue || !s.source.trim() } : s)))
                 fetchExportStatus()
             }
         } catch (err) {
@@ -226,7 +226,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     // Filter and sort strings.
     const processedStrings = React.useMemo(() => {
         let result = strings.filter((s) => {
-            const matchesFilter = filter === "all" || (filter === "translated" && s.is_translated) || (filter === "untranslated" && !s.is_translated)
+            const isDone = s.is_translated || !s.source.trim()
+            const matchesFilter = filter === "all" || (filter === "translated" && isDone) || (filter === "untranslated" && !isDone)
 
             const matchesSearch = s.key.toLowerCase().includes(search.toLowerCase()) || s.source.toLowerCase().includes(search.toLowerCase()) || s.english.toLowerCase().includes(search.toLowerCase())
 
@@ -331,7 +332,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 method: "POST",
             })
             if (res.ok) {
-                setStrings((prev) => prev.map((s) => ({ ...s, english: "", is_translated: false })))
+                setStrings((prev) => prev.map((s) => ({ ...s, english: "", is_translated: !s.source.trim() })))
                 fetchExportStatus()
             } else {
                 const error = await res.json()
@@ -654,10 +655,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     <tbody>
                         {processedStrings.map((s) => {
                             const hasOverride = s.english !== s.original_english
+                            const isDone = s.is_translated || !s.source.trim()
                             return (
                                 <tr key={s.key} style={hasOverride ? { backgroundColor: "rgba(255, 220, 40, 0.15)" } : undefined}>
                                     <td>
-                                        <span className={`status-badge ${s.is_translated ? "status-translated" : "status-missing"}`}>{s.is_translated ? "OK" : "MISSING"}</span>
+                                        <span className={`status-badge ${isDone ? "status-translated" : "status-missing"}`}>{isDone ? "OK" : "MISSING"}</span>
                                     </td>
                                     <td className="key-cell" title={s.key} style={{ maxWidth: columnWidths.key }}>
                                         {s.key}
