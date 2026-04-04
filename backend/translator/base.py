@@ -67,12 +67,13 @@ class TranslationProvider(ABC):
         return "", ""
 
     @abstractmethod
-    def estimate_cost(self, entries: list[tuple[str, str]]) -> dict:
+    def estimate_cost(self, entries: list[tuple[str, str]], **kwargs) -> dict:
         """
         Estimate the cost of translating the given entries.
 
         Args:
             entries: List of (key, source_text) tuples.
+            **kwargs: Provider-specific context (source_lang, glossary_prompt, etc.)
 
         Returns:
             Dictionary with cost estimation details:

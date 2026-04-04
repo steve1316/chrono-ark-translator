@@ -264,9 +264,25 @@ async def estimate_translation(req: TranslationRequest):
             by_lang[lang] = []
         by_lang[lang].append((key, loc_str.translations.get(lang, "")))
 
+    # Load glossary and context for accurate cost estimation.
+    base_glossary = load_glossary()
+    mod_glossary = load_mod_glossary(req.mod_id)
+    merged = merge_glossaries(base_glossary, mod_glossary)
+    glossary_prompt = get_glossary_prompt(merged)
+    game_context = _adapter.get_translation_context()
+    format_rules = _adapter.get_format_preservation_rules()
+    style_examples = _adapter.get_style_examples()
+
     estimates = {}
     for lang, entries in by_lang.items():
-        estimates[lang] = provider.estimate_cost(entries)
+        estimates[lang] = provider.estimate_cost(
+            entries,
+            source_lang=lang,
+            glossary_prompt=glossary_prompt,
+            game_context=game_context,
+            format_rules=format_rules,
+            style_examples=style_examples,
+        )
 
     return {
         "total_strings": len(untranslated),
@@ -405,7 +421,14 @@ async def translate_mod(req: TranslationRequest):
                 by_lang[lang].append((key, loc_str.translations.get(lang, "")))
         estimates = {}
         for lang, entries in by_lang.items():
-            estimates[lang] = provider.estimate_cost(entries)
+            estimates[lang] = provider.estimate_cost(
+                entries,
+                source_lang=lang,
+                glossary_prompt=glossary_prompt,
+                game_context=game_context,
+                format_rules=format_rules,
+                style_examples=style_examples,
+            )
         return {"total_strings": len(untranslated), "provider": provider.name, "estimates": estimates}
 
     # Translate.

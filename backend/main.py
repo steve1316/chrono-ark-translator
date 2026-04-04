@@ -227,9 +227,17 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
     # Dry run mode — just show cost estimate.
     if args.dry_run:
+        style_examples = adapter.get_style_examples()
         print(f"\n  Provider: {provider.name}")
         for lang, entries in entries_by_lang.items():
-            cost = provider.estimate_cost(entries)
+            cost = provider.estimate_cost(
+                entries,
+                source_lang=lang,
+                glossary_prompt=glossary_prompt,
+                game_context=game_context,
+                format_rules=format_rules,
+                style_examples=style_examples,
+            )
             print(f"\n  {lang} → English ({len(entries)} strings):")
             for k, v in cost.items():
                 print(f"    {k}: {v}")

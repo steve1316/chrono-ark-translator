@@ -216,10 +216,33 @@ class ClaudeProvider(TranslationProvider):
 
         return {}, []
 
-    def estimate_cost(self, entries: list[tuple[str, str]]) -> dict:
-        total_chars = sum(len(text) for _, text in entries)
-        estimated_input_tokens = int(total_chars * 1.5) + 500
-        estimated_output_tokens = int(total_chars * 0.8)
+    def estimate_cost(
+        self,
+        entries: list[tuple[str, str]],
+        source_lang: str = "Korean",
+        glossary_prompt: str = "",
+        game_context: str = "",
+        format_rules: list[str] | None = None,
+        style_examples: dict[str, list[tuple[str, str]]] | None = None,
+    ) -> dict:
+        # Build the actual prompt to get a realistic character count
+        system_prompt, user_message = self.build_prompt(
+            entries, source_lang, glossary_prompt,
+            game_context=game_context,
+            format_rules=format_rules,
+            style_examples=style_examples,
+        )
+        full_prompt = system_prompt + user_message
+
+        # CJK characters tokenize at ~1-2 tokens each, ASCII at ~4 chars/token.
+        # Count them separately for a more accurate estimate.
+        cjk_chars = sum(1 for c in full_prompt if '\u2e80' <= c <= '\u9fff' or '\uac00' <= c <= '\ud7af' or '\uff00' <= c <= '\uffef')
+        ascii_chars = len(full_prompt) - cjk_chars
+        estimated_input_tokens = int(cjk_chars * 1.5 + ascii_chars / 4) + 100
+
+        # Output: translations + JSON overhead + suggested terms
+        output_chars = sum(len(text) for _, text in entries)
+        estimated_output_tokens = int(output_chars * 1.5) + 200
 
         input_cost_per_m = 3.0
         output_cost_per_m = 15.0
@@ -234,5 +257,5 @@ class ClaudeProvider(TranslationProvider):
             "estimated_output_tokens": estimated_output_tokens,
             "estimated_cost_usd": round(estimated_cost, 4),
             "model": self._model,
-            "note": f"Estimated for {len(entries)} strings ({total_chars} chars)",
+            "note": f"Estimated for {len(entries)} strings ({cjk_chars} CJK + {ascii_chars} ASCII chars)",
         }

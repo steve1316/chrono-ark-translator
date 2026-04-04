@@ -89,7 +89,7 @@ class DeepLProvider(TranslationProvider):
 
         return results, []
 
-    def estimate_cost(self, entries: list[tuple[str, str]]) -> dict:
+    def estimate_cost(self, entries: list[tuple[str, str]], **kwargs) -> dict:
         """
         Estimate the cost of translating the given entries.
 
