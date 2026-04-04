@@ -4,6 +4,7 @@ from games.chrono_ark.csv_extractor import (
     find_all_csv_files,
     classify_csv_file,
     extract_mod_strings,
+    _fix_oversized_row,
 )
 
 
@@ -89,3 +90,56 @@ def test_extract_mod_strings_deduplicates(tmp_path):
     # Variants are reported.
     assert len(variants) == 1
     assert "副本" in variants[0]
+
+
+def test_fix_oversized_row_merges_korean_with_commas():
+    """Korean field with unquoted commas should be merged back together."""
+    col_indices = {
+        "Key": 0, "Type": 1, "Desc": 2, "Korean": 3,
+        "English": 4, "Japanese": 5, "Chinese": 6, "Chinese-TW [zh-tw]": 7, "": 8,
+    }
+    # Simulate csv.reader splitting Korean field into 3 columns (+ trailing empty
+    # from trailing comma in both header and data, matching real CSV format).
+    row = [
+        "Buff/B_Test", "Text", "",
+        '"로직 아틀리에"와 공격을 받을 때마다',
+        "받는 치명타 확률 10%",
+        '받는 치명타 피해 25% 증가합니다."',
+        "Increase critical hit chance by 10%",
+        "日本語テスト",
+        "中文测试",
+        "",
+        "",
+    ]
+    fixed = _fix_oversized_row(row, 9, col_indices)
+    assert len(fixed) == 9
+    assert "Increase critical hit" in fixed[col_indices["English"]]
+    assert "치명타" in fixed[col_indices["Korean"]]
+    assert "日本語" in fixed[col_indices["Japanese"]]
+    assert "中文" in fixed[col_indices["Chinese"]]
+
+
+def test_extract_mod_strings_handles_unquoted_commas(tmp_path):
+    """End-to-end: a CSV with unquoted commas in Korean parses correctly."""
+    # Real Chrono Ark CSVs have a trailing comma on every line, producing an
+    # extra empty column.  This matches the actual file format.
+    csv_content = (
+        "Key,Type,Desc,Korean,English,Japanese,Chinese,Chinese-TW [zh-tw],\n"
+        'Buff/B_6_T_Description,Text,,""로직 아틀리에"와 그가 관련된 스킬의 공격을 받을 때마다,'
+        "받는 치명타 확률 10% ,"
+        '받는 치명타 피해 25% 증가합니다.",'
+        "Increase critical hit chance by 10% and critical hit damage by 25%.,"
+        "「ロジックアトリエ」やそれに関するスキルからの攻撃を受ける時,"
+        "受到技能逻辑工作室及其衍生技能的攻击时,,\n"
+    )
+    loc_dir = tmp_path / "Localization"
+    loc_dir.mkdir()
+    csv_path = loc_dir / "LangDataDB.csv"
+    csv_path.write_text(csv_content, encoding="utf-8")
+
+    strings, _ = extract_mod_strings(tmp_path)
+    entry = strings["Buff/B_6_T_Description"]
+    assert "Increase critical hit" in entry.translations["English"]
+    assert "치명타" in entry.translations["Korean"]
+    assert "ロジック" in entry.translations["Japanese"]
+    assert "逻辑工作室" in entry.translations["Chinese"]

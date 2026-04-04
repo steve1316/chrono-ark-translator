@@ -32,6 +32,75 @@ _VARIANT_SUFFIX_RE = re.compile(
 )
 
 
+def _fix_oversized_row(
+    row: list[str], expected_cols: int, col_indices: dict[str, int]
+) -> list[str]:
+    """
+    Fix a row that has more columns than expected due to unquoted commas.
+
+    Tries merging excess columns at each language-column position and picks
+    the merge that best aligns columns with their expected scripts.
+    """
+    excess = len(row) - expected_cols
+    if excess <= 0:
+        return row
+
+    language_columns = {"Korean", "English", "Japanese", "Chinese", "Chinese-TW [zh-tw]"}
+    lang_positions = sorted(
+        idx for lang, idx in col_indices.items() if lang in language_columns
+    )
+    if not lang_positions:
+        return row
+
+    best_row = None
+    best_score = -1
+
+    for merge_pos in lang_positions:
+        end = merge_pos + excess + 1
+        if end > len(row):
+            continue
+        candidate = (
+            row[:merge_pos]
+            + [",".join(row[merge_pos:end])]
+            + row[end:]
+        )
+
+        score = 0
+        for lang, idx in col_indices.items():
+            if lang not in language_columns or idx >= len(candidate):
+                continue
+            cell = candidate[idx].strip()
+            if not cell:
+                continue
+            has_hangul = any("\uac00" <= c <= "\ud7af" for c in cell)
+            has_kana = any("\u3040" <= c <= "\u30ff" for c in cell)
+            has_cjk = any("\u4e00" <= c <= "\u9fff" for c in cell)
+            ascii_ratio = sum(1 for c in cell if ord(c) < 128) / len(cell)
+
+            if lang == "English":
+                if ascii_ratio > 0.8:
+                    score += 2
+                if has_hangul or has_kana:
+                    score -= 2
+            elif lang == "Korean":
+                if has_hangul:
+                    score += 1
+                if ascii_ratio > 0.9 and len(cell) > 10:
+                    score -= 1
+            elif lang == "Japanese":
+                if has_kana:
+                    score += 1
+            elif lang in ("Chinese", "Chinese-TW [zh-tw]"):
+                if has_cjk and not has_hangul and not has_kana:
+                    score += 1
+
+        if score > best_score:
+            best_score = score
+            best_row = candidate
+
+    return best_row if best_row is not None else row
+
+
 def _is_valid_key(key: str) -> bool:
     """Check if a string looks like a valid localization key."""
     if not key or " " in key:
@@ -78,6 +147,10 @@ def _parse_csv_content(file_path: Path) -> list[LocString]:
     for row in reader:
         if not row:
             continue
+
+        # Fix rows with excess columns caused by unquoted commas in fields.
+        if len(row) > len(header):
+            row = _fix_oversized_row(row, len(header), col_indices)
 
         first_cell = row[0].strip()
 
