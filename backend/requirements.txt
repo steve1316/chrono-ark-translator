@@ -1,0 +1,7 @@
+anthropic>=0.40.0
+openai>=1.0.0
+deepl>=1.0.0
+dotnetfile>=0.2.10
+pytest>=7.0.0
+fastapi>=0.100.0
+uvicorn>=0.22.0
