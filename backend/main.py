@@ -111,7 +111,7 @@ def cmd_extract(args: argparse.Namespace, adapter: GameAdapter) -> None:
             mod_path = matching[0].path
 
         print(f"Extracting strings from mod {args.mod}...")
-        strings = adapter.extract_strings(mod_path)
+        strings, _ = adapter.extract_strings(mod_path)
         output_path = config.STORAGE_PATH / "mods" / args.mod / "source.json"
         _save_extracted_strings(strings, output_path)
 
@@ -142,7 +142,7 @@ def cmd_extract(args: argparse.Namespace, adapter: GameAdapter) -> None:
         for mod_info in mods:
             if mod_info.has_loc_files:
                 print(f"\nExtracting: {mod_info.name} ({mod_info.mod_id})...")
-                strings = adapter.extract_strings(mod_info.path)
+                strings, _ = adapter.extract_strings(mod_info.path)
                 output = config.STORAGE_PATH / "mods" / mod_info.mod_id / "source.json"
                 _save_extracted_strings(strings, output)
                 tracker.update(mod_info.mod_id, strings, adapter.source_languages)
@@ -170,17 +170,20 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
     mod_path = matching[0].path
 
     print(f"Loading strings for mod {mod_id}...")
-    strings = adapter.extract_strings(mod_path)
+    strings, _ = adapter.extract_strings(mod_path)
     untranslated = adapter.get_untranslated(strings)
 
     if not untranslated:
         print("All strings already have English translations!")
         return
 
-    # Load translation memory and glossary.
+    # Load translation memory and glossary (merged base + mod).
     tm = TranslationMemory()
-    glossary = load_glossary()
-    glossary_prompt = get_glossary_prompt(glossary)
+    from data.glossary_manager import load_mod_glossary, merge_glossaries
+    base_glossary = load_glossary()
+    mod_glossary = load_mod_glossary(mod_id)
+    merged = merge_glossaries(base_glossary, mod_glossary)
+    glossary_prompt = get_glossary_prompt(merged)
 
     # Check translation memory for cached translations.
     needs_translation = []
@@ -235,11 +238,11 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
     # Translate in batches.
     print(f"\n  Using provider: {provider.name}")
     all_translations = dict(cached_translations)
+    all_suggestions = []
 
     for lang, entries in entries_by_lang.items():
         print(f"\n  Translating {len(entries)} {lang} strings...")
 
-        # Batch the entries.
         batch_size = config.BATCH_SIZE
         batch_num = 1
         total_batches = (len(entries) + batch_size - 1) // batch_size
@@ -248,22 +251,21 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
             batch = entries[i : i + batch_size]
             print(f"    Batch {batch_num}/{total_batches} ({len(batch)} strings)...")
 
-            translations = provider.translate_batch(
+            translations, suggestions = provider.translate_batch(
                 batch, lang, glossary_prompt,
                 game_context=game_context,
                 format_rules=format_rules,
+                style_examples=adapter.get_style_examples(),
             )
             all_translations.update(translations)
+            all_suggestions.extend(suggestions)
 
-            # Store in translation memory.
             for key, english in translations.items():
-                # Find the source text for this key.
                 source_text = ""
                 for k, t in batch:
                     if k == key:
                         source_text = t
                         break
-
                 if source_text and english:
                     tm.store(source_text, english, lang)
 
@@ -277,6 +279,12 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
     # Apply translations.
     _apply_translations(mod_id, strings, all_translations, tm)
+
+    # Store any glossary term suggestions.
+    if all_suggestions:
+        from data.suggestion_manager import add_suggestions
+        add_suggestions(mod_id, all_suggestions)
+        print(f"  {len(all_suggestions)} glossary term suggestions pending review")
 
 
 def _apply_translations(
@@ -404,7 +412,7 @@ def cmd_export(args: argparse.Namespace, adapter: GameAdapter) -> None:
         sys.exit(1)
     mod_path = matching[0].path
 
-    strings = adapter.extract_strings(mod_path)
+    strings, _ = adapter.extract_strings(mod_path)
 
     # Load saved translations.
     translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
