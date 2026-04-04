@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo, forwardRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useParams } from "react-router-dom"
-import { TableVirtuoso } from "react-virtuoso"
 import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook } from "react-icons/fa"
 import type { LocString, TermSuggestion } from "../shared_types"
 import GlossarySuggestionModal from "./GlossarySuggestionModal"
@@ -260,18 +259,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         return sortConfig.direction === "asc" ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
     }
     
-    // Table components for Virtuoso.
-    const virtuosoComponents = useMemo(
-        () => ({
-            Scroller: forwardRef<HTMLDivElement, any>((props, ref) => <div {...props} ref={ref} style={{ ...props.style, width: "100%" }} />),
-            Table: (props: any) => <table {...props} style={{ ...props.style, borderCollapse: "collapse" }} />,
-            TableHead: forwardRef<HTMLTableSectionElement, any>((props, ref) => <thead {...props} ref={ref} style={{ background: "var(--bg-color)", position: "sticky", top: 0, zIndex: 10 }} />),
-            TableRow: (props: any) => <tr {...props} />,
-            TableBody: forwardRef<HTMLTableSectionElement, any>((props, ref) => <tbody {...props} ref={ref} />),
-        }),
-        []
-    )
-
     const [exporting, setExporting] = useState(false)
 
     /**
@@ -593,49 +580,47 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 </div>
             )}
 
-            <div className="glass-card string-table-container">
-                <TableVirtuoso
-                    style={{ height: "calc(100vh - 400px)", minHeight: "500px" }}
-                    data={processedStrings}
-                    components={virtuosoComponents}
-                    overscan={5000}
-                    fixedHeaderContent={() => (
-                    <tr>
-                        <th className="sortable-th" onClick={() => handleSort("is_translated")} style={{ width: columnWidths.status }}>
-                            Status {getSortIcon("is_translated")}
-                            <div className="resizer" onPointerDown={(e) => onResizeStart(e, "status")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
-                        </th>
-                        <th className="sortable-th" onClick={() => handleSort("key")} style={{ width: columnWidths.key }}>
-                            Key {getSortIcon("key")}
-                            <div className="resizer" onPointerDown={(e) => onResizeStart(e, "key")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
-                        </th>
-                        <th className="sortable-th" onClick={() => handleSort("source")} style={{ width: columnWidths.source }}>
-                            Source ({strings[0]?.source_lang || "Source"}) {getSortIcon("source")}
-                            <div className="resizer" onPointerDown={(e) => onResizeStart(e, "source")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
-                        </th>
-                        <th className="sortable-th" onClick={() => handleSort("english")} style={{ width: columnWidths.english }}>
-                            English {getSortIcon("english")}
-                            <div className="resizer" onPointerDown={(e) => onResizeStart(e, "english")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
-                        </th>
-                    </tr>
-                )}
-                itemContent={(_index, s) => (
-                    <>
-                        <td>
-                            <span className={`status-badge ${s.is_translated ? "status-translated" : "status-missing"}`}>{s.is_translated ? "OK" : "MISSING"}</span>
-                        </td>
-                        <td className="key-cell" title={s.key} style={{ maxWidth: columnWidths.key }}>
-                            {s.key}
-                        </td>
-                        <td className="source-cell" style={{ maxWidth: columnWidths.source }}>
-                            {s.source}
-                        </td>
-                        <td className="english-cell" style={{ maxWidth: columnWidths.english, position: "relative" }}>
-                            <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
-                        </td>
-                    </>
-                )}
-            />
+            <div className="glass-card string-table-container" style={{ height: "calc(100vh - 400px)", minHeight: "500px", overflow: "auto" }}>
+                <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                    <thead style={{ background: "var(--bg-color)", position: "sticky", top: 0, zIndex: 10 }}>
+                        <tr>
+                            <th className="sortable-th" onClick={() => handleSort("is_translated")} style={{ width: columnWidths.status }}>
+                                Status {getSortIcon("is_translated")}
+                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "status")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
+                            </th>
+                            <th className="sortable-th" onClick={() => handleSort("key")} style={{ width: columnWidths.key }}>
+                                Key {getSortIcon("key")}
+                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "key")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
+                            </th>
+                            <th className="sortable-th" onClick={() => handleSort("source")} style={{ width: columnWidths.source }}>
+                                Source ({strings[0]?.source_lang || "Source"}) {getSortIcon("source")}
+                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "source")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
+                            </th>
+                            <th className="sortable-th" onClick={() => handleSort("english")} style={{ width: columnWidths.english }}>
+                                English {getSortIcon("english")}
+                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "english")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {processedStrings.map((s) => (
+                            <tr key={s.key}>
+                                <td>
+                                    <span className={`status-badge ${s.is_translated ? "status-translated" : "status-missing"}`}>{s.is_translated ? "OK" : "MISSING"}</span>
+                                </td>
+                                <td className="key-cell" title={s.key} style={{ maxWidth: columnWidths.key }}>
+                                    {s.key}
+                                </td>
+                                <td className="source-cell" style={{ maxWidth: columnWidths.source }}>
+                                    {s.source}
+                                </td>
+                                <td className="english-cell" style={{ maxWidth: columnWidths.english, position: "relative" }}>
+                                    <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
 
             {showSuggestionModal && (
