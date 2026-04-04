@@ -163,12 +163,11 @@ class ClaudeProvider(TranslationProvider):
                 time.sleep(wait_time)
             except anthropic.APIError as e:
                 if attempt == max_retries - 1:
-                    print(f"  API error after {max_retries} retries: {e}")
-                    return {}, []
+                    raise RuntimeError(f"API error after {max_retries} retries: {e}") from e
                 wait_time = 2 ** attempt * 2
                 time.sleep(wait_time)
 
-        return {}, []
+        raise RuntimeError("Translation failed after all retries")
 
     def _parse_response(
         self,

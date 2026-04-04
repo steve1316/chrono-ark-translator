@@ -403,22 +403,25 @@ async def translate_mod(req: TranslationRequest):
             by_lang[lang].append((key, loc_str.translations.get(lang, "")))
 
     batch_size = config.BATCH_SIZE
-    for lang, entries in by_lang.items():
-        for i in range(0, len(entries), batch_size):
-            batch = entries[i : i + batch_size]
-            translations, suggestions = provider.translate_batch(
-                batch, lang, glossary_prompt,
-                game_context=game_context,
-                format_rules=format_rules,
-                style_examples=style_examples,
-            )
-            all_translations.update(translations)
-            all_suggestions.extend(suggestions)
+    try:
+        for lang, entries in by_lang.items():
+            for i in range(0, len(entries), batch_size):
+                batch = entries[i : i + batch_size]
+                translations, suggestions = provider.translate_batch(
+                    batch, lang, glossary_prompt,
+                    game_context=game_context,
+                    format_rules=format_rules,
+                    style_examples=style_examples,
+                )
+                all_translations.update(translations)
+                all_suggestions.extend(suggestions)
 
-            for key, english in translations.items():
-                source_text = next((t for k, t in batch if k == key), "")
-                if source_text and english:
-                    tm.store(source_text, english, lang)
+                for key, english in translations.items():
+                    source_text = next((t for k, t in batch if k == key), "")
+                    if source_text and english:
+                        tm.store(source_text, english, lang)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
     # Save translations.
     translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
