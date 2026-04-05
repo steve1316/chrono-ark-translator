@@ -78,9 +78,7 @@ class DeepLProvider(TranslationProvider):
         import deepl
 
         if not self._api_key:
-            raise ValueError(
-                "DeepL API key not set. Set CATL_DEEPL_API_KEY env var."
-            )
+            raise ValueError("DeepL API key not set. Set CATL_DEEPL_API_KEY env var.")
 
         translator = deepl.Translator(self._api_key)
 
@@ -129,6 +127,6 @@ class DeepLProvider(TranslationProvider):
             "estimated_characters": total_chars,
             "estimated_cost_usd": round(estimated_cost, 4),
             "note": f"Estimated for {len(entries)} strings ({total_chars} chars). "
-                    f"DeepL does not support custom glossary prompts — consider "
-                    f"creating a DeepL glossary separately for term consistency.",
+            f"DeepL does not support custom glossary prompts — consider "
+            f"creating a DeepL glossary separately for term consistency.",
         }

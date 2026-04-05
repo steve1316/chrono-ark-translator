@@ -28,6 +28,7 @@ class ModInfo:
         target_lang_populated: Whether any entries already have target language text.
         path: Filesystem path to the mod's root directory.
     """
+
     mod_id: str
     name: str = ""
     author: str = ""

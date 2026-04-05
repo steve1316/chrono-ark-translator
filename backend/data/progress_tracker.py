@@ -120,10 +120,7 @@ class ProgressTracker:
             text = loc_string.translations.get(source_lang, "")
         else:
             # Fall back to concatenating all non-English translations.
-            text = "|".join(
-                loc_string.translations.get(lang, "")
-                for lang in source_languages
-            )
+            text = "|".join(loc_string.translations.get(lang, "") for lang in source_languages)
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def update(
@@ -160,7 +157,7 @@ class ProgressTracker:
         empty_source_keys = set()
         for key, loc_str in current_strings.items():
             new_hashes[key] = self._hash_source_text(loc_str, langs)
-            
+
             # If no source language has content, it's an empty source string.
             has_source = False
             for lang in langs:
@@ -253,20 +250,17 @@ class ProgressTracker:
         snapshot = self._load_snapshot(mod_id)
         total = snapshot.get("total_keys", 0)
         translated_set = set(snapshot.get("translated", []))
-        
+
         # Also count keys that have empty source hashes.
         # This fixes the dashboard for mods that haven't been re-scanned
         # since the empty-source logic was added.
         hashes = snapshot.get("hashes", {})
-        empty_hashes = {
-            hashlib.sha256(("|" * i).encode("utf-8")).hexdigest()
-            for i in range(5) # Covers up to 5 source languages
-        }
-        
+        empty_hashes = {hashlib.sha256(("|" * i).encode("utf-8")).hexdigest() for i in range(5)}  # Covers up to 5 source languages
+
         for key, h in hashes.items():
             if h in empty_hashes:
                 translated_set.add(key)
-        
+
         translated = len(translated_set)
         untranslated = total - translated
         percentage = (translated / total * 100) if total > 0 else 0.0

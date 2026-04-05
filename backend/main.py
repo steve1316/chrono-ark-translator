@@ -280,7 +280,9 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
             glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
             translations, suggestions = provider.translate_batch(
-                batch, lang, glossary_prompt,
+                batch,
+                lang,
+                glossary_prompt,
                 game_context=game_context,
                 format_rules=format_rules,
                 style_examples=adapter.get_style_examples(),
@@ -302,8 +304,7 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
     # Save translation memory.
     tm.save()
     tm_stats = tm.get_stats()
-    print(f"\n  Translation memory: {tm_stats['total_entries']} entries "
-          f"({tm_stats['hit_rate_percent']}% hit rate this session)")
+    print(f"\n  Translation memory: {tm_stats['total_entries']} entries " f"({tm_stats['hit_rate_percent']}% hit rate this session)")
 
     # Apply translations.
     _apply_translations(mod_id, strings, all_translations, tm)
@@ -386,13 +387,7 @@ def cmd_status(args: argparse.Namespace, adapter: GameAdapter) -> None:
             if mod_dir.is_dir():
                 status = tracker.get_status(mod_dir.name)
                 if status["total"] > 0:
-                    print(
-                        f"{mod_dir.name:<15} "
-                        f"{status['total']:<8} "
-                        f"{status['translated']:<8} "
-                        f"{status['untranslated']:<8} "
-                        f"{status['percentage']:<10}%"
-                    )
+                    print(f"{mod_dir.name:<15} " f"{status['total']:<8} " f"{status['translated']:<8} " f"{status['untranslated']:<8} " f"{status['percentage']:<10}%")
 
 
 # ── Subcommand: glossary ──────────────────────────────────────────────────────
@@ -514,9 +509,10 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--game", type=str, default=config.ACTIVE_GAME,
-        help=f"Game adapter to use (default: {config.ACTIVE_GAME}). "
-             f"Available: {', '.join(list_games()) or '(loading...)'}",
+        "--game",
+        type=str,
+        default=config.ACTIVE_GAME,
+        help=f"Game adapter to use (default: {config.ACTIVE_GAME}). " f"Available: {', '.join(list_games()) or '(loading...)'}",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -530,10 +526,7 @@ def main() -> None:
     # Translate subcommand.
     translate_parser = subparsers.add_parser("translate", help="Translate mod strings")
     translate_parser.add_argument("--mod", type=str, required=True, help="Mod Workshop ID")
-    translate_parser.add_argument(
-        "--provider", type=str, choices=["claude", "openai", "deepl"],
-        help="Translation provider (default: from config)"
-    )
+    translate_parser.add_argument("--provider", type=str, choices=["claude", "openai", "deepl"], help="Translation provider (default: from config)")
     translate_parser.add_argument("--dry-run", action="store_true", help="Show cost estimate only")
 
     # Status subcommand.

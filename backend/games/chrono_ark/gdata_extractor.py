@@ -65,11 +65,7 @@ def _has_cjk(s: str) -> bool:
     """
     for ch in s:
         cp = ord(ch)
-        if (0x4E00 <= cp <= 0x9FFF
-                or 0x3400 <= cp <= 0x4DBF
-                or 0xAC00 <= cp <= 0xD7AF
-                or 0x3040 <= cp <= 0x309F
-                or 0x30A0 <= cp <= 0x30FF):
+        if 0x4E00 <= cp <= 0x9FFF or 0x3400 <= cp <= 0x4DBF or 0xAC00 <= cp <= 0xD7AF or 0x3040 <= cp <= 0x309F or 0x30A0 <= cp <= 0x30FF:
             return True
     return False
 

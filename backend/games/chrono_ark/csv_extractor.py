@@ -20,20 +20,18 @@ _BACKUP_DIR_PATTERNS = {"langbackup", "备份", "备份2", "备份3", "备份4",
 
 # Regex to strip variant suffixes from filenames.
 _VARIANT_SUFFIX_RE = re.compile(
-    r"( - 副本"            # Chinese "copy"
-    r"| \(\d+\)"           # " (1)", " (2)"
-    r"|（\d+）"            # fullwidth parens
-    r"|_v[\d.]+"           # "_v0.6.13"
-    r"|_copy"              # "_copy"
-    r"| copy"              # " copy"
+    r"( - 副本"  # Chinese "copy"
+    r"| \(\d+\)"  # " (1)", " (2)"
+    r"|（\d+）"  # fullwidth parens
+    r"|_v[\d.]+"  # "_v0.6.13"
+    r"|_copy"  # "_copy"
+    r"| copy"  # " copy"
     r")(?=\.csv$)",
     re.IGNORECASE,
 )
 
 
-def _fix_oversized_row(
-    row: list[str], expected_cols: int, col_indices: dict[str, int]
-) -> list[str]:
+def _fix_oversized_row(row: list[str], expected_cols: int, col_indices: dict[str, int]) -> list[str]:
     """Fix a row that has more columns than expected due to unquoted commas.
 
     Tries merging excess columns at each language-column position and picks
@@ -53,9 +51,7 @@ def _fix_oversized_row(
         return row
 
     language_columns = {"Korean", "English", "Japanese", "Chinese", "Chinese-TW [zh-tw]"}
-    lang_positions = sorted(
-        idx for lang, idx in col_indices.items() if lang in language_columns
-    )
+    lang_positions = sorted(idx for lang, idx in col_indices.items() if lang in language_columns)
     if not lang_positions:
         return row
 
@@ -66,11 +62,7 @@ def _fix_oversized_row(
         end = merge_pos + excess + 1
         if end > len(row):
             continue
-        candidate = (
-            row[:merge_pos]
-            + [",".join(row[merge_pos:end])]
-            + row[end:]
-        )
+        candidate = row[:merge_pos] + [",".join(row[merge_pos:end])] + row[end:]
 
         score = 0
         for lang, idx in col_indices.items():
@@ -138,7 +130,7 @@ def _parse_csv_content(file_path: Path) -> list[LocString]:
         List of LocString objects extracted from the file.
     """
     # regex for a valid key: starts with alphanumeric, no spaces, optional /
-    key_pattern = re.compile(r'^[A-Za-z0-9_\-\./]+$')
+    key_pattern = re.compile(r"^[A-Za-z0-9_\-\./]+$")
 
     results = []
 
@@ -178,8 +170,9 @@ def _parse_csv_content(file_path: Path) -> list[LocString]:
         # A continuation has a key that is invalid OR it's a short row that
         # clearly belongs to the description of the previous entry.
         is_continuation = last_entry is not None and (
-            not first_cell or
-            not key_pattern.match(first_cell) or
+            not first_cell
+            or not key_pattern.match(first_cell)
+            or
             # If it's a known key pattern but the row is too short to be a real record
             (len(row) < 3 and last_entry)
         )
@@ -334,11 +327,7 @@ def classify_csv_file(csv_path: Path, loc_dir: Path) -> tuple[str, bool]:
     canonical = _VARIANT_SUFFIX_RE.sub("", filename)
 
     # If the file is a direct canonical name in the expected dir, it's canonical.
-    is_canonical = (
-        canonical == filename
-        and not in_backup
-        and canonical in _CANONICAL_NAMES
-    )
+    is_canonical = canonical == filename and not in_backup and canonical in _CANONICAL_NAMES
 
     # Top-level file when Localization/ version exists is a variant.
     if is_canonical and csv_path.parent != loc_dir:

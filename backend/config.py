@@ -18,10 +18,7 @@ load_dotenv(Path(__file__).parent / ".env")
 # ── Paths ──────────────────────────────────────────────────────────────────────
 
 # Local storage directory for extracted data, translations, and glossary.
-STORAGE_PATH = Path(os.environ.get(
-    "CATL_STORAGE_PATH",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "storage")
-))
+STORAGE_PATH = Path(os.environ.get("CATL_STORAGE_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "storage")))
 
 # ── API Keys ───────────────────────────────────────────────────────────────────
 
@@ -39,9 +36,7 @@ BATCH_SIZE = int(os.environ.get("CATL_BATCH_SIZE", "20"))
 
 # Glossary categories to include in the translation prompt.
 # Only these categories from the base glossary are sent to the LLM.
-GLOSSARY_CATEGORIES = os.environ.get(
-    "CATL_GLOSSARY_CATEGORIES", "buffs,characters"
-).split(",")
+GLOSSARY_CATEGORIES = os.environ.get("CATL_GLOSSARY_CATEGORIES", "buffs,characters").split(",")
 
 # ── Game Selection ─────────────────────────────────────────────────────────────
 

@@ -73,14 +73,20 @@ def test_classify_chinese_backup_dir():
 
 
 def test_extract_mod_strings_deduplicates(tmp_path):
-    _write_csv(tmp_path / "Localization" / "LangDataDB.csv", [
-        "Buff/B_1_Name,Text,,테스트,Canonical,,测试,測試",
-        "Buff/B_2_Name,Text,,테스트2,Test2,,测试2,測試2",
-    ])
-    _write_csv(tmp_path / "Localization" / "LangDataDB - 副本.csv", [
-        "Buff/B_1_Name,Text,,테스트,FromCopy,,测试,測試",
-        "Buff/B_3_Name,Text,,테스트3,Test3,,测试3,測試3",
-    ])
+    _write_csv(
+        tmp_path / "Localization" / "LangDataDB.csv",
+        [
+            "Buff/B_1_Name,Text,,테스트,Canonical,,测试,測試",
+            "Buff/B_2_Name,Text,,테스트2,Test2,,测试2,測試2",
+        ],
+    )
+    _write_csv(
+        tmp_path / "Localization" / "LangDataDB - 副本.csv",
+        [
+            "Buff/B_1_Name,Text,,테스트,FromCopy,,测试,測試",
+            "Buff/B_3_Name,Text,,테스트3,Test3,,测试3,測試3",
+        ],
+    )
     strings, variants = extract_mod_strings(tmp_path)
     # Canonical wins on key collision.
     assert strings["Buff/B_1_Name"].translations["English"] == "Canonical"
@@ -94,13 +100,22 @@ def test_extract_mod_strings_deduplicates(tmp_path):
 def test_fix_oversized_row_merges_korean_with_commas():
     """Korean field with unquoted commas should be merged back together."""
     col_indices = {
-        "Key": 0, "Type": 1, "Desc": 2, "Korean": 3,
-        "English": 4, "Japanese": 5, "Chinese": 6, "Chinese-TW [zh-tw]": 7, "": 8,
+        "Key": 0,
+        "Type": 1,
+        "Desc": 2,
+        "Korean": 3,
+        "English": 4,
+        "Japanese": 5,
+        "Chinese": 6,
+        "Chinese-TW [zh-tw]": 7,
+        "": 8,
     }
     # Simulate csv.reader splitting Korean field into 3 columns (+ trailing empty
     # from trailing comma in both header and data, matching real CSV format).
     row = [
-        "Buff/B_Test", "Text", "",
+        "Buff/B_Test",
+        "Text",
+        "",
         '"로직 아틀리에"와 공격을 받을 때마다',
         "받는 치명타 확률 10%",
         '받는 치명타 피해 25% 증가합니다."',

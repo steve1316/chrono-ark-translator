@@ -86,8 +86,8 @@ def build_style_examples_section(examples: dict[str, list[tuple[str, str]]]) -> 
         title = category_titles.get(category, category.title())
         lines.append(f"### {title}")
         for source, english in pairs:
-            lines.append(f"- Source: \"{source}\"")
-            lines.append(f"  English: \"{english}\"")
+            lines.append(f'- Source: "{source}"')
+            lines.append(f'  English: "{english}"')
         lines.append("")
 
     lines.append("Use this style: imperative for skills, declarative for buffs/items, concise throughout.")
@@ -190,9 +190,7 @@ class ClaudeProvider(TranslationProvider):
         """
         glossary_section = glossary_prompt if glossary_prompt else "No glossary available."
         rules = format_rules or []
-        format_rules_section = "\n".join(
-            f"{i+1}. **{rule}**" for i, rule in enumerate(rules)
-        ) if rules else ""
+        format_rules_section = "\n".join(f"{i+1}. **{rule}**" for i, rule in enumerate(rules)) if rules else ""
         style_examples_section = build_style_examples_section(style_examples or {})
         character_context_section = build_character_context_section(character_context)
 
@@ -209,7 +207,7 @@ class ClaudeProvider(TranslationProvider):
         for key, source_text in entries:
             escaped = source_text.replace("\n", "\\n")
             user_lines.append(f"**{key}**: {escaped}")
-        user_lines.append("\nReturn a JSON object with \"translations\" and \"suggested_terms\".")
+        user_lines.append('\nReturn a JSON object with "translations" and "suggested_terms".')
         user_message = "\n".join(user_lines)
 
         return system_prompt, user_message
@@ -257,7 +255,9 @@ class ClaudeProvider(TranslationProvider):
         client = anthropic.Anthropic(api_key=self._api_key)
 
         system_prompt, user_message = self.build_prompt(
-            entries, source_lang, glossary_prompt,
+            entries,
+            source_lang,
+            glossary_prompt,
             game_context=game_context,
             format_rules=format_rules,
             style_examples=style_examples,
@@ -276,13 +276,13 @@ class ClaudeProvider(TranslationProvider):
                 return self._parse_response(response.content[0].text, entries)
 
             except anthropic.RateLimitError:
-                wait_time = 2 ** attempt * 5
+                wait_time = 2**attempt * 5
                 print(f"  Rate limited. Waiting {wait_time}s...")
                 time.sleep(wait_time)
             except anthropic.APIError as e:
                 if attempt == max_retries - 1:
                     raise RuntimeError(f"API error after {max_retries} retries: {e}") from e
-                wait_time = 2 ** attempt * 2
+                wait_time = 2**attempt * 2
                 time.sleep(wait_time)
 
         raise RuntimeError("Translation failed after all retries")
@@ -323,20 +323,14 @@ class ClaudeProvider(TranslationProvider):
 
                 # New format: {translations: {...}, suggested_terms: [...]}
                 if "translations" in result and isinstance(result["translations"], dict):
-                    translations = {
-                        k: v.replace("\\n", "\n") for k, v in result["translations"].items()
-                        if k in expected_keys and isinstance(v, str)
-                    }
+                    translations = {k: v.replace("\\n", "\n") for k, v in result["translations"].items() if k in expected_keys and isinstance(v, str)}
                     suggestions = result.get("suggested_terms", [])
                     if not isinstance(suggestions, list):
                         suggestions = []
                     return translations, suggestions
 
                 # Old flat format fallback: {key: translation, ...}
-                translations = {
-                    k: v.replace("\\n", "\n") for k, v in result.items()
-                    if k in expected_keys and isinstance(v, str)
-                }
+                translations = {k: v.replace("\\n", "\n") for k, v in result.items() if k in expected_keys and isinstance(v, str)}
                 return translations, []
 
         except json.JSONDecodeError:
@@ -377,7 +371,9 @@ class ClaudeProvider(TranslationProvider):
         """
         # Build the actual prompt to get a realistic character count
         system_prompt, user_message = self.build_prompt(
-            entries, source_lang, glossary_prompt,
+            entries,
+            source_lang,
+            glossary_prompt,
             game_context=game_context,
             format_rules=format_rules,
             style_examples=style_examples,
@@ -387,7 +383,7 @@ class ClaudeProvider(TranslationProvider):
 
         # CJK characters tokenize at ~1-2 tokens each, ASCII at ~4 chars/token.
         # Count them separately for a more accurate estimate.
-        cjk_chars = sum(1 for c in full_prompt if '\u2e80' <= c <= '\u9fff' or '\uac00' <= c <= '\ud7af' or '\uff00' <= c <= '\uffef')
+        cjk_chars = sum(1 for c in full_prompt if "\u2e80" <= c <= "\u9fff" or "\uac00" <= c <= "\ud7af" or "\uff00" <= c <= "\uffef")
         ascii_chars = len(full_prompt) - cjk_chars
         estimated_input_tokens = int(cjk_chars * 1.5 + ascii_chars / 4) + 100
 
@@ -398,10 +394,7 @@ class ClaudeProvider(TranslationProvider):
         input_cost_per_m = 3.0
         output_cost_per_m = 15.0
 
-        estimated_cost = (
-            estimated_input_tokens / 1_000_000 * input_cost_per_m
-            + estimated_output_tokens / 1_000_000 * output_cost_per_m
-        )
+        estimated_cost = estimated_input_tokens / 1_000_000 * input_cost_per_m + estimated_output_tokens / 1_000_000 * output_cost_per_m
 
         return {
             "estimated_input_tokens": estimated_input_tokens,

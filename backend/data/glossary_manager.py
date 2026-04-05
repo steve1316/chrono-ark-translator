@@ -245,9 +245,7 @@ def get_glossary_prompt(
                 if source_lang and source_lang in mappings:
                     mapping_str = f"{source_lang}: {mappings[source_lang]}"
                 else:
-                    mapping_str = ", ".join(
-                        f"{lang}: {text}" for lang, text in mappings.items()
-                    )
+                    mapping_str = ", ".join(f"{lang}: {text}" for lang, text in mappings.items())
                 lines.append(f"- **{english_term}** ← {mapping_str}")
             else:
                 lines.append(f"- **{english_term}**")

@@ -85,7 +85,7 @@ class ManualProvider(TranslationProvider):
         print(f"  Source language: {source_lang}")
         print(f"\n  Edit this file:")
         print(f"    {edit_path}")
-        print(f"\n  Fill in the \"translation\" field for each entry.")
+        print(f'\n  Fill in the "translation" field for each entry.')
         print(f"  Leave blank to skip an entry.")
         print(f"\n{'=' * 60}")
 
@@ -137,6 +137,5 @@ class ManualProvider(TranslationProvider):
 
         return {
             "estimated_cost_usd": 0.0,
-            "note": f"Manual translation — no API cost. "
-                    f"{len(entries)} strings ({total_chars} chars) to translate.",
+            "note": f"Manual translation — no API cost. " f"{len(entries)} strings ({total_chars} chars) to translate.",
         }

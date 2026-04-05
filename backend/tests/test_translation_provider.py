@@ -5,12 +5,12 @@ from backend.translator.claude_provider import ClaudeProvider, build_style_examp
 def test_parse_response_new_format():
     provider = ClaudeProvider.__new__(ClaudeProvider)
     entries = [("Buff/B_Test_Name", "테스트")]
-    response = json.dumps({
-        "translations": {"Buff/B_Test_Name": "Test"},
-        "suggested_terms": [
-            {"english": "Dark Mage", "source": "흑마법사", "source_lang": "Korean", "category": "characters", "reason": "Recurring name"}
-        ]
-    })
+    response = json.dumps(
+        {
+            "translations": {"Buff/B_Test_Name": "Test"},
+            "suggested_terms": [{"english": "Dark Mage", "source": "흑마법사", "source_lang": "Korean", "category": "characters", "reason": "Recurring name"}],
+        }
+    )
     translations, suggestions = provider._parse_response(response, entries)
     assert translations == {"Buff/B_Test_Name": "Test"}
     assert len(suggestions) == 1

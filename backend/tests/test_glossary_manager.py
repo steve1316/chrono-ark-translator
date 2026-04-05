@@ -12,7 +12,9 @@ from backend.data.glossary_manager import (
 
 def test_build_glossary_extracts_name_keys(sample_base_strings, glossary_categories):
     glossary = build_glossary_from_base_game(
-        sample_base_strings, glossary_categories, ["Korean", "Chinese"],
+        sample_base_strings,
+        glossary_categories,
+        ["Korean", "Chinese"],
     )
     terms = glossary["terms"]
     assert "Armor Increased" in terms
@@ -24,7 +26,9 @@ def test_build_glossary_extracts_name_keys(sample_base_strings, glossary_categor
 
 def test_build_glossary_extracts_keyword_entries(sample_base_strings, glossary_categories):
     glossary = build_glossary_from_base_game(
-        sample_base_strings, glossary_categories, ["Korean", "Chinese"],
+        sample_base_strings,
+        glossary_categories,
+        ["Korean", "Chinese"],
         keyword_prefixes=["SkillKeyword/", "Battle/Keyword/"],
     )
     terms = glossary["terms"]
@@ -34,7 +38,9 @@ def test_build_glossary_extracts_keyword_entries(sample_base_strings, glossary_c
 
 def test_build_glossary_includes_seed_terms(sample_base_strings, glossary_categories):
     glossary = build_glossary_from_base_game(
-        sample_base_strings, glossary_categories, ["Korean", "Chinese"],
+        sample_base_strings,
+        glossary_categories,
+        ["Korean", "Chinese"],
     )
     terms = glossary["terms"]
     # Seed terms should be present.
@@ -100,10 +106,12 @@ def test_merge_glossaries_combines_both():
 
 
 def test_delete_mod_glossary_term(tmp_storage):
-    glossary = {"terms": {
-        "A": {"category": "c", "key": "", "source_mappings": {}},
-        "B": {"category": "c", "key": "", "source_mappings": {}},
-    }}
+    glossary = {
+        "terms": {
+            "A": {"category": "c", "key": "", "source_mappings": {}},
+            "B": {"category": "c", "key": "", "source_mappings": {}},
+        }
+    }
     save_mod_glossary("12345", glossary, tmp_storage)
     loaded = load_mod_glossary("12345", tmp_storage)
     del loaded["terms"]["A"]

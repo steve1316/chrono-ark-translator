@@ -20,12 +20,20 @@ from backend.games.registry import get_adapter
 from backend.games.base import GameAdapter
 from backend.data.progress_tracker import ProgressTracker
 from backend.data.glossary_manager import (
-    load_glossary, save_glossary, add_glossary_term, get_glossary_prompt,
-    load_mod_glossary, save_mod_glossary, merge_glossaries,
+    load_glossary,
+    save_glossary,
+    add_glossary_term,
+    get_glossary_prompt,
+    load_mod_glossary,
+    save_mod_glossary,
+    merge_glossaries,
 )
 from backend.data.translation_memory import TranslationMemory
 from backend.data.suggestion_manager import (
-    load_suggestions, add_suggestions, remove_suggestions, clear_suggestions,
+    load_suggestions,
+    add_suggestions,
+    remove_suggestions,
+    clear_suggestions,
 )
 from backend.data.character_context import load_character_context, save_character_context
 from backend.main import get_provider, save_extracted_strings
@@ -47,6 +55,7 @@ app.add_middleware(
 
 # --- Pydantic Models ---
 
+
 class GlossaryTerm(BaseModel):
     """A global glossary term mapping a source-language word to its English translation.
 
@@ -57,6 +66,7 @@ class GlossaryTerm(BaseModel):
 
     source: str
     english: str
+
 
 class ModGlossaryTerm(BaseModel):
     """A mod-specific glossary term with per-language source mappings.
@@ -72,6 +82,7 @@ class ModGlossaryTerm(BaseModel):
     source_mappings: dict[str, str] = {}
     category: str = "custom"
 
+
 class SuggestionAction(BaseModel):
     """Payload for accepting or dismissing glossary term suggestions.
 
@@ -83,6 +94,7 @@ class SuggestionAction(BaseModel):
 
     terms: list[str] = []
     all: bool = False
+
 
 class TranslationRequest(BaseModel):
     """Request body for translation, estimation, and preview endpoints.
@@ -97,6 +109,7 @@ class TranslationRequest(BaseModel):
     mod_id: str
     provider: Optional[str] = None
 
+
 class TranslationUpdate(BaseModel):
     """Payload for manually updating a single translated string.
 
@@ -109,6 +122,7 @@ class TranslationUpdate(BaseModel):
 
     key: str
     english: str
+
 
 class CharacterContext(BaseModel):
     """Optional character lore context used to improve translation quality.
@@ -124,7 +138,9 @@ class CharacterContext(BaseModel):
     character_name: str = ""
     background: str = ""
 
+
 # --- API Endpoints ---
+
 
 @app.get("/api/game")
 async def get_game_info():
@@ -138,6 +154,7 @@ async def get_game_info():
         "game_id": _adapter.game_id,
         "game_name": _adapter.game_name,
     }
+
 
 @app.get("/api/mods")
 async def get_mods():
@@ -155,21 +172,24 @@ async def get_mods():
     for mod in mods:
         status = tracker.get_status(mod.mod_id)
         preview_img = _find_mod_preview_image(mod.path)
-        results.append({
-            "id": mod.mod_id,
-            "name": mod.name,
-            "author": mod.author,
-            "has_csv": mod.has_loc_files,
-            "has_dll": mod.has_dll,
-            "total": status["total"],
-            "translated": status["translated"],
-            "untranslated": status["untranslated"],
-            "percentage": status["percentage"],
-            "last_updated": status["last_updated"],
-            "url": _adapter.get_mod_url(mod.mod_id),
-            "preview_image": f"/workshop/{mod.mod_id}/{preview_img.name}" if preview_img else None,
-        })
+        results.append(
+            {
+                "id": mod.mod_id,
+                "name": mod.name,
+                "author": mod.author,
+                "has_csv": mod.has_loc_files,
+                "has_dll": mod.has_dll,
+                "total": status["total"],
+                "translated": status["translated"],
+                "untranslated": status["untranslated"],
+                "percentage": status["percentage"],
+                "last_updated": status["last_updated"],
+                "url": _adapter.get_mod_url(mod.mod_id),
+                "preview_image": f"/workshop/{mod.mod_id}/{preview_img.name}" if preview_img else None,
+            }
+        )
     return results
+
 
 @app.get("/api/mods/{mod_id}")
 async def get_mod_detail(mod_id: str):
@@ -208,10 +228,7 @@ async def get_mod_detail(mod_id: str):
             pass
 
     # Capture original CSV English values before applying overrides.
-    original_english_map = {
-        key: loc_str.translations.get("English", "")
-        for key, loc_str in strings.items()
-    }
+    original_english_map = {key: loc_str.translations.get("English", "") for key, loc_str in strings.items()}
 
     # Apply saved translations so user edits (including clears) are respected.
     for key, english in translations.items():
@@ -235,16 +252,18 @@ async def get_mod_detail(mod_id: str):
             translated_keys.append(key)
 
         has_override = key in translations
-        results.append({
-            "key": key,
-            "type": loc_str.type,
-            "desc": loc_str.desc,
-            "source": source_text,
-            "source_lang": source_lang,
-            "english": english,
-            "is_translated": is_done,
-            "original_english": original_english_map.get(key, "") if has_override else english,
-        })
+        results.append(
+            {
+                "key": key,
+                "type": loc_str.type,
+                "desc": loc_str.desc,
+                "source": source_text,
+                "source_lang": source_lang,
+                "english": english,
+                "is_translated": is_done,
+                "original_english": original_english_map.get(key, "") if has_override else english,
+            }
+        )
 
     # Replace (not just add) the translated list so clears are reflected.
     tracker.set_translated(mod_id, translated_keys)
@@ -259,6 +278,7 @@ async def get_mod_detail(mod_id: str):
         "strings": results,
         "duplicate_files": duplicate_files,
     }
+
 
 @app.post("/api/mods/{mod_id}/strings")
 async def update_string(mod_id: str, update: TranslationUpdate):
@@ -287,7 +307,7 @@ async def update_string(mod_id: str, update: TranslationUpdate):
 
     # Update progress tracker
     tracker = ProgressTracker()
-    
+
     # We need to know if the source is empty to decide if it stays "translated"
     mods = _adapter.scan_mods()
     matching = [m for m in mods if m.mod_id == mod_id]
@@ -297,14 +317,15 @@ async def update_string(mod_id: str, update: TranslationUpdate):
             loc_str = strings[update.key]
             source_lang = _adapter.detect_source_language(loc_str)
             source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
-            
+
             is_done = bool(update.english) or not source_text.strip()
             if is_done:
                 tracker.mark_translated(mod_id, [update.key])
             else:
                 tracker.unmark_translated(mod_id, [update.key])
-    
+
     return {"status": "success"}
+
 
 @app.post("/api/mods/{mod_id}/sync")
 async def sync_mod(mod_id: str):
@@ -333,13 +354,8 @@ async def sync_mod(mod_id: str):
     tracker = ProgressTracker()
     diff = tracker.update(mod_id, strings, _adapter.source_languages)
 
-    return {
-        "status": "success",
-        "new": len(diff.new_keys),
-        "modified": len(diff.modified_keys),
-        "removed": len(diff.removed_keys),
-        "unchanged": len(diff.unchanged_keys)
-    }
+    return {"status": "success", "new": len(diff.new_keys), "modified": len(diff.modified_keys), "removed": len(diff.removed_keys), "unchanged": len(diff.unchanged_keys)}
+
 
 @app.post("/api/mods/{mod_id}/clear-translations")
 async def clear_translations(mod_id: str):
@@ -386,7 +402,7 @@ async def clear_translations(mod_id: str):
     # Re-run update so total_keys / hashes stay correct for the dashboard.
     tracker = ProgressTracker()
     tracker.update(mod_id, strings, _adapter.source_languages)
-    
+
     # Mark untranslated everything EXCEPT keys with empty sources.
     done_keys = []
     for key, loc_str in strings.items():
@@ -394,10 +410,11 @@ async def clear_translations(mod_id: str):
         source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
         if not source_text.strip():
             done_keys.append(key)
-    
+
     tracker.set_translated(mod_id, done_keys)
 
     return {"status": "success"}
+
 
 @app.post("/api/mods/{mod_id}/clear")
 async def clear_mod_cache(mod_id: str):
@@ -420,11 +437,13 @@ async def clear_mod_cache(mod_id: str):
         return {"status": "success", "message": "No data to clear"}
 
     import shutil
+
     try:
         shutil.rmtree(mod_storage)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
+
 
 @app.post("/api/mods/{mod_id}/open")
 async def open_mod_folder(mod_id: str):
@@ -450,6 +469,7 @@ async def open_mod_folder(mod_id: str):
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to open folder: {str(e)}")
+
 
 @app.post("/api/translate/estimate")
 async def estimate_translation(req: TranslationRequest):
@@ -513,11 +533,7 @@ async def estimate_translation(req: TranslationRequest):
             character_context=character_context,
         )
 
-    return {
-        "total_strings": len(untranslated),
-        "provider": provider.name,
-        "estimates": estimates
-    }
+    return {"total_strings": len(untranslated), "provider": provider.name, "estimates": estimates}
 
 
 @app.post("/api/translate/preview")
@@ -596,7 +612,9 @@ async def preview_translation(req: TranslationRequest):
         total_batches += num_batches
         first_batch = entries[:batch_size]
         system_prompt, user_message = provider.build_prompt(
-            first_batch, lang, glossary_prompt,
+            first_batch,
+            lang,
+            glossary_prompt,
             game_context=game_context,
             format_rules=format_rules,
             style_examples=style_examples,
@@ -707,7 +725,9 @@ async def translate_mod(req: TranslationRequest):
             for i in range(0, len(entries), batch_size):
                 batch = entries[i : i + batch_size]
                 translations, suggestions = provider.translate_batch(
-                    batch, lang, glossary_prompt,
+                    batch,
+                    lang,
+                    glossary_prompt,
                     game_context=game_context,
                     format_rules=format_rules,
                     style_examples=style_examples,
@@ -1058,6 +1078,7 @@ async def get_glossary():
     glossary = load_glossary()
     return glossary
 
+
 @app.post("/api/glossary")
 async def update_glossary(term: GlossaryTerm):
     """Add or update a glossary term.
@@ -1073,6 +1094,7 @@ async def update_glossary(term: GlossaryTerm):
     add_glossary_term(glossary, term.english, {"custom": term.source})
     save_glossary(glossary)
     return {"status": "success"}
+
 
 @app.get("/api/mods/{mod_id}/glossary")
 async def get_mod_glossary(mod_id: str):
@@ -1239,14 +1261,15 @@ async def get_stats():
         "tm_hits": stats["session_hits"],
         "total_mods": len(mods),
         "global_progress": round((total_translated / total_strings * 100), 2) if total_strings > 0 else 0,
-        "total_strings": total_strings
+        "total_strings": total_strings,
     }
+
 
 # Mount the workshop directory as static files so preview images are served
 # directly without going through a Python endpoint for each request.
 # This must be after all route definitions since mounts take priority over
 # routes defined after them.
-_workshop_path = getattr(_adapter, '_WORKSHOP_PATH', None)
+_workshop_path = getattr(_adapter, "_WORKSHOP_PATH", None)
 if _workshop_path and Path(_workshop_path).exists():
     app.mount("/workshop", StaticFiles(directory=str(_workshop_path)), name="workshop")
 

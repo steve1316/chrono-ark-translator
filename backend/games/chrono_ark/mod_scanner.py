@@ -91,10 +91,7 @@ def classify_mod(
         info.entry_count = len(strings)
 
         # Check if any entries have English text.
-        english_count = sum(
-            1 for s in strings.values()
-            if s.translations.get("English", "").strip()
-        )
+        english_count = sum(1 for s in strings.values() if s.translations.get("English", "").strip())
         info.target_lang_populated = english_count > 0
 
     return info

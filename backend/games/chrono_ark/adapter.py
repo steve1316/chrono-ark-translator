@@ -39,14 +39,8 @@ class ChronoArkAdapter(GameAdapter):
     """
 
     # Game-specific constants (moved from config.py).
-    _BASE_GAME_PATH = Path(os.environ.get(
-        "CATL_BASE_GAME_PATH",
-        r"F:\SteamLibrary\steamapps\common\Chrono Ark\ChronoArk_Data\StreamingAssets"
-    ))
-    _WORKSHOP_PATH = Path(os.environ.get(
-        "CATL_WORKSHOP_PATH",
-        r"F:\SteamLibrary\steamapps\workshop\content\1188930"
-    ))
+    _BASE_GAME_PATH = Path(os.environ.get("CATL_BASE_GAME_PATH", r"F:\SteamLibrary\steamapps\common\Chrono Ark\ChronoArk_Data\StreamingAssets"))
+    _WORKSHOP_PATH = Path(os.environ.get("CATL_WORKSHOP_PATH", r"F:\SteamLibrary\steamapps\workshop\content\1188930"))
     _CSV_FILES = [
         "LangDataDB.csv",
         "LangDialogueDB.csv",
@@ -54,14 +48,24 @@ class ChronoArkAdapter(GameAdapter):
         "LangSystemDB.csv",
     ]
     _CSV_COLUMNS = [
-        "Key", "Type", "Desc",
-        "Korean", "English", "Japanese", "Chinese", "Chinese-TW [zh-tw]",
+        "Key",
+        "Type",
+        "Desc",
+        "Korean",
+        "English",
+        "Japanese",
+        "Chinese",
+        "Chinese-TW [zh-tw]",
     ]
     _SOURCE_LANGUAGES = ["Chinese", "Korean", "Japanese", "Chinese-TW [zh-tw]"]
     _SKIP_DLLS = {
-        "0Harmony.dll", "Mono.Cecil.dll", "Mono.Cecil.Mdb.dll",
-        "Mono.Cecil.Pdb.dll", "Mono.Cecil.Rocks.dll",
-        "MonoMod.RuntimeDetour.dll", "MonoMod.Utils.dll",
+        "0Harmony.dll",
+        "Mono.Cecil.dll",
+        "Mono.Cecil.Mdb.dll",
+        "Mono.Cecil.Pdb.dll",
+        "Mono.Cecil.Rocks.dll",
+        "MonoMod.RuntimeDetour.dll",
+        "MonoMod.Utils.dll",
     }
     _DLL_MIN_STRING_LENGTH = 4
     _METADATA_FILENAME = "ChronoArkMod.json"
@@ -95,11 +99,11 @@ class ChronoArkAdapter(GameAdapter):
     def get_format_preservation_rules(self) -> list[str]:
         return [
             'Preserve ALL formatting tags exactly as-is: `<b>`, `</b>`, `<color=#XXXXXX>`, `</color>`, `<sprite=N>`, `<sprite name="...">`. Do NOT translate or modify these tags.',
-            'Preserve ALL placeholder variables exactly as-is: `&a`, `&b`, `&c`, `%`. These are runtime value substitutions.',
-            'Match the tone and style of the base game: The game uses a fantasy/adventure tone with concise, punchy skill descriptions. Character dialogue is conversational.',
-            'Use consistent terminology: Always use the exact English terms from the glossary below. Do NOT paraphrase or use synonyms for glossary terms.',
-            'Keep translations concise: Skill and buff descriptions should be brief and clear. Avoid overly formal or wordy translations.',
-            'Preserve line breaks: Source text uses literal `\\n` to represent line breaks. Keep every `\\n` in the translated output in the same positions. Do NOT remove or merge lines.',
+            "Preserve ALL placeholder variables exactly as-is: `&a`, `&b`, `&c`, `%`. These are runtime value substitutions.",
+            "Match the tone and style of the base game: The game uses a fantasy/adventure tone with concise, punchy skill descriptions. Character dialogue is conversational.",
+            "Use consistent terminology: Always use the exact English terms from the glossary below. Do NOT paraphrase or use synonyms for glossary terms.",
+            "Keep translations concise: Skill and buff descriptions should be brief and clear. Avoid overly formal or wordy translations.",
+            "Preserve line breaks: Source text uses literal `\\n` to represent line breaks. Keep every `\\n` in the translated output in the same positions. Do NOT remove or merge lines.",
         ]
 
     def get_style_examples(self) -> dict[str, list[tuple[str, str]]]:
@@ -161,7 +165,8 @@ class ChronoArkAdapter(GameAdapter):
             # No CSV localization files — try gdata JSON + DLL extraction.
             strings = gdata_extractor.extract_mod_gdata_strings(mod_path)
             dll_strings = dll_extractor.extract_mod_dll_loc_strings(
-                mod_path, self._SKIP_DLLS,
+                mod_path,
+                self._SKIP_DLLS,
             )
             for key, loc_str in dll_strings.items():
                 if key not in strings:
