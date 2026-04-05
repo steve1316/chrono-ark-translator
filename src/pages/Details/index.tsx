@@ -96,6 +96,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     const [characterContextSaved, setCharacterContextSaved] = useState(false)
 
     const [exporting, setExporting] = useState(false)
+    const [showApiResponses, setShowApiResponses] = useState(false)
+    const [apiResponses, setApiResponses] = useState<any[]>([])
+    const [activeResponseIdx, setActiveResponseIdx] = useState(0)
 
     /**
      * Initiates the translation workflow by fetching a preview from the backend.
@@ -525,6 +528,21 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    const fetchApiResponses = async () => {
+        if (!modId) return
+        try {
+            const res = await fetch(`${API_BASE}/mods/${modId}/api-responses`)
+            if (res.ok) {
+                const data = await res.json()
+                setApiResponses(data)
+                setActiveResponseIdx(0)
+                setShowApiResponses(true)
+            }
+        } catch (err) {
+            console.error("Failed to fetch API responses:", err)
+        }
+    }
+
     if (loading) {
         return (
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
@@ -641,6 +659,13 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                 </span>
                             </button>
                         )}
+                        <button
+                            className="btn btn-outline"
+                            onClick={fetchApiResponses}
+                            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+                        >
+                            API Responses
+                        </button>
                         <button
                             className="btn btn-outline"
                             onClick={() => {
@@ -1189,6 +1214,90 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                         fetchModGlossary()
                     }}
                 />
+            )}
+
+            {/* --- API Response Viewer Modal --- */}
+            {showApiResponses && (
+                <div
+                    style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowApiResponses(false)
+                    }}
+                >
+                    <div className="glass-card" style={{ width: "900px", maxHeight: "85vh", display: "flex", flexDirection: "column", padding: "2rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                            <h2 style={{ margin: 0 }}>API Provider Responses</h2>
+                            <button className="btn btn-outline" onClick={() => setShowApiResponses(false)} style={{ padding: "0.25rem 0.75rem" }}>
+                                Close
+                            </button>
+                        </div>
+                        {apiResponses.length === 0 ? (
+                            <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>No API responses recorded yet. Run a translation first.</p>
+                        ) : (
+                            <>
+                                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+                                    {apiResponses.map((r: any, idx: number) => (
+                                        <button
+                                            key={idx}
+                                            className={`btn ${activeResponseIdx === idx ? "btn-primary" : "btn-outline"}`}
+                                            onClick={() => setActiveResponseIdx(idx)}
+                                            style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
+                                        >
+                                            Batch {idx + 1}
+                                        </button>
+                                    ))}
+                                </div>
+                                {apiResponses[activeResponseIdx] && (
+                                    <>
+                                        <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1rem", fontSize: "0.85rem" }}>
+                                            <div>
+                                                <span style={{ color: "var(--text-dim)" }}>Model: </span>
+                                                <span style={{ fontWeight: 600 }}>{apiResponses[activeResponseIdx].model}</span>
+                                            </div>
+                                            {apiResponses[activeResponseIdx].input_tokens != null && (
+                                                <div>
+                                                    <span style={{ color: "var(--text-dim)" }}>Input tokens: </span>
+                                                    <span style={{ fontWeight: 600 }}>{apiResponses[activeResponseIdx].input_tokens}</span>
+                                                </div>
+                                            )}
+                                            {apiResponses[activeResponseIdx].output_tokens != null && (
+                                                <div>
+                                                    <span style={{ color: "var(--text-dim)" }}>Output tokens: </span>
+                                                    <span style={{ fontWeight: 600 }}>{apiResponses[activeResponseIdx].output_tokens}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div
+                                            style={{
+                                                flex: 1,
+                                                overflow: "auto",
+                                                background: "rgba(0,0,0,0.3)",
+                                                borderRadius: "8px",
+                                                border: "1px solid var(--glass-border)",
+                                                padding: "1rem",
+                                                minHeight: "300px",
+                                            }}
+                                        >
+                                            <pre
+                                                style={{
+                                                    margin: 0,
+                                                    whiteSpace: "pre-wrap",
+                                                    wordBreak: "break-word",
+                                                    fontSize: "0.85rem",
+                                                    lineHeight: "1.6",
+                                                    color: "var(--text-main)",
+                                                    fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
+                                                }}
+                                            >
+                                                {apiResponses[activeResponseIdx].raw_text}
+                                            </pre>
+                                        </div>
+                                    </>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
             )}
 
             {/* --- Translation Confirmation Modal ---

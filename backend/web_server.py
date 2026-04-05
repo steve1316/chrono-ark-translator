@@ -718,6 +718,10 @@ async def translate_mod(req: TranslationRequest):
                 by_lang[lang] = []
             by_lang[lang].append((key, loc_str.translations.get(lang, "")))
 
+    # Reset raw response tracking on the provider
+    if hasattr(provider, "last_raw_responses"):
+        provider.last_raw_responses = []
+
     batch_size = config.BATCH_SIZE
     try:
         for lang, entries in by_lang.items():
@@ -742,6 +746,14 @@ async def translate_mod(req: TranslationRequest):
                         tm.store(source_text, english, lang)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+    # Save raw API responses for inspection
+    raw_responses = getattr(provider, "last_raw_responses", [])
+    if raw_responses:
+        responses_path = config.STORAGE_PATH / "mods" / req.mod_id / "last_api_responses.json"
+        responses_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(responses_path, "w", encoding="utf-8") as f:
+            json.dump(raw_responses, f, indent=2, ensure_ascii=False)
 
     # Save translations.
     translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
@@ -1233,6 +1245,24 @@ async def dismiss_suggestions(mod_id: str, action: SuggestionAction):
     else:
         remove_suggestions(mod_id, action.terms)
     return {"status": "success"}
+
+
+@app.get("/api/mods/{mod_id}/api-responses")
+async def get_api_responses(mod_id: str):
+    """Get the raw API responses from the last translation run.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A list of response dicts, each containing batch_index, model,
+        input_tokens, output_tokens, and raw_text.
+    """
+    responses_path = config.STORAGE_PATH / "mods" / mod_id / "last_api_responses.json"
+    if not responses_path.exists():
+        return []
+    with open(responses_path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 @app.get("/api/stats")

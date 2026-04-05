@@ -273,7 +273,20 @@ class ClaudeProvider(TranslationProvider):
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_message}],
                 )
-                return self._parse_response(response.content[0].text, entries)
+                raw_text = response.content[0].text
+                translations, suggestions = self._parse_response(raw_text, entries)
+                # Store raw response for inspection
+                self.last_raw_responses = getattr(self, "last_raw_responses", [])
+                self.last_raw_responses.append(
+                    {
+                        "batch_index": len(self.last_raw_responses),
+                        "model": self._model,
+                        "input_tokens": getattr(response.usage, "input_tokens", None),
+                        "output_tokens": getattr(response.usage, "output_tokens", None),
+                        "raw_text": raw_text,
+                    }
+                )
+                return translations, suggestions
 
             except anthropic.RateLimitError:
                 wait_time = 2**attempt * 5
