@@ -78,7 +78,7 @@ def build_glossary_from_base_game(
         if not is_name_key and not is_keyword:
             continue
 
-        english = loc_str.translations.get("English", "").strip()
+        english = loc_str.translations.get("English", "").strip().split("\n")[0].strip()
         if not english:
             continue
 
@@ -95,7 +95,7 @@ def build_glossary_from_base_game(
         # Build source language mappings.
         source_mappings = {}
         for lang in source_languages:
-            text = loc_str.translations.get(lang, "").strip()
+            text = loc_str.translations.get(lang, "").strip().split("\n")[0].strip()
             if text:
                 source_mappings[lang] = text
 
