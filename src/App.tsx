@@ -65,6 +65,14 @@ function App() {
         init()
     }, [])
 
+    // Re-fetch mods whenever the user navigates back to the dashboard so that
+    // counts stay in sync with changes made on other pages (e.g. Clear English).
+    useEffect(() => {
+        if (!loading && location.pathname === "/dashboard") {
+            fetchMods()
+        }
+    }, [location.pathname])
+
     /**
      * Rescans a mod's workshop folder on disk and updates the backend database.
      *
