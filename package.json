@@ -5,7 +5,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "start": "concurrently \"yarn dev\" \"python backend/web_server.py\"",
+        "start": "concurrently \"yarn dev\" \"python -m backend.web_server\"",
         "build": "tsc -b && vite build",
         "lint": "eslint .",
         "preview": "vite preview",
