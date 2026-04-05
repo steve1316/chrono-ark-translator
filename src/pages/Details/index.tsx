@@ -681,11 +681,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                 </span>
                             </button>
                         )}
-                        <button
-                            className="btn btn-outline"
-                            onClick={fetchApiResponses}
-                            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-                        >
+                        <button className="btn btn-outline" onClick={fetchApiResponses} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             API Responses
                         </button>
                         <button
@@ -912,10 +908,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             {Object.entries(modGlossary)
                                 .sort(([a], [b]) => a.localeCompare(b))
                                 .map(([english, info]) => (
-                                    <div
-                                        key={english}
-                                        style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--glass-border)" }}
-                                    >
+                                    <div key={english} style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--glass-border)" }}>
                                         {editingTerm === english ? (
                                             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
                                                 <input
@@ -950,7 +943,13 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                                 <select
                                                     value={editTermLang}
                                                     onChange={(e) => setEditTermLang(e.target.value)}
-                                                    style={{ padding: "0.4rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)" }}
+                                                    style={{
+                                                        padding: "0.4rem",
+                                                        borderRadius: "6px",
+                                                        background: "rgba(0,0,0,0.2)",
+                                                        border: "1px solid var(--glass-border)",
+                                                        color: "var(--text-main)",
+                                                    }}
                                                 >
                                                     <option value="Chinese">Chinese</option>
                                                     <option value="Korean">Korean</option>
@@ -959,7 +958,13 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                                 <select
                                                     value={editTermCategory}
                                                     onChange={(e) => setEditTermCategory(e.target.value)}
-                                                    style={{ padding: "0.4rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)" }}
+                                                    style={{
+                                                        padding: "0.4rem",
+                                                        borderRadius: "6px",
+                                                        background: "rgba(0,0,0,0.2)",
+                                                        border: "1px solid var(--glass-border)",
+                                                        color: "var(--text-main)",
+                                                    }}
                                                 >
                                                     <option value="custom">Custom</option>
                                                     <option value="characters">Characters</option>
@@ -987,11 +992,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                                 >
                                                     Save
                                                 </button>
-                                                <button
-                                                    className="btn btn-outline"
-                                                    style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
-                                                    onClick={() => setEditingTerm(null)}
-                                                >
+                                                <button className="btn btn-outline" style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }} onClick={() => setEditingTerm(null)}>
                                                     Cancel
                                                 </button>
                                             </div>
@@ -1226,11 +1227,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             const hasOverride = s.english !== s.original_english
                             const isDone = s.is_translated || !s.source.trim()
                             // Row background: green for synced, yellow for unsynced overrides
-                            const rowStyle = s.is_synced && !hasOverride
-                                ? { backgroundColor: "rgba(52, 211, 153, 0.1)" }
-                                : hasOverride
-                                ? { backgroundColor: "rgba(255, 220, 40, 0.15)" }
-                                : undefined
+                            const rowStyle = s.is_synced && !hasOverride ? { backgroundColor: "rgba(52, 211, 153, 0.1)" } : hasOverride ? { backgroundColor: "rgba(255, 220, 40, 0.15)" } : undefined
                             return (
                                 <tr key={s.key} style={rowStyle}>
                                     <td>
@@ -1248,7 +1245,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                         {/* Show previous translation above the editable field when overridden or synced. */}
                                         {hasOverride && <div className="prev-translation">{s.original_english || "(no previous translation)"}</div>}
                                         {s.is_synced && !hasOverride && s.original_english && s.original_english !== s.english && (
-                                            <div className="prev-translation" style={{ color: "rgba(52, 211, 153, 0.6)" }}>{s.original_english || "(no original)"}</div>
+                                            <div className="prev-translation" style={{ color: "rgba(52, 211, 153, 0.6)" }}>
+                                                {s.original_english || "(no original)"}
+                                            </div>
                                         )}
                                         <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
                                     </td>
@@ -1310,19 +1309,16 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                     >
                                         <div>
                                             <div style={{ fontWeight: 500 }}>{entry.reason}</div>
-                                            <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem" }}>
-                                                {new Date(entry.created_at).toLocaleString()}
-                                            </div>
-                                            <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.15rem" }}>
-                                                Files: {entry.files.join(", ")}
-                                            </div>
+                                            <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem" }}>{new Date(entry.created_at).toLocaleString()}</div>
+                                            <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.15rem" }}>Files: {entry.files.join(", ")}</div>
                                         </div>
                                         <div style={{ display: "flex", gap: "0.35rem", flexShrink: 0 }}>
                                             <button
                                                 className="btn btn-primary"
                                                 style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
                                                 onClick={async () => {
-                                                    if (!window.confirm(`Restore to backup from ${new Date(entry.created_at).toLocaleString()}? A backup of the current state will be created first.`)) return
+                                                    if (!window.confirm(`Restore to backup from ${new Date(entry.created_at).toLocaleString()}? A backup of the current state will be created first.`))
+                                                        return
                                                     try {
                                                         const res = await fetch(`${API_BASE}/mods/${modId}/history/${entry.id}/restore`, { method: "POST" })
                                                         if (res.ok) {
@@ -1385,9 +1381,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>No translations contain "{replacePreview.oldTerm}". Nothing to replace.</p>
                         ) : (
                             <>
-                                <p style={{ color: "var(--text-dim)", marginBottom: "1rem" }}>
-                                    {replacePreview.affected.length} translation(s) will be updated:
-                                </p>
+                                <p style={{ color: "var(--text-dim)", marginBottom: "1rem" }}>{replacePreview.affected.length} translation(s) will be updated:</p>
                                 <div style={{ maxHeight: "50vh", overflow: "auto", marginBottom: "1rem" }}>
                                     {replacePreview.affected.map((item) => (
                                         <div
