@@ -15,6 +15,10 @@ interface GlossarySuggestionModalProps {
     onClose: () => void
     /** Callback fired after any accept/dismiss action so the parent can refresh its data. */
     onUpdated: () => void
+    /** When set, the modal is in batch-mode and shows batch progress. */
+    batchProgress?: { current: number; total: number }
+    /** Callback to continue to the next batch after reviewing suggestions. */
+    onContinue?: () => void
 }
 
 /**
@@ -38,7 +42,8 @@ interface GlossarySuggestionModalProps {
  * @param onUpdated - Refresh callback for the parent component
  * @returns The rendered suggestion review modal
  */
-const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId, suggestions, onClose, onUpdated }) => {
+const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId, suggestions, onClose, onUpdated, batchProgress, onContinue }) => {
+    const isBatchMode = !!batchProgress
     const [pending, setPending] = useState<TermSuggestion[]>(suggestions)
     const [processing, setProcessing] = useState(false)
 
@@ -115,11 +120,31 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId
             }}
         >
             <div className="glass-card" style={{ width: "700px", maxHeight: "80vh", overflow: "auto", padding: "2rem" }}>
-                {/* Modal header with title and close button */}
+                {/* Modal header with title, batch progress, and close button */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-                    <h2 style={{ margin: 0 }}>Suggested Glossary Terms</h2>
-                    <button className="btn btn-outline" onClick={onClose} style={{ padding: "0.25rem 0.75rem" }}>
-                        Close
+                    <div>
+                        <h2 style={{ margin: 0 }}>Suggested Glossary Terms</h2>
+                        {isBatchMode && (
+                            <div style={{ color: "var(--text-dim)", fontSize: "0.9rem", marginTop: "0.25rem" }}>
+                                Batch {batchProgress!.current} of {batchProgress!.total}
+                            </div>
+                        )}
+                    </div>
+                    <button
+                        onClick={onClose}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            color: "var(--text-dim)",
+                            fontSize: "2rem",
+                            lineHeight: 1,
+                            cursor: "pointer",
+                            padding: "0.25rem 0.5rem",
+                            borderRadius: "4px",
+                        }}
+                        title="Close"
+                    >
+                        &times;
                     </button>
                 </div>
 
@@ -204,6 +229,15 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId
                             </div>
                         ))}
                     </>
+                )}
+
+                {/* Batch-mode: Continue to next batch / finish button */}
+                {isBatchMode && onContinue && (
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--glass-border)" }}>
+                        <button className="btn btn-primary" disabled={processing} onClick={onContinue} style={{ padding: "0.5rem 1.5rem", fontSize: "1rem" }}>
+                            {batchProgress!.current >= batchProgress!.total ? "Finish" : pending.length === 0 ? "Continue to Next Batch" : "Skip & Continue to Next Batch"}
+                        </button>
+                    </div>
                 )}
             </div>
         </div>
