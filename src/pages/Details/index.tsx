@@ -428,37 +428,42 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     }
 
     /**
-     * Clears the mod's entire translation cache, including all extracted strings
-     * and translation progress. This is irreversible.
-     * POST `/api/mods/:modId/clear`.
-     *
-     * On success, navigates back to the dashboard since there is nothing left
-     * to display for this mod.
+     * Resets the mod by clearing all translation data and restoring the
+     * original CSV files (if they were backed up before the first export).
+     * POST `/api/mods/:modId/reset`.
      */
-    const handleClearCache = async () => {
+    const handleReset = async () => {
         if (!modId) return
-        if (!window.confirm("Are you sure you want to clear the cache and translations for this mod? This will delete all progress and extracted strings.")) {
+        if (
+            !window.confirm(
+                "Are you sure you want to reset this mod? This will:\n\n" +
+                    "• Delete all translation progress and extracted strings\n" +
+                    "• Restore the original CSV files (if previously synced)\n\n" +
+                    "A backup will be created first."
+            )
+        ) {
             return
         }
 
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/clear`, {
+            const res = await fetch(`${API_BASE}/mods/${modId}/reset`, {
                 method: "POST",
             })
             if (res.ok) {
-                // Re-fetch mod data to reflect the cleared state.
+                const data = await res.json()
+                const csvMsg = data.csv_restored ? " Original CSV files restored." : ""
                 fetchModDetail()
                 fetchExportStatus()
                 fetchSuggestions()
                 fetchModGlossary()
-                setTranslateBanner({ type: "success", message: "Cache cleared successfully." })
+                setTranslateBanner({ type: "success", message: `Reset complete.${csvMsg}` })
             } else {
                 const error = await res.json()
-                alert(`Failed to clear cache: ${error.detail || "Unknown error"}`)
+                alert(`Failed to reset: ${error.detail || "Unknown error"}`)
             }
         } catch (err) {
-            console.error("Failed to clear cache:", err)
-            alert("Failed to clear cache. Check console for details.")
+            console.error("Failed to reset:", err)
+            alert("Failed to reset. Check console for details.")
         }
     }
 
@@ -714,8 +719,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                         <button className="btn btn-outline" onClick={fetchHistory} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             History
                         </button>
-                        <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleClearCache}>
-                            Clear Cache
+                        <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleReset}>
+                            Reset
                         </button>
                         <button className="btn btn-outline" style={{ color: "#ffaa44", borderColor: "rgba(255, 170, 68, 0.3)" }} onClick={handleClearTranslations}>
                             Clear English

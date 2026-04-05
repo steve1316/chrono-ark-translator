@@ -9,6 +9,7 @@ import hashlib
 import os
 import json
 import uvicorn
+import shutil
 from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, HTTPException
@@ -432,36 +433,49 @@ async def clear_translations(mod_id: str):
     return {"status": "success"}
 
 
-@app.post("/api/mods/{mod_id}/clear")
-async def clear_mod_cache(mod_id: str):
-    """Delete all extracted strings, translations, and progress for a mod.
+@app.post("/api/mods/{mod_id}/reset")
+async def reset_mod(mod_id: str):
+    """Reset a mod by clearing all translation data and restoring original CSV files.
 
-    Removes the entire storage directory for the given mod.
+    If original CSV backups exist (created before the first export), they are
+    copied back to the mod directory. Then the entire storage directory for
+    the mod is deleted.
 
     Args:
         mod_id: The workshop identifier of the mod.
 
     Returns:
-        A dict with `{"status": "success"}` on success, or a dict with
-        an additional `message` if there was no data to clear.
+        A dict with `status`, and `csv_restored` indicating whether
+        original CSV files were restored.
 
     Raises:
-        HTTPException: 500 if the storage directory cannot be deleted.
+        HTTPException: 500 if the operation fails.
     """
     mod_storage = config.STORAGE_PATH / "mods" / mod_id
     if not mod_storage.exists():
-        return {"status": "success", "message": "No data to clear"}
+        return {"status": "success", "csv_restored": False, "message": "No data to clear"}
 
-    # Back up before clearing.
-    create_backup(mod_id, "Before clearing cache")
+    # Back up before resetting.
+    create_backup(mod_id, "Before reset")
 
-    import shutil
+    # Restore original CSV files if we have them.
+    csv_restored = False
+    original_csv_dir = mod_storage / "original_csvs"
+    if original_csv_dir.exists():
+        mod_path = _find_mod_path(mod_id)
+        for src in original_csv_dir.rglob("*"):
+            if src.is_file():
+                rel = src.relative_to(original_csv_dir)
+                dest = mod_path / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dest)
+                csv_restored = True
 
     try:
         shutil.rmtree(mod_storage)
-        return {"status": "success"}
+        return {"status": "success", "csv_restored": csv_restored}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset: {str(e)}")
 
 
 @app.post("/api/mods/{mod_id}/open")
@@ -986,6 +1000,18 @@ async def export_mod(mod_id: str):
         HTTPException: 404 if the mod is not found.
     """
     mod_path = _find_mod_path(mod_id)
+
+    # Save a backup of the original CSV files before the first export so
+    # "Reset" can restore them later.
+    original_csv_dir = config.STORAGE_PATH / "mods" / mod_id / "original_csvs"
+    if not original_csv_dir.exists():
+        original_csv_dir.mkdir(parents=True, exist_ok=True)
+        for csv_path in _get_mod_csv_paths(mod_path):
+            # Preserve relative path structure (Localization/file.csv vs file.csv)
+            rel = csv_path.relative_to(mod_path)
+            dest = original_csv_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(csv_path, dest)
 
     # Load saved translations.
     translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
