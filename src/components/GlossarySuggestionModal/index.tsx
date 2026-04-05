@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { FaCheck, FaTimes, FaCheckDouble, FaTimesCircle } from "react-icons/fa"
-import type { TermSuggestion } from "../shared_types"
-import { API_BASE } from "../config"
+import type { TermSuggestion } from "../../shared_types"
+import { API_BASE } from "../../config"
 
 
 /**
@@ -26,18 +26,17 @@ interface GlossarySuggestionModalProps {
  * terms individually, or act on all terms at once via bulk buttons.
  *
  * Workflow:
- * - "Accept" sends a POST to /api/mods/{modId}/glossary/suggestions/accept with
+ * - "Accept" sends a POST to `/api/mods/{modId}/glossary/suggestions/accept` with
  *   the selected English term(s). The backend adds them to the mod's glossary.
- * - "Dismiss" sends a POST to /api/mods/{modId}/glossary/suggestions/dismiss.
- *   When dismissing all, the request body is { all: true } instead of a term list.
+ * - "Dismiss" sends a POST to `/api/mods/{modId}/glossary/suggestions/dismiss`.
+ *   When dismissing all, the request body is `{ all: true }` instead of a term list.
  * - After each action, the local `pending` list is pruned optimistically and the
  *   parent is notified via `onUpdated()`.
  *
- * @param props - Component props
- * @param props.modId - The mod ID used in API routes
- * @param props.suggestions - Suggestions to display initially
- * @param props.onClose - Close handler for the modal
- * @param props.onUpdated - Refresh callback for the parent component
+ * @param modId - The mod ID used in API routes
+ * @param suggestions - Suggestions to display initially
+ * @param onClose - Close handler for the modal
+ * @param onUpdated - Refresh callback for the parent component
  * @returns The rendered suggestion review modal
  */
 const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId, suggestions, onClose, onUpdated }) => {
@@ -47,8 +46,8 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId
     /**
      * Accept one or more suggested terms, adding them to the mod's glossary.
      *
-     * Sends POST /api/mods/{modId}/glossary/suggestions/accept
-     * Request body: { terms: string[] }  (list of English term strings)
+     * Sends POST `/api/mods/{modId}/glossary/suggestions/accept`
+     * Request body: `{ terms: string[] }`  (list of English term strings)
      *
      * On success the accepted terms are removed from the local pending list.
      *
@@ -75,9 +74,10 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId
     /**
      * Dismiss one or more suggested terms (or all at once).
      *
-     * Sends POST /api/mods/{modId}/glossary/suggestions/dismiss
-     * Request body when dismissing specific terms: { terms: string[] }
-     * Request body when dismissing all:            { all: true }
+     * Sends POST `/api/mods/{modId}/glossary/suggestions/dismiss`
+     *
+     * - Request body when dismissing specific terms: `{ terms: string[] }`
+     * - Request body when dismissing all:            `{ all: true }`
      *
      * The backend differentiates between the two shapes. When `all` is true the
      * `terms` parameter is ignored and every remaining suggestion is dismissed.

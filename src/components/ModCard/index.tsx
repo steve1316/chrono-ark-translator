@@ -1,7 +1,7 @@
 import React from "react"
 import { FaSteam, FaSync } from "react-icons/fa"
-import type { ModStatus } from "../shared_types"
-import { API_BASE } from "../config"
+import type { ModStatus } from "../../shared_types"
+import { API_BASE } from "../../config"
 
 
 /**
@@ -24,10 +24,9 @@ interface ModCardProps {
  * update -- the card only re-renders when its own `mod`, `onClick`, or `onSync`
  * props change.
  *
- * @param props - Component props.
- * @param props.mod - The mod status data to display.
- * @param props.onClick - Handler invoked with the mod ID when the user wants to view its strings.
- * @param props.onSync - Handler invoked with the mod ID when the user wants to rescan files.
+ * @param mod - The mod status data to display.
+ * @param onClick - Handler invoked with the mod ID when the user wants to view its strings.
+ * @param onSync - Handler invoked with the mod ID when the user wants to rescan files.
  * @returns The rendered mod card JSX.
  */
 const ModCard: React.FC<ModCardProps> = React.memo(({ mod, onClick, onSync }) => {

@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react"
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom"
 import Sidebar from "./components/Sidebar"
-import ModGrid from "./components/ModGrid"
-import ModDetail from "./components/ModDetail"
-import GlossaryPage from "./components/GlossaryPage"
+import DashboardPage from "./pages/Dashboard"
+import ModDetail from "./pages/Details"
+import GlossaryPage from "./pages/Glossary"
+import StatisticsPage from "./pages/Statistics"
+import SettingsPage from "./pages/Settings"
 import type { ModStatus, Stats } from "./shared_types"
 import { API_BASE } from "./config"
 import "./index.css"
@@ -135,18 +137,12 @@ function App() {
                         <Route
                             path="/dashboard"
                             element={
-                                <>
-                                    <div className="dashboard-header">
-                                        <div className="title-group">
-                                            <h1>Workshop Dashboard</h1>
-                                            <p>Manage and translate your Chrono Ark mods</p>
-                                        </div>
-                                        <button className="btn btn-outline" onClick={fetchMods}>
-                                            Refresh
-                                        </button>
-                                    </div>
-                                    <ModGrid mods={mods} onModSelect={(modId) => navigate(`/mods/${modId}`)} onModSync={handleModSync} />
-                                </>
+                                <DashboardPage
+                                    mods={mods}
+                                    onModSelect={(modId) => navigate(`/mods/${modId}`)}
+                                    onModSync={handleModSync}
+                                    onRefresh={fetchMods}
+                                />
                             }
                         />
 
@@ -154,62 +150,13 @@ function App() {
                         <Route path="/mods/:modId" element={<ModDetail onBack={() => navigate("/dashboard")} onTranslate={(provider, modId) => handleTranslate(provider, modId)} />} />
 
                         {/* --- Statistics: aggregate translation metrics --- */}
-                        <Route
-                            path="/statistics"
-                            element={
-                                stats ? (
-                                    <div className="stats-view animate-fade-in">
-                                        <div className="dashboard-header">
-                                            <div className="title-group">
-                                                <h1>System Statistics</h1>
-                                                <p>Translation memory and global progress</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="mod-grid">
-                                            <div className="glass-card stat-card" style={{ padding: "2rem", textAlign: "center" }}>
-                                                <h2 style={{ fontSize: "3rem", color: "var(--accent-primary)" }}>{stats.global_progress}%</h2>
-                                                <p style={{ color: "var(--text-dim)" }}>Global Progress</p>
-                                            </div>
-                                            <div className="glass-card stat-card" style={{ padding: "2rem", textAlign: "center" }}>
-                                                <h2 style={{ fontSize: "3rem", color: "var(--accent-secondary)" }}>{stats.tm_entries}</h2>
-                                                <p style={{ color: "var(--text-dim)" }}>Translation Memory Entries</p>
-                                            </div>
-                                            <div className="glass-card stat-card" style={{ padding: "2rem", textAlign: "center" }}>
-                                                <h2 style={{ fontSize: "3rem", color: "var(--success)" }}>{stats.tm_hits}</h2>
-                                                <p style={{ color: "var(--text-dim)" }}>Total Cache Hits</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div>No statistics available.</div>
-                                )
-                            }
-                        />
+                        <Route path="/statistics" element={<StatisticsPage stats={stats} />} />
 
                         {/* --- Glossary: per-mod term management --- */}
                         <Route path="/glossary" element={<GlossaryPage />} />
 
                         {/* --- Settings: provider configuration (currently read-only) --- */}
-                        <Route
-                            path="/settings"
-                            element={
-                                <div className="settings-view">
-                                    <div className="dashboard-header">
-                                        <div className="title-group">
-                                            <h1>Settings</h1>
-                                            <p>API Keys and Provider Configuration</p>
-                                        </div>
-                                    </div>
-                                    <div className="glass-card" style={{ padding: "2rem", color: "var(--text-dim)" }}>
-                                        <p style={{ marginBottom: "1.5rem" }}>
-                                            Active Provider: <strong>Claude (Default)</strong>
-                                        </p>
-                                        <p>Configuration is currently managed via backend environment variables and system settings.</p>
-                                    </div>
-                                </div>
-                            }
-                        />
+                        <Route path="/settings" element={<SettingsPage />} />
 
                         {/* Catch-all: redirect unknown routes back to dashboard. */}
                         <Route path="*" element={<Navigate to="/dashboard" replace />} />

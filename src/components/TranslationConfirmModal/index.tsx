@@ -26,13 +26,13 @@ interface CostEstimate {
     estimated_output_tokens: number
     /**
      * Estimated total cost in USD for this language. Calculated by the backend
-     * as: (input_tokens * input_price + output_tokens * output_price) summed
+     * as: `(input_tokens * input_price + output_tokens * output_price)` summed
      * over all batches.
      */
     estimated_cost_usd: number
-    /** The LLM model name used for the estimate (e.g. "gpt-4o", "claude-3-haiku") */
+    /** The LLM model name used for the estimate (e.g. `"gpt-4o"`, `"claude-4-sonnet"`) */
     model: string
-    /** Human-readable note about the estimate (e.g. "Prices are approximate") */
+    /** Human-readable note about the estimate (e.g. `"Prices are approximate"`) */
     note: string
 }
 
@@ -41,14 +41,14 @@ interface CostEstimate {
  * confirms the translation job. Contains per-language prompt previews and
  * optional cost estimates.
  */
-interface TranslationPreview {
+export interface TranslationPreview {
     /** Total number of strings to translate across all languages */
     total_strings: number
     /** Total number of API batches across all languages */
     total_batches: number
     /** Number of strings sent per batch */
     batch_size: number
-    /** Translation provider name (e.g. "OpenAI", "Anthropic", "DeepL") */
+    /** Translation provider name (e.g. `"OpenAI"`, `"Anthropic"`, `"DeepL"`) */
     provider: string
     /** Per-language prompt previews, keyed by language code */
     previews: Record<string, LanguagePreview>
@@ -81,9 +81,9 @@ interface TranslationConfirmModalProps {
  * 1. **Language selector** (only shown when > 1 language) -- controlled by `activeLang`
  * 2. **Prompt type selector** ("System Prompt" vs "User Message") -- controlled by `activeTab`
  *
- * @param props.preview - Translation preview payload from the backend
- * @param props.onConfirm - Fires when the user clicks "Translate N strings"
- * @param props.onCancel - Fires when the user clicks Cancel or the backdrop
+ * @param preview - Translation preview payload from the backend
+ * @param onConfirm - Fires when the user clicks "Translate N strings"
+ * @param onCancel - Fires when the user clicks Cancel or the backdrop
  * @returns The rendered confirmation modal
  */
 const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ preview, onConfirm, onCancel }) => {
@@ -96,7 +96,7 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
     /**
      * Aggregate cost across all target languages. Computed by summing each
      * language's estimated_cost_usd. Returns null when the provider does not
-     * supply cost estimates (e.g. DeepL), in which case the cost section is
+     * supply cost estimates (e.g. `DeepL`), in which case the cost section is
      * hidden from the UI.
      */
     const totalCost = preview.estimates

@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { FaSearch } from "react-icons/fa"
-import { API_BASE } from "../config"
-import type { Glossary } from "../shared_types"
+import { API_BASE } from "../../config"
+import type { Glossary } from "../../shared_types"
 
 
 /**
  * Displays the base-game terminology glossary in a searchable, filterable table.
  *
  * This is a top-level page component that fetches the full glossary on mount
- * (GET /api/glossary) and lets users narrow it down via a text search and
+ * (GET `/api/glossary`) and lets users narrow it down via a text search and
  * per-category toggle buttons. The glossary contains English terms, their
- * category (e.g. "skill", "character"), and source-language mappings.
+ * category (e.g. `"skill"`, `"character"`), and source-language mappings.
  *
  * @returns The rendered glossary page with search bar, category filters, and terms table
  */

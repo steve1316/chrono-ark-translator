@@ -1,6 +1,6 @@
 import React from "react"
-import ModCard from "./ModCard"
-import type { ModStatus } from "../shared_types"
+import ModCard from "../ModCard"
+import type { ModStatus } from "../../shared_types"
 
 /**
  * Props accepted by the {@link ModGrid} component.
@@ -21,9 +21,9 @@ interface ModGridProps {
  * the `mods` array to cards, delegating user interactions upward via callbacks.
  * The grid layout (column count, gap) is controlled by the `.mod-grid` CSS class.
  *
- * @param props.mods - The list of mod summaries to display as cards.
- * @param props.onModSelect - Callback invoked when the user clicks a mod card.
- * @param props.onModSync - Callback invoked when the user triggers a mod resync.
+ * @param mods - The list of mod summaries to display as cards.
+ * @param onModSelect - Callback invoked when the user clicks a mod card.
+ * @param onModSync - Callback invoked when the user triggers a mod resync.
  * @returns The rendered grid of mod cards.
  */
 const ModGrid: React.FC<ModGridProps> = ({ mods, onModSelect, onModSync }) => {
