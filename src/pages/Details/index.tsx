@@ -921,7 +921,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     {Object.keys(modGlossary).length === 0 ? (
                         <p style={{ color: "var(--text-dim)", textAlign: "center" }}>No mod-specific glossary terms yet. Add terms above or accept AI suggestions.</p>
                     ) : (
-                        <div style={{ maxHeight: "300px", overflow: "auto" }}>
+                        <div style={{ maxHeight: "300px", overflow: "auto", paddingRight: "0.75rem" }}>
                             {Object.entries(modGlossary)
                                 .sort(([a], [b]) => a.localeCompare(b))
                                 .map(([english, info]) => (
