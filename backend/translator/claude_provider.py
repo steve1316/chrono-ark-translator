@@ -269,7 +269,7 @@ class ClaudeProvider(TranslationProvider):
             try:
                 response = client.messages.create(
                     model=self._model,
-                    max_tokens=4096,
+                    max_tokens=16384,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_message}],
                 )
