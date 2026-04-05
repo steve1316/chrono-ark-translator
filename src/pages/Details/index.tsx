@@ -831,7 +831,24 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 during translation to enforce consistent terminology. */}
             {showGlossaryPanel && (
                 <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1rem" }}>
-                    <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>Mod Glossary Terms</h3>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                        <h3 style={{ margin: 0 }}>Mod Glossary Terms</h3>
+                        {Object.keys(modGlossary).length > 0 && (
+                            <button
+                                className="btn btn-outline"
+                                style={{ padding: "0.2rem 0.6rem", fontSize: "0.75rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
+                                onClick={async () => {
+                                    if (!window.confirm(`Delete all ${Object.keys(modGlossary).length} glossary term(s)?`)) return
+                                    for (const term of Object.keys(modGlossary)) {
+                                        await fetch(`${API_BASE}/mods/${modId}/glossary/${encodeURIComponent(term)}`, { method: "DELETE" })
+                                    }
+                                    fetchModGlossary()
+                                }}
+                            >
+                                Delete All
+                            </button>
+                        )}
+                    </div>
                     <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
                         <input
                             type="text"
