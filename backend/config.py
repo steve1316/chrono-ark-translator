@@ -32,7 +32,9 @@ DEEPL_API_KEY = os.environ.get("CATL_DEEPL_API_KEY", "")
 TRANSLATION_PROVIDER = os.environ.get("CATL_TRANSLATION_PROVIDER", "claude")
 
 # Number of strings to send per LLM API batch request.
-BATCH_SIZE = int(os.environ.get("CATL_BATCH_SIZE", "20"))
+# Claude Sonnet 4 supports 64K output tokens; 75 strings per batch
+# typically produces ~12K output tokens, well within the 16K max_tokens limit.
+BATCH_SIZE = int(os.environ.get("CATL_BATCH_SIZE", "75"))
 
 # Glossary categories to include in the translation prompt.
 # Only these categories from the base glossary are sent to the LLM.
