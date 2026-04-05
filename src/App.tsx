@@ -5,24 +5,27 @@ import ModGrid from "./components/ModGrid"
 import ModDetail from "./components/ModDetail"
 import GlossaryPage from "./components/GlossaryPage"
 import type { ModStatus, Stats } from "./shared_types"
+import { API_BASE } from "./config"
 import "./index.css"
 
-const API_BASE = "http://localhost:8000/api"
 
-/**
- * Main application component that handles routing and global state.
- * @returns The rendered application.
- */
 function App() {
     const [mods, setMods] = useState<ModStatus[]>([])
     const [loading, setLoading] = useState(true)
     const [stats, setStats] = useState<Stats | null>(null)
+
     const navigate = useNavigate()
     const location = useLocation()
+    // Detail pages use a wider `container-fluid` layout to give the string
+    // table more horizontal space, while other pages use the narrower `container`.
     const isDetailPage = location.pathname.startsWith("/mods/")
 
     /**
      * Fetches the list of all mods from the backend.
+     *
+     * Hits `GET /api/mods` and expects a JSON array of {@link ModStatus} objects.
+     * On failure the error is logged but the UI is not disrupted (mods list
+     * simply keeps its previous value).
      */
     const fetchMods = async () => {
         try {
@@ -36,6 +39,10 @@ function App() {
 
     /**
      * Fetches global translation statistics from the backend.
+     *
+     * Hits `GET /api/stats` and expects a JSON {@link Stats} object containing
+     * aggregate metrics like global progress percentage and translation-memory
+     * cache hit counts.
      */
     const fetchStats = async () => {
         try {
@@ -47,6 +54,8 @@ function App() {
         }
     }
 
+    // Fetch mods and stats in parallel on first mount.
+    // The loading spinner stays visible until both requests settle.
     useEffect(() => {
         const init = async () => {
             await Promise.all([fetchMods(), fetchStats()])
@@ -56,8 +65,13 @@ function App() {
     }, [])
 
     /**
-     * Synchronizes a specific mod's files with the backend.
-     * @param modId - The ID of the mod to sync.
+     * Rescans a mod's workshop folder on disk and updates the backend database.
+     *
+     * Hits `POST /api/mods/{modId}/sync`. After a successful sync the mod list
+     * is re-fetched so the dashboard reflects any newly discovered or removed
+     * localization strings.
+     *
+     * @param modId - The unique identifier of the mod to sync.
      */
     const handleModSync = async (modId: string) => {
         try {
@@ -70,11 +84,18 @@ function App() {
     }
 
     /**
-     * Triggers the translation process for a mod.
-     * @param modId - The ID of the mod to translate.
-     * @param provider - The AI provider to use.
+     * Sends untranslated strings for a mod to the chosen AI translation provider.
+     *
+     * Hits `POST /api/translate` with `{ mod_id, provider }`. The backend
+     * translates all untranslated strings and optionally returns glossary term
+     * suggestions. On success the mod list is refreshed so progress bars update.
+     *
+     * @param provider - The AI provider key (e.g. "claude", "deepl").
+     * @param modId - The unique identifier of the mod to translate.
+     * @returns A result object indicating success/failure, a user-facing message,
+     *          and optionally the translated key-value pairs.
      */
-    const handleTranslate = async (modId: string, provider: string): Promise<{ success: boolean; message: string; translations?: Record<string, string> }> => {
+    const handleTranslate = async (provider: string, modId: string): Promise<{ success: boolean; message: string; translations?: Record<string, string> }> => {
         try {
             const res = await fetch(`${API_BASE}/translate`, {
                 method: "POST",
@@ -85,6 +106,7 @@ function App() {
             if (!res.ok) {
                 return { success: false, message: data.detail || "Unknown error" }
             }
+            // Refresh the mod list so dashboard progress bars reflect the new translations.
             fetchMods()
             const msg = `Translated ${data.translated} strings.${data.suggestions > 0 ? ` ${data.suggestions} glossary term suggestions pending review.` : ""}`
             return { success: true, message: msg, translations: data.translations }
@@ -98,6 +120,7 @@ function App() {
         <>
             <Sidebar />
 
+            {/* Detail pages get the wider container-fluid for the string table. */}
             <main className={isDetailPage ? "container-fluid" : "container"}>
                 {loading ? (
                     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
@@ -105,8 +128,10 @@ function App() {
                     </div>
                 ) : (
                     <Routes>
+                        {/* Redirect bare "/" to the dashboard. */}
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
+                        {/* --- Dashboard: mod grid overview --- */}
                         <Route
                             path="/dashboard"
                             element={
@@ -125,8 +150,10 @@ function App() {
                             }
                         />
 
-                        <Route path="/mods/:modId" element={<ModDetail onBack={() => navigate("/dashboard")} onTranslate={(provider, modId) => handleTranslate(modId, provider)} />} />
+                        {/* --- Mod detail: string editor and translation actions --- */}
+                        <Route path="/mods/:modId" element={<ModDetail onBack={() => navigate("/dashboard")} onTranslate={(provider, modId) => handleTranslate(provider, modId)} />} />
 
+                        {/* --- Statistics: aggregate translation metrics --- */}
                         <Route
                             path="/statistics"
                             element={
@@ -160,8 +187,10 @@ function App() {
                             }
                         />
 
+                        {/* --- Glossary: per-mod term management --- */}
                         <Route path="/glossary" element={<GlossaryPage />} />
 
+                        {/* --- Settings: provider configuration (currently read-only) --- */}
                         <Route
                             path="/settings"
                             element={
@@ -182,6 +211,7 @@ function App() {
                             }
                         />
 
+                        {/* Catch-all: redirect unknown routes back to dashboard. */}
                         <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                 )}

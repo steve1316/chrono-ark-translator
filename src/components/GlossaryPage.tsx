@@ -1,15 +1,26 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { FaSearch } from "react-icons/fa"
+import { API_BASE } from "../config"
 import type { Glossary } from "../shared_types"
 
-const API_BASE = "http://localhost:8000/api"
 
+/**
+ * Displays the base-game terminology glossary in a searchable, filterable table.
+ *
+ * This is a top-level page component that fetches the full glossary on mount
+ * (GET /api/glossary) and lets users narrow it down via a text search and
+ * per-category toggle buttons. The glossary contains English terms, their
+ * category (e.g. "skill", "character"), and source-language mappings.
+ *
+ * @returns The rendered glossary page with search bar, category filters, and terms table
+ */
 const GlossaryPage: React.FC = () => {
     const [glossary, setGlossary] = useState<Glossary>({ terms: {} })
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
     const [categoryFilter, setCategoryFilter] = useState<string>("all")
 
+    // Fetch the full glossary once on mount. The endpoint returns a Glossary object: { terms: Record<string, GlossaryTerm> }.
     useEffect(() => {
         const fetchGlossary = async () => {
             try {
@@ -25,6 +36,11 @@ const GlossaryPage: React.FC = () => {
         fetchGlossary()
     }, [])
 
+    /**
+     * Unique, alphabetically sorted list of categories present in the glossary.
+     * Used to render the category filter buttons. Recomputed only when the
+     * glossary data changes.
+     */
     const categories = useMemo(() => {
         const cats = new Set<string>()
         for (const term of Object.values(glossary.terms)) {
@@ -33,9 +49,22 @@ const GlossaryPage: React.FC = () => {
         return Array.from(cats).sort()
     }, [glossary])
 
+    /**
+     * Filtered and sorted glossary entries, recomputed whenever the glossary,
+     * search text, or category filter changes.
+     *
+     * Filtering logic:
+     * 1. Text search (case-insensitive) matches against the English key AND
+     *    against every value in source_mappings, so users can search by the
+     *    original-language text too (e.g. a Korean term name).
+     * 2. Category filter is an exact match when not "all".
+     *
+     * Results are sorted alphabetically by the English term.
+     */
     const filteredTerms = useMemo(() => {
         return Object.entries(glossary.terms)
             .filter(([english, info]) => {
+                // Match against the English key or any source mapping value.
                 const matchesSearch =
                     english.toLowerCase().includes(search.toLowerCase()) ||
                     Object.values(info.source_mappings).some((v) => v.toLowerCase().includes(search.toLowerCase()))
@@ -55,6 +84,7 @@ const GlossaryPage: React.FC = () => {
 
     return (
         <div className="glossary-view animate-fade-in">
+            {/* Page header showing total term and category counts. */}
             <div className="dashboard-header">
                 <div className="title-group">
                     <h1>Terminology Glossary</h1>
@@ -64,8 +94,10 @@ const GlossaryPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Search bar and category filter toggles */}
             <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
                 <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
+                    {/* Text search input with a magnifying-glass icon overlay. */}
                     <div style={{ flex: 1, minWidth: "200px", position: "relative" }}>
                         <FaSearch style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }} />
                         <input
@@ -77,6 +109,7 @@ const GlossaryPage: React.FC = () => {
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
+                    {/* Category toggle buttons -- "All" plus one per unique category. */}
                     <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                         <button className={`btn ${categoryFilter === "all" ? "btn-primary" : "btn-outline"}`} onClick={() => setCategoryFilter("all")}>
                             All
@@ -95,6 +128,7 @@ const GlossaryPage: React.FC = () => {
                 </div>
             </div>
 
+            {/* Terms table showing English term, category, and source-language mappings. */}
             <div className="glass-card" style={{ padding: 0, overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
@@ -110,6 +144,7 @@ const GlossaryPage: React.FC = () => {
                                 <td style={{ padding: "0.5rem 1rem", fontWeight: 500 }}>{english}</td>
                                 <td style={{ padding: "0.5rem 1rem", textTransform: "capitalize", color: "var(--text-dim)" }}>{info.category}</td>
                                 <td style={{ padding: "0.5rem 1rem", color: "var(--text-dim)", fontSize: "0.9rem" }}>
+                                    {/* Render each source-language mapping as "lang: text" pairs inline. */}
                                     {Object.entries(info.source_mappings).map(([lang, text]) => (
                                         <span key={lang} style={{ marginRight: "1rem" }}>
                                             <strong>{lang}:</strong> {text}
@@ -118,6 +153,7 @@ const GlossaryPage: React.FC = () => {
                                 </td>
                             </tr>
                         ))}
+                        {/* Empty-state row when filters yield no results. */}
                         {filteredTerms.length === 0 && (
                             <tr>
                                 <td colSpan={3} style={{ padding: "2rem", textAlign: "center", color: "var(--text-dim)" }}>

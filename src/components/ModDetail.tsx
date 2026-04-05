@@ -1,18 +1,56 @@
+/**
+ * ModDetail.tsx
+ *
+ * Primary detail view for a single Chrono Ark mod. Displays all translatable
+ * localization strings in an interactive table with filtering, sorting, inline
+ * editing, and column resizing. Integrates with the backend API to support:
+ *
+ * - AI-powered translation via a preview-then-confirm workflow
+ * - Manual per-string editing with blur/Enter/Escape save semantics
+ * - Exporting (syncing) saved translations back to the mod's CSV files
+ * - Per-mod glossary management (add/remove terms, accept AI suggestions)
+ * - Character context metadata for improving AI translation quality
+ * - Duplicate localization file detection and consolidation on export
+ *
+ * The component is route-mounted and reads `modId` from the URL via
+ * `useParams`. It fetches mod data, export status, glossary suggestions,
+ * and character context on mount.
+ */
+
 import React, { useState, useEffect, useRef } from "react"
 import { useParams } from "react-router-dom"
 import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook, FaFolderOpen } from "react-icons/fa"
 import type { LocString, TermSuggestion } from "../shared_types"
+import { API_BASE } from "../config"
 import GlossarySuggestionModal from "./GlossarySuggestionModal"
 import TranslationConfirmModal from "./TranslationConfirmModal"
 
+/**
+ * Props for the ModDetail component.
+ */
 interface ModDetailProps {
+    /** Callback to navigate back to the dashboard/mod list. */
     onBack: () => void
+    /**
+     * Callback to execute the actual translation request against the AI provider.
+     * Called only after the user confirms the translation preview modal.
+     *
+     * @param provider - The AI provider identifier (e.g. "claude").
+     * @param modId - The mod identifier to translate.
+     * @returns A result object with success status, a user-facing message, and
+     *          optionally a map of key-to-translated-English-string pairs.
+     */
     onTranslate: (provider: string, modId: string) => Promise<{ success: boolean; message: string; translations?: Record<string, string> }>
 }
 
-const API_BASE = "http://localhost:8000/api"
 
+/** Columns that support click-to-sort in the strings table. */
 type SortField = "is_translated" | "key" | "source" | "english"
+
+/**
+ * Sort direction for a column: ascending, descending, or null (unsorted).
+ * Clicking a column header cycles through asc -> desc -> null.
+ */
 type SortDirection = "asc" | "desc" | null
 
 /**
@@ -29,16 +67,15 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     const [modPreviewImage, setModPreviewImage] = useState<string | null>(null)
     const [modUrl, setModUrl] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
+
     const [filter, setFilter] = useState<"all" | "translated" | "untranslated">("all")
     const [search, setSearch] = useState("")
 
-    // Sorting state.
     const [sortConfig, setSortConfig] = useState<{ key: SortField; direction: SortDirection }>({
         key: "key",
         direction: "asc",
     })
 
-    // Column widths state.
     const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({
         status: 80,
         key: 300,
@@ -49,9 +86,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     const [hasExportChanges, setHasExportChanges] = useState(false)
     const [duplicateFiles, setDuplicateFiles] = useState<string[]>([])
     const [showDuplicateDetails, setShowDuplicateDetails] = useState(false)
+
     const [suggestions, setSuggestions] = useState<TermSuggestion[]>([])
     const [showSuggestionModal, setShowSuggestionModal] = useState(false)
     const [modGlossary, setModGlossary] = useState<Record<string, { category: string; source_mappings: Record<string, string> }>>({})
+
     const [translationPreview, setTranslationPreview] = useState<any>(null)
     const [pendingProvider, setPendingProvider] = useState<string>("")
     const [showGlossaryPanel, setShowGlossaryPanel] = useState(false)
@@ -61,6 +100,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     const [newTermCategory, setNewTermCategory] = useState("custom")
     const [translating, setTranslating] = useState(false)
     const [translateBanner, setTranslateBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
+
     const [characterContext, setCharacterContext] = useState<{
         source_game: string
         character_name: string
@@ -69,10 +109,28 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     const [showCharacterContext, setShowCharacterContext] = useState(false)
     const [characterContextSaved, setCharacterContextSaved] = useState(false)
 
+    const [exporting, setExporting] = useState(false)
+
+    /**
+     * Initiates the translation workflow by fetching a preview from the backend.
+     *
+     * The workflow is two-step:
+     *   1. This function calls POST `/api/translate/preview` to get batch counts,
+     *      prompt previews, and cost estimates without actually translating.
+     *   2. If there are strings to translate, the preview data is stored in state
+     *      which triggers the TranslationConfirmModal to open.
+     *   3. The user reviews and confirms, which calls `onTranslate` (see the modal
+     *      `onConfirm` handler further down in the JSX).
+     *
+     * If all strings are already translated, a success banner is shown instead.
+     *
+     * @param provider - The AI provider identifier (e.g. "claude").
+     */
     const handleTranslateClick = async (provider: string) => {
         if (!modId) return
         setTranslateBanner(null)
         try {
+            // POST /api/translate/preview — returns { total_strings, total_batches, batch_size, provider, previews, estimates }
             const res = await fetch(`${API_BASE}/translate/preview`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -87,6 +145,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 setTranslateBanner({ type: "success", message: "All strings are already translated." })
                 return
             }
+            // Store the provider and preview so the confirmation modal can render.
             setPendingProvider(provider)
             setTranslationPreview(data)
         } catch (err) {
@@ -95,8 +154,18 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    /**
+     * Ref tracking the active column resize operation. Stores which column field
+     * is being resized, the pointer's starting X position, and the column's width
+     * at the start of the drag. Null when no resize is in progress.
+     */
     const resizingRef = useRef<{ field: string; startX: number; startWidth: number } | null>(null)
 
+    /**
+     * Fetches whether there are pending translation changes that can be exported
+     * (synced) to the mod's CSV files.
+     * GET `/api/mods/:modId/export-status` -> `{ has_changes: boolean }`.
+     */
     const fetchExportStatus = async () => {
         if (!modId) return
         try {
@@ -105,11 +174,14 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 const data = await res.json()
                 setHasExportChanges(data.has_changes)
             }
-        } catch {
-            // Ignore — button stays disabled by default.
-        }
+        } catch {}
     }
 
+    /**
+     * Fetches AI-generated glossary term suggestions for this mod.
+     * GET `/api/mods/:modId/glossary/suggestions` -> `TermSuggestion[]`.
+     * Suggestions are shown as a badge on the "Suggestions" button.
+     */
     const fetchSuggestions = async () => {
         if (!modId) return
         try {
@@ -118,11 +190,14 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 const data = await res.json()
                 setSuggestions(data)
             }
-        } catch {
-            // Ignore.
-        }
+        } catch {}
     }
 
+    /**
+     * Fetches the mod-specific glossary terms.
+     * GET `/api/mods/:modId/glossary` -> `{ terms: Record<string, { category, source_mappings }> }`.
+     * Called when the glossary panel is opened.
+     */
     const fetchModGlossary = async () => {
         if (!modId) return
         try {
@@ -131,11 +206,14 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 const data = await res.json()
                 setModGlossary(data.terms || {})
             }
-        } catch {
-            // Ignore.
-        }
+        } catch {}
     }
 
+    /**
+     * Fetches character context metadata for this mod.
+     * GET `/api/mods/:modId/character-context` -> `{ source_game, character_name, background }`.
+     * This context is passed to AI providers to improve translation quality.
+     */
     const fetchCharacterContext = async () => {
         if (!modId) return
         try {
@@ -144,11 +222,14 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 const data = await res.json()
                 setCharacterContext(data)
             }
-        } catch {
-            // Ignore.
-        }
+        } catch {}
     }
 
+    /**
+     * Fetches the full mod detail including all localization strings, mod metadata,
+     * and duplicate file information.
+     * GET `/api/mods/:modId` -> `{ strings, name, author, preview_image, url, duplicate_files }`.
+     */
     const fetchModDetail = async () => {
         if (!modId) return
         setLoading(true)
@@ -168,6 +249,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    // On mount (or when modId changes), fetch all required data in parallel.
     useEffect(() => {
         fetchModDetail()
         fetchExportStatus()
@@ -191,8 +273,16 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
 
     /**
      * Saves a manual translation for a specific string key.
-     * @param key - The localization key.
-     * @param newValue - The new English translation.
+     * POST `/api/mods/:modId/strings` -> `{ key, english }`.
+     *
+     * On success, updates the local `strings` state optimistically so the table
+     * reflects the change immediately. A string is marked as translated if it has
+     * a non-empty English value OR its source text is blank (nothing to translate).
+     *
+     * Also re-fetches export status since the new edit may enable the Sync button.
+     *
+     * @param key - The localization key to update.
+     * @param newValue - The new English translation text.
      */
     const handleSaveString = async (key: string, newValue: string) => {
         if (!modId) return
@@ -203,6 +293,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 body: JSON.stringify({ key, english: newValue }),
             })
             if (res.ok) {
+                // Optimistic update: mark translated if English is non-empty or source is blank.
                 setStrings((prev) => prev.map((s) => (s.key === key ? { ...s, english: newValue, is_translated: !!newValue || !s.source.trim() } : s)))
                 fetchExportStatus()
             }
@@ -211,10 +302,16 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    // Uses pointer events with setPointerCapture for reliable cross-browser drag
+    // behavior. The resizer div is a narrow handle rendered at the right edge of
+    // each <th>. Minimum column width is clamped to 80px.
+
     /**
-     * Starts the column resizing process.
-     * @param e - Pointer event from the resizer.
-     * @param field - The field being resized.
+     * Starts the column resizing process by capturing the pointer and recording
+     * the initial drag position and column width.
+     *
+     * @param e - Pointer event from the resizer handle element.
+     * @param field - The column field key being resized (e.g. `"status"`, `"key"`).
      */
     const onResizeStart = (e: React.PointerEvent, field: string) => {
         resizingRef.current = {
@@ -222,12 +319,15 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
             startX: e.pageX,
             startWidth: columnWidths[field],
         }
+        // Capture the pointer so move/up events continue even if the cursor leaves the element.
         ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
     }
 
     /**
-     * Updates the column width during resizing.
-     * @param e - Pointer event from the movement.
+     * Updates the column width in real-time as the pointer moves during a resize.
+     * Width is clamped to a minimum of 80px.
+     *
+     * @param e - Pointer move event.
      */
     const onResizeMove = (e: React.PointerEvent) => {
         if (!resizingRef.current) return
@@ -237,24 +337,37 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     }
 
     /**
-     * Ends the resizing process.
-     * @param _ - Pointer event.
+     * Ends the column resize operation by clearing the tracking ref.
+     *
+     * @param _ - Pointer up event.
      */
     const onResizeEnd = (_: React.PointerEvent) => {
         resizingRef.current = null
     }
 
-    // Filter and sort strings.
+    /**
+     * This memoized computation derives the visible rows from the full strings
+     * array. It applies three stages in order:
+     *   1. Filter by translation status (all / translated / untranslated)
+     *   2. Filter by free-text search across key, source, and english fields
+     *   3. Sort by the currently active column + direction
+     *
+     * Note: A string with blank source text is treated as "done" (nothing to
+     * translate), matching the same logic used in `handleSaveString`.
+     */
     const processedStrings = React.useMemo(() => {
         let result = strings.filter((s) => {
+            // A string is "done" if explicitly translated OR its source is blank.
             const isDone = s.is_translated || !s.source.trim()
             const matchesFilter = filter === "all" || (filter === "translated" && isDone) || (filter === "untranslated" && !isDone)
 
+            // Case-insensitive search across all three text columns.
             const matchesSearch = s.key.toLowerCase().includes(search.toLowerCase()) || s.source.toLowerCase().includes(search.toLowerCase()) || s.english.toLowerCase().includes(search.toLowerCase())
 
             return matchesFilter && matchesSearch
         })
 
+        // Apply sorting only when a direction is active (null means unsorted).
         if (sortConfig.direction) {
             result.sort((a, b) => {
                 const aValue = a[sortConfig.key]
@@ -279,14 +392,19 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         if (sortConfig.key !== field || !sortConfig.direction) return <FaSort className="sort-icon" />
         return sortConfig.direction === "asc" ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
     }
-    
-    const [exporting, setExporting] = useState(false)
 
     /**
-     * Writes saved translations back to the mod's original CSV files.
+     * Writes saved translations back to the mod's original CSV files on disk.
+     * POST `/api/mods/:modId/export` -> `{ applied, files_written, files_removed }`.
+     *
+     * Shows a confirmation dialog first (including duplicate file warnings if any).
+     * On success, reports how many translations were applied and which files were
+     * written. If duplicate files existed, they are consolidated (merged then deleted)
+     * as part of the export.
      */
     const handleExport = async () => {
         if (!modId) return
+        // Build a warning message that includes duplicate files if present.
         const dupeWarning = duplicateFiles.length > 0
             ? `\n\nThis will also consolidate ${duplicateFiles.length} duplicate file(s):\n${duplicateFiles.join("\n")}\n\nDuplicate files will be deleted after merging.`
             : ""
@@ -317,7 +435,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     }
 
     /**
-     * Clears the mod's translation cache and local state.
+     * Clears the mod's entire translation cache, including all extracted strings
+     * and translation progress. This is irreversible.
+     * POST `/api/mods/:modId/clear`.
+     *
+     * On success, navigates back to the dashboard since there is nothing left
+     * to display for this mod.
      */
     const handleClearCache = async () => {
         if (!modId) return
@@ -342,6 +465,14 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    /**
+     * Clears only the English translations for all strings in this mod, resetting
+     * them to empty. This allows all rows to be re-sent to the AI provider.
+     * POST `/api/mods/:modId/clear-translations`.
+     *
+     * Unlike `handleClearCache`, this preserves the extracted source strings and
+     * mod metadata — only the English column is wiped.
+     */
     const handleClearTranslations = async () => {
         if (!modId) return
         if (!window.confirm("Are you sure you want to clear all English translations? This will allow all rows to be sent to the AI provider.")) {
@@ -365,6 +496,13 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    /**
+     * Opens the mod's local folder in the system file explorer.
+     * POST `/api/mods/:modId/open`.
+     *
+     * This is a convenience action so users can inspect or manually edit
+     * the mod's CSV files on disk.
+     */
     const handleOpenFolder = async () => {
         if (!modId) return
         try {
@@ -378,6 +516,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    /**
+     * Persists the character context metadata to the backend.
+     * POST `/api/mods/:modId/character-context` -> `{ source_game, character_name, background }`.
+     *
+     * On success, shows a transient "Saved!" indicator that auto-clears after 2 seconds.
+     */
     const handleSaveCharacterContext = async () => {
         if (!modId) return
         try {
@@ -407,6 +551,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
 
     return (
         <div className="mod-detail">
+            {/* --- Header: Mod info, navigation, and action buttons --- */}
             <div className="dashboard-header">
                 <div className="title-group">
                     <button className="btn btn-outline" onClick={onBack} style={{ marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -459,7 +604,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     </div>
                 </div>
 
+                {/* --- Action Buttons: glossary, suggestions, character context, clear, translate, sync --- */}
                 <div className="mod-actions">
+                    {/* Glossary, suggestions, and character context toggles. */}
                     <div className="mod-actions-group">
                         <button
                             className="btn btn-outline"
@@ -502,6 +649,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                         </button>
                     </div>
 
+                    {/* Destructive actions: clear cache (full reset) and clear English (wipe translations only). */}
                     <div className="mod-actions-group">
                         <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleClearCache}>
                             Clear Cache
@@ -511,6 +659,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                         </button>
                     </div>
 
+                    {/* Translation trigger and CSV sync. */}
                     <div className="mod-actions-group">
                         <button className="btn btn-primary" onClick={() => handleTranslateClick("claude")} disabled={translating}>
                             Translate (Claude)
@@ -523,6 +672,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 </div>
             </div>
 
+            {/* --- Translation In-Progress Spinner --- */}
             {translating && (
                 <div className="glass-card" style={{
                     padding: "1.25rem 1.5rem",
@@ -544,6 +694,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 </div>
             )}
 
+            {/* --- Translation Result Banner (success/error) — dismissible --- */}
             {translateBanner && (
                 <div className="glass-card" style={{
                     padding: "1rem 1.5rem",
@@ -569,6 +720,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 </div>
             )}
 
+            {/* --- Search & Filter Bar --- */}
             <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
                 <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
                     <div style={{ flex: 1 }}>
@@ -598,6 +750,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 </div>
             </div>
 
+            {/* --- Glossary Panel ---
+                Inline panel for managing mod-specific glossary terms.
+                Users can add new terms (English + source text + language + category)
+                and remove existing ones. These terms are sent to the AI provider
+                during translation to enforce consistent terminology. */}
             {showGlossaryPanel && (
                 <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1rem" }}>
                     <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>Mod Glossary Terms</h3>
@@ -657,6 +814,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 </div>
             )}
 
+            {/* --- Character Context Panel ---
+                Allows the user to provide metadata about the mod's character
+                (source game, character name, background lore). This context
+                is injected into the AI translation prompt so the provider can
+                produce more accurate, lore-consistent translations. */}
             {showCharacterContext && (
                 <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1rem" }}>
                     <h3 style={{ marginTop: 0, marginBottom: "0.5rem" }}>Character Context</h3>
@@ -705,6 +867,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 </div>
             )}
 
+            {/* --- Duplicate Files Warning ---
+                Shown when the backend detects multiple localization CSV files with
+                the same language in the mod directory. Clicking "Sync Changes"
+                will consolidate these duplicates by merging their contents and
+                deleting the extra files. The details are collapsible. */}
             {duplicateFiles.length > 0 && (
                 <div className="glass-card" style={{ padding: "1rem 1.5rem", marginBottom: "1rem", borderLeft: "3px solid var(--accent-secondary)" }}>
                     <div
@@ -726,6 +893,16 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 </div>
             )}
 
+            {/* --- Strings Table ---
+                The main data table showing all localization strings. Features:
+                - Sticky header row with sortable columns (click header to cycle sort)
+                - Drag-to-resize column handles on each header
+                - Status column shows OK/MISSING badge
+                - Source column shows the original language text
+                - English column is inline-editable via the EditableCell component
+                - Rows with overridden translations (english !== original_english)
+                  are highlighted with a yellow background and show the previous
+                  translation above the editable cell */}
             <div className="glass-card string-table-container" style={{ height: "calc(100vh - 400px)", minHeight: "500px", overflow: "auto" }}>
                 <table style={{ borderCollapse: "collapse", width: "100%" }}>
                     <thead style={{ background: "var(--bg-color)", position: "sticky", top: 0, zIndex: 10 }}>
@@ -750,9 +927,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     </thead>
                     <tbody>
                         {processedStrings.map((s) => {
+                            // hasOverride: true when the current English differs from what was originally in the CSV (user or AI changed it).
                             const hasOverride = s.english !== s.original_english
                             const isDone = s.is_translated || !s.source.trim()
                             return (
+                                // Yellow highlight on rows where the translation has been modified.
                                 <tr key={s.key} style={hasOverride ? { backgroundColor: "rgba(255, 220, 40, 0.15)" } : undefined}>
                                     <td>
                                         <span className={`status-badge ${isDone ? "status-translated" : "status-missing"}`}>{isDone ? "OK" : "MISSING"}</span>
@@ -764,6 +943,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                         {s.source}
                                     </td>
                                     <td className="english-cell" style={{ maxWidth: columnWidths.english, position: "relative" }}>
+                                        {/* Show previous translation above the editable field when overridden. */}
                                         {hasOverride && (
                                             <div className="prev-translation">{s.original_english || "(no previous translation)"}</div>
                                         )}
@@ -776,6 +956,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 </table>
             </div>
 
+            {/* --- Glossary Suggestion Modal ---
+                Modal for reviewing AI-generated glossary term suggestions.
+                The user can accept or reject each suggestion. Accepted terms
+                are added to the mod glossary. */}
             {showSuggestionModal && (
                 <GlossarySuggestionModal
                     modId={modId!}
@@ -785,6 +969,14 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 />
             )}
 
+            {/* --- Translation Confirmation Modal ---
+                Shown after handleTranslateClick fetches a preview. Displays
+                prompt previews, batch counts, and cost estimates. On confirm:
+                1. Close the modal and show the translating spinner
+                2. Call onTranslate (parent-provided) to execute the actual API call
+                3. On success with inline translations: merge them into local state
+                4. On success without inline translations: full re-fetch
+                5. Refresh export status and suggestions after any success */}
             {translationPreview && (
                 <TranslationConfirmModal
                     preview={translationPreview}
@@ -796,6 +988,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                         setTranslating(false)
                         setTranslateBanner({ type: result.success ? "success" : "error", message: result.message })
                         if (result.success && result.translations) {
+                            // Merge translations into local state to avoid a full re-fetch.
                             setStrings(prev => prev.map(s => {
                                 if (s.key in result.translations!) {
                                     return { ...s, english: result.translations![s.key], is_translated: true }
@@ -805,6 +998,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             fetchExportStatus()
                             fetchSuggestions()
                         } else if (result.success) {
+                            // Fallback: if no inline translations were returned, re-fetch everything.
                             fetchModDetail()
                         }
                     }}
@@ -815,18 +1009,37 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     )
 }
 
+// =============================================================================
+// EditableCell — Inline-editable table cell component
+// =============================================================================
+
+/**
+ * Props for the EditableCell component.
+ */
 interface EditableCellProps {
+    /** The current persisted value displayed in the cell. */
     value: string
+    /** Callback invoked when the user commits a change (blur or Enter). */
     onSave: (val: string) => void
+    /** Placeholder text shown in dim italic when the value is empty. */
     placeholder?: string
 }
 
 /**
- * Component for an editable table cell.
- * @param value - The current value of the cell.
- * @param onSave - Callback when the value is saved.
- * @param placeholder - Placeholder text when empty.
- * @returns The rendered editable cell.
+ * An inline-editable table cell that toggles between display and edit modes.
+ *
+ * Display mode: shows the value (or placeholder) as plain text. Clicking
+ * anywhere in the cell enters edit mode.
+ *
+ * Edit mode: renders an <input> that auto-focuses. The edit is committed on
+ * blur or Enter, and cancelled (reverted) on Escape. The `onSave` callback
+ * is only called if the value actually changed, avoiding unnecessary API calls.
+ *
+ * @param props - Component props
+ * @param props.value - The current persisted value displayed in the cell.
+ * @param props.onSave - Callback invoked when the user commits a change.
+ * @param props.placeholder - Placeholder text when the value is empty.
+ * @returns The rendered editable cell JSX.
  */
 const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, placeholder }) => {
     const [isEditing, setIsEditing] = useState(false)
