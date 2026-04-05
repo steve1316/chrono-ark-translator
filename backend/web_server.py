@@ -112,6 +112,24 @@ class TranslationRequest(BaseModel):
     provider: Optional[str] = None
 
 
+class BatchTranslationRequest(BaseModel):
+    """Request body for translating a single batch of strings.
+
+    Attributes:
+        mod_id: The unique workshop identifier of the mod to translate.
+        provider: Optional override for the translation provider name.
+        keys: Explicit localization keys to translate in this batch.
+        source_lang: The source language for all keys in this batch.
+        is_first_batch: When True, creates a backup before translating.
+    """
+
+    mod_id: str
+    provider: Optional[str] = None
+    keys: list[str]
+    source_lang: str
+    is_first_batch: bool = False
+
+
 class TranslationUpdate(BaseModel):
     """Payload for manually updating a single translated string.
 
@@ -139,6 +157,46 @@ class CharacterContext(BaseModel):
     source_game: str = ""
     character_name: str = ""
     background: str = ""
+
+
+# --- Helpers ---
+
+
+def _filter_suggestions(
+    suggestions: list[dict],
+    strings: dict,
+) -> list[dict]:
+    """Filter suggestions to only those whose terms appear in actual text.
+
+    Removes suggestions where the source/english term only appears in
+    localization keys but not in the actual source text or English translations.
+
+    Args:
+        suggestions: Raw suggestion dicts from the provider.
+        strings: The full strings dict mapping key -> LocalizedString.
+
+    Returns:
+        Filtered list of suggestion dicts.
+    """
+    all_source_texts: set[str] = set()
+    all_english_texts: set[str] = set()
+    for _key, loc_str in strings.items():
+        for lang_name, text in loc_str.translations.items():
+            if lang_name == "English":
+                all_english_texts.add(text.lower())
+            else:
+                all_source_texts.add(text.lower())
+    filtered = []
+    for suggestion in suggestions:
+        source_term = suggestion.get("source", "").lower()
+        english_term = suggestion.get("english", "").lower()
+        if not source_term and not english_term:
+            continue
+        source_found = any(source_term in text for text in all_source_texts) if source_term else False
+        english_found = any(english_term in text for text in all_english_texts) if english_term else False
+        if source_found or english_found:
+            filtered.append(suggestion)
+    return filtered
 
 
 # --- API Endpoints ---
@@ -667,6 +725,19 @@ async def preview_translation(req: TranslationRequest):
             character_context=character_context,
         )
 
+    # Build a flat batch plan the frontend can iterate over.
+    batch_plan = []
+    for lang, entries in by_lang.items():
+        for i in range(0, len(entries), batch_size):
+            batch = entries[i : i + batch_size]
+            batch_plan.append(
+                {
+                    "source_lang": lang,
+                    "keys": [key for key, _ in batch],
+                    "size": len(batch),
+                }
+            )
+
     return {
         "total_strings": len(untranslated),
         "total_batches": total_batches,
@@ -674,6 +745,7 @@ async def preview_translation(req: TranslationRequest):
         "provider": provider.name,
         "previews": previews,
         "estimates": estimates,
+        "batch_plan": batch_plan,
     }
 
 
@@ -808,28 +880,7 @@ async def translate_mod(req: TranslationRequest):
     # Save TM.
     tm.save()
 
-    # Filter out suggestions where the source term only appears in keys, not in
-    # the actual source text or English translations.
-    all_source_texts = set()
-    all_english_texts = set()
-    for key, loc_str in strings.items():
-        for lang_name, text in loc_str.translations.items():
-            if lang_name == "English":
-                all_english_texts.add(text.lower())
-            else:
-                all_source_texts.add(text.lower())
-    filtered_suggestions = []
-    for suggestion in all_suggestions:
-        source_term = suggestion.get("source", "").lower()
-        english_term = suggestion.get("english", "").lower()
-        if not source_term and not english_term:
-            continue
-        # Check if the source term appears in any source text
-        source_found = any(source_term in text for text in all_source_texts) if source_term else False
-        # Check if the english term appears in any english text
-        english_found = any(english_term in text for text in all_english_texts) if english_term else False
-        if source_found or english_found:
-            filtered_suggestions.append(suggestion)
+    filtered_suggestions = _filter_suggestions(all_suggestions, strings)
 
     # Store suggestions (add_suggestions deduplicates internally).
     if filtered_suggestions:
@@ -843,6 +894,147 @@ async def translate_mod(req: TranslationRequest):
         "translated": len(all_translations),
         "suggestions": len(stored_suggestions),
         "translations": all_translations,
+    }
+
+
+@app.post("/api/translate/batch")
+async def translate_batch(req: BatchTranslationRequest):
+    """Translate a single batch of strings by explicit keys.
+
+    Designed for iterative batch translation where the frontend drives the
+    loop, allowing the user to review glossary suggestions between batches.
+    The glossary is reloaded fresh each call so newly accepted terms from
+    previous batch reviews are included.
+
+    Args:
+        req: Batch translation request with mod_id, explicit keys,
+            source_lang, and whether this is the first batch.
+
+    Returns:
+        A dict with ``translations`` (key->english), ``suggestions`` (full
+        suggestion objects for review), and ``translated`` count.
+
+    Raises:
+        HTTPException: 404 if the mod is not found.
+        HTTPException: 400 if none of the provided keys have translatable text.
+        HTTPException: 502 if the translation provider returns an error.
+    """
+    mods = _adapter.scan_mods()
+    matching = [m for m in mods if m.mod_id == req.mod_id]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Mod not found")
+    mod_path = matching[0].path
+
+    strings, _ = _adapter.extract_strings(mod_path)
+
+    # Apply saved translations so user edits (including clears) are respected.
+    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
+    if translations_path.exists():
+        try:
+            with open(translations_path, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            for key, english in saved.items():
+                if key in strings:
+                    strings[key].translations["English"] = english
+        except Exception:
+            pass
+
+    # Build entries list from the explicit keys.
+    entries: list[tuple[str, str]] = []
+    for key in req.keys:
+        if key in strings:
+            source_text = strings[key].translations.get(req.source_lang, "")
+            if source_text:
+                entries.append((key, source_text))
+
+    if not entries:
+        raise HTTPException(status_code=400, detail="No translatable text found for the provided keys")
+
+    provider_name = req.provider or config.TRANSLATION_PROVIDER
+    provider = get_provider(provider_name)
+
+    # Create backup and reset raw responses only on the first batch.
+    if req.is_first_batch:
+        create_backup(req.mod_id, "Before translation run")
+        if hasattr(provider, "last_raw_responses"):
+            provider.last_raw_responses = []
+
+    # Re-load glossaries fresh (picks up terms accepted between batches).
+    base_glossary = load_glossary()
+    mod_glossary = load_mod_glossary(req.mod_id)
+    glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=req.source_lang)
+
+    game_context = _adapter.get_translation_context()
+    char_ctx = load_character_context(req.mod_id)
+    character_context = char_ctx if any(char_ctx.values()) else None
+    format_rules = _adapter.get_format_preservation_rules()
+    style_examples = _adapter.get_style_examples()
+
+    tm = TranslationMemory()
+
+    try:
+        translations, suggestions = provider.translate_batch(
+            entries,
+            req.source_lang,
+            glossary_prompt,
+            game_context=game_context,
+            format_rules=format_rules,
+            style_examples=style_examples,
+            character_context=character_context,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    # Store translation memory entries.
+    for key, english in translations.items():
+        source_text = next((t for k, t in entries if k == key), "")
+        if source_text and english:
+            tm.store(source_text, english, req.source_lang)
+
+    # Append raw API responses for inspection (accumulate across batches).
+    raw_responses = getattr(provider, "last_raw_responses", [])
+    if raw_responses:
+        responses_path = config.STORAGE_PATH / "mods" / req.mod_id / "last_api_responses.json"
+        responses_path.parent.mkdir(parents=True, exist_ok=True)
+        existing_responses = []
+        if not req.is_first_batch and responses_path.exists():
+            try:
+                with open(responses_path, "r", encoding="utf-8") as f:
+                    existing_responses = json.load(f)
+            except Exception:
+                pass
+        existing_responses.extend(raw_responses)
+        with open(responses_path, "w", encoding="utf-8") as f:
+            json.dump(existing_responses, f, indent=2, ensure_ascii=False)
+
+    # Save translations incrementally.
+    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
+    translations_path.parent.mkdir(parents=True, exist_ok=True)
+    existing = {}
+    if translations_path.exists():
+        with open(translations_path, "r", encoding="utf-8") as f:
+            existing = json.load(f)
+    existing.update(translations)
+    with open(translations_path, "w", encoding="utf-8") as f:
+        json.dump(existing, f, indent=2, ensure_ascii=False)
+
+    # Update progress.
+    tracker = ProgressTracker()
+    tracker.mark_translated(req.mod_id, list(translations.keys()))
+
+    # Save TM.
+    tm.save()
+
+    # Filter and store suggestions.
+    filtered_suggestions = _filter_suggestions(suggestions, strings)
+    if filtered_suggestions:
+        add_suggestions(req.mod_id, filtered_suggestions)
+
+    return {
+        "status": "success",
+        "translated": len(translations),
+        "translations": translations,
+        "suggestions": filtered_suggestions,
     }
 
 
