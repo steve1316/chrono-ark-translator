@@ -442,8 +442,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 method: "POST",
             })
             if (res.ok) {
-                // Redirect back to dashboard.
-                onBack()
+                // Re-fetch mod data to reflect the cleared state.
+                fetchModDetail()
+                fetchExportStatus()
+                fetchSuggestions()
+                fetchModGlossary()
+                setTranslateBanner({ type: "success", message: "Cache cleared successfully." })
             } else {
                 const error = await res.json()
                 alert(`Failed to clear cache: ${error.detail || "Unknown error"}`)
