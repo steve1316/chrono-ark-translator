@@ -1307,8 +1307,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     <div className="glass-card" style={{ width: "700px", maxHeight: "80vh", overflow: "auto", padding: "2rem" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
                             <h2 style={{ margin: 0 }}>History Backups</h2>
-                            <button className="btn btn-outline" onClick={() => setShowHistory(false)} style={{ padding: "0.25rem 0.75rem" }}>
-                                Close
+                            <button
+                                onClick={() => setShowHistory(false)}
+                                style={{ background: "none", border: "none", color: "var(--text-dim)", fontSize: "2rem", lineHeight: 1, cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px" }}
+                                title="Close"
+                            >
+                                &times;
                             </button>
                         </div>
                         {historyEntries.length === 0 ? (
@@ -1395,8 +1399,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             <h2 style={{ margin: 0 }}>
                                 Replace "{replacePreview.oldTerm}" with "{replacePreview.newTerm}"
                             </h2>
-                            <button className="btn btn-outline" onClick={() => setReplacePreview(null)} style={{ padding: "0.25rem 0.75rem" }}>
-                                Close
+                            <button
+                                onClick={() => setReplacePreview(null)}
+                                style={{ background: "none", border: "none", color: "var(--text-dim)", fontSize: "2rem", lineHeight: 1, cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px" }}
+                                title="Close"
+                            >
+                                &times;
                             </button>
                         </div>
                         {replacePreview.affected.length === 0 ? (
@@ -1465,8 +1473,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     <div className="glass-card" style={{ width: "900px", maxHeight: "85vh", display: "flex", flexDirection: "column", padding: "2rem" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                             <h2 style={{ margin: 0 }}>API Provider Responses</h2>
-                            <button className="btn btn-outline" onClick={() => setShowApiResponses(false)} style={{ padding: "0.25rem 0.75rem" }}>
-                                Close
+                            <button
+                                onClick={() => setShowApiResponses(false)}
+                                style={{ background: "none", border: "none", color: "var(--text-dim)", fontSize: "2rem", lineHeight: 1, cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px" }}
+                                title="Close"
+                            >
+                                &times;
                             </button>
                         </div>
                         {apiResponses.length === 0 ? (
