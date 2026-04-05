@@ -104,6 +104,7 @@ class ChronoArkAdapter(GameAdapter):
             "Use consistent terminology: Always use the exact English terms from the glossary below. Do NOT paraphrase or use synonyms for glossary terms.",
             "Keep translations concise: Skill and buff descriptions should be brief and clear. Avoid overly formal or wordy translations.",
             "Preserve line breaks: Source text uses literal `\\n` to represent line breaks. Keep every `\\n` in the translated output in the same positions. Do NOT remove or merge lines.",
+            "End sentences with periods: Even if the original source text does not end sentences with punctuation, always add a period at the end of each English sentence or description line. Exception: single-word names or titles should NOT have periods.",
         ]
 
     def get_style_examples(self) -> dict[str, list[tuple[str, str]]]:
