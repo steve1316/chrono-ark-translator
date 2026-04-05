@@ -36,6 +36,7 @@ from backend.data.suggestion_manager import (
     clear_suggestions,
 )
 from backend.data.character_context import load_character_context, save_character_context
+from backend.data.history_manager import create_backup, list_backups, restore_backup, delete_backup
 from backend.main import get_provider, save_extracted_strings
 
 
@@ -380,6 +381,9 @@ async def clear_translations(mod_id: str):
 
     strings, _ = _adapter.extract_strings(matching[0].path)
 
+    # Back up before clearing.
+    create_backup(mod_id, "Before clearing English translations")
+
     # Write empty overrides for every key that has an English value in the CSV
     # so the original CSV values don't show through.
     translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
@@ -435,6 +439,9 @@ async def clear_mod_cache(mod_id: str):
     mod_storage = config.STORAGE_PATH / "mods" / mod_id
     if not mod_storage.exists():
         return {"status": "success", "message": "No data to clear"}
+
+    # Back up before clearing.
+    create_backup(mod_id, "Before clearing cache")
 
     import shutil
 
@@ -717,6 +724,9 @@ async def translate_mod(req: TranslationRequest):
             if lang not in by_lang:
                 by_lang[lang] = []
             by_lang[lang].append((key, loc_str.translations.get(lang, "")))
+
+    # Back up before translation run.
+    create_backup(req.mod_id, "Before translation run")
 
     # Reset raw response tracking on the provider
     if hasattr(provider, "last_raw_responses"):
@@ -1243,6 +1253,9 @@ async def glossary_replace_apply(mod_id: str, req: GlossaryReplacePreview):
     with open(translations_path, "r", encoding="utf-8") as f:
         translations = json.load(f)
 
+    # Back up before applying replacements.
+    create_backup(mod_id, f"Before replacing '{req.old_english}' with '{req.new_english}'")
+
     replaced = 0
     for key in translations:
         if req.old_english in translations[key]:
@@ -1339,6 +1352,56 @@ async def dismiss_suggestions(mod_id: str, action: SuggestionAction):
         clear_suggestions(mod_id)
     else:
         remove_suggestions(mod_id, action.terms)
+    return {"status": "success"}
+
+
+@app.get("/api/mods/{mod_id}/history")
+async def get_history(mod_id: str):
+    """List all available backup snapshots for a mod, newest first.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A list of backup metadata dicts with id, reason, created_at, and files.
+    """
+    return list_backups(mod_id)
+
+
+@app.post("/api/mods/{mod_id}/history/{backup_id}/restore")
+async def restore_history(mod_id: str, backup_id: str):
+    """Restore a mod's state from a backup snapshot.
+
+    Creates a backup of the current state first, then restores the
+    selected snapshot.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        backup_id: The timestamp ID of the backup to restore.
+
+    Returns:
+        A dict with `{"status": "success"}` on success.
+
+    Raises:
+        HTTPException: 404 if the backup was not found.
+    """
+    if not restore_backup(mod_id, backup_id):
+        raise HTTPException(status_code=404, detail="Backup not found")
+    return {"status": "success"}
+
+
+@app.delete("/api/mods/{mod_id}/history/{backup_id}")
+async def delete_history(mod_id: str, backup_id: str):
+    """Delete a specific backup snapshot.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        backup_id: The timestamp ID of the backup to delete.
+
+    Returns:
+        A dict with `{"status": "success"}` on success.
+    """
+    delete_backup(mod_id, backup_id)
     return {"status": "success"}
 
 

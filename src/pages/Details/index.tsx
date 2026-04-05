@@ -100,6 +100,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     const [replacePreview, setReplacePreview] = useState<{ oldTerm: string; newTerm: string; affected: { key: string; old_text: string; new_text: string }[] } | null>(null)
     const [apiResponses, setApiResponses] = useState<any[]>([])
     const [activeResponseIdx, setActiveResponseIdx] = useState(0)
+    const [showHistory, setShowHistory] = useState(false)
+    const [historyEntries, setHistoryEntries] = useState<{ id: string; reason: string; created_at: string; files: string[] }[]>([])
 
     /**
      * Initiates the translation workflow by fetching a preview from the backend.
@@ -533,6 +535,20 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         }
     }
 
+    const fetchHistory = async () => {
+        if (!modId) return
+        try {
+            const res = await fetch(`${API_BASE}/mods/${modId}/history`)
+            if (res.ok) {
+                const data = await res.json()
+                setHistoryEntries(data)
+                setShowHistory(true)
+            }
+        } catch (err) {
+            console.error("Failed to fetch history:", err)
+        }
+    }
+
     const fetchApiResponses = async () => {
         if (!modId) return
         try {
@@ -696,8 +712,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                         </button>
                     </div>
 
-                    {/* Destructive actions: clear cache (full reset) and clear English (wipe translations only). */}
+                    {/* Destructive actions and history. */}
                     <div className="mod-actions-group">
+                        <button className="btn btn-outline" onClick={fetchHistory} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            History
+                        </button>
                         <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleClearCache}>
                             Clear Cache
                         </button>
@@ -1243,6 +1262,95 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                         fetchModGlossary()
                     }}
                 />
+            )}
+
+            {/* --- History Backup Modal --- */}
+            {showHistory && (
+                <div
+                    style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowHistory(false)
+                    }}
+                >
+                    <div className="glass-card" style={{ width: "700px", maxHeight: "80vh", overflow: "auto", padding: "2rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                            <h2 style={{ margin: 0 }}>History Backups</h2>
+                            <button className="btn btn-outline" onClick={() => setShowHistory(false)} style={{ padding: "0.25rem 0.75rem" }}>
+                                Close
+                            </button>
+                        </div>
+                        {historyEntries.length === 0 ? (
+                            <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>No backups available yet. Backups are created automatically before destructive operations.</p>
+                        ) : (
+                            <div>
+                                {historyEntries.map((entry) => (
+                                    <div
+                                        key={entry.id}
+                                        style={{
+                                            padding: "1rem",
+                                            marginBottom: "0.75rem",
+                                            background: "rgba(0,0,0,0.2)",
+                                            borderRadius: "8px",
+                                            border: "1px solid var(--glass-border)",
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <div>
+                                            <div style={{ fontWeight: 500 }}>{entry.reason}</div>
+                                            <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem" }}>
+                                                {new Date(entry.created_at).toLocaleString()}
+                                            </div>
+                                            <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.15rem" }}>
+                                                Files: {entry.files.join(", ")}
+                                            </div>
+                                        </div>
+                                        <div style={{ display: "flex", gap: "0.35rem", flexShrink: 0 }}>
+                                            <button
+                                                className="btn btn-primary"
+                                                style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
+                                                onClick={async () => {
+                                                    if (!window.confirm(`Restore to backup from ${new Date(entry.created_at).toLocaleString()}? A backup of the current state will be created first.`)) return
+                                                    try {
+                                                        const res = await fetch(`${API_BASE}/mods/${modId}/history/${entry.id}/restore`, { method: "POST" })
+                                                        if (res.ok) {
+                                                            setShowHistory(false)
+                                                            setTranslateBanner({ type: "success", message: "Restored from backup successfully." })
+                                                            fetchModDetail()
+                                                            fetchExportStatus()
+                                                            fetchSuggestions()
+                                                            fetchModGlossary()
+                                                        }
+                                                    } catch (err) {
+                                                        console.error("Failed to restore backup:", err)
+                                                    }
+                                                }}
+                                            >
+                                                Restore
+                                            </button>
+                                            <button
+                                                className="btn btn-outline"
+                                                style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
+                                                onClick={async () => {
+                                                    if (!window.confirm("Delete this backup?")) return
+                                                    try {
+                                                        await fetch(`${API_BASE}/mods/${modId}/history/${entry.id}`, { method: "DELETE" })
+                                                        setHistoryEntries((prev) => prev.filter((e) => e.id !== entry.id))
+                                                    } catch (err) {
+                                                        console.error("Failed to delete backup:", err)
+                                                    }
+                                                }}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
             )}
 
             {/* --- Glossary Replace Preview Modal --- */}
