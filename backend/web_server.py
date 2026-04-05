@@ -775,9 +775,32 @@ async def translate_mod(req: TranslationRequest):
     # Save TM.
     tm.save()
 
+    # Filter out suggestions where the source term only appears in keys, not in
+    # the actual source text or English translations.
+    all_source_texts = set()
+    all_english_texts = set()
+    for key, loc_str in strings.items():
+        for lang_name, text in loc_str.translations.items():
+            if lang_name == "English":
+                all_english_texts.add(text.lower())
+            else:
+                all_source_texts.add(text.lower())
+    filtered_suggestions = []
+    for suggestion in all_suggestions:
+        source_term = suggestion.get("source", "").lower()
+        english_term = suggestion.get("english", "").lower()
+        if not source_term and not english_term:
+            continue
+        # Check if the source term appears in any source text
+        source_found = any(source_term in text for text in all_source_texts) if source_term else False
+        # Check if the english term appears in any english text
+        english_found = any(english_term in text for text in all_english_texts) if english_term else False
+        if source_found or english_found:
+            filtered_suggestions.append(suggestion)
+
     # Store suggestions (add_suggestions deduplicates internally).
-    if all_suggestions:
-        add_suggestions(req.mod_id, all_suggestions)
+    if filtered_suggestions:
+        add_suggestions(req.mod_id, filtered_suggestions)
 
     # Return the actual stored count (post-dedup) so the UI is accurate.
     stored_suggestions = load_suggestions(req.mod_id)
