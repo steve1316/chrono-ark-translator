@@ -1271,7 +1271,7 @@ async def get_stats():
 # routes defined after them.
 _workshop_path = getattr(_adapter, "_WORKSHOP_PATH", None)
 if _workshop_path and Path(_workshop_path).exists():
-    app.mount("/workshop", StaticFiles(directory=str(_workshop_path)), name="workshop")
+    app.mount("/api/workshop", StaticFiles(directory=str(_workshop_path)), name="workshop")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
