@@ -23,12 +23,11 @@ from backend import config
 from backend.data.glossary_manager import (
     add_glossary_term,
     build_glossary_from_base_game,
-    get_glossary_prompt,
+    get_combined_glossary_prompt,
     load_glossary,
     print_glossary,
     save_glossary,
     load_mod_glossary,
-    merge_glossaries,
 )
 from backend.data.progress_tracker import ProgressTracker
 from backend.data.translation_memory import TranslationMemory
@@ -198,11 +197,10 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
         print("All strings already have English translations!")
         return
 
-    # Load translation memory and glossary (merged base + mod).
+    # Load translation memory and glossary.
     tm = TranslationMemory()
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(mod_id)
-    merged = merge_glossaries(base_glossary, mod_glossary)
     # Check translation memory for cached translations.
     needs_translation = []
     cached_translations = {}
@@ -248,7 +246,7 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
         style_examples = adapter.get_style_examples()
         print(f"\n  Provider: {provider.name}")
         for lang, entries in entries_by_lang.items():
-            glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
+            glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
             cost = provider.estimate_cost(
                 entries,
                 source_lang=lang,
@@ -278,7 +276,7 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
             batch = entries[i : i + batch_size]
             print(f"    Batch {batch_num}/{total_batches} ({len(batch)} strings)...")
 
-            glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
+            glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
             translations, suggestions = provider.translate_batch(
                 batch,
                 lang,

@@ -24,7 +24,7 @@ from backend.data.glossary_manager import (
     load_glossary,
     save_glossary,
     add_glossary_term,
-    get_glossary_prompt,
+    get_combined_glossary_prompt,
     load_mod_glossary,
     save_mod_glossary,
     merge_glossaries,
@@ -546,7 +546,6 @@ async def estimate_translation(req: TranslationRequest):
     # Load glossary and context for accurate cost estimation.
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
-    merged = merge_glossaries(base_glossary, mod_glossary)
     game_context = _adapter.get_translation_context()
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
@@ -555,7 +554,7 @@ async def estimate_translation(req: TranslationRequest):
 
     estimates = {}
     for lang, entries in by_lang.items():
-        glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
+        glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
         estimates[lang] = provider.estimate_cost(
             entries,
             source_lang=lang,
@@ -620,7 +619,6 @@ async def preview_translation(req: TranslationRequest):
 
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
-    merged = merge_glossaries(base_glossary, mod_glossary)
     game_context = _adapter.get_translation_context()
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
@@ -640,7 +638,7 @@ async def preview_translation(req: TranslationRequest):
     estimates = {}
     total_batches = 0
     for lang, entries in by_lang.items():
-        glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
+        glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
         num_batches = (len(entries) + batch_size - 1) // batch_size
         total_batches += num_batches
         first_batch = entries[:batch_size]
@@ -728,10 +726,9 @@ async def translate_mod(req: TranslationRequest):
     if not untranslated:
         return {"status": "complete", "message": "All strings already translated", "translated": 0, "suggestions": 0}
 
-    # Load merged glossary.
+    # Load glossaries.
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
-    merged = merge_glossaries(base_glossary, mod_glossary)
     game_context = _adapter.get_translation_context()
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
@@ -761,7 +758,7 @@ async def translate_mod(req: TranslationRequest):
     batch_size = config.BATCH_SIZE
     try:
         for lang, entries in by_lang.items():
-            glossary_prompt = get_glossary_prompt(merged, source_lang=lang)
+            glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
             for i in range(0, len(entries), batch_size):
                 batch = entries[i : i + batch_size]
                 translations, suggestions = provider.translate_batch(

@@ -190,6 +190,7 @@ def get_glossary_prompt(
     glossary: dict,
     allowed_categories: list[str] | None = None,
     source_lang: str | None = None,
+    exclude_terms: set[str] | None = None,
 ) -> str:
     """
     Format the glossary as context for an LLM translation prompt.
@@ -197,9 +198,11 @@ def get_glossary_prompt(
     Args:
         glossary: The glossary dictionary.
         allowed_categories: If provided, only include terms from these categories.
-            Defaults to config.GLOSSARY_CATEGORIES.
+            Defaults to config.GLOSSARY_CATEGORIES. Pass an empty list to
+            disable category filtering entirely.
         source_lang: If provided, only include mappings for this language.
             This significantly reduces prompt size.
+        exclude_terms: If provided, skip any term whose key is in this set.
 
     Returns:
         Formatted string suitable for use as LLM system prompt context.
@@ -220,6 +223,8 @@ def get_glossary_prompt(
     # Group by category, filtering to allowed categories.
     by_category: dict[str, list[tuple[str, dict]]] = {}
     for english_term, info in glossary["terms"].items():
+        if exclude_terms and english_term in exclude_terms:
+            continue
         cat = info.get("category", "other")
         if allowed_categories and cat not in allowed_categories:
             continue
@@ -252,6 +257,48 @@ def get_glossary_prompt(
         lines.append("")
 
     return "\n".join(lines)
+
+
+def get_combined_glossary_prompt(
+    base: dict,
+    mod: dict,
+    source_lang: str | None = None,
+) -> str:
+    """
+    Build a glossary prompt from base and mod glossaries.
+
+    Base glossary terms are filtered by config.GLOSSARY_CATEGORIES to control
+    prompt size. Mod glossary terms are always included (user-curated).
+    Mod terms that override base terms appear only once (unfiltered).
+
+    Args:
+        base: The base game glossary.
+        mod: The mod-specific glossary.
+        source_lang: If provided, only include mappings for this language.
+
+    Returns:
+        Combined formatted glossary prompt string.
+    """
+    mod_term_keys = set(mod.get("terms", {}).keys())
+
+    base_prompt = get_glossary_prompt(
+        base,
+        allowed_categories=config.GLOSSARY_CATEGORIES,
+        source_lang=source_lang,
+        exclude_terms=mod_term_keys,
+    )
+    # Pass empty list to disable category filtering for mod terms.
+    mod_prompt = get_glossary_prompt(
+        mod, allowed_categories=[], source_lang=source_lang
+    )
+
+    if base_prompt and mod_prompt:
+        # Strip the duplicate header from the mod prompt and append its terms.
+        mod_body = mod_prompt.split("\n\n", 2)
+        if len(mod_body) > 2:
+            return base_prompt + "\n" + mod_body[2]
+        return base_prompt + "\n" + mod_prompt
+    return mod_prompt or base_prompt
 
 
 def load_mod_glossary(mod_id: str, storage_path: Optional[Path] = None) -> dict:
