@@ -10,7 +10,6 @@ import type { ModStatus, Stats } from "./shared_types"
 import { API_BASE } from "./config"
 import "./index.css"
 
-
 function App() {
     const [mods, setMods] = useState<ModStatus[]>([])
     const [loading, setLoading] = useState(true)
@@ -134,17 +133,7 @@ function App() {
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
                         {/* --- Dashboard: mod grid overview --- */}
-                        <Route
-                            path="/dashboard"
-                            element={
-                                <DashboardPage
-                                    mods={mods}
-                                    onModSelect={(modId) => navigate(`/mods/${modId}`)}
-                                    onModSync={handleModSync}
-                                    onRefresh={fetchMods}
-                                />
-                            }
-                        />
+                        <Route path="/dashboard" element={<DashboardPage mods={mods} onModSelect={(modId) => navigate(`/mods/${modId}`)} onModSync={handleModSync} onRefresh={fetchMods} />} />
 
                         {/* --- Mod detail: string editor and translation actions --- */}
                         <Route path="/mods/:modId" element={<ModDetail onBack={() => navigate("/dashboard")} onTranslate={(provider, modId) => handleTranslate(provider, modId)} />} />

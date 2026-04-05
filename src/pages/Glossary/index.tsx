@@ -3,7 +3,6 @@ import { FaSearch } from "react-icons/fa"
 import { API_BASE } from "../../config"
 import type { Glossary } from "../../shared_types"
 
-
 /**
  * Displays the base-game terminology glossary in a searchable, filterable table.
  *
@@ -65,9 +64,7 @@ const GlossaryPage: React.FC = () => {
         return Object.entries(glossary.terms)
             .filter(([english, info]) => {
                 // Match against the English key or any source mapping value.
-                const matchesSearch =
-                    english.toLowerCase().includes(search.toLowerCase()) ||
-                    Object.values(info.source_mappings).some((v) => v.toLowerCase().includes(search.toLowerCase()))
+                const matchesSearch = english.toLowerCase().includes(search.toLowerCase()) || Object.values(info.source_mappings).some((v) => v.toLowerCase().includes(search.toLowerCase()))
                 const matchesCategory = categoryFilter === "all" || info.category === categoryFilter
                 return matchesSearch && matchesCategory
             })

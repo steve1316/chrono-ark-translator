@@ -3,7 +3,6 @@ import { FaSteam, FaSync } from "react-icons/fa"
 import type { ModStatus } from "../../shared_types"
 import { API_BASE } from "../../config"
 
-
 /**
  * Props accepted by the {@link ModCard} component.
  */

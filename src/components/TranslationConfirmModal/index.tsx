@@ -99,21 +99,23 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
      * supply cost estimates (e.g. `DeepL`), in which case the cost section is
      * hidden from the UI.
      */
-    const totalCost = preview.estimates
-        ? Object.values(preview.estimates).reduce((sum, est) => sum + est.estimated_cost_usd, 0)
-        : null
+    const totalCost = preview.estimates ? Object.values(preview.estimates).reduce((sum, est) => sum + est.estimated_cost_usd, 0) : null
 
     return (
         // Backdrop overlay: clicking outside the card cancels the translation.
         <div
             style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
-            onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onCancel()
+            }}
         >
             <div className="glass-card" style={{ width: "900px", maxHeight: "85vh", display: "flex", flexDirection: "column", padding: "2rem" }}>
                 {/* Modal header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                     <h2 style={{ margin: 0 }}>Confirm Translation</h2>
-                    <button className="btn btn-outline" onClick={onCancel} style={{ padding: "0.25rem 0.75rem" }}>Close</button>
+                    <button className="btn btn-outline" onClick={onCancel} style={{ padding: "0.25rem 0.75rem" }}>
+                        Close
+                    </button>
                 </div>
 
                 {/* Summary stats row: provider, string count, batch count, and optional cost */}
@@ -128,14 +130,16 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                     </div>
                     <div>
                         <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Batches</span>
-                        <div style={{ fontWeight: 600 }}>{preview.total_batches} (size {preview.batch_size})</div>
+                        <div style={{ fontWeight: 600 }}>
+                            {preview.total_batches} (size {preview.batch_size})
+                        </div>
                     </div>
                     {/*
-                      * Cost estimate section -- only rendered when the provider
-                      * returns estimates. Shows the aggregate total, and if
-                      * multiple languages are present, a per-language breakdown
-                      * in parentheses (e.g. "en: ~$0.0012, fr: ~$0.0015").
-                      */}
+                     * Cost estimate section -- only rendered when the provider
+                     * returns estimates. Shows the aggregate total, and if
+                     * multiple languages are present, a per-language breakdown
+                     * in parentheses (e.g. "en: ~$0.0012, fr: ~$0.0015").
+                     */}
                     {totalCost !== null && (
                         <div>
                             <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Estimated Cost</span>
@@ -144,7 +148,11 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                                 {/* Per-language breakdown shown only when translating to 2+ languages */}
                                 {Object.keys(preview.estimates!).length > 1 && (
                                     <span style={{ fontSize: "0.8rem", color: "var(--text-dim)", fontWeight: 400, marginLeft: "0.5rem" }}>
-                                        ({Object.entries(preview.estimates!).map(([lang, est]) => `${lang}: ~$${est.estimated_cost_usd.toFixed(4)}`).join(", ")})
+                                        (
+                                        {Object.entries(preview.estimates!)
+                                            .map(([lang, est]) => `${lang}: ~$${est.estimated_cost_usd.toFixed(4)}`)
+                                            .join(", ")}
+                                        )
                                     </span>
                                 )}
                             </div>
@@ -153,11 +161,11 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                 </div>
 
                 {/*
-                  * Language selector tabs (level 1).
-                  * Only rendered when translating to multiple target languages.
-                  * Each button shows the language code and its string count.
-                  * Switching language preserves the current prompt tab selection.
-                  */}
+                 * Language selector tabs (level 1).
+                 * Only rendered when translating to multiple target languages.
+                 * Each button shows the language code and its string count.
+                 * Switching language preserves the current prompt tab selection.
+                 */}
                 {languages.length > 1 && (
                     <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
                         {languages.map((lang) => (
@@ -174,11 +182,11 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                 )}
 
                 {/*
-                  * Prompt preview section (level 2 tabs + content pane).
-                  * "System Prompt" shows the instructions/rules sent as the system message.
-                  * "User Message" shows the first batch of strings that will be sent.
-                  * Note: only batch 1 is previewed; subsequent batches follow the same format.
-                  */}
+                 * Prompt preview section (level 2 tabs + content pane).
+                 * "System Prompt" shows the instructions/rules sent as the system message.
+                 * "User Message" shows the first batch of strings that will be sent.
+                 * Note: only batch 1 is previewed; subsequent batches follow the same format.
+                 */}
                 {langPreview && (
                     <>
                         {/* Prompt type selector tabs */}
@@ -200,25 +208,29 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                         </div>
 
                         {/* Scrollable code-style preview of the selected prompt */}
-                        <div style={{
-                            flex: 1,
-                            overflow: "auto",
-                            background: "rgba(0,0,0,0.3)",
-                            borderRadius: "8px",
-                            border: "1px solid var(--glass-border)",
-                            padding: "1rem",
-                            marginBottom: "1rem",
-                            minHeight: "300px",
-                        }}>
-                            <pre style={{
-                                margin: 0,
-                                whiteSpace: "pre-wrap",
-                                wordBreak: "break-word",
-                                fontSize: "0.85rem",
-                                lineHeight: "1.6",
-                                color: "var(--text-main)",
-                                fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
-                            }}>
+                        <div
+                            style={{
+                                flex: 1,
+                                overflow: "auto",
+                                background: "rgba(0,0,0,0.3)",
+                                borderRadius: "8px",
+                                border: "1px solid var(--glass-border)",
+                                padding: "1rem",
+                                marginBottom: "1rem",
+                                minHeight: "300px",
+                            }}
+                        >
+                            <pre
+                                style={{
+                                    margin: 0,
+                                    whiteSpace: "pre-wrap",
+                                    wordBreak: "break-word",
+                                    fontSize: "0.85rem",
+                                    lineHeight: "1.6",
+                                    color: "var(--text-main)",
+                                    fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
+                                }}
+                            >
                                 {activeTab === "system" ? langPreview.system_prompt : langPreview.user_message}
                             </pre>
                         </div>
@@ -227,7 +239,9 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
 
                 {/* Action buttons: Cancel or Confirm translation */}
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-                    <button className="btn btn-outline" onClick={onCancel}>Cancel</button>
+                    <button className="btn btn-outline" onClick={onCancel}>
+                        Cancel
+                    </button>
                     <button className="btn btn-primary" onClick={onConfirm}>
                         Translate {preview.total_strings} strings
                     </button>

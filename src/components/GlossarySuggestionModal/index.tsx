@@ -3,7 +3,6 @@ import { FaCheck, FaTimes, FaCheckDouble, FaTimesCircle } from "react-icons/fa"
 import type { TermSuggestion } from "../../shared_types"
 import { API_BASE } from "../../config"
 
-
 /**
  * Props for the {@link GlossarySuggestionModal} component.
  */
@@ -111,13 +110,17 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId
         // Backdrop overlay: clicking directly on the backdrop (not a child) closes the modal.
         <div
             style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
-            onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose()
+            }}
         >
             <div className="glass-card" style={{ width: "700px", maxHeight: "80vh", overflow: "auto", padding: "2rem" }}>
                 {/* Modal header with title and close button */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
                     <h2 style={{ margin: 0 }}>Suggested Glossary Terms</h2>
-                    <button className="btn btn-outline" onClick={onClose} style={{ padding: "0.25rem 0.75rem" }}>Close</button>
+                    <button className="btn btn-outline" onClick={onClose} style={{ padding: "0.25rem 0.75rem" }}>
+                        Close
+                    </button>
                 </div>
 
                 {pending.length === 0 ? (
@@ -161,15 +164,18 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId
                                             {suggestion.source_lang}: {suggestion.source}
                                         </div>
                                         {/* AI-generated reasoning for why this term should be in the glossary. */}
-                                        <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem", fontStyle: "italic" }}>
-                                            {suggestion.reason}
-                                        </div>
+                                        <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem", fontStyle: "italic" }}>{suggestion.reason}</div>
                                         {/* Category badge (e.g. "skill", "character", "item"). */}
                                         <span
                                             style={{
-                                                display: "inline-block", marginTop: "0.5rem", padding: "0.15rem 0.5rem",
-                                                borderRadius: "4px", fontSize: "0.75rem", textTransform: "capitalize",
-                                                background: "rgba(138,180,248,0.15)", color: "var(--accent-primary)",
+                                                display: "inline-block",
+                                                marginTop: "0.5rem",
+                                                padding: "0.15rem 0.5rem",
+                                                borderRadius: "4px",
+                                                fontSize: "0.75rem",
+                                                textTransform: "capitalize",
+                                                background: "rgba(138,180,248,0.15)",
+                                                color: "var(--accent-primary)",
                                             }}
                                         >
                                             {suggestion.category}

@@ -25,7 +25,6 @@ interface ModDetailProps {
     onTranslate: (provider: string, modId: string) => Promise<{ success: boolean; message: string; translations?: Record<string, string> }>
 }
 
-
 /** Columns that support click-to-sort in the strings table. */
 type SortField = "is_translated" | "key" | "source" | "english"
 
@@ -387,9 +386,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     const handleExport = async () => {
         if (!modId) return
         // Build a warning message that includes duplicate files if present.
-        const dupeWarning = duplicateFiles.length > 0
-            ? `\n\nThis will also consolidate ${duplicateFiles.length} duplicate file(s):\n${duplicateFiles.join("\n")}\n\nDuplicate files will be deleted after merging.`
-            : ""
+        const dupeWarning =
+            duplicateFiles.length > 0
+                ? `\n\nThis will also consolidate ${duplicateFiles.length} duplicate file(s):\n${duplicateFiles.join("\n")}\n\nDuplicate files will be deleted after merging.`
+                : ""
         if (!window.confirm(`This will overwrite the mod's CSV files with your translations.${dupeWarning} Continue?`)) {
             return
         }
@@ -399,9 +399,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
             const res = await fetch(`${API_BASE}/mods/${modId}/export`, { method: "POST" })
             if (res.ok) {
                 const data = await res.json()
-                const removedMsg = data.files_removed?.length
-                    ? `\nConsolidated ${data.files_removed.length} duplicate file(s).`
-                    : ""
+                const removedMsg = data.files_removed?.length ? `\nConsolidated ${data.files_removed.length} duplicate file(s).` : ""
                 alert(`Synced ${data.applied} translations to ${data.files_written.length} file(s): ${data.files_written.join(", ")}${removedMsg}`)
                 fetchExportStatus()
             } else {
@@ -564,8 +562,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                         rel="noopener noreferrer"
                                         title="Open on Steam Workshop"
                                         style={{ color: "var(--text-dim)", fontSize: "1.3rem", transition: "color 0.2s", display: "flex" }}
-                                        onMouseEnter={e => (e.currentTarget.style.color = "#66c0f4")}
-                                        onMouseLeave={e => (e.currentTarget.style.color = "var(--text-dim)")}
+                                        onMouseEnter={(e) => (e.currentTarget.style.color = "#66c0f4")}
+                                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-dim)")}
                                     >
                                         <FaSteam />
                                     </a>
@@ -573,9 +571,18 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                 <button
                                     onClick={handleOpenFolder}
                                     title="Open local folder"
-                                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-dim)", fontSize: "1.3rem", transition: "color 0.2s", display: "flex", padding: 0 }}
-                                    onMouseEnter={e => (e.currentTarget.style.color = "var(--accent-primary)")}
-                                    onMouseLeave={e => (e.currentTarget.style.color = "var(--text-dim)")}
+                                    style={{
+                                        background: "none",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        color: "var(--text-dim)",
+                                        fontSize: "1.3rem",
+                                        transition: "color 0.2s",
+                                        display: "flex",
+                                        padding: 0,
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent-primary)")}
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-dim)")}
                                 >
                                     <FaFolderOpen />
                                 </button>
@@ -592,7 +599,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     <div className="mod-actions-group">
                         <button
                             className="btn btn-outline"
-                            onClick={() => { setShowGlossaryPanel(!showGlossaryPanel); if (!showGlossaryPanel) fetchModGlossary() }}
+                            onClick={() => {
+                                setShowGlossaryPanel(!showGlossaryPanel)
+                                if (!showGlossaryPanel) fetchModGlossary()
+                            }}
                             style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
                         >
                             <FaBook /> Mod Glossary ({Object.keys(modGlossary).length})
@@ -604,29 +614,48 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                 style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--accent-secondary)", borderColor: "rgba(187,154,247,0.3)", position: "relative" }}
                             >
                                 <FaBook /> Suggestions
-                                <span style={{
-                                    position: "absolute", top: "-6px", right: "-6px",
-                                    background: "var(--accent-secondary)", color: "#fff",
-                                    borderRadius: "50%", width: "20px", height: "20px",
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    fontSize: "0.7rem", fontWeight: 700,
-                                }}>
+                                <span
+                                    style={{
+                                        position: "absolute",
+                                        top: "-6px",
+                                        right: "-6px",
+                                        background: "var(--accent-secondary)",
+                                        color: "#fff",
+                                        borderRadius: "50%",
+                                        width: "20px",
+                                        height: "20px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "0.7rem",
+                                        fontWeight: 700,
+                                    }}
+                                >
                                     {suggestions.length}
                                 </span>
                             </button>
                         )}
                         <button
                             className="btn btn-outline"
-                            onClick={() => { setShowCharacterContext(!showCharacterContext); if (!showCharacterContext) fetchCharacterContext() }}
+                            onClick={() => {
+                                setShowCharacterContext(!showCharacterContext)
+                                if (!showCharacterContext) fetchCharacterContext()
+                            }}
                             style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)", position: "relative" }}
                         >
                             Character Context
                             {(characterContext.source_game || characterContext.character_name || characterContext.background) && (
-                                <span style={{
-                                    position: "absolute", top: "-4px", right: "-4px",
-                                    width: "8px", height: "8px", borderRadius: "50%",
-                                    background: "#81e6d9",
-                                }} />
+                                <span
+                                    style={{
+                                        position: "absolute",
+                                        top: "-4px",
+                                        right: "-4px",
+                                        width: "8px",
+                                        height: "8px",
+                                        borderRadius: "50%",
+                                        background: "#81e6d9",
+                                    }}
+                                />
                             )}
                         </button>
                     </div>
@@ -656,41 +685,52 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
 
             {/* --- Translation In-Progress Spinner --- */}
             {translating && (
-                <div className="glass-card" style={{
-                    padding: "1.25rem 1.5rem",
-                    marginBottom: "1rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "1rem",
-                    background: "rgba(125,211,252,0.08)",
-                    border: "1px solid rgba(125,211,252,0.25)",
-                }}>
-                    <div style={{
-                        width: "20px", height: "20px",
-                        border: "3px solid rgba(125,211,252,0.3)",
-                        borderTop: "3px solid var(--accent-primary)",
-                        borderRadius: "50%",
-                        animation: "spin 1s linear infinite",
-                    }} />
+                <div
+                    className="glass-card"
+                    style={{
+                        padding: "1.25rem 1.5rem",
+                        marginBottom: "1rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "1rem",
+                        background: "rgba(125,211,252,0.08)",
+                        border: "1px solid rgba(125,211,252,0.25)",
+                    }}
+                >
+                    <div
+                        style={{
+                            width: "20px",
+                            height: "20px",
+                            border: "3px solid rgba(125,211,252,0.3)",
+                            borderTop: "3px solid var(--accent-primary)",
+                            borderRadius: "50%",
+                            animation: "spin 1s linear infinite",
+                        }}
+                    />
                     <span style={{ color: "var(--text-main)" }}>Translating... waiting for provider response</span>
                 </div>
             )}
 
             {/* --- Translation Result Banner (success/error) — dismissible --- */}
             {translateBanner && (
-                <div className="glass-card" style={{
-                    padding: "1rem 1.5rem",
-                    marginBottom: "1rem",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: translateBanner.type === "error" ? "rgba(248,113,113,0.1)" : "rgba(52,211,153,0.1)",
-                    border: `1px solid ${translateBanner.type === "error" ? "rgba(248,113,113,0.3)" : "rgba(52,211,153,0.3)"}`,
-                }}>
-                    <span style={{
-                        color: translateBanner.type === "error" ? "#f87171" : "#34d399",
-                        whiteSpace: "pre-wrap",
-                    }}>
+                <div
+                    className="glass-card"
+                    style={{
+                        padding: "1rem 1.5rem",
+                        marginBottom: "1rem",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        background: translateBanner.type === "error" ? "rgba(248,113,113,0.1)" : "rgba(52,211,153,0.1)",
+                        border: `1px solid ${translateBanner.type === "error" ? "rgba(248,113,113,0.3)" : "rgba(52,211,153,0.3)"}`,
+                    }}
+                >
+                    <span
+                        style={{
+                            color: translateBanner.type === "error" ? "#f87171" : "#34d399",
+                            whiteSpace: "pre-wrap",
+                        }}
+                    >
                         {translateBanner.message}
                     </span>
                     <button
@@ -741,18 +781,50 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1rem" }}>
                     <h3 style={{ marginTop: 0, marginBottom: "1rem" }}>Mod Glossary Terms</h3>
                     <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
-                        <input type="text" placeholder="English term" value={newTermEnglish} onChange={(e) => setNewTermEnglish(e.target.value)}
-                            style={{ padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", flex: 1, minWidth: "120px" }} />
-                        <input type="text" placeholder="Source text" value={newTermSource} onChange={(e) => setNewTermSource(e.target.value)}
-                            style={{ padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", flex: 1, minWidth: "120px" }} />
-                        <select value={newTermLang} onChange={(e) => setNewTermLang(e.target.value)}
-                            style={{ padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)" }}>
+                        <input
+                            type="text"
+                            placeholder="English term"
+                            value={newTermEnglish}
+                            onChange={(e) => setNewTermEnglish(e.target.value)}
+                            style={{
+                                padding: "0.5rem",
+                                borderRadius: "6px",
+                                background: "rgba(0,0,0,0.2)",
+                                border: "1px solid var(--glass-border)",
+                                color: "var(--text-main)",
+                                flex: 1,
+                                minWidth: "120px",
+                            }}
+                        />
+                        <input
+                            type="text"
+                            placeholder="Source text"
+                            value={newTermSource}
+                            onChange={(e) => setNewTermSource(e.target.value)}
+                            style={{
+                                padding: "0.5rem",
+                                borderRadius: "6px",
+                                background: "rgba(0,0,0,0.2)",
+                                border: "1px solid var(--glass-border)",
+                                color: "var(--text-main)",
+                                flex: 1,
+                                minWidth: "120px",
+                            }}
+                        />
+                        <select
+                            value={newTermLang}
+                            onChange={(e) => setNewTermLang(e.target.value)}
+                            style={{ padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)" }}
+                        >
                             <option value="Chinese">Chinese</option>
                             <option value="Korean">Korean</option>
                             <option value="Japanese">Japanese</option>
                         </select>
-                        <select value={newTermCategory} onChange={(e) => setNewTermCategory(e.target.value)}
-                            style={{ padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)" }}>
+                        <select
+                            value={newTermCategory}
+                            onChange={(e) => setNewTermCategory(e.target.value)}
+                            style={{ padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)" }}
+                        >
                             <option value="custom">Custom</option>
                             <option value="characters">Characters</option>
                             <option value="skills">Skills</option>
@@ -760,37 +832,67 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             <option value="items">Items</option>
                             <option value="mechanics">Mechanics</option>
                         </select>
-                        <button className="btn btn-primary" disabled={!newTermEnglish.trim()} onClick={async () => {
-                            await fetch(`${API_BASE}/mods/${modId}/glossary`, {
-                                method: "POST", headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ english: newTermEnglish, source_mappings: { [newTermLang]: newTermSource }, category: newTermCategory }),
-                            })
-                            setNewTermEnglish(""); setNewTermSource("")
-                            fetchModGlossary()
-                        }}>Add</button>
+                        <button
+                            className="btn btn-primary"
+                            disabled={!newTermEnglish.trim()}
+                            onClick={async () => {
+                                await fetch(`${API_BASE}/mods/${modId}/glossary`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ english: newTermEnglish, source_mappings: { [newTermLang]: newTermSource }, category: newTermCategory }),
+                                })
+                                setNewTermEnglish("")
+                                setNewTermSource("")
+                                fetchModGlossary()
+                            }}
+                        >
+                            Add
+                        </button>
                     </div>
                     {Object.keys(modGlossary).length === 0 ? (
                         <p style={{ color: "var(--text-dim)", textAlign: "center" }}>No mod-specific glossary terms yet. Add terms above or accept AI suggestions.</p>
                     ) : (
                         <div style={{ maxHeight: "300px", overflow: "auto" }}>
-                            {Object.entries(modGlossary).sort(([a], [b]) => a.localeCompare(b)).map(([english, info]) => (
-                                <div key={english} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--glass-border)" }}>
-                                    <div>
-                                        <span style={{ fontWeight: 500 }}>{english}</span>
-                                        <span style={{ color: "var(--text-dim)", marginLeft: "0.75rem", fontSize: "0.85rem" }}>
-                                            {Object.entries(info.source_mappings || {}).map(([lang, text]) => `${lang}: ${text}`).join(", ")}
-                                        </span>
-                                        <span style={{ marginLeft: "0.75rem", fontSize: "0.75rem", padding: "0.1rem 0.4rem", borderRadius: "4px", background: "rgba(138,180,248,0.15)", color: "var(--accent-primary)", textTransform: "capitalize" }}>
-                                            {info.category}
-                                        </span>
+                            {Object.entries(modGlossary)
+                                .sort(([a], [b]) => a.localeCompare(b))
+                                .map(([english, info]) => (
+                                    <div
+                                        key={english}
+                                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.5rem 0", borderBottom: "1px solid var(--glass-border)" }}
+                                    >
+                                        <div>
+                                            <span style={{ fontWeight: 500 }}>{english}</span>
+                                            <span style={{ color: "var(--text-dim)", marginLeft: "0.75rem", fontSize: "0.85rem" }}>
+                                                {Object.entries(info.source_mappings || {})
+                                                    .map(([lang, text]) => `${lang}: ${text}`)
+                                                    .join(", ")}
+                                            </span>
+                                            <span
+                                                style={{
+                                                    marginLeft: "0.75rem",
+                                                    fontSize: "0.75rem",
+                                                    padding: "0.1rem 0.4rem",
+                                                    borderRadius: "4px",
+                                                    background: "rgba(138,180,248,0.15)",
+                                                    color: "var(--accent-primary)",
+                                                    textTransform: "capitalize",
+                                                }}
+                                            >
+                                                {info.category}
+                                            </span>
+                                        </div>
+                                        <button
+                                            className="btn btn-outline"
+                                            style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
+                                            onClick={async () => {
+                                                await fetch(`${API_BASE}/mods/${modId}/glossary/${encodeURIComponent(english)}`, { method: "DELETE" })
+                                                fetchModGlossary()
+                                            }}
+                                        >
+                                            Remove
+                                        </button>
                                     </div>
-                                    <button className="btn btn-outline" style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
-                                        onClick={async () => {
-                                            await fetch(`${API_BASE}/mods/${modId}/glossary/${encodeURIComponent(english)}`, { method: "DELETE" })
-                                            fetchModGlossary()
-                                        }}>Remove</button>
-                                </div>
-                            ))}
+                                ))}
                         </div>
                     )}
                 </div>
@@ -809,40 +911,75 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     </p>
                     <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem" }}>
                         <div style={{ flex: 1 }}>
-                            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Source Game</label>
+                            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                Source Game
+                            </label>
                             <input
                                 type="text"
                                 placeholder="e.g. Library of Ruina"
                                 value={characterContext.source_game}
-                                onChange={(e) => setCharacterContext(prev => ({ ...prev, source_game: e.target.value }))}
-                                style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", boxSizing: "border-box" }}
+                                onChange={(e) => setCharacterContext((prev) => ({ ...prev, source_game: e.target.value }))}
+                                style={{
+                                    width: "100%",
+                                    padding: "0.5rem",
+                                    borderRadius: "6px",
+                                    background: "rgba(0,0,0,0.2)",
+                                    border: "1px solid var(--glass-border)",
+                                    color: "var(--text-main)",
+                                    boxSizing: "border-box",
+                                }}
                             />
                         </div>
                         <div style={{ flex: 1 }}>
-                            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Character Name</label>
+                            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                Character Name
+                            </label>
                             <input
                                 type="text"
                                 placeholder="e.g. Roland"
                                 value={characterContext.character_name}
-                                onChange={(e) => setCharacterContext(prev => ({ ...prev, character_name: e.target.value }))}
-                                style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", boxSizing: "border-box" }}
+                                onChange={(e) => setCharacterContext((prev) => ({ ...prev, character_name: e.target.value }))}
+                                style={{
+                                    width: "100%",
+                                    padding: "0.5rem",
+                                    borderRadius: "6px",
+                                    background: "rgba(0,0,0,0.2)",
+                                    border: "1px solid var(--glass-border)",
+                                    color: "var(--text-main)",
+                                    boxSizing: "border-box",
+                                }}
                             />
                         </div>
                     </div>
                     <div>
-                        <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Background</label>
+                        <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            Background
+                        </label>
                         <textarea
                             placeholder="Describe the character's personality, role in their source game, and any lore that would help with translation..."
                             value={characterContext.background}
-                            onChange={(e) => setCharacterContext(prev => ({ ...prev, background: e.target.value }))}
+                            onChange={(e) => setCharacterContext((prev) => ({ ...prev, background: e.target.value }))}
                             rows={4}
-                            style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
+                            style={{
+                                width: "100%",
+                                padding: "0.5rem",
+                                borderRadius: "6px",
+                                background: "rgba(0,0,0,0.2)",
+                                border: "1px solid var(--glass-border)",
+                                color: "var(--text-main)",
+                                resize: "vertical",
+                                fontFamily: "inherit",
+                                boxSizing: "border-box",
+                            }}
                         />
                     </div>
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem", alignItems: "center", gap: "0.75rem" }}>
                         {characterContextSaved && <span style={{ color: "#34d399", fontSize: "0.85rem" }}>Saved!</span>}
-                        <button className="btn btn-primary" onClick={handleSaveCharacterContext}
-                            style={{ background: "rgba(129,230,217,0.15)", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)" }}>
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleSaveCharacterContext}
+                            style={{ background: "rgba(129,230,217,0.15)", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)" }}
+                        >
                             Save Context
                         </button>
                     </div>
@@ -856,10 +993,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 deleting the extra files. The details are collapsible. */}
             {duplicateFiles.length > 0 && (
                 <div className="glass-card" style={{ padding: "1rem 1.5rem", marginBottom: "1rem", borderLeft: "3px solid var(--accent-secondary)" }}>
-                    <div
-                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
-                        onClick={() => setShowDuplicateDetails(!showDuplicateDetails)}
-                    >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setShowDuplicateDetails(!showDuplicateDetails)}>
                         <span style={{ color: "var(--accent-secondary)" }}>
                             Found {duplicateFiles.length} duplicate localization file{duplicateFiles.length > 1 ? "s" : ""}. These will be consolidated when you sync.
                         </span>
@@ -926,9 +1060,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                     </td>
                                     <td className="english-cell" style={{ maxWidth: columnWidths.english, position: "relative" }}>
                                         {/* Show previous translation above the editable field when overridden. */}
-                                        {hasOverride && (
-                                            <div className="prev-translation">{s.original_english || "(no previous translation)"}</div>
-                                        )}
+                                        {hasOverride && <div className="prev-translation">{s.original_english || "(no previous translation)"}</div>}
                                         <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
                                     </td>
                                 </tr>
@@ -947,7 +1079,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     modId={modId!}
                     suggestions={suggestions}
                     onClose={() => setShowSuggestionModal(false)}
-                    onUpdated={() => { fetchSuggestions() }}
+                    onUpdated={() => {
+                        fetchSuggestions()
+                    }}
                 />
             )}
 
@@ -971,12 +1105,14 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                         setTranslateBanner({ type: result.success ? "success" : "error", message: result.message })
                         if (result.success && result.translations) {
                             // Merge translations into local state to avoid a full re-fetch.
-                            setStrings(prev => prev.map(s => {
-                                if (s.key in result.translations!) {
-                                    return { ...s, english: result.translations![s.key], is_translated: true }
-                                }
-                                return s
-                            }))
+                            setStrings((prev) =>
+                                prev.map((s) => {
+                                    if (s.key in result.translations!) {
+                                        return { ...s, english: result.translations![s.key], is_translated: true }
+                                    }
+                                    return s
+                                })
+                            )
                             fetchExportStatus()
                             fetchSuggestions()
                         } else if (result.success) {
