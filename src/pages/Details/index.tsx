@@ -414,6 +414,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                 const removedMsg = data.files_removed?.length ? `\nConsolidated ${data.files_removed.length} duplicate file(s).` : ""
                 alert(`Synced ${data.applied} translations to ${data.files_written.length} file(s): ${data.files_written.join(", ")}${removedMsg}`)
                 fetchExportStatus()
+                fetchModDetail()
             } else {
                 const error = await res.json()
                 alert(`Export failed: ${error.detail || "Unknown error"}`)
@@ -1224,11 +1225,18 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             // hasOverride: true when the current English differs from what was originally in the CSV (user or AI changed it).
                             const hasOverride = s.english !== s.original_english
                             const isDone = s.is_translated || !s.source.trim()
+                            // Row background: green for synced, yellow for unsynced overrides
+                            const rowStyle = s.is_synced && !hasOverride
+                                ? { backgroundColor: "rgba(52, 211, 153, 0.1)" }
+                                : hasOverride
+                                ? { backgroundColor: "rgba(255, 220, 40, 0.15)" }
+                                : undefined
                             return (
-                                // Yellow highlight on rows where the translation has been modified.
-                                <tr key={s.key} style={hasOverride ? { backgroundColor: "rgba(255, 220, 40, 0.15)" } : undefined}>
+                                <tr key={s.key} style={rowStyle}>
                                     <td>
-                                        <span className={`status-badge ${isDone ? "status-translated" : "status-missing"}`}>{isDone ? "OK" : "MISSING"}</span>
+                                        <span className={`status-badge ${s.is_synced && !hasOverride ? "status-synced" : isDone ? "status-translated" : "status-missing"}`}>
+                                            {s.is_synced && !hasOverride ? "SYNCED" : isDone ? "OK" : "MISSING"}
+                                        </span>
                                     </td>
                                     <td className="key-cell" title={s.key} style={{ maxWidth: columnWidths.key }}>
                                         {s.key}
@@ -1237,8 +1245,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                                         {s.source}
                                     </td>
                                     <td className="english-cell" style={{ maxWidth: columnWidths.english, position: "relative" }}>
-                                        {/* Show previous translation above the editable field when overridden. */}
+                                        {/* Show previous translation above the editable field when overridden or synced. */}
                                         {hasOverride && <div className="prev-translation">{s.original_english || "(no previous translation)"}</div>}
+                                        {s.is_synced && !hasOverride && s.original_english && s.original_english !== s.english && (
+                                            <div className="prev-translation" style={{ color: "rgba(52, 211, 153, 0.6)" }}>{s.original_english || "(no original)"}</div>
+                                        )}
                                         <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
                                     </td>
                                 </tr>

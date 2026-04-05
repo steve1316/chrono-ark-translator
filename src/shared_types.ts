@@ -60,6 +60,8 @@ export type LocString = {
     is_translated: boolean
     /** The original English text from the mod files before any user edits, used for diffing. */
     original_english: string
+    /** Whether this string has been synced (exported) to the mod's CSV files. */
+    is_synced: boolean
 }
 
 /**

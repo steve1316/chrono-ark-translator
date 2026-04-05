@@ -231,6 +231,16 @@ async def get_mod_detail(mod_id: str):
     # Capture original CSV English values before applying overrides.
     original_english_map = {key: loc_str.translations.get("English", "") for key, loc_str in strings.items()}
 
+    # Load synced keys to identify rows that have been exported to CSV.
+    synced_keys_path = config.STORAGE_PATH / "mods" / mod_id / "synced_keys.json"
+    synced_keys: set[str] = set()
+    if synced_keys_path.exists():
+        try:
+            with open(synced_keys_path, "r", encoding="utf-8") as f:
+                synced_keys = set(json.load(f))
+        except Exception:
+            pass
+
     # Apply saved translations so user edits (including clears) are respected.
     for key, english in translations.items():
         if key in strings:
@@ -253,6 +263,7 @@ async def get_mod_detail(mod_id: str):
             translated_keys.append(key)
 
         has_override = key in translations
+        is_synced = key in synced_keys
         results.append(
             {
                 "key": key,
@@ -263,6 +274,7 @@ async def get_mod_detail(mod_id: str):
                 "english": english,
                 "is_translated": is_done,
                 "original_english": original_english_map.get(key, "") if has_override else english,
+                "is_synced": is_synced,
             }
         )
 
@@ -1057,6 +1069,12 @@ async def export_mod(mod_id: str):
     # Save snapshot hash so export-status knows we're in sync.
     snapshot_hash = _compute_export_snapshot(mod_id, mod_path)
     _save_last_export_hash(mod_id, snapshot_hash)
+
+    # Save the set of synced keys so the UI can highlight them.
+    synced_keys_path = config.STORAGE_PATH / "mods" / mod_id / "synced_keys.json"
+    synced_keys_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(synced_keys_path, "w", encoding="utf-8") as f:
+        json.dump(list(translations.keys()), f, ensure_ascii=False)
 
     return {
         "status": "success",
