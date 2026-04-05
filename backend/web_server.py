@@ -1185,6 +1185,78 @@ async def delete_mod_glossary_term(mod_id: str, term: str):
     return {"status": "success"}
 
 
+class GlossaryReplacePreview(BaseModel):
+    """Request body for previewing glossary term replacements.
+
+    Attributes:
+        old_english: The current English term to find in translations.
+        new_english: The replacement English term.
+    """
+
+    old_english: str
+    new_english: str
+
+
+@app.post("/api/mods/{mod_id}/glossary/replace-preview")
+async def glossary_replace_preview(mod_id: str, req: GlossaryReplacePreview):
+    """Preview which translations would be affected by a glossary term replacement.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        req: The old and new English terms.
+
+    Returns:
+        A dict with `affected` (list of dicts with key, old_text, new_text).
+    """
+    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
+    if not translations_path.exists():
+        return {"affected": []}
+
+    with open(translations_path, "r", encoding="utf-8") as f:
+        translations = json.load(f)
+
+    affected = []
+    for key, english in translations.items():
+        if req.old_english in english:
+            new_text = english.replace(req.old_english, req.new_english)
+            if new_text != english:
+                affected.append({"key": key, "old_text": english, "new_text": new_text})
+
+    return {"affected": affected}
+
+
+@app.post("/api/mods/{mod_id}/glossary/replace-apply")
+async def glossary_replace_apply(mod_id: str, req: GlossaryReplacePreview):
+    """Apply a glossary term replacement across all translations.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        req: The old and new English terms.
+
+    Returns:
+        A dict with `status` and the count of `replaced` translations.
+    """
+    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
+    if not translations_path.exists():
+        return {"status": "success", "replaced": 0}
+
+    with open(translations_path, "r", encoding="utf-8") as f:
+        translations = json.load(f)
+
+    replaced = 0
+    for key in translations:
+        if req.old_english in translations[key]:
+            new_text = translations[key].replace(req.old_english, req.new_english)
+            if new_text != translations[key]:
+                translations[key] = new_text
+                replaced += 1
+
+    with open(translations_path, "w", encoding="utf-8") as f:
+        json.dump(translations, f, indent=2, ensure_ascii=False)
+
+    return {"status": "success", "replaced": replaced}
+
+
 @app.get("/api/mods/{mod_id}/glossary/merged")
 async def get_merged_glossary(mod_id: str):
     """Get the merged base + mod glossary.
