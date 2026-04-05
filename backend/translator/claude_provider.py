@@ -369,37 +369,47 @@ class ClaudeProvider(TranslationProvider):
                 `"estimated_output_tokens"`, `"estimated_cost_usd"`, `"model"`,
                 and `"note"`.
         """
-        # Build the actual prompt to get a realistic character count
-        system_prompt, user_message = self.build_prompt(
-            entries,
-            source_lang,
-            glossary_prompt,
-            game_context=game_context,
-            format_rules=format_rules,
-            style_examples=style_examples,
-            character_context=character_context,
-        )
-        full_prompt = system_prompt + user_message
+        from backend import config as _cfg
 
-        # CJK characters tokenize at ~1-2 tokens each, ASCII at ~4 chars/token.
-        # Count them separately for a more accurate estimate.
-        cjk_chars = sum(1 for c in full_prompt if "\u2e80" <= c <= "\u9fff" or "\uac00" <= c <= "\ud7af" or "\uff00" <= c <= "\uffef")
-        ascii_chars = len(full_prompt) - cjk_chars
-        estimated_input_tokens = int(cjk_chars * 1.5 + ascii_chars / 4) + 100
+        batch_size = _cfg.BATCH_SIZE
+        num_batches = max(1, (len(entries) + batch_size - 1) // batch_size)
 
-        # Output: translations + JSON overhead + suggested terms
-        output_chars = sum(len(text) for _, text in entries)
-        estimated_output_tokens = int(output_chars * 1.5) + 200
+        total_input_tokens = 0
+        total_output_tokens = 0
+        total_cjk = 0
+        total_ascii = 0
+
+        for i in range(0, len(entries), batch_size):
+            batch = entries[i : i + batch_size]
+            system_prompt, user_message = self.build_prompt(
+                batch,
+                source_lang,
+                glossary_prompt,
+                game_context=game_context,
+                format_rules=format_rules,
+                style_examples=style_examples,
+                character_context=character_context,
+            )
+            full_prompt = system_prompt + user_message
+
+            cjk_chars = sum(1 for c in full_prompt if "\u2e80" <= c <= "\u9fff" or "\uac00" <= c <= "\ud7af" or "\uff00" <= c <= "\uffef")
+            ascii_chars = len(full_prompt) - cjk_chars
+            total_cjk += cjk_chars
+            total_ascii += ascii_chars
+            total_input_tokens += int(cjk_chars * 1.5 + ascii_chars / 4) + 100
+
+            output_chars = sum(len(text) for _, text in batch)
+            total_output_tokens += int(output_chars * 1.5) + 200
 
         input_cost_per_m = 3.0
         output_cost_per_m = 15.0
 
-        estimated_cost = estimated_input_tokens / 1_000_000 * input_cost_per_m + estimated_output_tokens / 1_000_000 * output_cost_per_m
+        estimated_cost = total_input_tokens / 1_000_000 * input_cost_per_m + total_output_tokens / 1_000_000 * output_cost_per_m
 
         return {
-            "estimated_input_tokens": estimated_input_tokens,
-            "estimated_output_tokens": estimated_output_tokens,
+            "estimated_input_tokens": total_input_tokens,
+            "estimated_output_tokens": total_output_tokens,
             "estimated_cost_usd": round(estimated_cost, 4),
             "model": self._model,
-            "note": f"Estimated for {len(entries)} strings ({cjk_chars} CJK + {ascii_chars} ASCII chars)",
+            "note": f"Estimated for {len(entries)} strings across {num_batches} batch(es) ({total_cjk} CJK + {total_ascii} ASCII chars)",
         }
