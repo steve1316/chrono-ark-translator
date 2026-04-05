@@ -540,7 +540,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
                         {modPreviewImage && (
                             <img
-                                src={`http://localhost:8000${modPreviewImage}`}
+                                src={`${API_BASE}${modPreviewImage}`}
                                 alt={modName}
                                 style={{
                                     width: "80px",
