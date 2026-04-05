@@ -763,14 +763,17 @@ async def translate_mod(req: TranslationRequest):
     # Save TM.
     tm.save()
 
-    # Store suggestions.
+    # Store suggestions (add_suggestions deduplicates internally).
     if all_suggestions:
         add_suggestions(req.mod_id, all_suggestions)
+
+    # Return the actual stored count (post-dedup) so the UI is accurate.
+    stored_suggestions = load_suggestions(req.mod_id)
 
     return {
         "status": "success",
         "translated": len(all_translations),
-        "suggestions": len(all_suggestions),
+        "suggestions": len(stored_suggestions),
         "translations": all_translations,
     }
 
