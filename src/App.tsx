@@ -92,39 +92,6 @@ function App() {
         }
     }
 
-    /**
-     * Sends untranslated strings for a mod to the chosen AI translation provider.
-     *
-     * Hits `POST /api/translate` with `{ mod_id, provider }`. The backend
-     * translates all untranslated strings and optionally returns glossary term
-     * suggestions. On success the mod list is refreshed so progress bars update.
-     *
-     * @param provider - The AI provider key (e.g. "claude", "deepl").
-     * @param modId - The unique identifier of the mod to translate.
-     * @returns A result object indicating success/failure, a user-facing message,
-     *          and optionally the translated key-value pairs.
-     */
-    const handleTranslate = async (provider: string, modId: string): Promise<{ success: boolean; message: string; translations?: Record<string, string> }> => {
-        try {
-            const res = await fetch(`${API_BASE}/translate`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ mod_id: modId, provider }),
-            })
-            const data = await res.json()
-            if (!res.ok) {
-                return { success: false, message: data.detail || "Unknown error" }
-            }
-            // Refresh the mod list so dashboard progress bars reflect the new translations.
-            fetchMods()
-            const msg = `Translated ${data.translated} strings.${data.suggestions > 0 ? ` ${data.suggestions} glossary term suggestions pending review.` : ""}`
-            return { success: true, message: msg, translations: data.translations }
-        } catch (err) {
-            console.error("Translation failed:", err)
-            return { success: false, message: "Translation failed. Could not reach the server." }
-        }
-    }
-
     return (
         <>
             <Sidebar />
@@ -144,7 +111,7 @@ function App() {
                         <Route path="/dashboard" element={<DashboardPage mods={mods} onModSelect={(modId) => navigate(`/mods/${modId}`)} onModSync={handleModSync} onRefresh={fetchMods} />} />
 
                         {/* --- Mod detail: string editor and translation actions --- */}
-                        <Route path="/mods/:modId" element={<ModDetail onBack={() => navigate("/dashboard")} onTranslate={(provider, modId) => handleTranslate(provider, modId)} />} />
+                        <Route path="/mods/:modId" element={<ModDetail onBack={() => navigate("/dashboard")} />} />
 
                         {/* --- Statistics: aggregate translation metrics --- */}
                         <Route path="/statistics" element={<StatisticsPage stats={stats} />} />

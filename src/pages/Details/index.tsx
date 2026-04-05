@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import { useParams } from "react-router-dom"
 import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook, FaFolderOpen } from "react-icons/fa"
 import type { LocString, TermSuggestion } from "../../shared_types"
@@ -6,6 +6,8 @@ import { API_BASE } from "../../config"
 import GlossarySuggestionModal from "../../components/GlossarySuggestionModal"
 import TranslationConfirmModal from "../../components/TranslationConfirmModal"
 import EditableCell from "../../components/EditableCell"
+import { useIterativeTranslation } from "../../hooks/useIterativeTranslation"
+import type { BatchDescriptor } from "../../hooks/useIterativeTranslation"
 
 /**
  * Props for the ModDetail component.
@@ -13,16 +15,6 @@ import EditableCell from "../../components/EditableCell"
 interface ModDetailProps {
     /** Callback to navigate back to the dashboard/mod list. */
     onBack: () => void
-    /**
-     * Callback to execute the actual translation request against the AI provider.
-     * Called only after the user confirms the translation preview modal.
-     *
-     * @param provider - The AI provider identifier (e.g. "claude").
-     * @param modId - The mod identifier to translate.
-     * @returns A result object with success status, a user-facing message, and
-     *          optionally a map of key-to-translated-English-string pairs.
-     */
-    onTranslate: (provider: string, modId: string) => Promise<{ success: boolean; message: string; translations?: Record<string, string> }>
 }
 
 /** Columns that support click-to-sort in the strings table. */
@@ -37,10 +29,9 @@ type SortDirection = "asc" | "desc" | null
 /**
  * Detail view for a specific mod, showing all translatable strings.
  * @param onBack - Callback to return to the dashboard.
- * @param onTranslate - Callback to trigger translation process.
  * @returns The rendered mod detail view.
  */
-const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
+const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const { modId } = useParams<{ modId: string }>()
     const [strings, setStrings] = useState<LocString[]>([])
     const [modName, setModName] = useState<string>("")
@@ -70,6 +61,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
 
     const [suggestions, setSuggestions] = useState<TermSuggestion[]>([])
     const [showSuggestionModal, setShowSuggestionModal] = useState(false)
+    const [showReviewModal, setShowReviewModal] = useState(false)
     const [modGlossary, setModGlossary] = useState<Record<string, { category: string; source_mappings: Record<string, string> }>>({})
 
     const [translationPreview, setTranslationPreview] = useState<any>(null)
@@ -84,7 +76,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     const [editTermSource, setEditTermSource] = useState("")
     const [editTermLang, setEditTermLang] = useState("Chinese")
     const [editTermCategory, setEditTermCategory] = useState("custom")
-    const [translating, setTranslating] = useState(false)
     const [translateBanner, setTranslateBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
     const [characterContext, setCharacterContext] = useState<{
@@ -103,6 +94,39 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
     const [showHistory, setShowHistory] = useState(false)
     const [historyEntries, setHistoryEntries] = useState<{ id: string; reason: string; created_at: string; files: string[] }[]>([])
 
+    /** Callback fired by the iterative translation hook after each batch completes. */
+    const handleBatchTranslated = useCallback((translations: Record<string, string>) => {
+        setStrings((prev) =>
+            prev.map((s) => {
+                if (s.key in translations) {
+                    return { ...s, english: translations[s.key], is_translated: true }
+                }
+                return s
+            })
+        )
+        fetchExportStatus()
+    }, [])
+
+    const { state: batchState, startTranslation, continueAfterReview, cancel: cancelTranslation } = useIterativeTranslation(modId ?? "", handleBatchTranslated)
+
+    // React to batch translation phase changes.
+    useEffect(() => {
+        if (batchState.phase === "reviewing") {
+            // Auto-open the review modal when a batch finishes with suggestions.
+            setShowReviewModal(true)
+        } else if (batchState.phase === "complete") {
+            setShowReviewModal(false)
+            setTranslateBanner({ type: "success", message: `Translated ${batchState.totalTranslated} strings.` })
+            fetchSuggestions()
+            fetchExportStatus()
+        } else if (batchState.phase === "error") {
+            setShowReviewModal(false)
+            const partial = batchState.completedBatches > 0 ? ` ${batchState.completedBatches} batch(es) completed before the error.` : ""
+            setTranslateBanner({ type: "error", message: `${batchState.message}${partial}` })
+            fetchSuggestions()
+        }
+    }, [batchState.phase]) // eslint-disable-line react-hooks/exhaustive-deps
+
     /**
      * Initiates the translation workflow by fetching a preview from the backend.
      *
@@ -111,8 +135,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
      *      prompt previews, and cost estimates without actually translating.
      *   2. If there are strings to translate, the preview data is stored in state
      *      which triggers the TranslationConfirmModal to open.
-     *   3. The user reviews and confirms, which calls `onTranslate` (see the modal
-     *      `onConfirm` handler further down in the JSX).
+     *   3. The user reviews and confirms, which starts the iterative batch
+     *      translation loop via the `useIterativeTranslation` hook.
      *
      * If all strings are already translated, a success banner is shown instead.
      *
@@ -729,7 +753,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
 
                     {/* Translation trigger and CSV sync. */}
                     <div className="mod-actions-group">
-                        <button className="btn btn-primary" onClick={() => handleTranslateClick("claude")} disabled={translating}>
+                        <button className="btn btn-primary" onClick={() => handleTranslateClick("claude")} disabled={batchState.phase === "translating" || batchState.phase === "reviewing"}>
                             Translate (Claude)
                         </button>
                         <button className="btn btn-primary" onClick={handleExport} disabled={exporting || !hasExportChanges} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -741,7 +765,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
             </div>
 
             {/* --- Translation In-Progress Spinner --- */}
-            {translating && (
+            {batchState.phase === "translating" && (
                 <div
                     className="glass-card"
                     style={{
@@ -764,7 +788,65 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                             animation: "spin 1s linear infinite",
                         }}
                     />
-                    <span style={{ color: "var(--text-main)" }}>Translating... waiting for provider response</span>
+                    <span style={{ color: "var(--text-main)" }}>
+                        Translating batch {batchState.batchIndex + 1} of {batchState.totalBatches}... waiting for provider response
+                    </span>
+                    <button
+                        className="btn btn-outline"
+                        onClick={() => {
+                            cancelTranslation()
+                            setTranslateBanner({ type: "success", message: `Translation cancelled. ${batchState.batchIndex} of ${batchState.totalBatches} batches completed.` })
+                        }}
+                        style={{ marginLeft: "auto", padding: "0.25rem 0.75rem" }}
+                    >
+                        Cancel
+                    </button>
+                </div>
+            )}
+
+            {/* --- Batch Paused Banner ---
+                Shown when the user closes the review modal to inspect the table.
+                They can resume the review or cancel remaining batches. */}
+            {batchState.phase === "reviewing" && !showReviewModal && (
+                <div
+                    className="glass-card"
+                    style={{
+                        padding: "1.25rem 1.5rem",
+                        marginBottom: "1rem",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "1rem",
+                        background: "rgba(250,204,21,0.08)",
+                        border: "1px solid rgba(250,204,21,0.25)",
+                    }}
+                >
+                    <span style={{ color: "var(--text-main)" }}>
+                        Batch {batchState.batchIndex + 1} of {batchState.totalBatches} complete — review paused. {batchState.suggestions.length} glossary suggestion(s) pending.
+                    </span>
+                    <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
+                        <button className="btn btn-primary" onClick={() => setShowReviewModal(true)} style={{ padding: "0.25rem 0.75rem" }}>
+                            Review Suggestions
+                        </button>
+                        <button
+                            className="btn btn-primary"
+                            onClick={() => {
+                                continueAfterReview()
+                            }}
+                            style={{ padding: "0.25rem 0.75rem" }}
+                        >
+                            Skip & Continue
+                        </button>
+                        <button
+                            className="btn btn-outline"
+                            onClick={() => {
+                                cancelTranslation()
+                                setTranslateBanner({ type: "success", message: `Translation cancelled. ${batchState.batchIndex} of ${batchState.totalBatches} batches completed.` })
+                            }}
+                            style={{ padding: "0.25rem 0.75rem" }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -1552,40 +1634,39 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
 
             {/* --- Translation Confirmation Modal ---
                 Shown after handleTranslateClick fetches a preview. Displays
-                prompt previews, batch counts, and cost estimates. On confirm:
-                1. Close the modal and show the translating spinner
-                2. Call onTranslate (parent-provided) to execute the actual API call
-                3. On success with inline translations: merge them into local state
-                4. On success without inline translations: full re-fetch
-                5. Refresh export status and suggestions after any success */}
+                prompt previews, batch counts, and cost estimates. On confirm,
+                starts the iterative batch translation loop via the hook. */}
             {translationPreview && (
                 <TranslationConfirmModal
                     preview={translationPreview}
-                    onConfirm={async () => {
+                    onConfirm={() => {
+                        const plan: BatchDescriptor[] = translationPreview.batch_plan || []
                         setTranslationPreview(null)
                         setTranslateBanner(null)
-                        setTranslating(true)
-                        const result = await onTranslate(pendingProvider, modId!)
-                        setTranslating(false)
-                        setTranslateBanner({ type: result.success ? "success" : "error", message: result.message })
-                        if (result.success && result.translations) {
-                            // Merge translations into local state to avoid a full re-fetch.
-                            setStrings((prev) =>
-                                prev.map((s) => {
-                                    if (s.key in result.translations!) {
-                                        return { ...s, english: result.translations![s.key], is_translated: true }
-                                    }
-                                    return s
-                                })
-                            )
-                            fetchExportStatus()
-                            fetchSuggestions()
-                        } else if (result.success) {
-                            // Fallback: if no inline translations were returned, re-fetch everything.
-                            fetchModDetail()
-                        }
+                        startTranslation(pendingProvider, plan)
                     }}
                     onCancel={() => setTranslationPreview(null)}
+                />
+            )}
+
+            {/* --- Batch Translation Review Modal ---
+                Shown automatically when the iterative hook pauses for glossary
+                suggestion review between batches. Closing the modal pauses the
+                process; the user can resume via the paused banner below. */}
+            {batchState.phase === "reviewing" && showReviewModal && (
+                <GlossarySuggestionModal
+                    modId={modId!}
+                    suggestions={batchState.suggestions}
+                    onClose={() => setShowReviewModal(false)}
+                    onUpdated={() => {
+                        fetchSuggestions()
+                        fetchModGlossary()
+                    }}
+                    batchProgress={{ current: batchState.batchIndex + 1, total: batchState.totalBatches }}
+                    onContinue={() => {
+                        setShowReviewModal(false)
+                        continueAfterReview()
+                    }}
                 />
             )}
         </div>
