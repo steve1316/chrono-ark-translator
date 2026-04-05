@@ -235,6 +235,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
         fetchModDetail()
         fetchExportStatus()
         fetchSuggestions()
+        fetchModGlossary()
         fetchCharacterContext()
     }, [modId])
 
@@ -1081,6 +1082,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack, onTranslate }) => {
                     onClose={() => setShowSuggestionModal(false)}
                     onUpdated={() => {
                         fetchSuggestions()
+                        fetchModGlossary()
                     }}
                 />
             )}
