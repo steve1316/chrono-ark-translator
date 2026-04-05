@@ -1,6 +1,5 @@
 from pathlib import Path
-
-from games.chrono_ark.csv_extractor import (
+from backend.games.chrono_ark.csv_extractor import (
     find_all_csv_files,
     classify_csv_file,
     extract_mod_strings,

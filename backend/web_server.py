@@ -7,33 +7,29 @@ glossary management, and triggering translation jobs.
 
 import hashlib
 import os
-import sys
 import json
+import uvicorn
 from pathlib import Path
 from typing import Optional
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-
-# Add current directory to path for imports
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-import config
-from games.registry import get_adapter
-from games.base import GameAdapter
-from data.progress_tracker import ProgressTracker
-from data.glossary_manager import (
+from backend import config
+from backend.games.registry import get_adapter
+from backend.games.base import GameAdapter
+from backend.data.progress_tracker import ProgressTracker
+from backend.data.glossary_manager import (
     load_glossary, save_glossary, add_glossary_term, get_glossary_prompt,
     load_mod_glossary, save_mod_glossary, merge_glossaries,
 )
-from data.translation_memory import TranslationMemory
-from data.suggestion_manager import (
+from backend.data.translation_memory import TranslationMemory
+from backend.data.suggestion_manager import (
     load_suggestions, add_suggestions, remove_suggestions, clear_suggestions,
 )
-from data.character_context import load_character_context, save_character_context
-from main import _get_provider, _save_extracted_strings
+from backend.data.character_context import load_character_context, save_character_context
+from backend.main import get_provider, save_extracted_strings
+
 
 # Initialize the active game adapter.
 _adapter: GameAdapter = get_adapter(config.ACTIVE_GAME)
@@ -52,27 +48,78 @@ app.add_middleware(
 # --- Pydantic Models ---
 
 class GlossaryTerm(BaseModel):
+    """A global glossary term mapping a source-language word to its English translation.
+
+    Attributes:
+        source: The original term in the source language.
+        english: The English translation of the term.
+    """
+
     source: str
     english: str
 
 class ModGlossaryTerm(BaseModel):
+    """A mod-specific glossary term with per-language source mappings.
+
+    Attributes:
+        english: The English translation of the term.
+        source_mappings: Mapping of source language codes to the original term
+            in each language (e.g. `{"Korean": "마법"}`).
+        category: The category for this term (e.g. `"custom"`, `"skill"`).
+    """
+
     english: str
     source_mappings: dict[str, str] = {}
     category: str = "custom"
 
 class SuggestionAction(BaseModel):
+    """Payload for accepting or dismissing glossary term suggestions.
+
+    Attributes:
+        terms: List of specific English term strings to act on.
+        all: If `True`, the action applies to every pending suggestion
+            regardless of `terms`.
+    """
+
     terms: list[str] = []
     all: bool = False
 
 class TranslationRequest(BaseModel):
+    """Request body for translation, estimation, and preview endpoints.
+
+    Attributes:
+        mod_id: The unique workshop identifier of the mod to translate.
+        provider: Optional override for the translation provider name.
+            Defaults to the value in `config.TRANSLATION_PROVIDER` when
+            `None`.
+    """
+
     mod_id: str
     provider: Optional[str] = None
 
 class TranslationUpdate(BaseModel):
+    """Payload for manually updating a single translated string.
+
+    Attributes:
+        key: The localization key identifying the string (e.g.
+            `"LangDataDB::Skill_FireBall::Desc"`).
+        english: The new English translation text. An empty string clears
+            the existing translation.
+    """
+
     key: str
     english: str
 
 class CharacterContext(BaseModel):
+    """Optional character lore context used to improve translation quality.
+
+    Attributes:
+        source_game: The name of the game the character originates from.
+        character_name: The character's display name.
+        background: Free-text description of the character's lore, personality,
+            or speech style that should inform translations.
+    """
+
     source_game: str = ""
     character_name: str = ""
     background: str = ""
@@ -81,7 +128,12 @@ class CharacterContext(BaseModel):
 
 @app.get("/api/game")
 async def get_game_info():
-    """Return metadata about the active game adapter."""
+    """Return metadata about the active game adapter.
+
+    Returns:
+        A dict containing `game_id` and `game_name` for the currently
+        configured game.
+    """
     return {
         "game_id": _adapter.game_id,
         "game_name": _adapter.game_name,
@@ -89,7 +141,13 @@ async def get_game_info():
 
 @app.get("/api/mods")
 async def get_mods():
-    """List all workshop mods with their current status."""
+    """List all workshop mods with their current translation status.
+
+    Returns:
+        A list of dicts, one per mod, each containing the mod's id, name,
+        author, CSV/DLL flags, translation progress counters, workshop URL,
+        and preview image path.
+    """
     mods = _adapter.scan_mods()
     tracker = ProgressTracker()
 
@@ -115,7 +173,20 @@ async def get_mods():
 
 @app.get("/api/mods/{mod_id}")
 async def get_mod_detail(mod_id: str):
-    """Get detailed string data for a specific mod."""
+    """Get detailed string data for a specific mod.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with the mod's metadata, a `strings` list containing every
+        localization entry (key, source text, English text, translation
+        status), and a `duplicate_files` list of any variant CSV paths
+        that were found.
+
+    Raises:
+        HTTPException: 404 if no mod with the given id is found.
+    """
     # Find the mod path by scanning.
     mods = _adapter.scan_mods()
     matching = [m for m in mods if m.mod_id == mod_id]
@@ -191,7 +262,16 @@ async def get_mod_detail(mod_id: str):
 
 @app.post("/api/mods/{mod_id}/strings")
 async def update_string(mod_id: str, update: TranslationUpdate):
-    """Save a manual translation for a specific key."""
+    """Save a manual translation for a specific key.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        update: The translation update containing the localization key and the
+            new English text.
+
+    Returns:
+        A dict with `{"status": "success"}` on success.
+    """
     translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
     translations_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -228,7 +308,18 @@ async def update_string(mod_id: str, update: TranslationUpdate):
 
 @app.post("/api/mods/{mod_id}/sync")
 async def sync_mod(mod_id: str):
-    """Re-scan and extract strings for a mod."""
+    """Re-scan and extract strings for a mod.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with `status` and counts of `new`, `modified`,
+        `removed`, and `unchanged` keys detected during the sync.
+
+    Raises:
+        HTTPException: 404 if no mod with the given id is found.
+    """
     mods = _adapter.scan_mods()
     matching = [m for m in mods if m.mod_id == mod_id]
     if not matching:
@@ -237,7 +328,7 @@ async def sync_mod(mod_id: str):
 
     strings, _ = _adapter.extract_strings(mod_path)
     output_path = config.STORAGE_PATH / "mods" / mod_id / "source.json"
-    _save_extracted_strings(strings, output_path)
+    save_extracted_strings(strings, output_path)
 
     tracker = ProgressTracker()
     diff = tracker.update(mod_id, strings, _adapter.source_languages)
@@ -252,7 +343,20 @@ async def sync_mod(mod_id: str):
 
 @app.post("/api/mods/{mod_id}/clear-translations")
 async def clear_translations(mod_id: str):
-    """Clear all English translations so every row is sent to the AI provider."""
+    """Clear all English translations so every row is sent to the AI provider.
+
+    Writes empty-string overrides for every key that had an English value,
+    effectively resetting the mod to an untranslated state.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with `{"status": "success"}` on success.
+
+    Raises:
+        HTTPException: 404 if no mod with the given id is found.
+    """
     mods = _adapter.scan_mods()
     matching = [m for m in mods if m.mod_id == mod_id]
     if not matching:
@@ -297,7 +401,20 @@ async def clear_translations(mod_id: str):
 
 @app.post("/api/mods/{mod_id}/clear")
 async def clear_mod_cache(mod_id: str):
-    """Delete all extracted strings, translations, and progress for a mod."""
+    """Delete all extracted strings, translations, and progress for a mod.
+
+    Removes the entire storage directory for the given mod.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with `{"status": "success"}` on success, or a dict with
+        an additional `message` if there was no data to clear.
+
+    Raises:
+        HTTPException: 500 if the storage directory cannot be deleted.
+    """
     mod_storage = config.STORAGE_PATH / "mods" / mod_id
     if not mod_storage.exists():
         return {"status": "success", "message": "No data to clear"}
@@ -311,7 +428,18 @@ async def clear_mod_cache(mod_id: str):
 
 @app.post("/api/mods/{mod_id}/open")
 async def open_mod_folder(mod_id: str):
-    """Open the mod's directory in the system file explorer."""
+    """Open the mod's directory in the system file explorer.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with `{"status": "success"}` on success.
+
+    Raises:
+        HTTPException: 404 if the mod or its directory is not found.
+        HTTPException: 500 if the OS fails to open the folder.
+    """
     mod_path = _find_mod_path(mod_id)
     if not mod_path.exists():
         raise HTTPException(status_code=404, detail="Mod directory not found")
@@ -325,7 +453,20 @@ async def open_mod_folder(mod_id: str):
 
 @app.post("/api/translate/estimate")
 async def estimate_translation(req: TranslationRequest):
-    """Estimate cost and time for translating a mod."""
+    """Estimate cost and time for translating a mod.
+
+    Args:
+        req: Translation request containing the mod id and optional provider
+            override.
+
+    Returns:
+        A dict with `total_strings`, `provider` name, and `estimates`
+        keyed by source language, each containing the provider's cost and
+        token estimates.
+
+    Raises:
+        HTTPException: 404 if no mod with the given id is found.
+    """
     mods = _adapter.scan_mods()
     matching = [m for m in mods if m.mod_id == req.mod_id]
     if not matching:
@@ -339,7 +480,7 @@ async def estimate_translation(req: TranslationRequest):
         return {"total": 0, "estimates": {}}
 
     provider_name = req.provider or config.TRANSLATION_PROVIDER
-    provider = _get_provider(provider_name)
+    provider = get_provider(provider_name)
 
     # Group by language
     by_lang = {}
@@ -381,7 +522,25 @@ async def estimate_translation(req: TranslationRequest):
 
 @app.post("/api/translate/preview")
 async def preview_translation(req: TranslationRequest):
-    """Preview the translation prompt that will be sent to the provider."""
+    """Preview the translation prompt that will be sent to the provider.
+
+    Builds the system prompt and user message for the first batch of each
+    source language so the user can inspect what will be sent before
+    committing to a full translation run.
+
+    Args:
+        req: Translation request containing the mod id and optional provider
+            override.
+
+    Returns:
+        A dict with `total_strings`, `total_batches`, `batch_size`,
+        `provider` name, `previews` keyed by source language (each
+        containing the prompts and batch metadata), and `estimates` with
+        per-language cost estimates.
+
+    Raises:
+        HTTPException: 404 if no mod with the given id is found.
+    """
     mods = _adapter.scan_mods()
     matching = [m for m in mods if m.mod_id == req.mod_id]
     if not matching:
@@ -408,7 +567,7 @@ async def preview_translation(req: TranslationRequest):
         return {"total_strings": 0, "message": "All strings already translated", "previews": {}}
 
     provider_name = req.provider or config.TRANSLATION_PROVIDER
-    provider = _get_provider(provider_name)
+    provider = get_provider(provider_name)
 
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
@@ -471,7 +630,25 @@ async def preview_translation(req: TranslationRequest):
 
 @app.post("/api/translate")
 async def translate_mod(req: TranslationRequest):
-    """Trigger translation for a mod."""
+    """Trigger translation for a mod.
+
+    Sends all untranslated strings to the configured AI provider in batches,
+    saves the resulting translations, updates progress tracking, and stores
+    any glossary suggestions returned by the provider.
+
+    Args:
+        req: Translation request containing the mod id and optional provider
+            override.
+
+    Returns:
+        A dict with `status`, the count of `translated` strings, the
+        count of `suggestions` received, and a `translations` mapping
+        of key to English text.
+
+    Raises:
+        HTTPException: 404 if no mod with the given id is found.
+        HTTPException: 502 if the translation provider returns an error.
+    """
     mods = _adapter.scan_mods()
     matching = [m for m in mods if m.mod_id == req.mod_id]
     if not matching:
@@ -495,7 +672,7 @@ async def translate_mod(req: TranslationRequest):
     untranslated = _adapter.get_untranslated(strings)
 
     provider_name = req.provider or config.TRANSLATION_PROVIDER
-    provider = _get_provider(provider_name)
+    provider = get_provider(provider_name)
 
     if not untranslated:
         return {"status": "complete", "message": "All strings already translated", "translated": 0, "suggestions": 0}
@@ -579,7 +756,17 @@ async def translate_mod(req: TranslationRequest):
 
 
 def _get_mod_csv_paths(mod_path: Path) -> list[Path]:
-    """Collect all CSV file paths for a mod (Localization/ and top-level Lang*)."""
+    """Collect all CSV file paths for a mod.
+
+    Gathers CSVs from the `Localization/` subdirectory and any top-level
+    `Lang*.csv` files in the mod root.
+
+    Args:
+        mod_path: Filesystem path to the mod's root directory.
+
+    Returns:
+        A list of `Path` objects pointing to each discovered CSV file.
+    """
     paths = []
     loc_dir = mod_path / "Localization"
     if loc_dir.exists():
@@ -611,7 +798,15 @@ def _compute_export_snapshot(mod_id: str, mod_path: Path) -> str:
 
 
 def _load_last_export_hash(mod_id: str) -> str:
-    """Load the snapshot hash saved after the last successful export."""
+    """Load the snapshot hash saved after the last successful export.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        The hex-digest hash string, or an empty string if no export has
+        been recorded yet.
+    """
     path = config.STORAGE_PATH / "mods" / mod_id / "last_export.json"
     if not path.exists():
         return ""
@@ -623,7 +818,12 @@ def _load_last_export_hash(mod_id: str) -> str:
 
 
 def _save_last_export_hash(mod_id: str, snapshot_hash: str) -> None:
-    """Save the snapshot hash after a successful export."""
+    """Save the snapshot hash after a successful export.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        snapshot_hash: The hex-digest hash string to persist.
+    """
     path = config.STORAGE_PATH / "mods" / mod_id / "last_export.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -631,7 +831,17 @@ def _save_last_export_hash(mod_id: str, snapshot_hash: str) -> None:
 
 
 def _find_mod_path(mod_id: str) -> Path:
-    """Find the mod directory path by scanning, or raise 404."""
+    """Find the mod directory path by scanning all workshop mods.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        The filesystem `Path` to the mod's root directory.
+
+    Raises:
+        HTTPException: 404 if no mod with the given id is found.
+    """
     mods = _adapter.scan_mods()
     matching = [m for m in mods if m.mod_id == mod_id]
     if not matching:
@@ -641,7 +851,17 @@ def _find_mod_path(mod_id: str) -> Path:
 
 @app.get("/api/mods/{mod_id}/export-status")
 async def get_export_status(mod_id: str):
-    """Check whether there are changes to sync to the mod's CSV files."""
+    """Check whether there are changes to sync to the mod's CSV files.
+
+    Compares the current translation and CSV state against the last
+    successful export snapshot to determine if a re-export is needed.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with a single `has_changes` boolean.
+    """
     mod_path = _find_mod_path(mod_id)
 
     # No translations at all — nothing to sync.
@@ -667,7 +887,24 @@ async def get_export_status(mod_id: str):
 
 @app.post("/api/mods/{mod_id}/export")
 async def export_mod(mod_id: str):
-    """Write saved translations back into the mod's original CSV files."""
+    """Write saved translations back into the mod's original CSV files.
+
+    Applies all stored English translations to the mod's localization CSVs,
+    removes any duplicate variant files, and records an export snapshot so
+    subsequent `get_export_status` calls can detect new changes.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with `status`, the number of `applied` translations,
+        `files_written` (list of CSV filenames updated), and
+        `files_removed` (list of variant file paths deleted).
+
+    Raises:
+        HTTPException: 400 if no translations exist for the mod.
+        HTTPException: 404 if the mod is not found.
+    """
     mod_path = _find_mod_path(mod_id)
 
     # Load saved translations.
@@ -762,36 +999,76 @@ async def export_mod(mod_id: str):
 
 
 def _find_mod_preview_image(mod_path: Path) -> Optional[Path]:
-    """Find a preview image (.png or .jpg) in the mod's root directory."""
+    """Find a preview image in the mod's root directory.
+
+    Searches for `.png`, `.jpg`, and `.jpeg` files and returns the
+    first match found.
+
+    Args:
+        mod_path: Filesystem path to the mod's root directory.
+
+    Returns:
+        The `Path` to the first image found, or `None` if the mod has
+        no preview image.
+    """
     for ext in ("*.png", "*.jpg", "*.jpeg"):
         for img in mod_path.glob(ext):
             return img
     return None
 
 
-
 @app.get("/api/mods/{mod_id}/character-context")
 async def get_character_context(mod_id: str):
-    """Return saved character context for a mod."""
+    """Return saved character context for a mod.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with `source_game`, `character_name`, and `background`
+        fields (all strings, possibly empty).
+    """
     return load_character_context(mod_id)
 
 
 @app.post("/api/mods/{mod_id}/character-context")
 async def set_character_context(mod_id: str, ctx: CharacterContext):
-    """Save character context for a mod."""
+    """Save character context for a mod.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        ctx: The character context data to persist.
+
+    Returns:
+        A dict with `{"status": "saved"}`.
+    """
     save_character_context(mod_id, ctx.model_dump())
     return {"status": "saved"}
 
 
 @app.get("/api/glossary")
 async def get_glossary():
-    """Get all terminology glossary entries."""
+    """Get all terminology glossary entries.
+
+    Returns:
+        The full global glossary dict as stored on disk, containing a
+        `terms` mapping of English terms to their source-language
+        mappings.
+    """
     glossary = load_glossary()
     return glossary
 
 @app.post("/api/glossary")
 async def update_glossary(term: GlossaryTerm):
-    """Add or update a glossary term."""
+    """Add or update a glossary term.
+
+    Args:
+        term: The glossary term to add, containing the source text and its
+            English translation.
+
+    Returns:
+        A dict with `{"status": "success"}`.
+    """
     glossary = load_glossary()
     add_glossary_term(glossary, term.english, {"custom": term.source})
     save_glossary(glossary)
@@ -799,13 +1076,29 @@ async def update_glossary(term: GlossaryTerm):
 
 @app.get("/api/mods/{mod_id}/glossary")
 async def get_mod_glossary(mod_id: str):
-    """Get a mod's glossary terms."""
+    """Get a mod's glossary terms.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        The mod-specific glossary dict containing a `terms` mapping.
+    """
     return load_mod_glossary(mod_id)
 
 
 @app.post("/api/mods/{mod_id}/glossary")
 async def update_mod_glossary(mod_id: str, term: ModGlossaryTerm):
-    """Add or update a term in a mod's glossary."""
+    """Add or update a term in a mod's glossary.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        term: The glossary term containing the English text, per-language
+            source mappings, and category.
+
+    Returns:
+        A dict with `{"status": "success"}`.
+    """
     glossary = load_mod_glossary(mod_id)
     add_glossary_term(glossary, term.english, term.source_mappings, term.category)
     save_mod_glossary(mod_id, glossary)
@@ -814,7 +1107,17 @@ async def update_mod_glossary(mod_id: str, term: ModGlossaryTerm):
 
 @app.delete("/api/mods/{mod_id}/glossary/{term}")
 async def delete_mod_glossary_term(mod_id: str, term: str):
-    """Remove a term from a mod's glossary."""
+    """Remove a term from a mod's glossary.
+
+    If the term does not exist, the operation is a no-op.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        term: The English term string to delete.
+
+    Returns:
+        A dict with `{"status": "success"}`.
+    """
     glossary = load_mod_glossary(mod_id)
     if term in glossary.get("terms", {}):
         del glossary["terms"][term]
@@ -824,7 +1127,17 @@ async def delete_mod_glossary_term(mod_id: str, term: str):
 
 @app.get("/api/mods/{mod_id}/glossary/merged")
 async def get_merged_glossary(mod_id: str):
-    """Get the merged base + mod glossary."""
+    """Get the merged base + mod glossary.
+
+    Combines the global glossary with the mod-specific glossary, with
+    mod-level terms taking precedence on conflicts.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        The merged glossary dict ready for use in translation prompts.
+    """
     base = load_glossary()
     mod = load_mod_glossary(mod_id)
     return merge_glossaries(base, mod)
@@ -832,13 +1145,33 @@ async def get_merged_glossary(mod_id: str):
 
 @app.get("/api/mods/{mod_id}/glossary/suggestions")
 async def get_suggestions(mod_id: str):
-    """Get pending glossary term suggestions."""
+    """Get pending glossary term suggestions.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A list of suggestion dicts, each containing `english`,
+        `source`, `source_lang`, and `category` fields.
+    """
     return load_suggestions(mod_id)
 
 
 @app.post("/api/mods/{mod_id}/glossary/suggestions/accept")
 async def accept_suggestions(mod_id: str, action: SuggestionAction):
-    """Accept suggestions into the mod glossary."""
+    """Accept suggestions into the mod glossary.
+
+    Moves the specified (or all) pending suggestions into the mod's
+    glossary and removes them from the suggestions list.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        action: Specifies which suggestions to accept, either by listing
+            specific terms or setting `all` to `True`.
+
+    Returns:
+        A dict with `status` and the count of `accepted` terms.
+    """
     suggestions = load_suggestions(mod_id)
     glossary = load_mod_glossary(mod_id)
 
@@ -860,7 +1193,16 @@ async def accept_suggestions(mod_id: str, action: SuggestionAction):
 
 @app.post("/api/mods/{mod_id}/glossary/suggestions/dismiss")
 async def dismiss_suggestions(mod_id: str, action: SuggestionAction):
-    """Dismiss (remove) suggestions without adding to glossary."""
+    """Dismiss (remove) suggestions without adding to glossary.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        action: Specifies which suggestions to dismiss, either by listing
+            specific terms or setting `all` to `True`.
+
+    Returns:
+        A dict with `{"status": "success"}`.
+    """
     if action.all:
         clear_suggestions(mod_id)
     else:
@@ -870,7 +1212,13 @@ async def dismiss_suggestions(mod_id: str, action: SuggestionAction):
 
 @app.get("/api/stats")
 async def get_stats():
-    """Get global statistics for translation memory and progress."""
+    """Get global statistics for translation memory and progress.
+
+    Returns:
+        A dict with `tm_entries` (translation memory size), `tm_hits`
+        (session cache hits), `total_mods`, `global_progress`
+        (percentage), and `total_strings` across all mods.
+    """
     tm = TranslationMemory()
     stats = tm.get_stats()
 
@@ -903,5 +1251,4 @@ if _workshop_path and Path(_workshop_path).exists():
     app.mount("/workshop", StaticFiles(directory=str(_workshop_path)), name="workshop")
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

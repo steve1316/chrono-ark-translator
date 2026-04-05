@@ -1,15 +1,14 @@
 """
 GDE (Game Data Editor) JSON extractor for Chrono Ark mods.
 
-Parses the ``gdata/Add/*.json`` files that mods ship alongside their DLLs.
+Parses the `gdata/Add/*.json` files that mods ship alongside their DLLs.
 These files define skills, buffs, equipment, characters, etc. and contain
 localizable text fields such as Name, Description, and dialogue arrays.
 """
 
 import json
 from pathlib import Path
-
-from models import LocString
+from backend.models import LocString
 
 
 # Maps (schema, field_name) to a canonical suffix used in the localization key.
@@ -55,7 +54,15 @@ _DIALOGUE_ARRAY_FIELDS = {
 
 
 def _has_cjk(s: str) -> bool:
-    """Return True if the string contains CJK / Hangul characters."""
+    """Check if a string contains CJK or Hangul characters.
+
+    Args:
+        s: The string to check.
+
+    Returns:
+        True if the string contains any CJK Unified Ideographs, CJK
+        Extension A, Hangul Syllables, Hiragana, or Katakana characters.
+    """
     for ch in s:
         cp = ord(ch)
         if (0x4E00 <= cp <= 0x9FFF
@@ -68,7 +75,20 @@ def _has_cjk(s: str) -> bool:
 
 
 def _extract_gdata_file(file_path: Path) -> dict[str, LocString]:
-    """Extract localization entries from a single gdata JSON file."""
+    """Extract localization entries from a single gdata JSON file.
+
+    Parses the JSON structure for known schemas (Skill, Buff, Item, etc.)
+    and extracts scalar text fields and dialogue string arrays that
+    contain CJK text.
+
+    Args:
+        file_path: Path to the gdata JSON file.
+
+    Returns:
+        Dictionary mapping localization key to LocString. Returns an
+        empty dict if the file cannot be read or contains no localizable
+        entries.
+    """
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -137,7 +157,7 @@ def _extract_gdata_file(file_path: Path) -> dict[str, LocString]:
 
 def extract_mod_gdata_strings(mod_path: Path) -> dict[str, LocString]:
     """
-    Extract all localization strings from a mod's ``gdata/Add/`` directory.
+    Extract all localization strings from a mod's `gdata/Add/` directory.
 
     Args:
         mod_path: Root directory of the mod.

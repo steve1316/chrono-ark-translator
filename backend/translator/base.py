@@ -19,7 +19,11 @@ class TranslationProvider(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        """Human-readable name of this translation provider."""
+        """Human-readable name of this translation provider.
+
+        Returns:
+            str: Display name including any model information.
+        """
         ...
 
     @abstractmethod
@@ -38,17 +42,21 @@ class TranslationProvider(ABC):
 
         Args:
             entries: List of (key, source_text) tuples to translate.
-            source_lang: Name of the source language (e.g., "Chinese").
+            source_lang: Name of the source language (e.g., `"Chinese"`).
             glossary_prompt: Formatted glossary context for the LLM.
             game_context: Game description for the system prompt.
             format_rules: Game-specific formatting preservation rules.
             style_examples: Dict of category -> [(source, english)] pairs for few-shot.
+            character_context: Character background info dict with keys like
+                `"character_name"`, `"source_game"`, and `"background"`.
 
         Returns:
-            Tuple of (translations dict, suggested_terms list).
+            tuple[dict[str, str], list[dict]]: A tuple of (translations dict
+                mapping key to English text, suggested_terms list of dicts).
         """
         ...
 
+    @abstractmethod
     def build_prompt(
         self,
         entries: list[tuple[str, str]],
@@ -59,14 +67,25 @@ class TranslationProvider(ABC):
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
     ) -> tuple[str, str]:
-        """
-        Build the system and user prompts without sending to the API.
+        """Build the system and user prompts without sending to the API.
+
+        Args:
+            entries: List of (key, source_text) tuples to translate.
+            source_lang: Name of the source language (e.g., `"Chinese"`).
+            glossary_prompt: Formatted glossary context for the LLM.
+            game_context: Game description for the system prompt.
+            format_rules: Game-specific formatting preservation rules.
+            style_examples: Dict of category -> [(source, english)] pairs
+                for few-shot style guidance.
+            character_context: Character background info dict with keys like
+                `"character_name"`, `"source_game"`, and `"background"`.
 
         Returns:
-            Tuple of (system_prompt, user_message). Providers that don't use
-            custom prompts (e.g. DeepL) return empty strings.
+            tuple[str, str]: A tuple of (system_prompt, user_message).
+                Providers that don't use custom prompts (e.g. `DeepL`) return
+                empty strings for both.
         """
-        return "", ""
+        ...
 
     @abstractmethod
     def estimate_cost(self, entries: list[tuple[str, str]], **kwargs) -> dict:
@@ -75,10 +94,10 @@ class TranslationProvider(ABC):
 
         Args:
             entries: List of (key, source_text) tuples.
-            **kwargs: Provider-specific context (source_lang, glossary_prompt, etc.)
+            **kwargs: Provider-specific context (`source_lang`, `glossary_prompt`, etc.)
 
         Returns:
             Dictionary with cost estimation details:
-            {"estimated_tokens": int, "estimated_cost_usd": float, "note": str}
+            `{"estimated_tokens": int, "estimated_cost_usd": float, "note": str}`
         """
         ...

@@ -9,14 +9,34 @@ import csv
 import os
 from pathlib import Path
 from typing import Optional
-
-from models import LocString
-from games.base import GameAdapter, ModInfo
-from games.chrono_ark import csv_extractor, dll_extractor, gdata_extractor, mod_scanner
+from backend.models import LocString
+from backend.games.base import GameAdapter, ModInfo
+from backend.games.chrono_ark import csv_extractor, dll_extractor, gdata_extractor, mod_scanner
 
 
 class ChronoArkAdapter(GameAdapter):
-    """Game adapter for Chrono Ark."""
+    """Game adapter for Chrono Ark.
+
+    Handles extraction from Chrono Ark's CSV localization files,
+    .NET DLL string extraction, GDE JSON data files, and Steam
+    Workshop mod discovery.
+
+    Attributes:
+        _BASE_GAME_PATH: Default path to the base game's StreamingAssets
+            directory. Overridable via the `CATL_BASE_GAME_PATH` env var.
+        _WORKSHOP_PATH: Default path to the Steam Workshop content directory.
+            Overridable via the `CATL_WORKSHOP_PATH` env var.
+        _CSV_FILES: Canonical CSV filenames for Chrono Ark localization.
+        _CSV_COLUMNS: Ordered column names for the localization CSV format.
+        _SOURCE_LANGUAGES: Source languages to check, in priority order.
+        _SKIP_DLLS: Set of known dependency DLL filenames to skip during
+            extraction.
+        _DLL_MIN_STRING_LENGTH: Minimum string length to keep when filtering
+            DLL-extracted strings.
+        _METADATA_FILENAME: Name of the mod metadata JSON file.
+        _GLOSSARY_CATEGORIES: Mapping of glossary category names to their
+            localization key prefixes.
+    """
 
     # Game-specific constants (moved from config.py).
     _BASE_GAME_PATH = Path(os.environ.get(
@@ -101,6 +121,19 @@ class ChronoArkAdapter(GameAdapter):
         }
 
     def scan_mods(self, search_path: Optional[Path] = None) -> list[ModInfo]:
+        """Discover all installed Chrono Ark workshop mods.
+
+        Scans the Steam Workshop directory for mod folders containing
+        `ChronoArkMod.json` metadata files.
+
+        Args:
+            search_path: Optional override for the workshop directory.
+                Defaults to `_WORKSHOP_PATH`.
+
+        Returns:
+            List of ModInfo objects for each discovered mod, sorted by
+            mod_id.
+        """
         workshop_path = search_path or self._WORKSHOP_PATH
         return mod_scanner.scan_workshop(
             workshop_path=workshop_path,
@@ -109,6 +142,20 @@ class ChronoArkAdapter(GameAdapter):
         )
 
     def extract_strings(self, mod_path: Path) -> tuple[dict[str, LocString], list[str]]:
+        """Extract all localization strings from a Chrono Ark mod.
+
+        Attempts CSV extraction first. If no CSV localization files are
+        found, falls back to GDE JSON (`gdata/Add/`) and DLL IL-level
+        extraction.
+
+        Args:
+            mod_path: Path to the mod's root directory.
+
+        Returns:
+            Tuple of (strings dict mapping localization key to LocString,
+            list of variant/duplicate file relative paths). The variant
+            list is empty when falling back to non-CSV extraction.
+        """
         strings, variants = csv_extractor.extract_mod_strings(mod_path)
         if not strings:
             # No CSV localization files — try gdata JSON + DLL extraction.
@@ -123,19 +170,68 @@ class ChronoArkAdapter(GameAdapter):
         return strings, variants
 
     def extract_base_game_strings(self, game_path: Optional[Path] = None) -> dict[str, LocString]:
+        """Extract localization strings from the base Chrono Ark game.
+
+        Parses the canonical `Lang*.csv` files from the game's
+        StreamingAssets directory for use in glossary building.
+
+        Args:
+            game_path: Optional override for the StreamingAssets directory.
+                Defaults to `_BASE_GAME_PATH`.
+
+        Returns:
+            Dictionary mapping localization key to LocString.
+        """
         path = game_path or self._BASE_GAME_PATH
         return csv_extractor.extract_base_game_strings(path, self._CSV_FILES)
 
     def detect_source_language(self, loc_string: LocString) -> Optional[str]:
+        """Determine which source language column has content.
+
+        Checks Chinese, Korean, Japanese, and Chinese-TW in priority order.
+
+        Args:
+            loc_string: The localization string to inspect.
+
+        Returns:
+            Name of the first source language with non-empty text, or None.
+        """
         return csv_extractor.detect_source_language(loc_string, self._SOURCE_LANGUAGES)
 
     def get_untranslated(self, strings: dict[str, LocString]) -> dict[str, LocString]:
+        """Filter strings that need English translation.
+
+        Returns entries where the English column is empty but at least one
+        source language column has content.
+
+        Args:
+            strings: Dictionary of all localization strings to filter.
+
+        Returns:
+            Dictionary containing only the strings needing translation.
+        """
         return csv_extractor.get_untranslated_strings(strings, self._SOURCE_LANGUAGES)
 
     def get_glossary_categories(self) -> dict[str, str]:
+        """Return Chrono Ark glossary category-to-key-prefix mappings.
+
+        Returns:
+            Dictionary mapping category names (e.g. `"characters"`,
+            `"skills"`) to their localization key prefixes
+            (e.g. `"Character/"`, `"Skill/"`).
+        """
         return self._GLOSSARY_CATEGORIES
 
     def export_strings(self, output_path: Path, entries: list[LocString]) -> None:
+        """Write localization entries to a Chrono Ark CSV file.
+
+        Outputs a CSV with the standard column order: Key, Type, Desc,
+        followed by each language column.
+
+        Args:
+            output_path: Destination file path for the CSV.
+            entries: List of LocString objects to write.
+        """
         columns = self._CSV_COLUMNS
         with open(output_path, "w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
@@ -147,4 +243,12 @@ class ChronoArkAdapter(GameAdapter):
                 writer.writerow(row)
 
     def get_mod_url(self, mod_id: str) -> Optional[str]:
+        """Return the Steam Workshop URL for a Chrono Ark mod.
+
+        Args:
+            mod_id: Steam Workshop item ID.
+
+        Returns:
+            Steam Workshop file details URL for the given mod.
+        """
         return f"https://steamcommunity.com/sharedfiles/filedetails/?id={mod_id}"

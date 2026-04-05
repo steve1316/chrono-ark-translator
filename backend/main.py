@@ -19,41 +19,43 @@ import argparse
 import json
 import sys
 from pathlib import Path
-
-import config
-from data.glossary_manager import (
+from backend import config
+from backend.data.glossary_manager import (
     add_glossary_term,
     build_glossary_from_base_game,
     get_glossary_prompt,
     load_glossary,
     print_glossary,
     save_glossary,
+    load_mod_glossary,
+    merge_glossaries,
 )
-from data.progress_tracker import ProgressTracker
-from data.translation_memory import TranslationMemory
-from games.registry import get_adapter, list_games
-from games.base import GameAdapter
-from translator.base import TranslationProvider
+from backend.data.progress_tracker import ProgressTracker
+from backend.data.translation_memory import TranslationMemory
+from backend.games.registry import get_adapter, list_games
+from backend.games.base import GameAdapter
+from backend.translator.base import TranslationProvider
+from backend.translator.claude_provider import ClaudeProvider
+from backend.translator.openai_provider import OpenAIProvider
+from backend.translator.deepl_provider import DeepLProvider
+from backend.data.suggestion_manager import add_suggestions
 
 
-def _get_provider(provider_name: str) -> TranslationProvider:
+def get_provider(provider_name: str) -> TranslationProvider:
     """
     Create a translation provider instance by name.
 
     Args:
-        provider_name: One of "claude", "openai", "deepl", "manual".
+        provider_name: One of `"claude"`, `"openai"`, `"deepl"`, `"manual"`.
 
     Returns:
         The initialized TranslationProvider.
     """
     if provider_name == "claude":
-        from translator.claude_provider import ClaudeProvider
         return ClaudeProvider()
     elif provider_name == "openai":
-        from translator.openai_provider import OpenAIProvider
         return OpenAIProvider()
     elif provider_name == "deepl":
-        from translator.deepl_provider import DeepLProvider
         return DeepLProvider()
     else:
         print(f"Unknown provider: {provider_name}")
@@ -61,7 +63,7 @@ def _get_provider(provider_name: str) -> TranslationProvider:
         sys.exit(1)
 
 
-def _save_extracted_strings(strings: dict, output_path: Path) -> None:
+def save_extracted_strings(strings: dict, output_path: Path) -> None:
     """
     Save extracted strings to a JSON file.
 
@@ -91,12 +93,20 @@ def _save_extracted_strings(strings: dict, output_path: Path) -> None:
 
 
 def cmd_extract(args: argparse.Namespace, adapter: GameAdapter) -> None:
-    """Handle the 'extract' subcommand."""
+    """Handle the `extract` subcommand.
+
+    Extracts localization strings from the base game, a single mod, or all
+    workshop mods depending on the CLI flags provided.
+
+    Args:
+        args: Parsed CLI arguments containing extraction options.
+        adapter: Active game adapter for string extraction.
+    """
     if args.base_game:
         print("Extracting base game strings...")
         strings = adapter.extract_base_game_strings()
         output_path = config.STORAGE_PATH / "base_game" / "strings.json"
-        _save_extracted_strings(strings, output_path)
+        save_extracted_strings(strings, output_path)
 
     elif args.mod:
         mod_path = Path(args.mod)
@@ -113,7 +123,7 @@ def cmd_extract(args: argparse.Namespace, adapter: GameAdapter) -> None:
         print(f"Extracting strings from mod {args.mod}...")
         strings, _ = adapter.extract_strings(mod_path)
         output_path = config.STORAGE_PATH / "mods" / args.mod / "source.json"
-        _save_extracted_strings(strings, output_path)
+        save_extracted_strings(strings, output_path)
 
         # Update progress tracker.
         tracker = ProgressTracker()
@@ -144,7 +154,7 @@ def cmd_extract(args: argparse.Namespace, adapter: GameAdapter) -> None:
                 print(f"\nExtracting: {mod_info.name} ({mod_info.mod_id})...")
                 strings, _ = adapter.extract_strings(mod_info.path)
                 output = config.STORAGE_PATH / "mods" / mod_info.mod_id / "source.json"
-                _save_extracted_strings(strings, output)
+                save_extracted_strings(strings, output)
                 tracker.update(mod_info.mod_id, strings, adapter.source_languages)
     else:
         print("Specify --base-game, --mod <id>, or --all-mods")
@@ -155,7 +165,18 @@ def cmd_extract(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
 
 def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
-    """Handle the 'translate' subcommand."""
+    """Handle the `translate` subcommand.
+
+    Translates untranslated strings for a given mod using the specified
+    translation provider. Leverages translation memory for caching and
+    supports dry-run mode for cost estimation.
+
+    Args:
+        args: Parsed CLI arguments containing the mod ID, provider name,
+            and dry-run flag.
+        adapter: Active game adapter for string extraction and language
+            detection.
+    """
     mod_id = args.mod
     if not mod_id:
         print("Specify --mod <id>")
@@ -179,7 +200,6 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
     # Load translation memory and glossary (merged base + mod).
     tm = TranslationMemory()
-    from data.glossary_manager import load_mod_glossary, merge_glossaries
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(mod_id)
     merged = merge_glossaries(base_glossary, mod_glossary)
@@ -208,7 +228,7 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
     # Get provider.
     provider_name = args.provider or config.TRANSLATION_PROVIDER
-    provider = _get_provider(provider_name)
+    provider = get_provider(provider_name)
 
     # Get game context for LLM providers.
     game_context = adapter.get_translation_context()
@@ -290,7 +310,6 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
     # Store any glossary term suggestions.
     if all_suggestions:
-        from data.suggestion_manager import add_suggestions
         add_suggestions(mod_id, all_suggestions)
         print(f"  {len(all_suggestions)} glossary term suggestions pending review")
 
@@ -332,7 +351,17 @@ def _apply_translations(
 
 
 def cmd_status(args: argparse.Namespace, adapter: GameAdapter) -> None:
-    """Handle the 'status' subcommand."""
+    """Handle the `status` subcommand.
+
+    Displays translation progress for a specific mod or a summary table
+    of all extracted mods.
+
+    Args:
+        args: Parsed CLI arguments. If `args.mod` is set, shows detailed
+            status for that mod; otherwise shows a summary of all mods.
+        adapter: Active game adapter (unused directly, but kept for
+            consistent subcommand signature).
+    """
     tracker = ProgressTracker()
 
     if args.mod:
@@ -370,7 +399,18 @@ def cmd_status(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
 
 def cmd_glossary(args: argparse.Namespace, adapter: GameAdapter) -> None:
-    """Handle the 'glossary' subcommand."""
+    """Handle the `glossary` subcommand.
+
+    Manages the terminology glossary used for translation consistency.
+    Supports displaying the current glossary, auto-building it from base
+    game strings, or manually adding individual entries.
+
+    Args:
+        args: Parsed CLI arguments containing one of `--show`, `--build`,
+            or `--add <source> <english>`.
+        adapter: Active game adapter used for base game extraction when
+            building the glossary.
+    """
     if args.show:
         glossary = load_glossary()
         print_glossary(glossary)
@@ -406,7 +446,15 @@ def cmd_glossary(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
 
 def cmd_export(args: argparse.Namespace, adapter: GameAdapter) -> None:
-    """Handle the 'export' subcommand."""
+    """Handle the `export` subcommand.
+
+    Exports translated strings back into CSV files that can be placed into
+    the mod's directory for use in-game.
+
+    Args:
+        args: Parsed CLI arguments containing the target mod ID.
+        adapter: Active game adapter for string extraction and CSV export.
+    """
     mod_id = args.mod
     if not mod_id:
         print("Specify --mod <id>")

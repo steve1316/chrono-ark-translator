@@ -1,7 +1,4 @@
-import json
-from pathlib import Path
-
-from data.glossary_manager import (
+from backend.data.glossary_manager import (
     build_glossary_from_base_game,
     load_glossary,
     save_glossary,
@@ -10,7 +7,6 @@ from data.glossary_manager import (
     load_mod_glossary,
     save_mod_glossary,
     merge_glossaries,
-    MECHANIC_SEED_TERMS,
 )
 
 
@@ -74,8 +70,6 @@ def test_glossary_prompt_format():
     assert "**Armor**" in prompt
     assert "Korean: 화염구" in prompt
 
-
-# --- Per-mod glossary tests (Task 3) ---
 
 def test_load_mod_glossary_empty(tmp_storage):
     result = load_mod_glossary("12345", tmp_storage)

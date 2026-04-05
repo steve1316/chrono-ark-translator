@@ -1,6 +1,5 @@
 import json
-
-from data.character_context import load_character_context, save_character_context
+from backend.data.character_context import load_character_context, save_character_context
 
 
 def test_load_returns_empty_defaults_when_no_file(tmp_storage):

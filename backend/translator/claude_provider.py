@@ -8,9 +8,8 @@ with glossary enforcement, style examples, and term suggestion.
 import json
 import time
 from typing import Optional
-
-import config
-from translator.base import TranslationProvider
+from backend import config
+from backend.translator.base import TranslationProvider
 
 
 _SYSTEM_PROMPT_TEMPLATE = """You are a professional game translator specializing in translating {source_lang} text into English for the game {game_context}.
@@ -56,8 +55,21 @@ For suggested_terms: identify any recurring proper nouns, character names, skill
 If no terms to suggest, return an empty array."""
 
 
-def _build_style_examples_section(examples: dict[str, list[tuple[str, str]]]) -> str:
-    """Format style examples as a prompt section."""
+def build_style_examples_section(examples: dict[str, list[tuple[str, str]]]) -> str:
+    """Format style examples as a prompt section for the LLM.
+
+    Builds a Markdown section showing source/English pairs grouped by category
+    (`"skills"`, `"buffs"`, `"items"`, `"dialogue"`) so the LLM can match the game's existing
+    translation style.
+
+    Args:
+        examples: Dict mapping category name (e.g., `"skills"`, `"buffs"`) to a
+            list of (source_text, english_text) example pairs.
+
+    Returns:
+        str: Formatted Markdown section string, or an empty string if no
+            examples are provided.
+    """
     if not examples:
         return ""
 
@@ -82,8 +94,20 @@ def _build_style_examples_section(examples: dict[str, list[tuple[str, str]]]) ->
     return "\n".join(lines)
 
 
-def _build_character_context_section(ctx: dict | None) -> str:
-    """Format character context as a prompt section. Returns empty string if no context."""
+def build_character_context_section(ctx: dict | None) -> str:
+    """Format character context as a prompt section for the LLM.
+
+    Builds a Markdown section describing the mod character's background so
+    the LLM can use appropriate tone and terminology from the source game.
+
+    Args:
+        ctx: Character context dictionary with optional keys
+            `"character_name"`, `"source_game"`, and `"background"`. May be None.
+
+    Returns:
+        str: Formatted Markdown section string, or an empty string if no
+            meaningful context is provided.
+    """
     if not ctx:
         return ""
     name = ctx.get("character_name", "").strip()
@@ -108,9 +132,25 @@ def _build_character_context_section(ctx: dict | None) -> str:
 
 
 class ClaudeProvider(TranslationProvider):
-    """Translation provider using Anthropic's Claude API."""
+    """Translation provider using Anthropic's Claude API.
+
+    Uses Claude to translate game mod text from a source language to English,
+    with support for glossary enforcement, style examples, character context,
+    and automatic glossary term suggestions.
+
+    Attributes:
+        _api_key: Anthropic API key for authentication.
+        _model: Claude model identifier to use for requests.
+    """
 
     def __init__(self, api_key: Optional[str] = None, model: str = "claude-sonnet-4-20250514"):
+        """Initialize the Claude translation provider.
+
+        Args:
+            api_key: Anthropic API key. Falls back to the value from
+                `config.ANTHROPIC_API_KEY` when not provided.
+            model: Claude model identifier (default: `"claude-sonnet-4-20250514"`).
+        """
         self._api_key = api_key or config.ANTHROPIC_API_KEY
         self._model = model
 
@@ -128,13 +168,33 @@ class ClaudeProvider(TranslationProvider):
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
     ) -> tuple[str, str]:
+        """Build the system and user prompts for the Claude API.
+
+        Assembles the full system prompt (with glossary, formatting rules,
+        style examples, and character context) and the user message listing
+        all entries to translate.
+
+        Args:
+            entries: List of (key, source_text) tuples to translate.
+            source_lang: Name of the source language (e.g., `"Korean"`).
+            glossary_prompt: Pre-formatted glossary section for the prompt.
+            game_context: Game title or description for the system prompt.
+            format_rules: Formatting preservation rules to include.
+            style_examples: Dict of category -> [(source, english)] pairs
+                for few-shot style guidance.
+            character_context: Character background info dict with keys like
+                `"character_name"`, `"source_game"`, and `"background"`.
+
+        Returns:
+            tuple[str, str]: A tuple of (system_prompt, user_message).
+        """
         glossary_section = glossary_prompt if glossary_prompt else "No glossary available."
         rules = format_rules or []
         format_rules_section = "\n".join(
             f"{i+1}. **{rule}**" for i, rule in enumerate(rules)
         ) if rules else ""
-        style_examples_section = _build_style_examples_section(style_examples or {})
-        character_context_section = _build_character_context_section(character_context)
+        style_examples_section = build_style_examples_section(style_examples or {})
+        character_context_section = build_character_context_section(character_context)
 
         system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
             source_lang=source_lang,
@@ -164,6 +224,31 @@ class ClaudeProvider(TranslationProvider):
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
     ) -> tuple[dict[str, str], list[dict]]:
+        """Translate a batch of strings to English using the Claude API.
+
+        Sends the entries to Claude with the assembled prompt and parses the
+        JSON response. Retries automatically on rate-limit and transient API
+        errors (up to 3 attempts with exponential backoff).
+
+        Args:
+            entries: List of (key, source_text) tuples to translate.
+            source_lang: Name of the source language (e.g., `"Korean"`).
+            glossary_prompt: Pre-formatted glossary section for the prompt.
+            game_context: Game title or description for the system prompt.
+            format_rules: Formatting preservation rules to include.
+            style_examples: Dict of category -> [(source, english)] pairs
+                for few-shot style guidance.
+            character_context: Character background info dict with keys like
+                `"character_name"`, `"source_game"`, and `"background"`.
+
+        Returns:
+            tuple[dict[str, str], list[dict]]: A tuple of (translations dict
+                mapping key to English text, suggested_terms list of dicts).
+
+        Raises:
+            ValueError: If no Anthropic API key is configured.
+            RuntimeError: If all retry attempts are exhausted.
+        """
         import anthropic
 
         if not self._api_key:
@@ -207,9 +292,20 @@ class ClaudeProvider(TranslationProvider):
         response_text: str,
         entries: list[tuple[str, str]],
     ) -> tuple[dict[str, str], list[dict]]:
-        """
-        Parse the LLM response. Supports both new format (translations + suggested_terms)
-        and old flat format (just key->translation dict) for backwards compatibility.
+        """Parse the JSON response from Claude.
+
+        Supports both the new format (`{"translations": {...}, "suggested_terms": [...]}`)
+        and the legacy flat format (`{"key": "translation", ...}`) for backwards
+        compatibility.
+
+        Args:
+            response_text: Raw text content from the Claude API response.
+            entries: Original list of (key, source_text) tuples, used to
+                validate which keys to accept from the response.
+
+        Returns:
+            tuple[dict[str, str], list[dict]]: A tuple of (translations dict,
+                suggested_terms list). Returns `({}, [])` if parsing fails.
         """
         text = response_text.strip()
         if text.startswith("```json"):
@@ -259,6 +355,26 @@ class ClaudeProvider(TranslationProvider):
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
     ) -> dict:
+        """Estimate the cost of translating the given entries with Claude.
+
+        Builds the full prompt to get a realistic character count, then
+        estimates token counts using heuristic ratios for CJK vs ASCII
+        characters. Applies Claude Sonnet pricing rates.
+
+        Args:
+            entries: List of (key, source_text) tuples.
+            source_lang: Name of the source language (default: `"Korean"`).
+            glossary_prompt: Pre-formatted glossary section for the prompt.
+            game_context: Game title or description for the system prompt.
+            format_rules: Formatting preservation rules to include.
+            style_examples: Dict of category -> [(source, english)] pairs.
+            character_context: Character background info dict.
+
+        Returns:
+            dict: Cost estimation with keys `"estimated_input_tokens"`,
+                `"estimated_output_tokens"`, `"estimated_cost_usd"`, `"model"`,
+                and `"note"`.
+        """
         # Build the actual prompt to get a realistic character count
         system_prompt, user_message = self.build_prompt(
             entries, source_lang, glossary_prompt,

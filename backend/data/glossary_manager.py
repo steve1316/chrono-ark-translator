@@ -10,9 +10,8 @@ that overlay the base game glossary.
 import json
 from pathlib import Path
 from typing import Optional
-
-import config
-from models import LocString
+from backend import config
+from backend.models import LocString
 
 
 # Common game terms to auto-extract from the base game.

@@ -4,7 +4,7 @@ DLL string extractor for Chrono Ark mod assemblies.
 Uses the dotnetfile library to extract strings from the .NET #US
 (User Strings) metadata heap without requiring the .NET runtime.
 
-Includes IL-level analysis to find consecutive ``ldstr`` pairs, which
+Includes IL-level analysis to find consecutive `ldstr` pairs, which
 represent key/value arguments to localization registration calls.
 """
 
@@ -12,12 +12,19 @@ import re
 import struct
 from pathlib import Path
 from typing import Optional
-
-from models import LocString
+from backend.models import LocString
 
 
 def _load_dotnet_pe(dll_path: Path):
-    """Load a .NET PE file, returning the DotNetPE object or None."""
+    """Load a .NET PE file, returning the DotNetPE object or None.
+
+    Args:
+        dll_path: Path to the .NET DLL file.
+
+    Returns:
+        A `DotNetPE` object if successful, or None if the dotnetfile
+        library is not installed or the file cannot be parsed.
+    """
     try:
         from dotnetfile import DotNetPE
     except ImportError:
@@ -32,7 +39,15 @@ def _load_dotnet_pe(dll_path: Path):
 
 
 def _build_us_heap_map(dotnet_file) -> dict[int, str]:
-    """Build a mapping of #US heap offset -> string."""
+    """Build a mapping of #US heap offset to decoded string.
+
+    Args:
+        dotnet_file: A `DotNetPE` object with user string lookup support.
+
+    Returns:
+        Dictionary mapping each #US heap byte offset to its decoded,
+        stripped string value. Empty or whitespace-only strings are excluded.
+    """
     us_map: dict[int, str] = {}
     lookup = getattr(dotnet_file, "dotnet_user_string_lookup", None)
     if not lookup:
@@ -48,14 +63,30 @@ def _build_us_heap_map(dotnet_file) -> dict[int, str]:
 
 
 def _is_loc_key(s: str) -> bool:
-    """Check if a string looks like a Chrono Ark localization key."""
+    """Check if a string looks like a Chrono Ark localization key.
+
+    Args:
+        s: The string to check.
+
+    Returns:
+        True if the string matches the localization key pattern
+        (no spaces, alphanumeric with underscores/hyphens/dots/slashes).
+    """
     if not s or " " in s:
         return False
     return bool(re.match(r"^[A-Za-z0-9_\-\./]+$", s))
 
 
 def _has_cjk(s: str) -> bool:
-    """Check if a string contains CJK characters."""
+    """Check if a string contains CJK characters.
+
+    Args:
+        s: The string to check.
+
+    Returns:
+        True if the string contains any CJK Unified Ideographs, CJK
+        Extension A, Hangul Syllables, Hiragana, or Katakana characters.
+    """
     for ch in s:
         cp = ord(ch)
         if (0x4E00 <= cp <= 0x9FFF      # CJK Unified Ideographs
@@ -91,16 +122,16 @@ def extract_dll_loc_strings(
 ) -> dict[str, LocString]:
     """
     Extract structured localization key-value pairs from a .NET assembly
-    by analysing IL ``ldstr`` instruction pairs.
+    by analysing IL `ldstr` instruction pairs.
 
-    Scans the raw DLL bytes for consecutive ``ldstr`` opcodes (0x72) that
+    Scans the raw DLL bytes for consecutive `ldstr` opcodes (0x72) that
     reference the #US heap.  When a pair consists of one ASCII key and one
     CJK-text value, it is treated as a localization registration call
-    (e.g. ``AddText(key, value)`` or ``AddText(value, key)``).
+    (e.g. `AddText(key, value)` or `AddText(value, key)`).
 
     Args:
         dll_path: Path to the .NET DLL file.
-        source_file_label: Value to set on ``LocString.source_file``.
+        source_file_label: Value to set on `LocString.source_file`.
 
     Returns:
         Dictionary mapping localization key to LocString.
@@ -290,7 +321,7 @@ def extract_mod_dll_loc_strings(
     """
     Extract structured localization key-value pairs from a mod's DLL assemblies.
 
-    Uses IL-level analysis to find ``ldstr`` pairs that represent
+    Uses IL-level analysis to find `ldstr` pairs that represent
     localization registration calls. Returns LocString objects compatible
     with the CSV extraction pipeline.
 

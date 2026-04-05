@@ -8,13 +8,19 @@ by hand, then reads the completed translations back in.
 import json
 from pathlib import Path
 from typing import Optional
-
-import config
-from translator.base import TranslationProvider
+from backend import config
+from backend.translator.base import TranslationProvider
 
 
 class ManualProvider(TranslationProvider):
-    """Interactive manual translation provider."""
+    """Interactive manual translation provider.
+
+    Exports untranslated strings to a JSON file for the user to fill in
+    manually, then reads back the completed translations.
+
+    Attributes:
+        _output_dir: Directory where the manual edit JSON file is written.
+    """
 
     def __init__(self, output_dir: Optional[Path] = None):
         """
@@ -22,7 +28,7 @@ class ManualProvider(TranslationProvider):
 
         Args:
             output_dir: Directory for manual edit files.
-                Defaults to config.STORAGE_PATH.
+                Defaults to `config.STORAGE_PATH`.
         """
         self._output_dir = output_dir or config.STORAGE_PATH
 

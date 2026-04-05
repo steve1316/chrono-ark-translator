@@ -10,8 +10,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-
-import config
+from backend import config
 
 
 class TranslationMemory:
@@ -124,5 +123,9 @@ class TranslationMemory:
         }
 
     def __len__(self) -> int:
-        """Return the number of stored translations."""
+        """Return the number of stored translations.
+
+        Returns:
+            Count of cached translation entries.
+        """
         return len(self._entries)

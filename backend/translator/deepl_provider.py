@@ -7,9 +7,8 @@ so glossary enforcement relies on DeepL's built-in glossary feature.
 """
 
 from typing import Optional
-
-import config
-from translator.base import TranslationProvider
+from backend import config
+from backend.translator.base import TranslationProvider
 
 # DeepL language code mappings for Chrono Ark source languages.
 _DEEPL_LANG_CODES = {
@@ -21,7 +20,15 @@ _DEEPL_LANG_CODES = {
 
 
 class DeepLProvider(TranslationProvider):
-    """Translation provider using the DeepL API."""
+    """Translation provider using the DeepL API.
+
+    Translates game mod text using DeepL's neural machine translation.
+    Does not support custom prompts, glossary enforcement via prompt, or
+    glossary term suggestions.
+
+    Attributes:
+        _api_key: DeepL API key for authentication.
+    """
 
     def __init__(self, api_key: Optional[str] = None):
         """
@@ -46,15 +53,27 @@ class DeepLProvider(TranslationProvider):
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
     ) -> tuple[dict[str, str], list[dict]]:
-        """
-        Translate a batch of strings using DeepL.
+        """Translate a batch of strings using DeepL.
 
         Note: glossary_prompt, game_context, format_rules, and style_examples
         are ignored since DeepL uses its own glossary system and doesn't
         support custom prompts. DeepL cannot suggest glossary terms.
 
+        Args:
+            entries: List of (key, source_text) tuples to translate.
+            source_lang: Name of the source language (e.g., "Korean").
+                Mapped to a DeepL language code internally.
+            glossary_prompt: Ignored by this provider.
+            game_context: Ignored by this provider.
+            format_rules: Ignored by this provider.
+            style_examples: Ignored by this provider.
+
         Returns:
-            Tuple of (translations dict, empty suggestions list).
+            tuple[dict[str, str], list[dict]]: A tuple of (translations dict
+                mapping key to English text, empty suggestions list).
+
+        Raises:
+            ValueError: If no DeepL API key is configured.
         """
         import deepl
 

@@ -9,8 +9,7 @@ import csv
 import re
 from pathlib import Path
 from typing import Optional
-
-from models import LocString
+from backend.models import LocString
 
 
 # Canonical CSV filenames for Chrono Ark.
@@ -35,11 +34,19 @@ _VARIANT_SUFFIX_RE = re.compile(
 def _fix_oversized_row(
     row: list[str], expected_cols: int, col_indices: dict[str, int]
 ) -> list[str]:
-    """
-    Fix a row that has more columns than expected due to unquoted commas.
+    """Fix a row that has more columns than expected due to unquoted commas.
 
     Tries merging excess columns at each language-column position and picks
     the merge that best aligns columns with their expected scripts.
+
+    Args:
+        row: The parsed CSV row with too many columns.
+        expected_cols: The expected number of columns (from the header).
+        col_indices: Mapping of column name to index position.
+
+    Returns:
+        A corrected row with the expected number of columns, or the
+        original row if no valid merge candidate is found.
     """
     excess = len(row) - expected_cols
     if excess <= 0:
@@ -102,7 +109,15 @@ def _fix_oversized_row(
 
 
 def _is_valid_key(key: str) -> bool:
-    """Check if a string looks like a valid localization key."""
+    """Check if a string looks like a valid localization key.
+
+    Args:
+        key: The string to validate.
+
+    Returns:
+        True if the string matches the expected key pattern (alphanumeric
+        characters, underscores, hyphens, dots, and forward slashes).
+    """
     if not key or " " in key:
         return False
     # Keys typically use A-Z, a-z, 0-9, _, /, ., -
@@ -111,11 +126,16 @@ def _is_valid_key(key: str) -> bool:
 
 
 def _parse_csv_content(file_path: Path) -> list[LocString]:
-    """
-    Parse a localization CSV with heuristic row stitching.
+    """Parse a localization CSV with heuristic row stitching.
 
     Handles unquoted multiline strings by detecting rows that don't start
     with a valid key and merging their columns into the previous entry.
+
+    Args:
+        file_path: Path to the CSV file to parse.
+
+    Returns:
+        List of LocString objects extracted from the file.
     """
     # regex for a valid key: starts with alphanumeric, no spaces, optional /
     key_pattern = re.compile(r'^[A-Za-z0-9_\-\./]+$')
@@ -252,11 +272,16 @@ def extract_base_game_strings(
 
 
 def find_all_csv_files(mod_path: Path) -> list[Path]:
-    """
-    Recursively find all CSV files in a mod directory.
+    """Recursively find all CSV files in a mod directory.
 
     Searches Localization/ subdirectory, top-level Lang*.csv, and any
     variant/backup files in subdirectories.
+
+    Args:
+        mod_path: Path to the mod's root directory.
+
+    Returns:
+        List of paths to all discovered CSV files.
     """
     found = []
     loc_dir = mod_path / "Localization"

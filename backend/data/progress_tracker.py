@@ -11,25 +11,24 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-
-import config
-from models import LocString
+from .. import config
+from ..models import LocString
 
 
 @dataclass
 class ProgressDiff:
-    """Result of comparing current strings against a stored snapshot."""
+    """Result of comparing current strings against a stored snapshot.
 
-    # Keys that are entirely new (not in previous snapshot).
+    Attributes:
+        new_keys: Keys that are entirely new (not in previous snapshot).
+        modified_keys: Keys whose source text has changed since last snapshot.
+        removed_keys: Keys that were in the previous snapshot but are now gone.
+        unchanged_keys: Keys that haven't changed since last snapshot.
+    """
+
     new_keys: list[str] = field(default_factory=list)
-
-    # Keys whose source text has changed since last snapshot.
     modified_keys: list[str] = field(default_factory=list)
-
-    # Keys that were in the previous snapshot but are now gone.
     removed_keys: list[str] = field(default_factory=list)
-
-    # Keys that haven't changed since last snapshot.
     unchanged_keys: list[str] = field(default_factory=list)
 
 
@@ -54,7 +53,14 @@ class ProgressTracker:
         self._storage_path = storage_path
 
     def _mod_progress_path(self, mod_id: str) -> Path:
-        """Get the path to a mod's progress file."""
+        """Get the path to a mod's progress file.
+
+        Args:
+            mod_id: The mod's Workshop ID.
+
+        Returns:
+            Path to the mod's progress JSON file.
+        """
         return self._storage_path / "mods" / mod_id / "progress.json"
 
     def _load_snapshot(self, mod_id: str) -> dict:

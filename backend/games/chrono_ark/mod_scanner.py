@@ -7,10 +7,8 @@ their metadata, and determines what localization resources are available.
 
 import json
 from pathlib import Path
-
-from models import LocString
-from games.base import ModInfo
-from games.chrono_ark.csv_extractor import extract_mod_strings
+from backend.games.base import ModInfo
+from backend.games.chrono_ark.csv_extractor import extract_mod_strings
 
 
 def _read_mod_metadata(mod_path: Path, metadata_filename: str) -> dict:
