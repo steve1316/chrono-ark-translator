@@ -34,6 +34,8 @@ export type ModStatus = {
     url?: string
     /** Optional URL/path to the mod's preview image; null if none exists. */
     preview_image?: string | null
+    /** Whether the mod has pending translation changes that need to be synced to CSV files. */
+    has_changes: boolean
 }
 
 /**

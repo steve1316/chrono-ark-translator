@@ -272,6 +272,16 @@ async def get_mods():
     for mod in mods:
         status = tracker.get_status(mod.mod_id)
         preview_img = _find_mod_preview_image(mod.path)
+
+        # Check whether this mod has unsynced translation changes.
+        translations_path = config.STORAGE_PATH / "mods" / mod.mod_id / "translations.json"
+        if translations_path.exists():
+            current_hash = _compute_export_snapshot(mod.mod_id, mod.path)
+            last_hash = _load_last_export_hash(mod.mod_id)
+            has_changes = current_hash != last_hash
+        else:
+            has_changes = False
+
         results.append(
             {
                 "id": mod.mod_id,
@@ -286,6 +296,7 @@ async def get_mods():
                 "last_updated": status["last_updated"],
                 "url": _adapter.get_mod_url(mod.mod_id),
                 "preview_image": f"/workshop/{mod.mod_id}/{preview_img.name}" if preview_img else None,
+                "has_changes": has_changes,
             }
         )
     return results
@@ -316,6 +327,10 @@ async def get_mod_detail(mod_id: str):
 
     # Extract current strings
     strings, duplicate_files = _adapter.extract_strings(mod_path)
+
+    # For gdata-sourced mods whose JSONs have already been exported,
+    # restore the original Chinese source text from backup.
+    _merge_gdata_originals(mod_id, strings)
 
     # Load existing translations if any
     translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react"
 import { useParams } from "react-router-dom"
-import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook, FaFolderOpen } from "react-icons/fa"
+import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook, FaFolderOpen, FaExclamationCircle } from "react-icons/fa"
 import type { LocString, TermSuggestion } from "../../shared_types"
 import { API_BASE } from "../../config"
 import GlossarySuggestionModal from "../../components/GlossarySuggestionModal"
@@ -669,6 +669,25 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 >
                                     <FaFolderOpen />
                                 </button>
+                                {hasExportChanges && (
+                                    <span
+                                        style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "0.4rem",
+                                            fontSize: "0.8rem",
+                                            padding: "0.3rem 0.7rem",
+                                            background: "rgba(251, 191, 36, 0.12)",
+                                            border: "1px solid rgba(251, 191, 36, 0.3)",
+                                            borderRadius: "8px",
+                                            color: "#fbbf24",
+                                            fontWeight: 600,
+                                        }}
+                                    >
+                                        <FaExclamationCircle size={12} />
+                                        Changes pending sync
+                                    </span>
+                                )}
                             </div>
                             {modAuthor && <p style={{ color: "var(--text-dim)", marginTop: "0.25rem" }}>by {modAuthor}</p>}
                             <p>{processedStrings.length} total strings found</p>

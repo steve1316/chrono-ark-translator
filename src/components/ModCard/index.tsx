@@ -1,5 +1,5 @@
 import React from "react"
-import { FaSteam, FaSync } from "react-icons/fa"
+import { FaExclamationCircle, FaSteam, FaSync } from "react-icons/fa"
 import type { ModStatus } from "../../shared_types"
 import { API_BASE } from "../../config"
 
@@ -97,6 +97,26 @@ const ModCard: React.FC<ModCardProps> = React.memo(({ mod, onClick, onSync, sear
                         <span className="stat-value">{mod.has_dll ? "DLL" : "CSV"}</span>
                         <span className="stat-label">Format</span>
                     </div>
+                    {mod.has_changes && (
+                        <span
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.3rem",
+                                fontSize: "0.7rem",
+                                padding: "0.25rem 0.5rem",
+                                background: "rgba(251, 191, 36, 0.15)",
+                                border: "1px solid rgba(251, 191, 36, 0.3)",
+                                borderRadius: "6px",
+                                color: "#fbbf24",
+                                fontWeight: 600,
+                            }}
+                            title="Has unsynced changes"
+                        >
+                            <FaExclamationCircle size={10} />
+                            Needs Sync
+                        </span>
+                    )}
                 </div>
 
                 {/* --- Action Buttons --- */}
