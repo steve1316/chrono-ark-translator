@@ -1611,6 +1611,15 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>No API responses recorded yet. Run a translation first.</p>
                         ) : (
                             <>
+                                {(() => {
+                                    const totalCost = apiResponses.reduce((sum: number, r: any) => sum + (r.cost_usd ?? 0), 0)
+                                    return totalCost > 0 ? (
+                                        <div style={{ marginBottom: "0.75rem", fontSize: "0.85rem", color: "var(--text-dim)" }}>
+                                            Total cost across {apiResponses.length} batch{apiResponses.length !== 1 ? "es" : ""}:{" "}
+                                            <span style={{ fontWeight: 600, color: "var(--text-main)" }}>${totalCost.toFixed(4)}</span>
+                                        </div>
+                                    ) : null
+                                })()}
                                 <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
                                     {apiResponses.map((r: any, idx: number) => (
                                         <button
@@ -1640,6 +1649,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                 <div>
                                                     <span style={{ color: "var(--text-dim)" }}>Output tokens: </span>
                                                     <span style={{ fontWeight: 600 }}>{apiResponses[activeResponseIdx].output_tokens}</span>
+                                                </div>
+                                            )}
+                                            {apiResponses[activeResponseIdx].cost_usd != null && (
+                                                <div>
+                                                    <span style={{ color: "var(--text-dim)" }}>Cost: </span>
+                                                    <span style={{ fontWeight: 600 }}>${apiResponses[activeResponseIdx].cost_usd.toFixed(4)}</span>
                                                 </div>
                                             )}
                                         </div>

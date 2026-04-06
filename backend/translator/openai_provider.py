@@ -201,7 +201,26 @@ class OpenAIProvider(TranslationProvider):
                     max_tokens=4096,
                     temperature=0.3,
                 )
-                return self._parse_response(response.choices[0].message.content, entries)
+                raw_text = response.choices[0].message.content
+                translations, suggestions = self._parse_response(raw_text, entries)
+                # Store raw response for inspection
+                self.last_raw_responses = getattr(self, "last_raw_responses", [])
+                in_tok = getattr(response.usage, "prompt_tokens", None)
+                out_tok = getattr(response.usage, "completion_tokens", None)
+                cost_usd = None
+                if in_tok is not None and out_tok is not None:
+                    cost_usd = in_tok / 1_000_000 * 2.5 + out_tok / 1_000_000 * 10.0
+                self.last_raw_responses.append(
+                    {
+                        "batch_index": len(self.last_raw_responses),
+                        "model": self._model,
+                        "input_tokens": in_tok,
+                        "output_tokens": out_tok,
+                        "cost_usd": cost_usd,
+                        "raw_text": raw_text,
+                    }
+                )
+                return translations, suggestions
 
             except RateLimitError:
                 wait_time = 2**attempt * 5

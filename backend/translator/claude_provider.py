@@ -277,12 +277,18 @@ class ClaudeProvider(TranslationProvider):
                 translations, suggestions = self._parse_response(raw_text, entries)
                 # Store raw response for inspection
                 self.last_raw_responses = getattr(self, "last_raw_responses", [])
+                in_tok = getattr(response.usage, "input_tokens", None)
+                out_tok = getattr(response.usage, "output_tokens", None)
+                cost_usd = None
+                if in_tok is not None and out_tok is not None:
+                    cost_usd = in_tok / 1_000_000 * 3.0 + out_tok / 1_000_000 * 15.0
                 self.last_raw_responses.append(
                     {
                         "batch_index": len(self.last_raw_responses),
                         "model": self._model,
-                        "input_tokens": getattr(response.usage, "input_tokens", None),
-                        "output_tokens": getattr(response.usage, "output_tokens", None),
+                        "input_tokens": in_tok,
+                        "output_tokens": out_tok,
+                        "cost_usd": cost_usd,
                         "raw_text": raw_text,
                     }
                 )
