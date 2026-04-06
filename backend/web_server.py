@@ -699,19 +699,25 @@ async def preview_translation(req: TranslationRequest):
         glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
         num_batches = (len(entries) + batch_size - 1) // batch_size
         total_batches += num_batches
-        first_batch = entries[:batch_size]
-        system_prompt, user_message = provider.build_prompt(
-            first_batch,
-            lang,
-            glossary_prompt,
-            game_context=game_context,
-            format_rules=format_rules,
-            style_examples=style_examples,
-            character_context=character_context,
-        )
+        user_messages: list[str] = []
+        system_prompt = ""
+        for i in range(0, len(entries), batch_size):
+            batch = entries[i : i + batch_size]
+            sp, um = provider.build_prompt(
+                batch,
+                lang,
+                glossary_prompt,
+                game_context=game_context,
+                format_rules=format_rules,
+                style_examples=style_examples,
+                character_context=character_context,
+            )
+            if not system_prompt:
+                system_prompt = sp
+            user_messages.append(um)
         previews[lang] = {
             "system_prompt": system_prompt,
-            "user_message": user_message,
+            "user_messages": user_messages,
             "strings_in_language": len(entries),
             "batches": num_batches,
         }

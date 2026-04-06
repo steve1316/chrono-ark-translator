@@ -7,8 +7,8 @@ import React, { useState } from "react"
 interface LanguagePreview {
     /** The system-level prompt that sets up the translation context and rules */
     system_prompt: string
-    /** The user-level message containing the first batch of strings to translate */
-    user_message: string
+    /** The user-level messages for each batch of strings to translate */
+    user_messages: string[]
     /** How many translatable strings exist for this language */
     strings_in_language: number
     /** Total number of batches this language's strings will be split into */
@@ -90,6 +90,7 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
     const languages = Object.keys(preview.previews)
     const [activeLang, setActiveLang] = useState(languages[0] || "")
     const [activeTab, setActiveTab] = useState<"system" | "user">("system")
+    const [activeBatch, setActiveBatch] = useState(0)
     /** Convenience reference to the preview data for the currently active language. */
     const langPreview = preview.previews[activeLang]
 
@@ -176,7 +177,10 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                             <button
                                 key={lang}
                                 className={`btn ${activeLang === lang ? "btn-primary" : "btn-outline"}`}
-                                onClick={() => setActiveLang(lang)}
+                                onClick={() => {
+                                    setActiveLang(lang)
+                                    setActiveBatch(0)
+                                }}
                                 style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
                             >
                                 {lang} ({preview.previews[lang].strings_in_language})
@@ -188,13 +192,12 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                 {/*
                  * Prompt preview section (level 2 tabs + content pane).
                  * "System Prompt" shows the instructions/rules sent as the system message.
-                 * "User Message" shows the first batch of strings that will be sent.
-                 * Note: only batch 1 is previewed; subsequent batches follow the same format.
+                 * "User Message" shows the batch strings with prev/next navigation.
                  */}
                 {langPreview && (
                     <>
                         {/* Prompt type selector tabs */}
-                        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem", alignItems: "center" }}>
                             <button
                                 className={`btn ${activeTab === "system" ? "btn-primary" : "btn-outline"}`}
                                 onClick={() => setActiveTab("system")}
@@ -207,8 +210,31 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                                 onClick={() => setActiveTab("user")}
                                 style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
                             >
-                                User Message (Batch 1 of {langPreview.batches})
+                                User Message
                             </button>
+                            {activeTab === "user" && langPreview.batches > 1 && (
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginLeft: "0.5rem" }}>
+                                    <button
+                                        className="btn btn-outline"
+                                        onClick={() => setActiveBatch((b) => Math.max(0, b - 1))}
+                                        disabled={activeBatch === 0}
+                                        style={{ padding: "0.15rem 0.5rem", fontSize: "0.85rem", lineHeight: 1 }}
+                                    >
+                                        &larr;
+                                    </button>
+                                    <span style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>
+                                        Batch {activeBatch + 1} of {langPreview.batches}
+                                    </span>
+                                    <button
+                                        className="btn btn-outline"
+                                        onClick={() => setActiveBatch((b) => Math.min(langPreview.batches - 1, b + 1))}
+                                        disabled={activeBatch === langPreview.batches - 1}
+                                        style={{ padding: "0.15rem 0.5rem", fontSize: "0.85rem", lineHeight: 1 }}
+                                    >
+                                        &rarr;
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* Scrollable code-style preview of the selected prompt */}
@@ -235,7 +261,7 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                                     fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
                                 }}
                             >
-                                {activeTab === "system" ? langPreview.system_prompt : langPreview.user_message}
+                                {activeTab === "system" ? langPreview.system_prompt : langPreview.user_messages[activeBatch]}
                             </pre>
                         </div>
                     </>
