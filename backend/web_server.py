@@ -159,6 +159,46 @@ class CharacterContext(BaseModel):
     background: str = ""
 
 
+class SettingsResponse(BaseModel):
+    """Current application settings returned by GET /api/settings.
+
+    Attributes:
+        provider: Active translation provider ID (claude, openai, deepl, manual).
+        batch_size: Number of strings sent per API request.
+        anthropic_api_key_set: Masked Anthropic key (e.g. ``"••••ab12"``)
+            or empty string if not configured.
+        openai_api_key_set: Masked OpenAI key or empty string.
+        deepl_api_key_set: Masked DeepL key or empty string.
+    """
+
+    provider: str
+    batch_size: int
+    anthropic_api_key_set: str
+    openai_api_key_set: str
+    deepl_api_key_set: str
+
+
+class SettingsUpdate(BaseModel):
+    """Payload for POST /api/settings.
+
+    All fields are optional — only include fields that should change.
+    Omitted (``None``) fields are left at their current values.
+
+    Attributes:
+        provider: New translation provider ID.
+        batch_size: New batch size (must be >= 1).
+        anthropic_api_key: New Anthropic API key value.
+        openai_api_key: New OpenAI API key value.
+        deepl_api_key: New DeepL API key value.
+    """
+
+    provider: Optional[str] = None
+    batch_size: Optional[int] = None
+    anthropic_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    deepl_api_key: Optional[str] = None
+
+
 # --- Helpers ---
 
 
@@ -1660,6 +1700,105 @@ async def get_api_responses(mod_id: str):
         return []
     with open(responses_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+_ENV_PATH = Path(__file__).parent / ".env"
+
+
+def _mask_key(key: str) -> str:
+    """Return a masked version of an API key, or empty string if unset."""
+    if not key or not key.strip():
+        return ""
+    return "••••" + key[-4:]
+
+
+def _update_env_file(updates: dict[str, str]) -> None:
+    """Write updated CATL_* values to the .env file and os.environ.
+
+    Reads the existing .env line-by-line, replacing matching keys in place
+    to preserve comments and ordering. Keys not already present are appended
+    at the end. Also updates ``os.environ`` so the running process sees the
+    new values immediately.
+
+    Args:
+        updates: Mapping of env-var names (e.g. ``CATL_BATCH_SIZE``) to their
+            new string values.
+    """
+    lines: list[str] = []
+    if _ENV_PATH.exists():
+        lines = _ENV_PATH.read_text(encoding="utf-8").splitlines(keepends=True)
+
+    # Replace existing keys in place; track which ones we found.
+    found_keys: set[str] = set()
+    new_lines: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#"):
+            key = stripped.split("=", 1)[0]
+            if key in updates:
+                new_lines.append(f"{key}={updates[key]}\n")
+                found_keys.add(key)
+                continue
+        new_lines.append(line if line.endswith("\n") else line + "\n")
+
+    # Append any keys that weren't already in the file.
+    for key, value in updates.items():
+        if key not in found_keys:
+            new_lines.append(f"{key}={value}\n")
+
+    _ENV_PATH.write_text("".join(new_lines), encoding="utf-8")
+
+    # Mirror into os.environ so config reads are consistent within the
+    # current process without needing a restart.
+    for key, value in updates.items():
+        os.environ[key] = value
+
+
+@app.get("/api/settings")
+async def get_settings():
+    """Return current provider, batch size, and masked API key status."""
+    return SettingsResponse(
+        provider=config.TRANSLATION_PROVIDER,
+        batch_size=config.BATCH_SIZE,
+        anthropic_api_key_set=_mask_key(config.ANTHROPIC_API_KEY),
+        openai_api_key_set=_mask_key(config.OPENAI_API_KEY),
+        deepl_api_key_set=_mask_key(config.DEEPL_API_KEY),
+    )
+
+
+@app.post("/api/settings")
+async def update_settings(payload: SettingsUpdate):
+    """Update provider, batch size, and/or API keys. Persists to .env."""
+    env_updates: dict[str, str] = {}
+
+    if payload.provider is not None:
+        if payload.provider not in ("claude", "openai", "deepl", "manual"):
+            raise HTTPException(400, f"Invalid provider: {payload.provider}")
+        config.TRANSLATION_PROVIDER = payload.provider
+        env_updates["CATL_TRANSLATION_PROVIDER"] = payload.provider
+
+    if payload.batch_size is not None:
+        if payload.batch_size < 1:
+            raise HTTPException(400, "Batch size must be >= 1")
+        config.BATCH_SIZE = payload.batch_size
+        env_updates["CATL_BATCH_SIZE"] = str(payload.batch_size)
+
+    if payload.anthropic_api_key is not None:
+        config.ANTHROPIC_API_KEY = payload.anthropic_api_key
+        env_updates["CATL_ANTHROPIC_API_KEY"] = payload.anthropic_api_key
+
+    if payload.openai_api_key is not None:
+        config.OPENAI_API_KEY = payload.openai_api_key
+        env_updates["CATL_OPENAI_API_KEY"] = payload.openai_api_key
+
+    if payload.deepl_api_key is not None:
+        config.DEEPL_API_KEY = payload.deepl_api_key
+        env_updates["CATL_DEEPL_API_KEY"] = payload.deepl_api_key
+
+    if env_updates:
+        _update_env_file(env_updates)
+
+    return await get_settings()
 
 
 @app.get("/api/stats")

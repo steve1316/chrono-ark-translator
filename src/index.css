@@ -471,3 +471,84 @@ th {
         opacity: 1;
     }
 }
+
+/* --- Settings Page --- */
+
+.provider-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.provider-card {
+    padding: 1.25rem;
+    border-radius: 12px;
+    border: 2px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: border-color var(--transition), background var(--transition);
+    text-align: center;
+}
+
+.provider-card.active {
+    border-color: var(--accent-primary);
+    background: rgba(56, 189, 248, 0.1);
+}
+
+.provider-card:hover:not(.active) {
+    border-color: var(--text-dim);
+}
+
+.key-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.key-input-wrapper input {
+    flex: 1;
+    padding: 0.75rem;
+    padding-right: 3rem;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-main);
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.key-input-wrapper input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.key-toggle-btn {
+    position: absolute;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: color var(--transition);
+}
+
+.key-toggle-btn:hover {
+    color: var(--text-main);
+}
+
+.key-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.key-status.configured {
+    color: var(--success);
+}
+
+.key-status.missing {
+    color: var(--warning);
+}
