@@ -124,13 +124,17 @@ def test_delete_mod_glossary_term(tmp_storage):
 
 def test_combined_glossary_prompt_includes_mod_terms_from_all_categories():
     """Mod glossary terms should appear regardless of GLOSSARY_CATEGORIES config."""
-    base = {"terms": {
-        "Lucy": {"category": "characters", "key": "", "source_mappings": {"Korean": "루시"}},
-    }}
-    mod = {"terms": {
-        "Dark Slash": {"category": "custom", "key": "", "source_mappings": {"Korean": "다크 슬래시"}},
-        "Heal Potion": {"category": "items", "key": "", "source_mappings": {"Korean": "힐 포션"}},
-    }}
+    base = {
+        "terms": {
+            "Lucy": {"category": "characters", "key": "", "source_mappings": {"Korean": "루시"}},
+        }
+    }
+    mod = {
+        "terms": {
+            "Dark Slash": {"category": "custom", "key": "", "source_mappings": {"Korean": "다크 슬래시"}},
+            "Heal Potion": {"category": "items", "key": "", "source_mappings": {"Korean": "힐 포션"}},
+        }
+    }
     prompt = get_combined_glossary_prompt(base, mod, source_lang="Korean")
     # Base "characters" term should appear (it's in the default allowed categories).
     assert "**Lucy**" in prompt
@@ -141,10 +145,12 @@ def test_combined_glossary_prompt_includes_mod_terms_from_all_categories():
 
 def test_combined_glossary_prompt_base_terms_still_filtered():
     """Base glossary terms outside GLOSSARY_CATEGORIES should be filtered out."""
-    base = {"terms": {
-        "Lucy": {"category": "characters", "key": "", "source_mappings": {"Korean": "루시"}},
-        "Fire Bolt": {"category": "skills", "key": "", "source_mappings": {"Korean": "화염구"}},
-    }}
+    base = {
+        "terms": {
+            "Lucy": {"category": "characters", "key": "", "source_mappings": {"Korean": "루시"}},
+            "Fire Bolt": {"category": "skills", "key": "", "source_mappings": {"Korean": "화염구"}},
+        }
+    }
     mod = {"terms": {}}
     prompt = get_combined_glossary_prompt(base, mod, source_lang="Korean")
     # "characters" is in default GLOSSARY_CATEGORIES → included.
@@ -155,12 +161,16 @@ def test_combined_glossary_prompt_base_terms_still_filtered():
 
 def test_combined_glossary_prompt_mod_overrides_base():
     """When a mod term overrides a base term, only the mod version appears."""
-    base = {"terms": {
-        "Fire": {"category": "buffs", "key": "", "source_mappings": {"Korean": "불 (base)"}},
-    }}
-    mod = {"terms": {
-        "Fire": {"category": "custom", "key": "", "source_mappings": {"Korean": "불 (mod)"}},
-    }}
+    base = {
+        "terms": {
+            "Fire": {"category": "buffs", "key": "", "source_mappings": {"Korean": "불 (base)"}},
+        }
+    }
+    mod = {
+        "terms": {
+            "Fire": {"category": "custom", "key": "", "source_mappings": {"Korean": "불 (mod)"}},
+        }
+    }
     prompt = get_combined_glossary_prompt(base, mod, source_lang="Korean")
     assert "불 (mod)" in prompt
     assert "불 (base)" not in prompt
@@ -168,9 +178,11 @@ def test_combined_glossary_prompt_mod_overrides_base():
 
 def test_combined_glossary_prompt_empty_mod():
     """With no mod terms, only filtered base terms appear."""
-    base = {"terms": {
-        "Shield Up": {"category": "buffs", "key": "", "source_mappings": {"Korean": "방패"}},
-    }}
+    base = {
+        "terms": {
+            "Shield Up": {"category": "buffs", "key": "", "source_mappings": {"Korean": "방패"}},
+        }
+    }
     mod = {"terms": {}}
     prompt = get_combined_glossary_prompt(base, mod, source_lang="Korean")
     assert "**Shield Up**" in prompt

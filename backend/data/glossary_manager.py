@@ -288,9 +288,7 @@ def get_combined_glossary_prompt(
         exclude_terms=mod_term_keys,
     )
     # Pass empty list to disable category filtering for mod terms.
-    mod_prompt = get_glossary_prompt(
-        mod, allowed_categories=[], source_lang=source_lang
-    )
+    mod_prompt = get_glossary_prompt(mod, allowed_categories=[], source_lang=source_lang)
 
     if base_prompt and mod_prompt:
         # Strip the duplicate header from the mod prompt and append its terms.

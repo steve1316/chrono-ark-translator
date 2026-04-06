@@ -821,7 +821,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                     }}
                 >
                     <span style={{ color: "var(--text-main)" }}>
-                        Batch {batchState.batchIndex + 1} of {batchState.totalBatches} complete — review paused. {batchState.suggestions.length} glossary suggestion(s) pending.
+                        Batch {batchState.batchIndex + 1} of {batchState.totalBatches} complete.
                     </span>
                     <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
                         <button className="btn btn-primary" onClick={() => setShowReviewModal(true)} style={{ padding: "0.25rem 0.75rem" }}>
@@ -834,7 +834,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             }}
                             style={{ padding: "0.25rem 0.75rem" }}
                         >
-                            Skip & Continue
+                            Continue
                         </button>
                         <button
                             className="btn btn-outline"
@@ -1391,7 +1391,16 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             <h2 style={{ margin: 0 }}>History Backups</h2>
                             <button
                                 onClick={() => setShowHistory(false)}
-                                style={{ background: "none", border: "none", color: "var(--text-dim)", fontSize: "2rem", lineHeight: 1, cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px" }}
+                                style={{
+                                    background: "none",
+                                    border: "none",
+                                    color: "var(--text-dim)",
+                                    fontSize: "2rem",
+                                    lineHeight: 1,
+                                    cursor: "pointer",
+                                    padding: "0.25rem 0.5rem",
+                                    borderRadius: "4px",
+                                }}
                                 title="Close"
                             >
                                 &times;
@@ -1483,7 +1492,16 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             </h2>
                             <button
                                 onClick={() => setReplacePreview(null)}
-                                style={{ background: "none", border: "none", color: "var(--text-dim)", fontSize: "2rem", lineHeight: 1, cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px" }}
+                                style={{
+                                    background: "none",
+                                    border: "none",
+                                    color: "var(--text-dim)",
+                                    fontSize: "2rem",
+                                    lineHeight: 1,
+                                    cursor: "pointer",
+                                    padding: "0.25rem 0.5rem",
+                                    borderRadius: "4px",
+                                }}
                                 title="Close"
                             >
                                 &times;
@@ -1557,7 +1575,16 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             <h2 style={{ margin: 0 }}>API Provider Responses</h2>
                             <button
                                 onClick={() => setShowApiResponses(false)}
-                                style={{ background: "none", border: "none", color: "var(--text-dim)", fontSize: "2rem", lineHeight: 1, cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px" }}
+                                style={{
+                                    background: "none",
+                                    border: "none",
+                                    color: "var(--text-dim)",
+                                    fontSize: "2rem",
+                                    lineHeight: 1,
+                                    cursor: "pointer",
+                                    padding: "0.25rem 0.5rem",
+                                    borderRadius: "4px",
+                                }}
                                 title="Close"
                             >
                                 &times;
