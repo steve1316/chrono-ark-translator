@@ -13,6 +13,27 @@ interface ModCardProps {
     onClick: (modId: string) => void
     /** Called when the user clicks the resync button to rescan the workshop folder. */
     onSync: (modId: string) => void
+    /** Current search query for highlighting matching characters in name/author. */
+    searchQuery?: string
+}
+
+/**
+ * Wraps substrings matching `query` in a highlight span. Returns the original
+ * text unchanged when the query is empty.
+ */
+function highlightMatch(text: string, query: string): React.ReactNode {
+    if (!query) return text
+    const lower = text.toLowerCase()
+    const q = query.toLowerCase()
+    const idx = lower.indexOf(q)
+    if (idx === -1) return text
+    return (
+        <>
+            {text.slice(0, idx)}
+            <span style={{ background: "rgba(56, 189, 248, 0.3)", borderRadius: "2px" }}>{text.slice(idx, idx + query.length)}</span>
+            {text.slice(idx + query.length)}
+        </>
+    )
 }
 
 /**
@@ -26,9 +47,10 @@ interface ModCardProps {
  * @param mod - The mod status data to display.
  * @param onClick - Handler invoked with the mod ID when the user wants to view its strings.
  * @param onSync - Handler invoked with the mod ID when the user wants to rescan files.
+ * @param searchQuery - Optional search string for highlighting matched text in name/author.
  * @returns The rendered mod card JSX.
  */
-const ModCard: React.FC<ModCardProps> = React.memo(({ mod, onClick, onSync }) => {
+const ModCard: React.FC<ModCardProps> = React.memo(({ mod, onClick, onSync, searchQuery = "" }) => {
     return (
         <div className="glass-card mod-card animate-fade-in">
             {/* --- Preview Image --- */}
@@ -43,8 +65,8 @@ const ModCard: React.FC<ModCardProps> = React.memo(({ mod, onClick, onSync }) =>
                 {/* --- Header: name, author, ID badge --- */}
                 <div className="mod-header">
                     <div className="mod-info">
-                        <h3>{mod.name}</h3>
-                        <span className="author">by {mod.author || "Unknown"}</span>
+                        <h3>{highlightMatch(mod.name, searchQuery)}</h3>
+                        <span className="author">by {highlightMatch(mod.author || "Unknown", searchQuery)}</span>
                     </div>
                     <span className="id-badge">{mod.id}</span>
                 </div>

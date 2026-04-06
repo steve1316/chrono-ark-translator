@@ -1,4 +1,5 @@
-import React from "react"
+import React, { useState, useMemo, useEffect, useRef } from "react"
+import { FaSearch } from "react-icons/fa"
 import ModGrid from "../../components/ModGrid"
 import type { ModStatus } from "../../shared_types"
 
@@ -18,6 +19,32 @@ interface DashboardPageProps {
  * @returns A React component that displays a grid of all mods and their translation progress.
  */
 const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModSync, onRefresh }) => {
+    const [search, setSearch] = useState("")
+    const [cardWidth, setCardWidth] = useState<number | undefined>(undefined)
+    const gridWrapperRef = useRef<HTMLDivElement>(null)
+
+    const filteredMods = useMemo(() => {
+        const query = search.trim().toLowerCase()
+        if (!query) return mods
+        return mods.filter((mod) => mod.name.toLowerCase().includes(query) || (mod.author ?? "").toLowerCase().includes(query))
+    }, [mods, search])
+
+    // Observe the first mod card's width so the search bar can match it exactly.
+    useEffect(() => {
+        const wrapper = gridWrapperRef.current
+        if (!wrapper) return
+
+        const updateWidth = () => {
+            const firstCard = wrapper.querySelector(".mod-card")
+            if (firstCard) setCardWidth(firstCard.getBoundingClientRect().width)
+        }
+
+        updateWidth()
+        const observer = new ResizeObserver(updateWidth)
+        observer.observe(wrapper)
+        return () => observer.disconnect()
+    }, [filteredMods.length])
+
     return (
         <>
             <div className="dashboard-header">
@@ -25,11 +52,28 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
                     <h1>Workshop Dashboard</h1>
                     <p>Manage and translate your Chrono Ark mods</p>
                 </div>
-                <button className="btn btn-outline" onClick={onRefresh}>
-                    Refresh
-                </button>
+                {/* Search bar width matches the mod-grid card column; Refresh sits beside it. */}
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <div style={{ position: "relative", width: cardWidth ?? 320 }}>
+                        <FaSearch style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }} />
+                        <input
+                            type="text"
+                            placeholder="Search by name or author..."
+                            className="btn-outline"
+                            style={{ width: "100%", padding: "0.75rem 0.75rem 0.75rem 2.5rem", borderRadius: "8px", background: "rgba(0,0,0,0.2)" }}
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <button className="btn btn-outline" onClick={onRefresh}>
+                        Refresh
+                    </button>
+                </div>
             </div>
-            <ModGrid mods={mods} onModSelect={onModSelect} onModSync={onModSync} />
+
+            <div ref={gridWrapperRef}>
+                <ModGrid mods={filteredMods} onModSelect={onModSelect} onModSync={onModSync} searchQuery={search.trim()} />
+            </div>
         </>
     )
 }
