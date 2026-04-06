@@ -101,6 +101,7 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
      * hidden from the UI.
      */
     const totalCost = preview.estimates ? Object.values(preview.estimates).reduce((sum, est) => sum + est.estimated_cost_usd, 0) : null
+    const totalInputTokens = preview.estimates ? Object.values(preview.estimates).reduce((sum, est) => sum + est.estimated_input_tokens, 0) : null
 
     return (
         // Backdrop overlay: clicking outside the card cancels the translation.
@@ -145,6 +146,12 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                      * multiple languages are present, a per-language breakdown
                      * in parentheses (e.g. "en: ~$0.0012, fr: ~$0.0015").
                      */}
+                    {totalInputTokens !== null && (
+                        <div>
+                            <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Input Tokens</span>
+                            <div style={{ fontWeight: 600 }}>{totalInputTokens.toLocaleString()}</div>
+                        </div>
+                    )}
                     {totalCost !== null && (
                         <div>
                             <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Estimated Cost</span>
