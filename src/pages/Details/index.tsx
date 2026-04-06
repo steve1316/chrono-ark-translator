@@ -76,6 +76,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [editTermSource, setEditTermSource] = useState("")
     const [editTermLang, setEditTermLang] = useState("Chinese")
     const [editTermCategory, setEditTermCategory] = useState("custom")
+    const [renamedTerm, setRenamedTerm] = useState<{ oldName: string; newName: string } | null>(null)
     const [translateBanner, setTranslateBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
     const [characterContext, setCharacterContext] = useState<{
@@ -246,9 +247,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
      * and duplicate file information.
      * GET `/api/mods/:modId` -> `{ strings, name, author, preview_image, url, duplicate_files }`.
      */
-    const fetchModDetail = async () => {
+    const fetchModDetail = async (silent = false) => {
         if (!modId) return
-        setLoading(true)
+        if (!silent) setLoading(true)
         try {
             const res = await fetch(`${API_BASE}/mods/${modId}`)
             const data = await res.json()
@@ -1090,6 +1091,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                             headers: { "Content-Type": "application/json" },
                                                             body: JSON.stringify({ english: editTermEnglish, source_mappings: { [editTermLang]: editTermSource }, category: editTermCategory }),
                                                         })
+                                                        if (editTermEnglish !== english) {
+                                                            setRenamedTerm({ oldName: english, newName: editTermEnglish })
+                                                        }
                                                         setEditingTerm(null)
                                                         fetchModGlossary()
                                                     }}
@@ -1128,6 +1132,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                         className="btn btn-outline"
                                                         style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem" }}
                                                         onClick={() => {
+                                                            setRenamedTerm(null)
                                                             setEditingTerm(english)
                                                             setEditTermEnglish(english)
                                                             const firstLang = Object.keys(info.source_mappings || {})[0] || "Chinese"
@@ -1138,30 +1143,29 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                     >
                                                         Edit
                                                     </button>
-                                                    <button
-                                                        className="btn btn-outline"
-                                                        style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "var(--accent-primary)", borderColor: "rgba(138,180,248,0.3)" }}
-                                                        onClick={async () => {
-                                                            // Prompt for the new term to replace with
-                                                            const newTerm = window.prompt(`Replace "${english}" with:`, english)
-                                                            if (!newTerm || newTerm === english) return
-                                                            try {
-                                                                const res = await fetch(`${API_BASE}/mods/${modId}/glossary/replace-preview`, {
-                                                                    method: "POST",
-                                                                    headers: { "Content-Type": "application/json" },
-                                                                    body: JSON.stringify({ old_english: english, new_english: newTerm }),
-                                                                })
-                                                                if (res.ok) {
-                                                                    const data = await res.json()
-                                                                    setReplacePreview({ oldTerm: english, newTerm, affected: data.affected })
+                                                    {renamedTerm && renamedTerm.newName === english && (
+                                                        <button
+                                                            className="btn btn-outline"
+                                                            style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "var(--accent-primary)", borderColor: "rgba(138,180,248,0.3)" }}
+                                                            onClick={async () => {
+                                                                try {
+                                                                    const res = await fetch(`${API_BASE}/mods/${modId}/glossary/replace-preview`, {
+                                                                        method: "POST",
+                                                                        headers: { "Content-Type": "application/json" },
+                                                                        body: JSON.stringify({ old_english: renamedTerm.oldName, new_english: renamedTerm.newName }),
+                                                                    })
+                                                                    if (res.ok) {
+                                                                        const data = await res.json()
+                                                                        setReplacePreview({ oldTerm: renamedTerm.oldName, newTerm: renamedTerm.newName, affected: data.affected })
+                                                                    }
+                                                                } catch (err) {
+                                                                    console.error("Failed to preview replacement:", err)
                                                                 }
-                                                            } catch (err) {
-                                                                console.error("Failed to preview replacement:", err)
-                                                            }
-                                                        }}
-                                                    >
-                                                        Replace
-                                                    </button>
+                                                            }}
+                                                        >
+                                                            Replace in translations
+                                                        </button>
+                                                    )}
                                                     <button
                                                         className="btn btn-outline"
                                                         style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
@@ -1482,7 +1486,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                 <div
                     style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
                     onClick={(e) => {
-                        if (e.target === e.currentTarget) setReplacePreview(null)
+                        if (e.target === e.currentTarget) {
+                            setReplacePreview(null)
+                            setRenamedTerm(null)
+                        }
                     }}
                 >
                     <div className="glass-card" style={{ width: "800px", maxHeight: "80vh", overflow: "auto", padding: "2rem" }}>
@@ -1491,7 +1498,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 Replace "{replacePreview.oldTerm}" with "{replacePreview.newTerm}"
                             </h2>
                             <button
-                                onClick={() => setReplacePreview(null)}
+                                onClick={() => {
+                                    setReplacePreview(null)
+                                    setRenamedTerm(null)
+                                }}
                                 style={{
                                     background: "none",
                                     border: "none",
@@ -1529,7 +1539,13 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                     ))}
                                 </div>
                                 <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-                                    <button className="btn btn-outline" onClick={() => setReplacePreview(null)}>
+                                    <button
+                                        className="btn btn-outline"
+                                        onClick={() => {
+                                            setReplacePreview(null)
+                                            setRenamedTerm(null)
+                                        }}
+                                    >
                                         Cancel
                                     </button>
                                     <button
@@ -1544,8 +1560,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                 if (res.ok) {
                                                     const data = await res.json()
                                                     setReplacePreview(null)
+                                                    setRenamedTerm(null)
                                                     setTranslateBanner({ type: "success", message: `Replaced "${replacePreview.oldTerm}" in ${data.replaced} translation(s).` })
-                                                    fetchModDetail()
+                                                    fetchModDetail(true)
                                                     fetchExportStatus()
                                                 }
                                             } catch (err) {
