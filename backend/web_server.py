@@ -1084,6 +1084,34 @@ async def translate_batch(req: BatchTranslationRequest):
     }
 
 
+def _merge_gdata_originals(mod_id: str, strings: dict[str, "LocString"]) -> None:
+    """Restore original Chinese source text for gdata entries from backup.
+
+    After exporting translations into gdata JSON files, re-extraction
+    picks up the English text but loses the Chinese source.  This helper
+    reads the backed-up originals and merges the Chinese text back into
+    any entry that only has English.
+    """
+    from backend.games.chrono_ark import gdata_extractor
+
+    backup_dir = config.STORAGE_PATH / "mods" / mod_id / "original_gdata"
+    if not backup_dir.exists():
+        return
+
+    # Extract strings from the backed-up originals.
+    originals: dict[str, "LocString"] = {}
+    for json_file in sorted(backup_dir.glob("*.json")):
+        originals.update(gdata_extractor._extract_gdata_file(json_file))
+
+    # Merge: if the live entry has only English, add the original Chinese.
+    for key, orig in originals.items():
+        if key not in strings:
+            continue
+        live = strings[key]
+        if "Chinese" not in live.translations and "Chinese" in orig.translations:
+            live.translations["Chinese"] = orig.translations["Chinese"]
+
+
 def _get_mod_csv_paths(mod_path: Path) -> list[Path]:
     """Collect all CSV file paths for a mod.
 
@@ -1248,6 +1276,14 @@ async def export_mod(mod_id: str):
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(csv_path, dest)
 
+    # Save a backup of the original gdata JSON files before the first export.
+    original_gdata_dir = config.STORAGE_PATH / "mods" / mod_id / "original_gdata"
+    gdata_src = mod_path / "gdata" / "Add"
+    if not original_gdata_dir.exists() and gdata_src.exists():
+        original_gdata_dir.mkdir(parents=True, exist_ok=True)
+        for json_path in gdata_src.glob("*.json"):
+            shutil.copy2(json_path, original_gdata_dir / json_path.name)
+
     # Load saved translations.
     translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
     if not translations_path.exists():
@@ -1269,20 +1305,33 @@ async def export_mod(mod_id: str):
             strings[key].translations["English"] = english
             applied += 1
 
-    # Group strings by source file and write back to original locations.
+    # Separate gdata JSON-sourced strings from CSV/DLL-sourced strings.
+    # JSON strings get written back into the original gdata files; the
+    # rest go into standard localization CSVs.
+    gdata_translations: dict[str, str] = {}
     by_source: dict[str, list] = {}
     for key, loc_str in strings.items():
         source = loc_str.source_file or "LangDataDB.csv"
-        if source not in by_source:
-            by_source[source] = []
-        by_source[source].append(loc_str)
+        if source.lower().endswith(".json"):
+            english = loc_str.translations.get("English", "")
+            if english:
+                gdata_translations[key] = english
+        else:
+            if source.lower().endswith(".dll"):
+                source = "LangDataDB.csv"
+            if source not in by_source:
+                by_source[source] = []
+            by_source[source].append(loc_str)
 
     files_written = []
+    gdata_files_written = []
+
+    # Write gdata JSON translations back into the original files.
+    if gdata_translations:
+        gdata_files_written = _adapter.export_gdata_strings(mod_path, gdata_translations)
+
+    # Write CSV-sourced and DLL-sourced strings to localization CSVs.
     for csv_filename, entries in by_source.items():
-        # DLL-extracted strings have the DLL name as source_file.
-        # Remap to a standard CSV so we create a proper localization file.
-        if csv_filename.lower().endswith(".dll"):
-            csv_filename = "LangDataDB.csv"
 
         # Determine the original file path.
         loc_path = mod_path / "Localization" / csv_filename
@@ -1341,6 +1390,7 @@ async def export_mod(mod_id: str):
         "status": "success",
         "applied": applied,
         "files_written": files_written,
+        "gdata_files_written": gdata_files_written,
         "files_removed": files_removed,
     }
 

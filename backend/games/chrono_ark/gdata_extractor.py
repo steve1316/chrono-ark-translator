@@ -104,15 +104,16 @@ def _extract_gdata_file(file_path: Path) -> dict[str, LocString]:
         # Extract scalar text fields (Name, Description, etc.).
         for field_name, suffix in _FIELD_SUFFIXES.items():
             value = obj.get(field_name)
-            if not value or not isinstance(value, str) or not _has_cjk(value):
+            if not value or not isinstance(value, str):
                 continue
 
             loc_key = f"{prefix}/{item_id}{suffix}"
+            lang = "Chinese" if _has_cjk(value) else "English"
             results[loc_key] = LocString(
                 key=loc_key,
                 type="Text",
-                desc=f"{schema}.{field_name}",
-                translations={"Chinese": value},
+                desc="",
+                translations={lang: value},
                 source_file=file_path.name,
             )
 
@@ -127,28 +128,109 @@ def _extract_gdata_file(file_path: Path) -> dict[str, LocString]:
                     if not isinstance(line, str) or not line.strip():
                         continue
                     line = line.strip()
-                    if not _has_cjk(line):
+                    if not line:
                         continue
                     loc_key = f"{field_name}_{idx}"
+                    lang = "Chinese" if _has_cjk(line) else "English"
                     results[loc_key] = LocString(
                         key=loc_key,
                         type="Text",
-                        desc=f"{schema} dialogue",
-                        translations={"Chinese": line},
+                        desc="",
+                        translations={lang: line},
                         source_file=file_path.name,
                     )
-            elif isinstance(arr, str) and _has_cjk(arr):
+            elif isinstance(arr, str) and arr.strip():
                 # Some dialogue fields might be a single string.
                 loc_key = field_name
+                text = arr.strip()
+                lang = "Chinese" if _has_cjk(text) else "English"
                 results[loc_key] = LocString(
                     key=loc_key,
                     type="Text",
-                    desc=f"{schema} dialogue",
-                    translations={"Chinese": arr.strip()},
+                    desc="",
+                    translations={lang: text},
                     source_file=file_path.name,
                 )
 
     return results
+
+
+def export_gdata_translations(
+    mod_path: Path,
+    translations: dict[str, str],
+) -> list[str]:
+    """Write English translations back into a mod's gdata JSON files.
+
+    Iterates over each JSON object in ``gdata/Add/*.json``, mirrors the
+    extraction key logic, and overwrites the source-language field with
+    the English translation when one exists.
+
+    Args:
+        mod_path: Root directory of the mod.
+        translations: Mapping of localization key to English text.
+
+    Returns:
+        List of JSON filenames that were modified.
+    """
+    gdata_dir = mod_path / "gdata" / "Add"
+    if not gdata_dir.exists():
+        return []
+
+    json_files = sorted(gdata_dir.glob("*.json"))
+    if not json_files:
+        return []
+
+    files_modified: list[str] = []
+
+    for json_file in json_files:
+        try:
+            with open(json_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            continue
+
+        modified = False
+
+        for item_id, obj in data.items():
+            if not isinstance(obj, dict):
+                continue
+
+            schema = obj.get("_gdeSchema", "")
+            prefix = _SCHEMA_PREFIX.get(schema, schema)
+
+            # Update scalar text fields.
+            for field_name, suffix in _FIELD_SUFFIXES.items():
+                if field_name not in obj:
+                    continue
+                loc_key = f"{prefix}/{item_id}{suffix}"
+                if loc_key in translations:
+                    obj[field_name] = translations[loc_key]
+                    modified = True
+
+            # Update dialogue string arrays.
+            for field_name in _DIALOGUE_ARRAY_FIELDS:
+                arr = obj.get(field_name)
+                if not arr:
+                    continue
+
+                if isinstance(arr, list):
+                    for idx in range(len(arr)):
+                        loc_key = f"{field_name}_{idx}"
+                        if loc_key in translations:
+                            arr[idx] = translations[loc_key]
+                            modified = True
+                elif isinstance(arr, str):
+                    loc_key = field_name
+                    if loc_key in translations:
+                        obj[field_name] = translations[loc_key]
+                        modified = True
+
+        if modified:
+            with open(json_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            files_modified.append(json_file.name)
+
+    return files_modified
 
 
 def extract_mod_gdata_strings(mod_path: Path) -> dict[str, LocString]:

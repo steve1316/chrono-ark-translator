@@ -427,7 +427,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             duplicateFiles.length > 0
                 ? `\n\nThis will also consolidate ${duplicateFiles.length} duplicate file(s):\n${duplicateFiles.join("\n")}\n\nDuplicate files will be deleted after merging.`
                 : ""
-        if (!window.confirm(`This will overwrite the mod's CSV files with your translations.${dupeWarning} Continue?`)) {
+        if (!window.confirm(`This will overwrite the mod's localization files (CSVs and/or gdata JSONs) with your translations.${dupeWarning} Continue?`)) {
             return
         }
 
@@ -437,7 +437,14 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             if (res.ok) {
                 const data = await res.json()
                 const removedMsg = data.files_removed?.length ? `\nConsolidated ${data.files_removed.length} duplicate file(s).` : ""
-                alert(`Synced ${data.applied} translations to ${data.files_written.length} file(s): ${data.files_written.join(", ")}${removedMsg}`)
+                const parts: string[] = []
+                if (data.files_written?.length) {
+                    parts.push(`${data.files_written.length} CSV file(s): ${data.files_written.join(", ")}`)
+                }
+                if (data.gdata_files_written?.length) {
+                    parts.push(`${data.gdata_files_written.length} gdata JSON file(s): ${data.gdata_files_written.join(", ")}`)
+                }
+                alert(`Synced ${data.applied} translations to ${parts.join("\n")}${removedMsg}`)
                 fetchExportStatus()
                 fetchModDetail()
             } else {

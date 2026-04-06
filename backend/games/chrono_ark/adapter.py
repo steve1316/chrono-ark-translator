@@ -162,17 +162,22 @@ class ChronoArkAdapter(GameAdapter):
             list is empty when falling back to non-CSV extraction.
         """
         strings, variants = csv_extractor.extract_mod_strings(mod_path)
-        if not strings:
-            # No CSV localization files — try gdata JSON + DLL extraction.
-            strings = gdata_extractor.extract_mod_gdata_strings(mod_path)
-            dll_strings = dll_extractor.extract_mod_dll_loc_strings(
-                mod_path,
-                self._SKIP_DLLS,
-            )
-            for key, loc_str in dll_strings.items():
-                if key not in strings:
-                    strings[key] = loc_str
-            variants = []
+
+        # Always try gdata JSON and DLL extraction, merging any entries
+        # that aren't already covered by the CSVs.
+        gdata_strings = gdata_extractor.extract_mod_gdata_strings(mod_path)
+        for key, loc_str in gdata_strings.items():
+            if key not in strings:
+                strings[key] = loc_str
+
+        dll_strings = dll_extractor.extract_mod_dll_loc_strings(
+            mod_path,
+            self._SKIP_DLLS,
+        )
+        for key, loc_str in dll_strings.items():
+            if key not in strings:
+                strings[key] = loc_str
+
         return strings, variants
 
     def extract_base_game_strings(self, game_path: Optional[Path] = None) -> dict[str, LocString]:
@@ -247,6 +252,20 @@ class ChronoArkAdapter(GameAdapter):
                 for lang in columns[3:]:
                     row.append(entry.translations.get(lang, ""))
                 writer.writerow(row)
+
+    def export_gdata_strings(
+        self, mod_path: Path, translations: dict[str, str]
+    ) -> list[str]:
+        """Write translations back into a mod's gdata JSON files.
+
+        Args:
+            mod_path: Root directory of the mod.
+            translations: Mapping of localization key to English text.
+
+        Returns:
+            List of JSON filenames that were modified.
+        """
+        return gdata_extractor.export_gdata_translations(mod_path, translations)
 
     def get_mod_url(self, mod_id: str) -> Optional[str]:
         """Return the Steam Workshop URL for a Chrono Ark mod.

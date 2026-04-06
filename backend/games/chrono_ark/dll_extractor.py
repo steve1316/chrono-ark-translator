@@ -190,7 +190,7 @@ def extract_dll_loc_strings(
             results[key] = LocString(
                 key=key,
                 type="Text",
-                desc="(extracted from DLL)",
+                desc="",
                 translations={"Chinese": value},
                 source_file=source_file_label,
             )
