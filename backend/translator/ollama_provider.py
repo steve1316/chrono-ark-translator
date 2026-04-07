@@ -82,6 +82,17 @@ class OllamaProvider(TranslationProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def _unload_model(self) -> None:
+        """Tell Ollama to unload the model from GPU memory immediately."""
+        try:
+            requests.post(
+                f"{self._base_url}/api/chat",
+                json={"model": self._model, "messages": [], "keep_alive": 0},
+                timeout=5,
+            )
+        except Exception:
+            pass
+
     def build_prompt(
         self,
         entries: list[tuple[str, str]],
@@ -269,6 +280,7 @@ class OllamaProvider(TranslationProvider):
                 for line in resp.iter_lines(decode_unicode=True):
                     if cancel_event and cancel_event.is_set():
                         resp.close()
+                        self._unload_model()
                         yield {"type": "cancelled"}
                         return
 
