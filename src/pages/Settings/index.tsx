@@ -478,41 +478,44 @@ const SettingsPage: React.FC = () => {
                                     <p style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginBottom: "0.25rem" }}>
                                         Use an installed model instead of the recommended one above.
                                     </p>
-                                    {ollamaModels.length > 0 ? (
-                                        <select
-                                            value={isModelOverride ? ollamaModel : ""}
-                                            onChange={(e) => {
-                                                const val = e.target.value
-                                                if (val === "") {
-                                                    // Reset to VRAM tier default
-                                                    const tierModel = VRAM_TIERS.find((t) => t.tier === ollamaVramTier)?.model || ""
-                                                    setOllamaModel(tierModel)
-                                                } else {
-                                                    setOllamaModel(val)
-                                                }
-                                            }}
-                                            style={{
-                                                padding: "0.6rem 0.75rem",
-                                                borderRadius: "8px",
-                                                border: "1px solid var(--glass-border)",
-                                                background: "rgba(0, 0, 0, 0.2)",
-                                                color: "var(--text-main)",
-                                                fontSize: "0.85rem",
-                                                width: "340px",
-                                            }}
-                                        >
-                                            <option value="">None (use recommended)</option>
-                                            {ollamaModels.map((m) => (
-                                                <option key={m} value={m}>
-                                                    {m}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
-                                            {ollamaStatus === "running" ? "No models installed" : "Ollama not running"}
-                                        </span>
-                                    )}
+                                    {(() => {
+                                        const overrideModels = ollamaModels.filter((m) => !VRAM_TIERS.some((t) => t.model === m))
+                                        return overrideModels.length > 0 ? (
+                                            <select
+                                                value={isModelOverride ? ollamaModel : ""}
+                                                onChange={(e) => {
+                                                    const val = e.target.value
+                                                    if (val === "") {
+                                                        // Reset to VRAM tier default
+                                                        const tierModel = VRAM_TIERS.find((t) => t.tier === ollamaVramTier)?.model || ""
+                                                        setOllamaModel(tierModel)
+                                                    } else {
+                                                        setOllamaModel(val)
+                                                    }
+                                                }}
+                                                style={{
+                                                    padding: "0.6rem 0.75rem",
+                                                    borderRadius: "8px",
+                                                    border: "1px solid var(--glass-border)",
+                                                    background: "rgba(0, 0, 0, 0.2)",
+                                                    color: "var(--text-main)",
+                                                    fontSize: "0.85rem",
+                                                    width: "340px",
+                                                }}
+                                            >
+                                                <option value="">None (use recommended)</option>
+                                                {overrideModels.map((m) => (
+                                                    <option key={m} value={m}>
+                                                        {m}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
+                                                {ollamaStatus === "running" ? "No other models installed" : "Ollama not running"}
+                                            </span>
+                                        )
+                                    })()}
                                 </div>
                             </div>
                         )}
