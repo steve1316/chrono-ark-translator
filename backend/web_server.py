@@ -1513,19 +1513,28 @@ async def get_export_status(mod_id: str):
     current_hash = _compute_export_snapshot(mod_id, mod_path)
     last_hash = _load_last_export_hash(mod_id)
 
-    return {"has_changes": current_hash != last_hash}
+    return {
+        "has_changes": current_hash != last_hash,
+        "has_previous_sync": last_hash != "",
+    }
 
 
 @app.post("/api/mods/{mod_id}/export")
-async def export_mod(mod_id: str):
+async def export_mod(mod_id: str, resync: bool = False):
     """Write saved translations back into the mod's original CSV files.
 
     Applies all stored English translations to the mod's localization CSVs,
     removes any duplicate variant files, and records an export snapshot so
     subsequent `get_export_status` calls can detect new changes.
 
+    When ``resync`` is True, the original CSV and gdata files are restored
+    from backups first so that translations are applied on top of a clean
+    base.  This is useful when no new changes exist but the user wants to
+    re-apply translations from scratch.
+
     Args:
         mod_id: The workshop identifier of the mod.
+        resync: If True, restore original files before re-exporting.
 
     Returns:
         A dict with `status`, the number of `applied` translations,
@@ -1538,25 +1547,45 @@ async def export_mod(mod_id: str):
     """
     mod_path = _find_mod_path(mod_id)
 
-    # Save a backup of the original CSV files before the first export so
-    # "Reset" can restore them later.
     original_csv_dir = config.STORAGE_PATH / "mods" / mod_id / "original_csvs"
-    if not original_csv_dir.exists():
-        original_csv_dir.mkdir(parents=True, exist_ok=True)
-        for csv_path in _get_mod_csv_paths(mod_path):
-            # Preserve relative path structure (Localization/file.csv vs file.csv)
-            rel = csv_path.relative_to(mod_path)
-            dest = original_csv_dir / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(csv_path, dest)
-
-    # Save a backup of the original gdata JSON files before the first export.
     original_gdata_dir = config.STORAGE_PATH / "mods" / mod_id / "original_gdata"
-    gdata_src = mod_path / "gdata" / "Add"
-    if not original_gdata_dir.exists() and gdata_src.exists():
-        original_gdata_dir.mkdir(parents=True, exist_ok=True)
-        for json_path in gdata_src.glob("*.json"):
-            shutil.copy2(json_path, original_gdata_dir / json_path.name)
+
+    if resync:
+        # Restore original CSV files from backups so we re-apply on a
+        # clean base.
+        if original_csv_dir.exists():
+            for src in original_csv_dir.rglob("*"):
+                if src.is_file():
+                    rel = src.relative_to(original_csv_dir)
+                    dest = mod_path / rel
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, dest)
+
+        # Restore original gdata JSON files from backups.
+        if original_gdata_dir.exists():
+            gdata_dest = mod_path / "gdata" / "Add"
+            gdata_dest.mkdir(parents=True, exist_ok=True)
+            for src in original_gdata_dir.rglob("*"):
+                if src.is_file():
+                    shutil.copy2(src, gdata_dest / src.name)
+    else:
+        # Save a backup of the original CSV files before the first export so
+        # "Reset" can restore them later.
+        if not original_csv_dir.exists():
+            original_csv_dir.mkdir(parents=True, exist_ok=True)
+            for csv_path in _get_mod_csv_paths(mod_path):
+                # Preserve relative path structure (Localization/file.csv vs file.csv)
+                rel = csv_path.relative_to(mod_path)
+                dest = original_csv_dir / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(csv_path, dest)
+
+        # Save a backup of the original gdata JSON files before the first export.
+        gdata_src = mod_path / "gdata" / "Add"
+        if not original_gdata_dir.exists() and gdata_src.exists():
+            original_gdata_dir.mkdir(parents=True, exist_ok=True)
+            for json_path in gdata_src.glob("*.json"):
+                shutil.copy2(json_path, original_gdata_dir / json_path.name)
 
     # Load saved translations.
     translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"

@@ -56,6 +56,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     })
 
     const [hasExportChanges, setHasExportChanges] = useState(false)
+    const [hasPreviousSync, setHasPreviousSync] = useState(false)
     const [duplicateFiles, setDuplicateFiles] = useState<string[]>([])
     const [showDuplicateDetails, setShowDuplicateDetails] = useState(false)
 
@@ -191,6 +192,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             if (res.ok) {
                 const data = await res.json()
                 setHasExportChanges(data.has_changes)
+                setHasPreviousSync(data.has_previous_sync ?? false)
             }
         } catch {}
     }
@@ -425,20 +427,22 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
      * written. If duplicate files existed, they are consolidated (merged then deleted)
      * as part of the export.
      */
-    const handleExport = async () => {
+    const handleExport = async (resync = false) => {
         if (!modId) return
         // Build a warning message that includes duplicate files if present.
         const dupeWarning =
             duplicateFiles.length > 0
                 ? `\n\nThis will also consolidate ${duplicateFiles.length} duplicate file(s):\n${duplicateFiles.join("\n")}\n\nDuplicate files will be deleted after merging.`
                 : ""
-        if (!window.confirm(`This will overwrite the mod's localization files (CSVs and/or gdata JSONs) with your translations.${dupeWarning} Continue?`)) {
+        const resyncNote = resync ? "This will restore the original files and re-apply all translations from scratch.\n\n" : ""
+        if (!window.confirm(`${resyncNote}This will overwrite the mod's localization files (CSVs and/or gdata JSONs) with your translations.${dupeWarning} Continue?`)) {
             return
         }
 
         setExporting(true)
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/export`, { method: "POST" })
+            const url = resync ? `${API_BASE}/mods/${modId}/export?resync=true` : `${API_BASE}/mods/${modId}/export`
+            const res = await fetch(url, { method: "POST" })
             if (res.ok) {
                 const data = await res.json()
                 const removedMsg = data.files_removed?.length ? `\nConsolidated ${data.files_removed.length} duplicate file(s).` : ""
@@ -790,10 +794,22 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                         <button className="btn btn-primary" onClick={() => handleTranslateClick("")} disabled={batchState.phase === "translating" || batchState.phase === "reviewing"}>
                             Translate{activeProvider ? ` (${activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})` : ""}
                         </button>
-                        <button className="btn btn-primary" onClick={handleExport} disabled={exporting || !hasExportChanges} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <FaFileExport />
-                            {exporting ? "Syncing..." : "Sync Changes"}
-                        </button>
+                        {hasExportChanges ? (
+                            <button className="btn btn-primary" onClick={() => handleExport()} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <FaFileExport />
+                                {exporting ? "Syncing..." : "Sync Changes"}
+                            </button>
+                        ) : hasPreviousSync ? (
+                            <button className="btn btn-primary" onClick={() => handleExport(true)} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <FaFileExport />
+                                {exporting ? "Syncing..." : "Re-sync Changes"}
+                            </button>
+                        ) : (
+                            <button className="btn btn-primary" disabled style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <FaFileExport />
+                                Sync Changes
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
