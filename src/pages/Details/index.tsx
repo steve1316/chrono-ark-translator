@@ -821,7 +821,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                         }}
                     />
                     <span style={{ color: "var(--text-main)" }}>
-                        Translating batch {batchState.batchIndex + 1} of {batchState.totalBatches}... waiting for provider response
+                        Translating batch {batchState.batchIndex + 1} of {batchState.totalBatches}...{" "}
+                        {batchState.streamingProgress
+                            ? `${batchState.streamingProgress.tokensGenerated} tokens (${batchState.streamingProgress.tokensPerSec} tok/s, ${batchState.streamingProgress.elapsedSec}s elapsed)`
+                            : "waiting for provider response"}
                     </span>
                     <button
                         className="btn btn-outline"
@@ -1733,7 +1736,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                         const plan: BatchDescriptor[] = translationPreview.batch_plan || []
                         setTranslationPreview(null)
                         setTranslateBanner(null)
-                        startTranslation(pendingProvider, plan)
+                        startTranslation(pendingProvider || activeProvider, plan)
                     }}
                     onCancel={() => setTranslationPreview(null)}
                 />
