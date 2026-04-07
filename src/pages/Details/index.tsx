@@ -66,6 +66,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
 
     const [translationPreview, setTranslationPreview] = useState<any>(null)
     const [pendingProvider, setPendingProvider] = useState<string>("")
+    const [activeProvider, setActiveProvider] = useState<string>("")
     const [showGlossaryPanel, setShowGlossaryPanel] = useState(false)
     const [newTermEnglish, setNewTermEnglish] = useState("")
     const [newTermSource, setNewTermSource] = useState("")
@@ -273,6 +274,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
         fetchSuggestions()
         fetchModGlossary()
         fetchCharacterContext()
+        fetch(`${API_BASE}/settings`)
+            .then((r) => r.json())
+            .then((data) => setActiveProvider(data.provider))
+            .catch(() => {})
     }, [modId])
 
     /**
@@ -780,8 +785,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
 
                     {/* Translation trigger and CSV sync. */}
                     <div className="mod-actions-group">
-                        <button className="btn btn-primary" onClick={() => handleTranslateClick("claude")} disabled={batchState.phase === "translating" || batchState.phase === "reviewing"}>
-                            Translate (Claude)
+                        <button className="btn btn-primary" onClick={() => handleTranslateClick("")} disabled={batchState.phase === "translating" || batchState.phase === "reviewing"}>
+                            Translate{activeProvider ? ` (${activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})` : ""}
                         </button>
                         <button className="btn btn-primary" onClick={handleExport} disabled={exporting || !hasExportChanges} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <FaFileExport />
