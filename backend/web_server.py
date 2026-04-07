@@ -11,13 +11,14 @@ import os
 import json
 import subprocess
 import tempfile
+import threading
 import urllib.request
 import uvicorn
 import shutil
 import httpx
 from pathlib import Path
 from typing import Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -51,6 +52,9 @@ from backend.main import get_provider, save_extracted_strings
 _adapter: GameAdapter = get_adapter(config.ACTIVE_GAME)
 
 app = FastAPI(title="Chrono Ark Translator API")
+
+# Active translation cancel events, keyed by mod_id.
+_active_translations: dict[str, threading.Event] = {}
 
 # Enable CORS for Vite development server
 app.add_middleware(
@@ -220,6 +224,33 @@ class SettingsUpdate(BaseModel):
 
 
 # --- Helpers ---
+
+
+def _fill_duplicate_translations(
+    translations: dict[str, str],
+    entries: list[tuple[str, str]],
+) -> dict[str, str]:
+    """Fill missing keys whose source text matches an already-translated entry.
+
+    LLMs often deduplicate identical source strings and only return one key in
+    the response.  This copies the translation to every other key that shares
+    the same source text so nothing is left as "Pending translation...".
+
+    Args:
+        translations: Mutable dict of key -> English text returned by the LLM.
+            Modified in-place to include any missing duplicate keys.
+        entries: Original (key, source_text) tuples sent to the provider.
+    """
+    source_to_translation: dict[str, str] = {}
+    for key, source_text in entries:
+        if key in translations:
+            source_to_translation[source_text] = translations[key]
+
+    for key, source_text in entries:
+        if key not in translations and source_text in source_to_translation:
+            translations[key] = source_to_translation[source_text]
+
+    return translations
 
 
 def _filter_suggestions(
@@ -923,6 +954,7 @@ async def translate_mod(req: TranslationRequest):
                     style_examples=style_examples,
                     character_context=character_context,
                 )
+                _fill_duplicate_translations(translations, batch)
                 all_translations.update(translations)
                 all_suggestions.extend(suggestions)
 
@@ -1066,6 +1098,9 @@ async def translate_batch(req: BatchTranslationRequest):
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 
+    # Fill in keys the LLM dropped due to duplicate source text.
+    _fill_duplicate_translations(translations, entries)
+
     # Store translation memory entries.
     for key, english in translations.items():
         source_text = next((t for k, t in entries if k == key), "")
@@ -1117,6 +1152,176 @@ async def translate_batch(req: BatchTranslationRequest):
         "translations": translations,
         "suggestions": filtered_suggestions,
     }
+
+
+@app.post("/api/translate/cancel")
+async def translate_cancel(mod_id: str = ""):
+    """Signal an in-progress streaming translation to stop.
+
+    Args:
+        mod_id: The mod whose translation should be cancelled.  Looks up the
+            corresponding cancel event in `_active_translations`.
+    """
+    event = _active_translations.pop(mod_id, None)
+    if event:
+        event.set()
+    return {"cancelled": event is not None}
+
+
+@app.post("/api/translate/batch/stream")
+async def translate_batch_stream(req: BatchTranslationRequest, request: Request):
+    """Translate a single batch with real-time SSE progress events.
+
+    Same logic as `/api/translate/batch` but streams progress events for
+    providers that support it (currently Ollama).  Non-streaming providers
+    fall back to a single `complete` event.
+
+    Args:
+        req: Batch translation parameters (mod_id, provider, keys, etc.).
+        request: The underlying Starlette request, used to detect client
+            disconnection so the Ollama process can be stopped early.
+    """
+    mods = _adapter.scan_mods()
+    matching = [m for m in mods if m.mod_id == req.mod_id]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Mod not found")
+    mod_path = matching[0].path
+
+    strings, _ = _adapter.extract_strings(mod_path)
+
+    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
+    if translations_path.exists():
+        try:
+            with open(translations_path, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            for key, english in saved.items():
+                if key in strings:
+                    strings[key].translations["English"] = english
+        except Exception:
+            pass
+
+    entries: list[tuple[str, str]] = []
+    for key in req.keys:
+        if key in strings:
+            source_text = strings[key].translations.get(req.source_lang, "")
+            if source_text:
+                entries.append((key, source_text))
+
+    if not entries:
+        raise HTTPException(status_code=400, detail="No translatable text found for the provided keys")
+
+    provider_name = req.provider or config.TRANSLATION_PROVIDER
+    provider = get_provider(provider_name)
+
+    if req.is_first_batch:
+        create_backup(req.mod_id, "Before translation run")
+        if hasattr(provider, "last_raw_responses"):
+            provider.last_raw_responses = []
+
+    base_glossary = load_glossary()
+    mod_glossary = load_mod_glossary(req.mod_id)
+    glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=req.source_lang)
+
+    game_context = _adapter.get_translation_context()
+    char_ctx = load_character_context(req.mod_id)
+    character_context = char_ctx if any(char_ctx.values()) else None
+    format_rules = _adapter.get_format_preservation_rules()
+    style_examples = _adapter.get_style_examples()
+
+    tm = TranslationMemory()
+
+    async def event_stream():
+        queue: asyncio.Queue[dict | None] = asyncio.Queue()
+        loop = asyncio.get_event_loop()
+        cancel_event = threading.Event()
+        _active_translations[req.mod_id] = cancel_event
+
+        def run_generator():
+            try:
+                for event in provider.translate_batch_stream(
+                    entries,
+                    req.source_lang,
+                    glossary_prompt,
+                    game_context=game_context,
+                    format_rules=format_rules,
+                    style_examples=style_examples,
+                    character_context=character_context,
+                    cancel_event=cancel_event,
+                ):
+                    if cancel_event.is_set():
+                        break
+                    loop.call_soon_threadsafe(queue.put_nowait, event)
+            except Exception as e:
+                if not cancel_event.is_set():
+                    loop.call_soon_threadsafe(queue.put_nowait, {"type": "error", "message": str(e)})
+            finally:
+                _active_translations.pop(req.mod_id, None)
+                loop.call_soon_threadsafe(queue.put_nowait, None)
+
+        loop.run_in_executor(None, run_generator)
+
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                if await request.is_disconnected():
+                    cancel_event.set()
+                    break
+                continue
+
+            if event is None:
+                break
+
+            if event.get("type") == "complete":
+                translations = event.get("translations", {})
+                suggestions = event.get("suggestions", [])
+
+                # Fill in keys the LLM dropped due to duplicate source text.
+                _fill_duplicate_translations(translations, entries)
+                event["translations"] = translations
+
+                for key, english in translations.items():
+                    source_text = next((t for k, t in entries if k == key), "")
+                    if source_text and english:
+                        tm.store(source_text, english, req.source_lang)
+
+                raw_responses = getattr(provider, "last_raw_responses", [])
+                if raw_responses:
+                    responses_path = config.STORAGE_PATH / "mods" / req.mod_id / "last_api_responses.json"
+                    responses_path.parent.mkdir(parents=True, exist_ok=True)
+                    existing_responses = []
+                    if not req.is_first_batch and responses_path.exists():
+                        try:
+                            with open(responses_path, "r", encoding="utf-8") as f:
+                                existing_responses = json.load(f)
+                        except Exception:
+                            pass
+                    existing_responses.extend(raw_responses)
+                    with open(responses_path, "w", encoding="utf-8") as f:
+                        json.dump(existing_responses, f, indent=2, ensure_ascii=False)
+
+                trans_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
+                trans_path.parent.mkdir(parents=True, exist_ok=True)
+                existing = {}
+                if trans_path.exists():
+                    with open(trans_path, "r", encoding="utf-8") as f:
+                        existing = json.load(f)
+                existing.update(translations)
+                with open(trans_path, "w", encoding="utf-8") as f:
+                    json.dump(existing, f, indent=2, ensure_ascii=False)
+
+                tracker = ProgressTracker()
+                tracker.mark_translated(req.mod_id, list(translations.keys()))
+
+                tm.save()
+
+                filtered_suggestions = _filter_suggestions(suggestions, strings)
+                if filtered_suggestions:
+                    add_suggestions(req.mod_id, filtered_suggestions)
+
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 def _merge_gdata_originals(mod_id: str, strings: dict[str, "LocString"]) -> None:

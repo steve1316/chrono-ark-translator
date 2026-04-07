@@ -12,13 +12,23 @@ export type BatchDescriptor = {
 /** Possible phases of the iterative batch translation state machine. */
 export type BatchPhase = "idle" | "translating" | "reviewing" | "complete" | "error"
 
+/** Real-time progress from a streaming provider (e.g. Ollama). */
+export type StreamingProgress = {
+    tokensGenerated: number
+    elapsedSec: number
+    tokensPerSec: number
+}
+
 /** Full state exposed by the hook. */
 export type BatchState =
     | { phase: "idle" }
-    | { phase: "translating"; batchIndex: number; totalBatches: number }
+    | { phase: "translating"; batchIndex: number; totalBatches: number; streamingProgress?: StreamingProgress }
     | { phase: "reviewing"; batchIndex: number; totalBatches: number; suggestions: TermSuggestion[] }
     | { phase: "complete"; totalTranslated: number }
     | { phase: "error"; message: string; completedBatches: number }
+
+/** Providers that support real-time streaming progress. */
+const STREAMING_PROVIDERS = new Set(["ollama"])
 
 /**
  * Hook that manages iterative per-batch translation with glossary review
@@ -45,7 +55,127 @@ export function useIterativeTranslation(
     const planRef = useRef<BatchDescriptor[]>([])
     const providerRef = useRef<string>("")
     const cancelledRef = useRef(false)
+    const abortControllerRef = useRef<AbortController | null>(null)
     const totalTranslatedRef = useRef(0)
+    // Ref to break circular dependency between translateBatch <-> handleBatchResult.
+    const translateBatchRef = useRef<(batchIndex: number) => Promise<void>>(undefined)
+
+    /** Handle a completed batch result (shared by streaming and non-streaming paths). */
+    const handleBatchResult = useCallback(
+        (
+            batchIndex: number,
+            totalBatches: number,
+            newTranslations: Record<string, string>,
+            suggestions: TermSuggestion[],
+        ) => {
+            totalTranslatedRef.current += Object.keys(newTranslations).length
+            setBatchTranslations((prev) => ({ ...prev, ...newTranslations }))
+            onBatchTranslated(newTranslations)
+
+            const isLastBatch = batchIndex >= totalBatches - 1
+
+            if (isLastBatch) {
+                if (suggestions.length > 0) {
+                    setState({ phase: "reviewing", batchIndex, totalBatches, suggestions })
+                } else {
+                    setState({ phase: "complete", totalTranslated: totalTranslatedRef.current })
+                }
+            } else if (suggestions.length > 0) {
+                setState({ phase: "reviewing", batchIndex, totalBatches, suggestions })
+            } else {
+                translateBatchRef.current?.(batchIndex + 1)
+            }
+        },
+        [onBatchTranslated],
+    )
+
+    /** Translate a batch via SSE streaming (real-time progress). */
+    const translateBatchStreaming = useCallback(
+        async (batchIndex: number, totalBatches: number) => {
+            const batch = planRef.current[batchIndex]
+
+            try {
+                const controller = new AbortController()
+                abortControllerRef.current = controller
+
+                const res = await fetch(`${API_BASE}/translate/batch/stream`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        mod_id: modId,
+                        provider: providerRef.current,
+                        keys: batch.keys,
+                        source_lang: batch.source_lang,
+                        is_first_batch: batchIndex === 0,
+                    }),
+                    signal: controller.signal,
+                })
+
+                if (cancelledRef.current) return
+
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({ detail: "Translation failed" }))
+                    setState({ phase: "error", message: data.detail || "Translation failed", completedBatches: batchIndex })
+                    return
+                }
+
+                const reader = res.body?.getReader()
+                if (!reader) return
+
+                const decoder = new TextDecoder()
+                let buffer = ""
+
+                while (true) {
+                    const { done, value } = await reader.read()
+                    if (done || cancelledRef.current) break
+
+                    buffer += decoder.decode(value, { stream: true })
+                    const lines = buffer.split("\n")
+                    buffer = lines.pop() ?? ""
+
+                    for (const line of lines) {
+                        if (!line.startsWith("data: ")) continue
+                        let event: Record<string, unknown>
+                        try {
+                            event = JSON.parse(line.slice(6))
+                        } catch {
+                            continue
+                        }
+
+                        if (event.type === "progress") {
+                            setState({
+                                phase: "translating",
+                                batchIndex,
+                                totalBatches,
+                                streamingProgress: {
+                                    tokensGenerated: event.tokens_generated as number,
+                                    elapsedSec: event.elapsed_sec as number,
+                                    tokensPerSec: event.tokens_per_sec as number,
+                                },
+                            })
+                        } else if (event.type === "complete") {
+                            handleBatchResult(
+                                batchIndex,
+                                totalBatches,
+                                (event.translations as Record<string, string>) || {},
+                                (event.suggestions as TermSuggestion[]) || [],
+                            )
+                        } else if (event.type === "error") {
+                            setState({ phase: "error", message: event.message as string, completedBatches: batchIndex })
+                        }
+                    }
+                }
+            } catch (err) {
+                if (cancelledRef.current) return
+                setState({
+                    phase: "error",
+                    message: err instanceof Error ? err.message : "Translation failed. Could not reach the server.",
+                    completedBatches: batchIndex,
+                })
+            }
+        },
+        [modId, handleBatchResult],
+    )
 
     const translateBatch = useCallback(
         async (batchIndex: number) => {
@@ -56,6 +186,11 @@ export function useIterativeTranslation(
             const totalBatches = plan.length
 
             setState({ phase: "translating", batchIndex, totalBatches })
+
+            // Use streaming endpoint for providers that support it.
+            if (STREAMING_PROVIDERS.has(providerRef.current)) {
+                return translateBatchStreaming(batchIndex, totalBatches)
+            }
 
             try {
                 const res = await fetch(`${API_BASE}/translate/batch`, {
@@ -82,29 +217,12 @@ export function useIterativeTranslation(
                     return
                 }
 
-                const newTranslations: Record<string, string> = data.translations || {}
-                totalTranslatedRef.current += Object.keys(newTranslations).length
-
-                setBatchTranslations((prev) => ({ ...prev, ...newTranslations }))
-                onBatchTranslated(newTranslations)
-
-                const suggestions: TermSuggestion[] = data.suggestions || []
-                const isLastBatch = batchIndex >= totalBatches - 1
-
-                if (isLastBatch) {
-                    if (suggestions.length > 0) {
-                        // Last batch with suggestions: let user review before completing.
-                        setState({ phase: "reviewing", batchIndex, totalBatches, suggestions })
-                    } else {
-                        setState({ phase: "complete", totalTranslated: totalTranslatedRef.current })
-                    }
-                } else if (suggestions.length > 0) {
-                    // Mid-batch with suggestions: pause for review.
-                    setState({ phase: "reviewing", batchIndex, totalBatches, suggestions })
-                } else {
-                    // No suggestions: auto-advance to next batch.
-                    translateBatch(batchIndex + 1)
-                }
+                handleBatchResult(
+                    batchIndex,
+                    totalBatches,
+                    data.translations || {},
+                    data.suggestions || [],
+                )
             } catch (err) {
                 if (cancelledRef.current) return
                 setState({
@@ -114,8 +232,11 @@ export function useIterativeTranslation(
                 })
             }
         },
-        [modId, onBatchTranslated],
+        [modId, translateBatchStreaming, handleBatchResult],
     )
+
+    // Keep ref in sync so handleBatchResult can call translateBatch for auto-advance.
+    translateBatchRef.current = translateBatch
 
     const startTranslation = useCallback(
         (provider: string, batchPlan: BatchDescriptor[]) => {
@@ -143,8 +264,14 @@ export function useIterativeTranslation(
 
     const cancel = useCallback(() => {
         cancelledRef.current = true
+        abortControllerRef.current?.abort()
+        abortControllerRef.current = null
+        // Explicitly tell the backend to cancel so it closes the Ollama connection.
+        fetch(`${API_BASE}/translate/cancel?mod_id=${encodeURIComponent(modId)}`, {
+            method: "POST",
+        }).catch(() => {})
         setState({ phase: "idle" })
-    }, [])
+    }, [modId])
 
     return {
         state,
