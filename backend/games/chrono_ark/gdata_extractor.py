@@ -161,7 +161,7 @@ def export_gdata_translations(
 ) -> list[str]:
     """Write English translations back into a mod's gdata JSON files.
 
-    Iterates over each JSON object in ``gdata/Add/*.json``, mirrors the
+    Iterates over each JSON object in `gdata/Add/*.json`, mirrors the
     extraction key logic, and overwrites the source-language field with
     the English translation when one exists.
 

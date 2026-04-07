@@ -175,14 +175,14 @@ class SettingsResponse(BaseModel):
     Attributes:
         provider: Active translation provider ID (claude, openai, deepl, ollama, manual).
         batch_size: Number of strings sent per API request.
-        anthropic_api_key_set: Masked Anthropic key (e.g. ``"••••ab12"``)
+        anthropic_api_key_set: Masked Anthropic key (e.g. `"••••ab12"`)
             or empty string if not configured.
         openai_api_key_set: Masked OpenAI key or empty string.
         deepl_api_key_set: Masked DeepL key or empty string.
         ollama_base_url: Ollama server base URL.
         ollama_model: Selected Ollama model name.
-        ollama_vram_tier: Selected VRAM tier (e.g. ``"8gb"``).
-        ollama_status: Ollama status — ``"running"``, ``"stopped"``, or ``"not_installed"``.
+        ollama_vram_tier: Selected VRAM tier (e.g. `"8gb"`).
+        ollama_status: Ollama status — `"running"`, `"stopped"`, or `"not_installed"`.
     """
 
     provider: str
@@ -200,7 +200,7 @@ class SettingsUpdate(BaseModel):
     """Payload for POST /api/settings.
 
     All fields are optional — only include fields that should change.
-    Omitted (``None``) fields are left at their current values.
+    Omitted (`None`) fields are left at their current values.
 
     Attributes:
         provider: New translation provider ID.
@@ -1024,8 +1024,8 @@ async def translate_batch(req: BatchTranslationRequest):
             source_lang, and whether this is the first batch.
 
     Returns:
-        A dict with ``translations`` (key->english), ``suggestions`` (full
-        suggestion objects for review), and ``translated`` count.
+        A dict with `translations` (key->english), `suggestions` (full
+        suggestion objects for review), and `translated` count.
 
     Raises:
         HTTPException: 404 if the mod is not found.
@@ -2007,11 +2007,11 @@ def _update_env_file(updates: dict[str, str]) -> None:
 
     Reads the existing .env line-by-line, replacing matching keys in place
     to preserve comments and ordering. Keys not already present are appended
-    at the end. Also updates ``os.environ`` so the running process sees the
+    at the end. Also updates `os.environ` so the running process sees the
     new values immediately.
 
     Args:
-        updates: Mapping of env-var names (e.g. ``CATL_BATCH_SIZE``) to their
+        updates: Mapping of env-var names (e.g. `CATL_BATCH_SIZE`) to their
             new string values.
     """
     lines: list[str] = []
@@ -2051,8 +2051,8 @@ async def _check_ollama_status() -> str:
     """Check if Ollama is installed and running.
 
     Returns:
-        ``"running"`` if the Ollama API responds, ``"stopped"`` if the binary
-        exists on PATH but the API is unreachable, or ``"not_installed"``
+        `"running"` if the Ollama API responds, `"stopped"` if the binary
+        exists on PATH but the API is unreachable, or `"not_installed"`
         if neither is detected.
     """
     try:
