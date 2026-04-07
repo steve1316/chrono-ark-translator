@@ -47,6 +47,22 @@ class ChronoArkAdapter(GameAdapter):
         "LangRecordsDB.csv",
         "LangSystemDB.csv",
     ]
+    # Key prefixes → CSV file mapping based on base game conventions.
+    # Everything not listed here defaults to LangDataDB.csv.
+    _KEY_PREFIX_TO_CSV: dict[str, str] = {
+        "Dialogue": "LangDialogueDB.csv",
+        "Record": "LangRecordsDB.csv",
+        "Battle": "LangSystemDB.csv",
+        "CharText": "LangSystemDB.csv",
+        "Chartext": "LangSystemDB.csv",
+        "Font": "LangSystemDB.csv",
+        "Name": "LangSystemDB.csv",
+        "Story": "LangSystemDB.csv",
+        "StoryGlitch": "LangSystemDB.csv",
+        "StoryNames": "LangSystemDB.csv",
+        "System": "LangSystemDB.csv",
+        "UI": "LangSystemDB.csv",
+    }
     _CSV_COLUMNS = [
         "Key",
         "Type",
@@ -76,6 +92,27 @@ class ChronoArkAdapter(GameAdapter):
         "items": "Item_Equip/",
         "passives": "Item_Passive/",
     }
+
+    @staticmethod
+    def csv_for_key(key: str) -> str:
+        """Return the canonical CSV filename for a localization key based on its prefix."""
+        prefix = key.split("/", 1)[0] if "/" in key else ""
+        csv = ChronoArkAdapter._KEY_PREFIX_TO_CSV.get(prefix)
+        if csv:
+            return csv
+        # Keys with a known LangDataDB prefix go there; everything else
+        # (custom mod keys without a slash, unknown prefixes) → LangSystemDB.
+        _DATA_PREFIXES = {
+            "ArkUpgrade", "Buff", "Character", "Character_Skin", "CurseList",
+            "EnchantList", "Enemy", "Item_Active", "Item_Consume",
+            "Item_Equip", "Item_Friendship", "Item_Misc", "Item_Passive",
+            "Item_Potions", "Item_Scroll", "RandomEvent",
+            "SimpleCampDialogue", "Skill", "SkillExtended", "SkillKeyword",
+            "SpecialKey", "SpecialRule", "UnlockWindow",
+        }
+        if prefix in _DATA_PREFIXES:
+            return "LangDataDB.csv"
+        return "LangSystemDB.csv"
 
     @property
     def game_id(self) -> str:

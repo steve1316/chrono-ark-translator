@@ -1585,14 +1585,14 @@ async def export_mod(mod_id: str):
     gdata_translations: dict[str, str] = {}
     by_source: dict[str, list] = {}
     for key, loc_str in strings.items():
-        source = loc_str.source_file or "LangDataDB.csv"
+        source = loc_str.source_file or _adapter.csv_for_key(loc_str.key)
         if source.lower().endswith(".json"):
             english = loc_str.translations.get("English", "")
             if english:
                 gdata_translations[key] = english
         else:
             if source.lower().endswith(".dll"):
-                source = "LangDataDB.csv"
+                source = _adapter.csv_for_key(loc_str.key)
             if source not in by_source:
                 by_source[source] = []
             by_source[source].append(loc_str)

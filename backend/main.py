@@ -487,7 +487,7 @@ def cmd_export(args: argparse.Namespace, adapter: GameAdapter) -> None:
     # Group strings by source file.
     by_source: dict[str, list] = {}
     for key, loc_str in strings.items():
-        source = loc_str.source_file or "LangDataDB.csv"
+        source = loc_str.source_file or adapter.csv_for_key(loc_str.key)
         if source not in by_source:
             by_source[source] = []
         by_source[source].append(loc_str)
