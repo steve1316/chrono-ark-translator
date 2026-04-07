@@ -635,9 +635,43 @@ async def reset_mod(mod_id: str):
                 shutil.copy2(src, dest)
                 csv_restored = True
 
+    # Restore original gdata JSON files if we have them.
+    gdata_restored = False
+    original_gdata_dir = mod_storage / "original_gdata"
+    if original_gdata_dir.exists():
+        mod_path = _find_mod_path(mod_id)
+        gdata_dest = mod_path / "gdata" / "Add"
+        gdata_dest.mkdir(parents=True, exist_ok=True)
+        for src in original_gdata_dir.rglob("*"):
+            if src.is_file():
+                shutil.copy2(src, gdata_dest / src.name)
+                gdata_restored = True
+
+    # Selectively delete only translation-related files and directories,
+    # preserving user-configured data (character context, glossary, etc.).
+    files_to_delete = [
+        "translations.json",
+        "progress.json",
+        "synced_keys.json",
+        "last_export.json",
+        "last_api_responses.json",
+    ]
+    dirs_to_delete = ["history", "original_csvs", "original_gdata"]
+
     try:
-        shutil.rmtree(mod_storage)
-        return {"status": "success", "csv_restored": csv_restored}
+        for filename in files_to_delete:
+            path = mod_storage / filename
+            if path.exists():
+                path.unlink()
+        for dirname in dirs_to_delete:
+            path = mod_storage / dirname
+            if path.exists():
+                shutil.rmtree(path)
+        return {
+            "status": "success",
+            "csv_restored": csv_restored,
+            "gdata_restored": gdata_restored,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reset: {str(e)}")
 

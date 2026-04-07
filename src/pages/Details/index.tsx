@@ -475,7 +475,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             !window.confirm(
                 "Are you sure you want to reset this mod? This will:\n\n" +
                     "• Delete all translation progress and extracted strings\n" +
-                    "• Restore the original CSV files (if previously synced)\n\n" +
+                    "• Restore the original CSV and gdata JSON files (if previously synced)\n\n" +
+                    "Character context and glossary will be preserved.\n" +
                     "A backup will be created first."
             )
         ) {
@@ -489,11 +490,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             if (res.ok) {
                 const data = await res.json()
                 const csvMsg = data.csv_restored ? " Original CSV files restored." : ""
+                const gdataMsg = data.gdata_restored ? " Original gdata JSON files restored." : ""
                 fetchModDetail()
                 fetchExportStatus()
                 fetchSuggestions()
                 fetchModGlossary()
-                setTranslateBanner({ type: "success", message: `Reset complete.${csvMsg}` })
+                setTranslateBanner({ type: "success", message: `Reset complete.${csvMsg}${gdataMsg}` })
             } else {
                 const error = await res.json()
                 alert(`Failed to reset: ${error.detail || "Unknown error"}`)
