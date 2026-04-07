@@ -37,6 +37,7 @@ from backend.translator.base import TranslationProvider
 from backend.translator.claude_provider import ClaudeProvider
 from backend.translator.openai_provider import OpenAIProvider
 from backend.translator.deepl_provider import DeepLProvider
+from backend.translator.ollama_provider import OllamaProvider
 from backend.data.suggestion_manager import add_suggestions
 
 
@@ -56,9 +57,11 @@ def get_provider(provider_name: str) -> TranslationProvider:
         return OpenAIProvider()
     elif provider_name == "deepl":
         return DeepLProvider()
+    elif provider_name == "ollama":
+        return OllamaProvider()
     else:
         print(f"Unknown provider: {provider_name}")
-        print("Available: claude, openai, deepl")
+        print("Available: claude, openai, deepl, ollama")
         sys.exit(1)
 
 

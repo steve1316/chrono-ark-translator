@@ -26,9 +26,15 @@ ANTHROPIC_API_KEY = os.environ.get("CATL_ANTHROPIC_API_KEY", "")
 OPENAI_API_KEY = os.environ.get("CATL_OPENAI_API_KEY", "")
 DEEPL_API_KEY = os.environ.get("CATL_DEEPL_API_KEY", "")
 
+# ── Ollama Settings ───────────────────────────────────────────────────────────
+
+OLLAMA_BASE_URL = os.environ.get("CATL_OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.environ.get("CATL_OLLAMA_MODEL", "qwen2.5:7b")
+OLLAMA_VRAM_TIER = os.environ.get("CATL_OLLAMA_VRAM_TIER", "")
+
 # ── Translation Settings ──────────────────────────────────────────────────────
 
-# Default translation provider (claude, openai, deepl, manual).
+# Default translation provider (claude, openai, deepl, ollama, manual).
 TRANSLATION_PROVIDER = os.environ.get("CATL_TRANSLATION_PROVIDER", "claude")
 
 # Number of strings to send per LLM API batch request.

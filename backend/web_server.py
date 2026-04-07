@@ -5,15 +5,21 @@ Provides REST APIs for mod discovery, string extraction, translation status,
 glossary management, and triggering translation jobs.
 """
 
+import asyncio
 import hashlib
 import os
 import json
+import subprocess
+import tempfile
+import urllib.request
 import uvicorn
 import shutil
+import httpx
 from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from backend import config
@@ -163,12 +169,16 @@ class SettingsResponse(BaseModel):
     """Current application settings returned by GET /api/settings.
 
     Attributes:
-        provider: Active translation provider ID (claude, openai, deepl, manual).
+        provider: Active translation provider ID (claude, openai, deepl, ollama, manual).
         batch_size: Number of strings sent per API request.
         anthropic_api_key_set: Masked Anthropic key (e.g. ``"••••ab12"``)
             or empty string if not configured.
         openai_api_key_set: Masked OpenAI key or empty string.
         deepl_api_key_set: Masked DeepL key or empty string.
+        ollama_base_url: Ollama server base URL.
+        ollama_model: Selected Ollama model name.
+        ollama_vram_tier: Selected VRAM tier (e.g. ``"8gb"``).
+        ollama_status: Ollama status — ``"running"``, ``"stopped"``, or ``"not_installed"``.
     """
 
     provider: str
@@ -176,6 +186,10 @@ class SettingsResponse(BaseModel):
     anthropic_api_key_set: str
     openai_api_key_set: str
     deepl_api_key_set: str
+    ollama_base_url: str
+    ollama_model: str
+    ollama_vram_tier: str
+    ollama_status: str
 
 
 class SettingsUpdate(BaseModel):
@@ -190,6 +204,9 @@ class SettingsUpdate(BaseModel):
         anthropic_api_key: New Anthropic API key value.
         openai_api_key: New OpenAI API key value.
         deepl_api_key: New DeepL API key value.
+        ollama_base_url: New Ollama base URL.
+        ollama_model: New Ollama model name.
+        ollama_vram_tier: New VRAM tier selection.
     """
 
     provider: Optional[str] = None
@@ -197,6 +214,9 @@ class SettingsUpdate(BaseModel):
     anthropic_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     deepl_api_key: Optional[str] = None
+    ollama_base_url: Optional[str] = None
+    ollama_model: Optional[str] = None
+    ollama_vram_tier: Optional[str] = None
 
 
 # --- Helpers ---
@@ -1819,15 +1839,126 @@ def _update_env_file(updates: dict[str, str]) -> None:
         os.environ[key] = value
 
 
+# ── Ollama Management ─────────────────────────────────────────────────────────
+
+
+async def _check_ollama_status() -> str:
+    """Check if Ollama is installed and running.
+
+    Returns:
+        ``"running"`` if the Ollama API responds, ``"stopped"`` if the binary
+        exists on PATH but the API is unreachable, or ``"not_installed"``
+        if neither is detected.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{config.OLLAMA_BASE_URL}/api/tags", timeout=1.0)
+        if resp.status_code == 200:
+            return "running"
+        return "stopped"
+    except httpx.ConnectError:
+        if shutil.which("ollama") is not None:
+            return "stopped"
+        return "not_installed"
+    except Exception:
+        return "stopped"
+
+
+@app.get("/api/ollama/status")
+async def get_ollama_status():
+    """Check Ollama installation status and list available models."""
+    status = await _check_ollama_status()
+    models: list[dict] = []
+    if status == "running":
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(f"{config.OLLAMA_BASE_URL}/api/tags", timeout=3.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                models = [
+                    {"name": m["name"], "size": m.get("size", 0), "modified_at": m.get("modified_at", "")}
+                    for m in data.get("models", [])
+                ]
+        except Exception:
+            pass
+    return {"status": status, "models": models, "base_url": config.OLLAMA_BASE_URL}
+
+
+@app.get("/api/ollama/models")
+async def get_ollama_models():
+    """List models currently downloaded in Ollama."""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{config.OLLAMA_BASE_URL}/api/tags", timeout=3.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            return {"models": data.get("models", [])}
+        raise HTTPException(502, "Ollama returned non-200 status")
+    except httpx.ConnectError:
+        raise HTTPException(503, "Cannot connect to Ollama. Is it running?")
+
+
+class OllamaPullRequest(BaseModel):
+    """Request body for POST /api/ollama/pull."""
+
+    model: str
+
+
+@app.post("/api/ollama/pull")
+async def pull_ollama_model(req: OllamaPullRequest):
+    """Pull (download) an Ollama model with streaming progress via SSE."""
+
+    async def event_stream():
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream(
+                "POST",
+                f"{config.OLLAMA_BASE_URL}/api/pull",
+                json={"name": req.model, "stream": True},
+            ) as response:
+                async for line in response.aiter_lines():
+                    if line.strip():
+                        yield f"data: {line}\n\n"
+        yield 'data: {"status": "done"}\n\n'
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.post("/api/ollama/install")
+async def install_ollama():
+    """Download and launch the official Ollama Windows installer."""
+    if await _check_ollama_status() == "running":
+        return {"success": True, "message": "Ollama is already installed and running."}
+
+    try:
+        installer_url = "https://ollama.com/download/OllamaSetup.exe"
+        temp_dir = tempfile.mkdtemp()
+        installer_path = os.path.join(temp_dir, "OllamaSetup.exe")
+
+        await asyncio.to_thread(urllib.request.urlretrieve, installer_url, installer_path)
+
+        subprocess.Popen([installer_path], shell=False)
+
+        return {"success": True, "message": "Installer launched. Complete the installation wizard, then check status again."}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to download/launch installer: {e}")
+
+
+# ── Settings ──────────────────────────────────────────────────────────────────
+
+
 @app.get("/api/settings")
 async def get_settings():
-    """Return current provider, batch size, and masked API key status."""
+    """Return current provider, batch size, masked API key status, and Ollama settings."""
     return SettingsResponse(
         provider=config.TRANSLATION_PROVIDER,
         batch_size=config.BATCH_SIZE,
         anthropic_api_key_set=_mask_key(config.ANTHROPIC_API_KEY),
         openai_api_key_set=_mask_key(config.OPENAI_API_KEY),
         deepl_api_key_set=_mask_key(config.DEEPL_API_KEY),
+        ollama_base_url=config.OLLAMA_BASE_URL,
+        ollama_model=config.OLLAMA_MODEL,
+        ollama_vram_tier=config.OLLAMA_VRAM_TIER,
+        ollama_status="unknown",
     )
 
 
@@ -1837,7 +1968,7 @@ async def update_settings(payload: SettingsUpdate):
     env_updates: dict[str, str] = {}
 
     if payload.provider is not None:
-        if payload.provider not in ("claude", "openai", "deepl", "manual"):
+        if payload.provider not in ("claude", "openai", "deepl", "ollama", "manual"):
             raise HTTPException(400, f"Invalid provider: {payload.provider}")
         config.TRANSLATION_PROVIDER = payload.provider
         env_updates["CATL_TRANSLATION_PROVIDER"] = payload.provider
@@ -1859,6 +1990,18 @@ async def update_settings(payload: SettingsUpdate):
     if payload.deepl_api_key is not None:
         config.DEEPL_API_KEY = payload.deepl_api_key
         env_updates["CATL_DEEPL_API_KEY"] = payload.deepl_api_key
+
+    if payload.ollama_base_url is not None:
+        config.OLLAMA_BASE_URL = payload.ollama_base_url
+        env_updates["CATL_OLLAMA_BASE_URL"] = payload.ollama_base_url
+
+    if payload.ollama_model is not None:
+        config.OLLAMA_MODEL = payload.ollama_model
+        env_updates["CATL_OLLAMA_MODEL"] = payload.ollama_model
+
+    if payload.ollama_vram_tier is not None:
+        config.OLLAMA_VRAM_TIER = payload.ollama_vram_tier
+        env_updates["CATL_OLLAMA_VRAM_TIER"] = payload.ollama_vram_tier
 
     if env_updates:
         _update_env_file(env_updates)
