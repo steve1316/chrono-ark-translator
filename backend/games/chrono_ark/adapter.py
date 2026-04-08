@@ -103,12 +103,29 @@ class ChronoArkAdapter(GameAdapter):
         # Keys with a known LangDataDB prefix go there; everything else
         # (custom mod keys without a slash, unknown prefixes) → LangSystemDB.
         _DATA_PREFIXES = {
-            "ArkUpgrade", "Buff", "Character", "Character_Skin", "CurseList",
-            "EnchantList", "Enemy", "Item_Active", "Item_Consume",
-            "Item_Equip", "Item_Friendship", "Item_Misc", "Item_Passive",
-            "Item_Potions", "Item_Scroll", "RandomEvent",
-            "SimpleCampDialogue", "Skill", "SkillExtended", "SkillKeyword",
-            "SpecialKey", "SpecialRule", "UnlockWindow",
+            "ArkUpgrade",
+            "Buff",
+            "Character",
+            "Character_Skin",
+            "CurseList",
+            "EnchantList",
+            "Enemy",
+            "Item_Active",
+            "Item_Consume",
+            "Item_Equip",
+            "Item_Friendship",
+            "Item_Misc",
+            "Item_Passive",
+            "Item_Potions",
+            "Item_Scroll",
+            "RandomEvent",
+            "SimpleCampDialogue",
+            "Skill",
+            "SkillExtended",
+            "SkillKeyword",
+            "SpecialKey",
+            "SpecialRule",
+            "UnlockWindow",
         }
         if prefix in _DATA_PREFIXES:
             return "LangDataDB.csv"
@@ -290,9 +307,7 @@ class ChronoArkAdapter(GameAdapter):
                     row.append(entry.translations.get(lang, ""))
                 writer.writerow(row)
 
-    def export_gdata_strings(
-        self, mod_path: Path, translations: dict[str, str]
-    ) -> list[str]:
+    def export_gdata_strings(self, mod_path: Path, translations: dict[str, str]) -> list[str]:
         """Write translations back into a mod's gdata JSON files.
 
         Args:

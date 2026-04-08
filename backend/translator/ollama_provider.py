@@ -199,9 +199,7 @@ class OllamaProvider(TranslationProvider):
                 return translations, suggestions
 
             except requests.ConnectionError:
-                raise RuntimeError(
-                    f"Cannot connect to Ollama at {self._base_url}. Is Ollama running?"
-                )
+                raise RuntimeError(f"Cannot connect to Ollama at {self._base_url}. Is Ollama running?")
             except requests.HTTPError as e:
                 if attempt == max_retries - 1:
                     print(f"  Ollama API error after {max_retries} retries: {e}")

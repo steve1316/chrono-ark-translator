@@ -348,9 +348,7 @@ const SettingsPage: React.FC = () => {
                     {/* Install Button */}
                     {ollamaStatus === "not_installed" && (
                         <div style={{ marginBottom: "1.25rem" }}>
-                            <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginBottom: "0.75rem" }}>
-                                Ollama is not installed. Click below to download and install it automatically.
-                            </p>
+                            <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginBottom: "0.75rem" }}>Ollama is not installed. Click below to download and install it automatically.</p>
                             <button className="btn btn-primary" disabled={ollamaInstalling} onClick={handleOllamaInstall}>
                                 <FaDownload style={{ marginRight: "0.5rem" }} />
                                 {ollamaInstalling ? "Downloading installer..." : "Install Ollama"}
@@ -361,9 +359,7 @@ const SettingsPage: React.FC = () => {
                     {/* VRAM Tier Selector */}
                     <div style={{ marginBottom: "1.25rem" }}>
                         <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.9rem", display: "block", marginBottom: "0.5rem" }}>GPU VRAM Tier</label>
-                        <p style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
-                            Select your GPU's VRAM to get the best model recommendation for translation quality.
-                        </p>
+                        <p style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "0.75rem" }}>Select your GPU's VRAM to get the best model recommendation for translation quality.</p>
                         <div className="vram-tier-cards">
                             {VRAM_TIERS.map((t) => (
                                 <div key={t.tier} className={`vram-tier-card ${ollamaVramTier === t.tier ? "active" : ""}`} onClick={() => handleVramTierSelect(t)}>
@@ -410,10 +406,7 @@ const SettingsPage: React.FC = () => {
                                     <div style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "0.25rem" }}>{ollamaPullProgress.status}...</div>
                                     {ollamaPullProgress.total && ollamaPullProgress.total > 0 && (
                                         <div className="ollama-progress-bar">
-                                            <div
-                                                className="ollama-progress-fill"
-                                                style={{ width: `${Math.round(((ollamaPullProgress.completed || 0) / ollamaPullProgress.total) * 100)}%` }}
-                                            />
+                                            <div className="ollama-progress-fill" style={{ width: `${Math.round(((ollamaPullProgress.completed || 0) / ollamaPullProgress.total) * 100)}%` }} />
                                         </div>
                                     )}
                                     {ollamaPullProgress.total && ollamaPullProgress.total > 0 && (
@@ -475,9 +468,7 @@ const SettingsPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.85rem", display: "block", marginBottom: "0.25rem" }}>Model (override)</label>
-                                    <p style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginBottom: "0.25rem" }}>
-                                        Use an installed model instead of the recommended one above.
-                                    </p>
+                                    <p style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginBottom: "0.25rem" }}>Use an installed model instead of the recommended one above.</p>
                                     {(() => {
                                         const overrideModels = ollamaModels.filter((m) => !VRAM_TIERS.some((t) => t.model === m))
                                         return overrideModels.length > 0 ? (
@@ -511,9 +502,7 @@ const SettingsPage: React.FC = () => {
                                                 ))}
                                             </select>
                                         ) : (
-                                            <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
-                                                {ollamaStatus === "running" ? "No other models installed" : "Ollama not running"}
-                                            </span>
+                                            <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>{ollamaStatus === "running" ? "No other models installed" : "Ollama not running"}</span>
                                         )
                                     })()}
                                 </div>
