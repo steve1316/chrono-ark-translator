@@ -1617,10 +1617,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                             style={{ padding: "0.75rem", marginBottom: "0.5rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}
                                         >
                                             <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", marginBottom: "0.25rem" }}>{item.key}</div>
-                                            {replacePreview.oldTerm ? (
+                                            {item.old_text !== item.new_text ? (
                                                 <>
                                                     <div style={{ marginBottom: "0.25rem" }}>
-                                                        <span style={{ color: "#ff6b6b", textDecoration: "line-through" }}>{item.old_text}</span>
+                                                        <span style={{ color: "#ff6b6b", textDecoration: "line-through" }}>{item.old_text || <em style={{ color: "var(--text-dim)" }}>empty</em>}</span>
                                                     </div>
                                                     <div>
                                                         <span style={{ color: "#34d399" }}>{item.new_text}</span>
@@ -1628,7 +1628,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                 </>
                                             ) : (
                                                 <div>
-                                                    <span style={{ color: "var(--text-main)" }}>{item.old_text || <em style={{ color: "var(--text-dim)" }}>empty</em>}</span>
+                                                    <span style={{ color: "var(--text-main)" }}>{item.old_text}</span>
                                                 </div>
                                             )}
                                         </div>
