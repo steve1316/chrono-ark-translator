@@ -406,6 +406,14 @@ async def get_mod_detail(mod_id: str):
         except Exception:
             pass
 
+    # If export snapshot has drifted (CSV files deleted/changed, new
+    # translations), the per-row synced status is stale — clear it.
+    if synced_keys:
+        current_hash = _compute_export_snapshot(mod_id, mod_path)
+        last_hash = _load_last_export_hash(mod_id)
+        if current_hash != last_hash:
+            synced_keys = set()
+
     # Apply saved translations so user edits (including clears) are respected.
     for key, english in translations.items():
         if key in strings:
