@@ -91,7 +91,13 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
 
     const [exporting, setExporting] = useState(false)
     const [showApiResponses, setShowApiResponses] = useState(false)
-    const [replacePreview, setReplacePreview] = useState<{ oldTerm: string; newTerm: string; affected: { key: string; old_text: string; new_text: string }[] } | null>(null)
+    const [replacePreview, setReplacePreview] = useState<{
+        oldTerm: string
+        newTerm: string
+        sourceText: string
+        needsInput: boolean
+        affected: { key: string; old_text: string; new_text: string }[]
+    } | null>(null)
     const [apiResponses, setApiResponses] = useState<any[]>([])
     const [activeResponseIdx, setActiveResponseIdx] = useState(0)
     const [showHistory, setShowHistory] = useState(false)
@@ -1195,29 +1201,24 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                     >
                                                         Edit
                                                     </button>
-                                                    {renamedTerm && renamedTerm.newName === english && (
-                                                        <button
-                                                            className="btn btn-outline"
-                                                            style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "var(--accent-primary)", borderColor: "rgba(138,180,248,0.3)" }}
-                                                            onClick={async () => {
-                                                                try {
-                                                                    const res = await fetch(`${API_BASE}/mods/${modId}/glossary/replace-preview`, {
-                                                                        method: "POST",
-                                                                        headers: { "Content-Type": "application/json" },
-                                                                        body: JSON.stringify({ old_english: renamedTerm.oldName, new_english: renamedTerm.newName }),
-                                                                    })
-                                                                    if (res.ok) {
-                                                                        const data = await res.json()
-                                                                        setReplacePreview({ oldTerm: renamedTerm.oldName, newTerm: renamedTerm.newName, affected: data.affected })
-                                                                    }
-                                                                } catch (err) {
-                                                                    console.error("Failed to preview replacement:", err)
-                                                                }
-                                                            }}
-                                                        >
-                                                            Replace in translations
-                                                        </button>
-                                                    )}
+                                                    <button
+                                                        className="btn btn-outline"
+                                                        style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "var(--accent-primary)", borderColor: "rgba(138,180,248,0.3)" }}
+                                                        onClick={() => {
+                                                            const oldEnglish = renamedTerm && renamedTerm.newName === english ? renamedTerm.oldName : ""
+                                                            const sourceText = Object.values(info.source_mappings || {})[0] || ""
+                                                            if (!sourceText) return
+                                                            const sourceMatches = strings.filter((s) => s.source.includes(sourceText))
+                                                            const affected = oldEnglish
+                                                                ? sourceMatches
+                                                                      .filter((s) => s.english.includes(oldEnglish))
+                                                                      .map((s) => ({ key: s.key, old_text: s.english, new_text: s.english.replace(new RegExp(oldEnglish.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), english) }))
+                                                                : sourceMatches.map((s) => ({ key: s.key, old_text: s.english, new_text: english }))
+                                                            setReplacePreview({ oldTerm: oldEnglish, newTerm: english, sourceText, needsInput: !oldEnglish, affected })
+                                                        }}
+                                                    >
+                                                        Apply
+                                                    </button>
                                                     <button
                                                         className="btn btn-outline"
                                                         style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
@@ -1547,7 +1548,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                     <div className="glass-card" style={{ width: "800px", maxHeight: "80vh", overflow: "auto", padding: "2rem" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                             <h2 style={{ margin: 0 }}>
-                                Replace "{replacePreview.oldTerm}" with "{replacePreview.newTerm}"
+                                Apply glossary term: "{replacePreview.newTerm}"
                             </h2>
                             <button
                                 onClick={() => {
@@ -1569,11 +1570,46 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 &times;
                             </button>
                         </div>
+                        <p style={{ color: "var(--text-dim)", marginBottom: "1rem", fontSize: "0.85rem" }}>
+                            Rows where source contains "{replacePreview.sourceText}"
+                        </p>
+                        {replacePreview.needsInput && (
+                            <div style={{ marginBottom: "1rem" }}>
+                                <input
+                                    type="text"
+                                    placeholder="Old English text to find and replace"
+                                    value={replacePreview.oldTerm}
+                                    onChange={(e) => {
+                                        const oldTerm = e.target.value
+                                        const sourceMatches = strings.filter((s) => s.source.includes(replacePreview.sourceText))
+                                        const affected = oldTerm
+                                            ? sourceMatches
+                                                  .filter((s) => s.english.includes(oldTerm))
+                                                  .map((s) => ({ key: s.key, old_text: s.english, new_text: replacePreview.newTerm }))
+                                            : sourceMatches.map((s) => ({ key: s.key, old_text: s.english, new_text: replacePreview.newTerm }))
+                                        setReplacePreview({ ...replacePreview, oldTerm, affected })
+                                    }}
+                                    style={{
+                                        padding: "0.5rem",
+                                        borderRadius: "6px",
+                                        background: "rgba(0,0,0,0.2)",
+                                        border: "1px solid var(--glass-border)",
+                                        color: "var(--text-main)",
+                                        width: "100%",
+                                    }}
+                                />
+                            </div>
+                        )}
                         {replacePreview.affected.length === 0 ? (
-                            <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>No translations contain "{replacePreview.oldTerm}". Nothing to replace.</p>
+                            <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>
+                                {replacePreview.oldTerm ? "No matches found." : "No rows found with this source text."}
+                            </p>
                         ) : (
                             <>
-                                <p style={{ color: "var(--text-dim)", marginBottom: "1rem" }}>{replacePreview.affected.length} translation(s) will be updated:</p>
+                                <p style={{ color: "var(--text-dim)", marginBottom: "1rem" }}>
+                                    {replacePreview.affected.length} row(s) found
+                                    {replacePreview.oldTerm ? ` — replacing "${replacePreview.oldTerm}" with "${replacePreview.newTerm}"` : ""}:
+                                </p>
                                 <div style={{ maxHeight: "50vh", overflow: "auto", marginBottom: "1rem" }}>
                                     {replacePreview.affected.map((item) => (
                                         <div
@@ -1581,50 +1617,59 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                             style={{ padding: "0.75rem", marginBottom: "0.5rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}
                                         >
                                             <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", marginBottom: "0.25rem" }}>{item.key}</div>
-                                            <div style={{ marginBottom: "0.25rem" }}>
-                                                <span style={{ color: "#ff6b6b", textDecoration: "line-through" }}>{item.old_text}</span>
-                                            </div>
-                                            <div>
-                                                <span style={{ color: "#34d399" }}>{item.new_text}</span>
-                                            </div>
+                                            {replacePreview.oldTerm ? (
+                                                <>
+                                                    <div style={{ marginBottom: "0.25rem" }}>
+                                                        <span style={{ color: "#ff6b6b", textDecoration: "line-through" }}>{item.old_text}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span style={{ color: "#34d399" }}>{item.new_text}</span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div>
+                                                    <span style={{ color: "var(--text-main)" }}>{item.old_text || <em style={{ color: "var(--text-dim)" }}>empty</em>}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
-                                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-                                    <button
-                                        className="btn btn-outline"
-                                        onClick={() => {
-                                            setReplacePreview(null)
-                                            setRenamedTerm(null)
-                                        }}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={async () => {
-                                            try {
-                                                const res = await fetch(`${API_BASE}/mods/${modId}/glossary/replace-apply`, {
-                                                    method: "POST",
-                                                    headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify({ old_english: replacePreview.oldTerm, new_english: replacePreview.newTerm }),
-                                                })
-                                                if (res.ok) {
-                                                    const data = await res.json()
+                                {replacePreview.affected.some((item) => item.old_text !== item.new_text) && (
+                                    <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                                        <button
+                                            className="btn btn-outline"
+                                            onClick={() => {
+                                                setReplacePreview(null)
+                                                setRenamedTerm(null)
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={async () => {
+                                                try {
+                                                    for (const item of replacePreview.affected) {
+                                                        await fetch(`${API_BASE}/mods/${modId}/strings`, {
+                                                            method: "POST",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify({ key: item.key, english: item.new_text }),
+                                                        })
+                                                    }
                                                     setReplacePreview(null)
                                                     setRenamedTerm(null)
-                                                    setTranslateBanner({ type: "success", message: `Replaced "${replacePreview.oldTerm}" in ${data.replaced} translation(s).` })
+                                                    setTranslateBanner({ type: "success", message: `Applied "${replacePreview.newTerm}" to ${replacePreview.affected.length} translation(s).` })
                                                     fetchModDetail(true)
                                                     fetchExportStatus()
+                                                } catch (err) {
+                                                    console.error("Failed to apply replacement:", err)
                                                 }
-                                            } catch (err) {
-                                                console.error("Failed to apply replacement:", err)
-                                            }
-                                        }}
-                                    >
-                                        Apply {replacePreview.affected.length} Replacement(s)
-                                    </button>
-                                </div>
+                                            }}
+                                        >
+                                            Apply {replacePreview.affected.length} Replacement(s)
+                                        </button>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
@@ -1673,7 +1718,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                     ) : null
                                 })()}
                                 <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
-                                    {apiResponses.map((r: any, idx: number) => (
+                                    {apiResponses.map((_: any, idx: number) => (
                                         <button
                                             key={idx}
                                             className={`btn ${activeResponseIdx === idx ? "btn-primary" : "btn-outline"}`}
