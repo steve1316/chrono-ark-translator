@@ -1213,7 +1213,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                                 ? sourceMatches
                                                                       .filter((s) => s.english.includes(oldEnglish))
                                                                       .map((s) => ({ key: s.key, old_text: s.english, new_text: s.english.replace(new RegExp(oldEnglish.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), english) }))
-                                                                : sourceMatches.map((s) => ({ key: s.key, old_text: s.english, new_text: english }))
+                                                                : sourceMatches
+                                                                      .filter((s) => !s.english)
+                                                                      .map((s) => ({ key: s.key, old_text: s.english, new_text: english }))
                                                             setReplacePreview({ oldTerm: oldEnglish, newTerm: english, sourceText, needsInput: !oldEnglish, affected })
                                                         }}
                                                     >
@@ -1585,8 +1587,13 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                         const affected = oldTerm
                                             ? sourceMatches
                                                   .filter((s) => s.english.includes(oldTerm))
+                                                  .map((s) => {
+                                                      const escaped = oldTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+                                                      return { key: s.key, old_text: s.english, new_text: s.english.replace(new RegExp(escaped, "g"), replacePreview.newTerm) }
+                                                  })
+                                            : sourceMatches
+                                                  .filter((s) => !s.english)
                                                   .map((s) => ({ key: s.key, old_text: s.english, new_text: replacePreview.newTerm }))
-                                            : sourceMatches.map((s) => ({ key: s.key, old_text: s.english, new_text: replacePreview.newTerm }))
                                         setReplacePreview({ ...replacePreview, oldTerm, affected })
                                     }}
                                     style={{
@@ -1602,7 +1609,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                         )}
                         {replacePreview.affected.length === 0 ? (
                             <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>
-                                {replacePreview.oldTerm ? "No matches found." : "No rows found with this source text."}
+                                {replacePreview.oldTerm
+                                    ? `No rows found with source "${replacePreview.sourceText}" and English containing "${replacePreview.oldTerm}".`
+                                    : `No rows found with source "${replacePreview.sourceText}" and empty English.`}
                             </p>
                         ) : (
                             <>
@@ -1620,10 +1629,30 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                             {item.old_text !== item.new_text ? (
                                                 <>
                                                     <div style={{ marginBottom: "0.25rem" }}>
-                                                        <span style={{ color: "#ff6b6b", textDecoration: "line-through" }}>{item.old_text || <em style={{ color: "var(--text-dim)" }}>empty</em>}</span>
+                                                        {replacePreview.oldTerm ? (
+                                                            item.old_text.split(new RegExp(`(${replacePreview.oldTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "g")).map((part, i) =>
+                                                                part === replacePreview.oldTerm ? (
+                                                                    <span key={i} style={{ color: "#ff6b6b", textDecoration: "line-through" }}>{part}</span>
+                                                                ) : (
+                                                                    <span key={i} style={{ color: "var(--text-main)" }}>{part}</span>
+                                                                )
+                                                            )
+                                                        ) : (
+                                                            <span style={{ color: "#ff6b6b", textDecoration: "line-through" }}>{item.old_text || <em style={{ color: "var(--text-dim)" }}>empty</em>}</span>
+                                                        )}
                                                     </div>
                                                     <div>
-                                                        <span style={{ color: "#34d399" }}>{item.new_text}</span>
+                                                        {replacePreview.oldTerm ? (
+                                                            item.new_text.split(new RegExp(`(${replacePreview.newTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "g")).map((part, i) =>
+                                                                part === replacePreview.newTerm ? (
+                                                                    <span key={i} style={{ color: "#34d399" }}>{part}</span>
+                                                                ) : (
+                                                                    <span key={i} style={{ color: "var(--text-main)" }}>{part}</span>
+                                                                )
+                                                            )
+                                                        ) : (
+                                                            <span style={{ color: "#34d399" }}>{item.new_text}</span>
+                                                        )}
                                                     </div>
                                                 </>
                                             ) : (
