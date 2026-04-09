@@ -592,9 +592,10 @@ async def get_mod_detail(mod_id: str):
             translated_keys.append(key)
 
         has_override = key in translations
-        # A row is synced if it was explicitly exported OR if it already has
-        # English in the CSV and was never overridden by the user.
-        is_synced = key in synced_keys or (bool(original_english_map.get(key, "")) and not has_override)
+        # A row is synced if it was explicitly exported OR if its English
+        # value matches the CSV and was never overridden by the user.
+        csv_english = original_english_map.get(key, "")
+        is_synced = key in synced_keys or (bool(csv_english) and not has_override and english == csv_english)
         results.append(
             {
                 "key": key,
@@ -747,6 +748,12 @@ async def clear_translations(mod_id: str):
 
     with open(translations_path, "w", encoding="utf-8") as f:
         json.dump(overrides, f, indent=2, ensure_ascii=False)
+
+    # Clear synced state since all translations have been wiped.
+    for filename in ("synced_keys.json", "pre_export_english.json"):
+        path = config.STORAGE_PATH / "mods" / mod_id / filename
+        if path.exists():
+            path.unlink()
 
     # Re-run update so total_keys / hashes stay correct for the dashboard.
     tracker = ProgressTracker()
