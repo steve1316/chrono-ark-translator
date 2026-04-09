@@ -805,10 +805,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                         <button className="btn btn-outline" onClick={fetchHistory} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             History
                         </button>
-                        <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleReset}>
+                        <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleResetConfirm}>
                             Reset
                         </button>
-                        <button className="btn btn-outline" style={{ color: "#ffaa44", borderColor: "rgba(255, 170, 68, 0.3)" }} onClick={handleClearTranslations}>
+                        <button className="btn btn-outline" style={{ color: "#ffaa44", borderColor: "rgba(255, 170, 68, 0.3)" }} onClick={handleClearTranslationsConfirm}>
                             Clear English
                         </button>
                     </div>
@@ -819,12 +819,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             Translate{activeProvider ? ` (${activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})` : ""}
                         </button>
                         {hasExportChanges ? (
-                            <button className="btn btn-primary" onClick={() => handleExport()} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <button className="btn btn-primary" onClick={() => handleExportConfirm(false)} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                                 <FaFileExport />
                                 {exporting ? "Syncing..." : "Sync Changes"}
                             </button>
                         ) : hasPreviousSync ? (
-                            <button className="btn btn-primary" onClick={() => handleExport(true)} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <button className="btn btn-primary" onClick={() => handleExportConfirm(true)} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                                 <FaFileExport />
                                 {exporting ? "Syncing..." : "Re-sync Changes"}
                             </button>
@@ -1001,12 +1001,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             <button
                                 className="btn btn-outline"
                                 style={{ padding: "0.2rem 0.6rem", fontSize: "0.75rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
-                                onClick={async () => {
-                                    if (!window.confirm(`Delete all ${Object.keys(modGlossary).length} glossary term(s)?`)) return
-                                    for (const term of Object.keys(modGlossary)) {
-                                        await fetch(`${API_BASE}/mods/${modId}/glossary/${encodeURIComponent(term)}`, { method: "DELETE" })
-                                    }
-                                    fetchModGlossary()
+                                onClick={() => {
+                                    setConfirmModal({
+                                        type: "delete-all-glossary",
+                                        message: `Delete all ${Object.keys(modGlossary).length} glossary term(s)?`,
+                                    })
                                 }}
                             >
                                 Delete All
@@ -1512,22 +1511,13 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                             <button
                                                 className="btn btn-primary"
                                                 style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
-                                                onClick={async () => {
-                                                    if (!window.confirm(`Restore to backup from ${new Date(entry.created_at).toLocaleString()}? A backup of the current state will be created first.`))
-                                                        return
-                                                    try {
-                                                        const res = await fetch(`${API_BASE}/mods/${modId}/history/${entry.id}/restore`, { method: "POST" })
-                                                        if (res.ok) {
-                                                            setShowHistory(false)
-                                                            setTranslateBanner({ type: "success", message: "Restored from backup successfully." })
-                                                            fetchModDetail()
-                                                            fetchExportStatus()
-                                                            fetchSuggestions()
-                                                            fetchModGlossary()
-                                                        }
-                                                    } catch (err) {
-                                                        console.error("Failed to restore backup:", err)
-                                                    }
+                                                onClick={() => {
+                                                    setConfirmModal({
+                                                        type: "restore-backup",
+                                                        message: `Restore to backup from ${new Date(entry.created_at).toLocaleString()}? A backup of the current state will be created first.`,
+                                                        entryId: entry.id,
+                                                        entryDate: new Date(entry.created_at).toLocaleString(),
+                                                    })
                                                 }}
                                             >
                                                 Restore
@@ -1535,14 +1525,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                             <button
                                                 className="btn btn-outline"
                                                 style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
-                                                onClick={async () => {
-                                                    if (!window.confirm("Delete this backup?")) return
-                                                    try {
-                                                        await fetch(`${API_BASE}/mods/${modId}/history/${entry.id}`, { method: "DELETE" })
-                                                        setHistoryEntries((prev) => prev.filter((e) => e.id !== entry.id))
-                                                    } catch (err) {
-                                                        console.error("Failed to delete backup:", err)
-                                                    }
+                                                onClick={() => {
+                                                    setConfirmModal({
+                                                        type: "delete-backup",
+                                                        message: "Delete this backup?",
+                                                        entryId: entry.id,
+                                                    })
                                                 }}
                                             >
                                                 Delete
@@ -1875,6 +1863,98 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                     onContinue={() => {
                         setShowReviewModal(false)
                         continueAfterReview()
+                    }}
+                />
+            )}
+
+            {/* --- Confirm Modal ---
+                Single reusable confirmation modal that handles all destructive
+                action confirmations. The `confirmModal` state determines which
+                action to dispatch on confirm. */}
+            {confirmModal && (
+                <ConfirmModal
+                    title={
+                        {
+                            export: "Sync Changes",
+                            resync: "Re-sync Changes",
+                            reset: "Reset Mod",
+                            "clear-translations": "Clear Translations",
+                            "delete-all-glossary": "Delete All Glossary Terms",
+                            "restore-backup": "Restore Backup",
+                            "delete-backup": "Delete Backup",
+                        }[confirmModal.type]
+                    }
+                    message={confirmModal.message}
+                    variant={
+                        {
+                            export: "warning" as const,
+                            resync: "warning" as const,
+                            reset: "danger" as const,
+                            "clear-translations": "danger" as const,
+                            "delete-all-glossary": "danger" as const,
+                            "restore-backup": "warning" as const,
+                            "delete-backup": "danger" as const,
+                        }[confirmModal.type]
+                    }
+                    confirmLabel={
+                        {
+                            export: "Sync",
+                            resync: "Re-sync",
+                            reset: "Reset",
+                            "clear-translations": "Clear",
+                            "delete-all-glossary": "Delete All",
+                            "restore-backup": "Restore",
+                            "delete-backup": "Delete",
+                        }[confirmModal.type]
+                    }
+                    onCancel={() => setConfirmModal(null)}
+                    onConfirm={async () => {
+                        const type = confirmModal.type
+                        const entryId = confirmModal.entryId
+                        setConfirmModal(null)
+                        switch (type) {
+                            case "export":
+                                handleExport(false)
+                                break
+                            case "resync":
+                                handleExport(true)
+                                break
+                            case "reset":
+                                handleReset()
+                                break
+                            case "clear-translations":
+                                handleClearTranslations()
+                                break
+                            case "delete-all-glossary":
+                                for (const term of Object.keys(modGlossary)) {
+                                    await fetch(`${API_BASE}/mods/${modId}/glossary/${encodeURIComponent(term)}`, { method: "DELETE" })
+                                }
+                                fetchModGlossary()
+                                break
+                            case "restore-backup":
+                                try {
+                                    const res = await fetch(`${API_BASE}/mods/${modId}/history/${entryId}/restore`, { method: "POST" })
+                                    if (res.ok) {
+                                        setShowHistory(false)
+                                        setTranslateBanner({ type: "success", message: "Restored from backup successfully." })
+                                        fetchModDetail()
+                                        fetchExportStatus()
+                                        fetchSuggestions()
+                                        fetchModGlossary()
+                                    }
+                                } catch (err) {
+                                    console.error("Failed to restore backup:", err)
+                                }
+                                break
+                            case "delete-backup":
+                                try {
+                                    await fetch(`${API_BASE}/mods/${modId}/history/${entryId}`, { method: "DELETE" })
+                                    setHistoryEntries((prev) => prev.filter((e) => e.id !== entryId))
+                                } catch (err) {
+                                    console.error("Failed to delete backup:", err)
+                                }
+                                break
+                        }
                     }}
                 />
             )}
