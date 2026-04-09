@@ -738,7 +738,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             </div>
                             {modAuthor && <p style={{ color: "var(--text-dim)", marginTop: "0.25rem" }}>by {modAuthor}</p>}
                             <p>
-                                {strings.filter((s) => s.is_translated || !s.source.trim()).length} / {strings.length} total strings translated
+                                {strings.filter((s) => s.source.trim() && s.is_translated).length} / {strings.filter((s) => s.source.trim()).length} total strings translated
                             </p>
                         </div>
                     </div>
