@@ -591,7 +591,10 @@ async def get_mod_detail(mod_id: str):
         if is_done:
             translated_keys.append(key)
 
-        is_synced = key in synced_keys
+        has_override = key in translations
+        # A row is synced if it was explicitly exported OR if it already has
+        # English in the CSV and was never overridden by the user.
+        is_synced = key in synced_keys or (bool(original_english_map.get(key, "")) and not has_override)
         results.append(
             {
                 "key": key,
