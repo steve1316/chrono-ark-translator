@@ -1778,11 +1778,7 @@ async def export_mod(mod_id: str, resync: bool = False):
     strings, variant_files = _adapter.extract_strings(mod_path)
 
     # Capture pre-export English values so we can show a diff in the UI.
-    pre_export_english = {
-        key: loc_str.translations.get("English", "")
-        for key, loc_str in strings.items()
-        if key in translations
-    }
+    pre_export_english = {key: loc_str.translations.get("English", "") for key, loc_str in strings.items() if key in translations}
 
     # Apply translations to the English column.
     applied = 0

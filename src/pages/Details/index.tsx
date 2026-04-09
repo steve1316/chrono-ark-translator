@@ -41,7 +41,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [modUrl, setModUrl] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
 
-    const [filter, setFilter] = useState<"all" | "translated" | "untranslated">("all")
+    const [filter, setFilter] = useState<"all" | "missing" | "pending" | "synced">("all")
     const [search, setSearch] = useState("")
 
     const [sortConfig, setSortConfig] = useState<{ key: SortField; direction: SortDirection }>({
@@ -398,7 +398,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
         let result = strings.filter((s) => {
             // A string is "done" if explicitly translated OR its source is blank.
             const isDone = s.is_translated || !s.source.trim()
-            const matchesFilter = filter === "all" || (filter === "translated" && isDone) || (filter === "untranslated" && !isDone)
+            const isPending = isDone && !s.is_synced
+            const matchesFilter = filter === "all" || (filter === "missing" && !isDone) || (filter === "pending" && isPending) || (filter === "synced" && s.is_synced)
 
             // Case-insensitive search across all text columns.
             const matchesSearch =
@@ -980,16 +981,16 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem" }}>
                         <button className={`btn ${filter === "all" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("all")}>
-                            {" "}
-                            All{" "}
+                            All
                         </button>
-                        <button className={`btn ${filter === "untranslated" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("untranslated")}>
-                            {" "}
-                            Missing{" "}
+                        <button className={`btn ${filter === "missing" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("missing")}>
+                            Missing
                         </button>
-                        <button className={`btn ${filter === "translated" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("translated")}>
-                            {" "}
-                            Done{" "}
+                        <button className={`btn ${filter === "pending" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("pending")}>
+                            Pending
+                        </button>
+                        <button className={`btn ${filter === "synced" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("synced")}>
+                            Synced
                         </button>
                     </div>
                 </div>
@@ -1382,7 +1383,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                 The main data table showing all localization strings. Features:
                 - Sticky header row with sortable columns (click header to cycle sort)
                 - Drag-to-resize column handles on each header
-                - Status column shows OK/MISSING badge
+                - Status column shows SYNCED/PENDING/MISSING badge
                 - Source column shows the original language text
                 - English column is inline-editable via the EditableCell component
                 - Rows with overridden translations (english !== original_english)
@@ -1424,7 +1425,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 <tr key={s.key} style={rowStyle}>
                                     <td>
                                         <span className={`status-badge ${s.is_synced ? "status-synced" : isDone ? "status-translated" : "status-missing"}`}>
-                                            {s.is_synced ? "SYNCED" : isDone ? "OK" : "MISSING"}
+                                            {s.is_synced ? "SYNCED" : isDone ? "PENDING" : "MISSING"}
                                         </span>
                                     </td>
                                     <td className="key-cell" title={s.source_file} style={{ maxWidth: columnWidths.source_file }}>
