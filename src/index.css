@@ -409,8 +409,8 @@ th {
 }
 
 .status-translated {
-    background: rgba(16, 185, 129, 0.1);
-    color: var(--success);
+    background: rgba(234, 179, 8, 0.1);
+    color: #eab308;
 }
 .status-missing {
     background: rgba(239, 68, 68, 0.1);
