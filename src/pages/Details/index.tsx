@@ -137,11 +137,13 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             setTranslateBanner({ type: "success", message: `Translated ${batchState.totalTranslated} strings.` })
             fetchSuggestions()
             fetchExportStatus()
+            fetchModDetail(true)
         } else if (batchState.phase === "error") {
             setShowReviewModal(false)
             const partial = batchState.completedBatches > 0 ? ` ${batchState.completedBatches} batch(es) completed before the error.` : ""
             setTranslateBanner({ type: "error", message: `${batchState.message}${partial}` })
             fetchSuggestions()
+            fetchModDetail(true)
         }
     }, [batchState.phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
