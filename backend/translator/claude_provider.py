@@ -415,10 +415,10 @@ class ClaudeProvider(TranslationProvider):
             ascii_chars = len(full_prompt) - cjk_chars
             total_cjk += cjk_chars
             total_ascii += ascii_chars
-            total_input_tokens += int(cjk_chars * 1.5 + ascii_chars / 4) + 100
+            total_input_tokens += int(cjk_chars * 1.5 + ascii_chars * 0.35) + 300
 
             output_chars = sum(len(text) for _, text in batch)
-            total_output_tokens += int(output_chars * 1.5) + 200
+            total_output_tokens += int(output_chars * 1.5) + 500
 
         input_cost_per_m = 3.0
         output_cost_per_m = 15.0

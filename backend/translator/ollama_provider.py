@@ -479,10 +479,10 @@ class OllamaProvider(TranslationProvider):
 
         cjk_chars = sum(1 for c in full_prompt if "\u2e80" <= c <= "\u9fff" or "\uac00" <= c <= "\ud7af" or "\uff00" <= c <= "\uffef")
         ascii_chars = len(full_prompt) - cjk_chars
-        estimated_input_tokens = int(cjk_chars * 1.5 + ascii_chars / 4) + 100
+        estimated_input_tokens = int(cjk_chars * 1.5 + ascii_chars * 0.35) + 300
 
         output_chars = sum(len(text) for _, text in entries)
-        estimated_output_tokens = int(output_chars * 1.5) + 200
+        estimated_output_tokens = int(output_chars * 1.5) + 500
 
         return {
             "estimated_input_tokens": estimated_input_tokens,
