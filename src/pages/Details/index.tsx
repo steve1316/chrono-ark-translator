@@ -19,7 +19,7 @@ interface ModDetailProps {
 }
 
 /** Columns that support click-to-sort in the strings table. */
-type SortField = "is_translated" | "key" | "source_file" | "source" | "english"
+type SortField = "is_translated" | "translated_by" | "key" | "source_file" | "source" | "english"
 
 /**
  * Sort direction for a column: ascending, descending, or null (unsorted).
@@ -51,6 +51,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
 
     const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({
         status: 80,
+        translated_by: 90,
         key: 300,
         source_file: 150,
         source: 500,
@@ -335,7 +336,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                 // Optimistic update: mark translated if English is non-empty or source is blank.
                 setStrings((prev) =>
                     prev.map((s) =>
-                        s.key === key ? { ...s, english: newValue, is_translated: !!newValue || !s.source.trim(), is_synced: s.synced_english !== "" && newValue === s.synced_english } : s
+                        s.key === key
+                            ? { ...s, english: newValue, is_translated: !!newValue || !s.source.trim(), is_synced: s.synced_english !== "" && newValue === s.synced_english, translated_by: "manual" }
+                            : s
                     )
                 )
                 fetchExportStatus()
@@ -1403,6 +1406,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 Status {getSortIcon("is_translated")}
                                 <div className="resizer" onPointerDown={(e) => onResizeStart(e, "status")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
                             </th>
+                            <th className="sortable-th" onClick={() => handleSort("translated_by")} style={{ width: columnWidths.translated_by }}>
+                                Mode {getSortIcon("translated_by")}
+                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "translated_by")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
+                            </th>
                             <th className="sortable-th" onClick={() => handleSort("source_file")} style={{ width: columnWidths.source_file }}>
                                 Source {getSortIcon("source_file")}
                                 <div className="resizer" onPointerDown={(e) => onResizeStart(e, "source_file")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
@@ -1433,6 +1440,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                         <span className={`status-badge ${s.is_synced ? "status-synced" : isDone ? "status-translated" : "status-missing"}`}>
                                             {s.is_synced ? "SYNCED" : isDone ? "PENDING" : "MISSING"}
                                         </span>
+                                    </td>
+                                    <td className="key-cell" title={s.translated_by} style={{ maxWidth: columnWidths.translated_by }}>
+                                        {s.translated_by || "—"}
                                     </td>
                                     <td className="key-cell" title={s.source_file} style={{ maxWidth: columnWidths.source_file }}>
                                         {s.source_file}

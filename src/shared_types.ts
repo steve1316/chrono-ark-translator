@@ -68,6 +68,8 @@ export type LocString = {
     synced_english: string
     /** The source file (CSV/JSON/DLL) this string was extracted from. */
     source_file: string
+    /** Which translation provider produced this translation (e.g., "claude", "ollama", "manual"), or empty if unknown. */
+    translated_by: string
 }
 
 /**

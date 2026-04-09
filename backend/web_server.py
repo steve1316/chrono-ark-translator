@@ -536,6 +536,16 @@ async def get_mod_detail(mod_id: str):
         except Exception:
             pass
 
+    # Load translation provider info per key.
+    providers_path = config.STORAGE_PATH / "mods" / mod_id / "translation_providers.json"
+    translation_providers: dict[str, str] = {}
+    if providers_path.exists():
+        try:
+            with open(providers_path, "r", encoding="utf-8") as f:
+                translation_providers = json.load(f)
+        except Exception:
+            pass
+
     # Capture original CSV English values before applying overrides.
     original_english_map = {key: loc_str.translations.get("English", "") for key, loc_str in strings.items()}
 
@@ -609,6 +619,7 @@ async def get_mod_detail(mod_id: str):
                 "is_synced": is_synced,
                 "synced_english": english if is_synced else "",
                 "source_file": loc_str.source_file,
+                "translated_by": translation_providers.get(key, ""),
             }
         )
 
@@ -651,6 +662,19 @@ async def update_string(mod_id: str, update: TranslationUpdate):
 
     with open(translations_path, "w", encoding="utf-8") as f:
         json.dump(translations, f, indent=2, ensure_ascii=False)
+
+    # Track that this key was manually edited.
+    providers_path = config.STORAGE_PATH / "mods" / mod_id / "translation_providers.json"
+    providers: dict[str, str] = {}
+    if providers_path.exists():
+        try:
+            with open(providers_path, "r", encoding="utf-8") as f:
+                providers = json.load(f)
+        except Exception:
+            pass
+    providers[update.key] = "manual"
+    with open(providers_path, "w", encoding="utf-8") as f:
+        json.dump(providers, f, indent=2, ensure_ascii=False)
 
     # Update progress tracker
     tracker = ProgressTracker()
@@ -1349,6 +1373,20 @@ async def translate_batch(req: BatchTranslationRequest):
     existing.update(translations)
     with open(translations_path, "w", encoding="utf-8") as f:
         json.dump(existing, f, indent=2, ensure_ascii=False)
+
+    # Track which provider translated each key.
+    providers_path = config.STORAGE_PATH / "mods" / req.mod_id / "translation_providers.json"
+    existing_providers: dict[str, str] = {}
+    if providers_path.exists():
+        try:
+            with open(providers_path, "r", encoding="utf-8") as f:
+                existing_providers = json.load(f)
+        except Exception:
+            pass
+    for key in translations:
+        existing_providers[key] = provider_name
+    with open(providers_path, "w", encoding="utf-8") as f:
+        json.dump(existing_providers, f, indent=2, ensure_ascii=False)
 
     # Update progress.
     tracker = ProgressTracker()
