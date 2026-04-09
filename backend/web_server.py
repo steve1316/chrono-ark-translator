@@ -35,6 +35,7 @@ from backend.data.glossary_manager import (
     load_mod_glossary,
     save_mod_glossary,
     merge_glossaries,
+    extract_name_key_suggestions,
 )
 from backend.data.translation_memory import TranslationMemory
 from backend.data.suggestion_manager import (
@@ -1230,6 +1231,23 @@ async def translate_mod(req: TranslationRequest):
 
     filtered_suggestions = _filter_suggestions(all_suggestions, strings)
 
+    # Auto-detect name-key terms not already suggested by the provider.
+    existing_suggestions = load_suggestions(req.mod_id)
+    combined_existing = existing_suggestions + filtered_suggestions
+    for lang, entries in by_lang.items():
+        lang_keys = [k for k, _ in entries if k in all_translations]
+        name_key_suggestions = extract_name_key_suggestions(
+            translated_keys=lang_keys,
+            strings=strings,
+            translations=all_translations,
+            source_lang=lang,
+            existing_suggestions=combined_existing,
+            mod_glossary=mod_glossary,
+            term_categories=_adapter.get_glossary_categories(),
+        )
+        filtered_suggestions.extend(name_key_suggestions)
+        combined_existing.extend(name_key_suggestions)
+
     # Store suggestions (add_suggestions deduplicates internally).
     if filtered_suggestions:
         add_suggestions(req.mod_id, filtered_suggestions)
@@ -1397,6 +1415,20 @@ async def translate_batch(req: BatchTranslationRequest):
 
     # Filter and store suggestions.
     filtered_suggestions = _filter_suggestions(suggestions, strings)
+
+    # Auto-detect name-key terms not already suggested by the provider.
+    existing_suggestions = load_suggestions(req.mod_id)
+    name_key_suggestions = extract_name_key_suggestions(
+        translated_keys=list(translations.keys()),
+        strings=strings,
+        translations=translations,
+        source_lang=req.source_lang,
+        existing_suggestions=existing_suggestions + filtered_suggestions,
+        mod_glossary=mod_glossary,
+        term_categories=_adapter.get_glossary_categories(),
+    )
+    filtered_suggestions.extend(name_key_suggestions)
+
     if filtered_suggestions:
         add_suggestions(req.mod_id, filtered_suggestions)
 
@@ -1575,6 +1607,20 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
                 tm.save()
 
                 filtered_suggestions = _filter_suggestions(suggestions, strings)
+
+                # Auto-detect name-key terms not already suggested.
+                existing_suggestions = load_suggestions(req.mod_id)
+                name_key_suggestions = extract_name_key_suggestions(
+                    translated_keys=list(translations.keys()),
+                    strings=strings,
+                    translations=translations,
+                    source_lang=req.source_lang,
+                    existing_suggestions=existing_suggestions + filtered_suggestions,
+                    mod_glossary=mod_glossary,
+                    term_categories=_adapter.get_glossary_categories(),
+                )
+                filtered_suggestions.extend(name_key_suggestions)
+
                 if filtered_suggestions:
                     add_suggestions(req.mod_id, filtered_suggestions)
 

@@ -15,7 +15,7 @@ from backend.models import LocString
 
 
 # Common game terms to auto-extract from the base game.
-_NAME_KEY_SUFFIXES = ("_Name", "_name")
+_NAME_KEY_SUFFIXES = ("_Name", "_name", "_PassiveName", "_SkinName")
 
 # Keyword key prefixes that contain game mechanic terms.
 _KEYWORD_PREFIXES = ("SkillKeyword/", "Battle/Keyword/")
@@ -46,6 +46,14 @@ MECHANIC_SEED_TERMS = {
     "Dispose": "Card is removed from deck",
 }
 
+# Suffix-to-category mapping for mod name-key auto-detection.
+_SUFFIX_CATEGORY: dict[str, str] = {
+    "_PassiveName": "passives",
+    "_SkinName": "characters",
+    "_Name": "other",
+    "_name": "other",
+}
+
 
 def build_glossary_from_base_game(
     base_strings: dict[str, LocString],
@@ -56,8 +64,9 @@ def build_glossary_from_base_game(
     """
     Auto-build a glossary from the base game's localization data.
 
-    Extracts name entries (keys ending in _Name or _name), keyword entries
-    (matching keyword_prefixes), and seeds universal mechanic terms.
+    Extracts name entries (keys ending in _Name, _name, _PassiveName, or
+    _SkinName), keyword entries (matching keyword_prefixes), and seeds
+    universal mechanic terms.
 
     Args:
         base_strings: Dictionary of base game LocString objects.
@@ -115,6 +124,84 @@ def build_glossary_from_base_game(
             }
 
     return glossary
+
+
+def extract_name_key_suggestions(
+    translated_keys: list[str],
+    strings: dict[str, LocString],
+    translations: dict[str, str],
+    source_lang: str,
+    existing_suggestions: list[dict],
+    mod_glossary: dict,
+    term_categories: dict[str, str] | None = None,
+) -> list[dict]:
+    """Extract glossary suggestions from translated name keys.
+
+    Scans the translated keys for entries ending in name suffixes
+    (`_Name`, `_name`, `_PassiveName`, `_SkinName`). Any such entry whose
+    English translation is not already in the mod glossary or pending
+    suggestions is returned as a new suggestion marked as auto-detected.
+
+    Args:
+        translated_keys: Keys that were just translated.
+        strings: Full strings dict mapping key -> LocString.
+        translations: Key -> English translation mapping from the provider.
+        source_lang: Source language name (e.g. `"Korean"`).
+        existing_suggestions: Already-pending suggestion dicts for dedup.
+        mod_glossary: The mod's current glossary dict.
+        term_categories: Optional category name -> key prefix mappings for
+            categorising suggestions (e.g. `{"characters": "Character/"}`).
+
+    Returns:
+        List of new suggestion dicts ready to be stored.
+    """
+    existing_english = {s.get("english", "") for s in existing_suggestions}
+    glossary_terms = set(mod_glossary.get("terms", {}).keys())
+    categories = term_categories or {}
+    new_suggestions: list[dict] = []
+
+    for key in translated_keys:
+        # Check longest suffixes first so _PassiveName matches before _Name.
+        matched_suffix = ""
+        for suffix in _SUFFIX_CATEGORY:
+            if key.endswith(suffix) and len(suffix) > len(matched_suffix):
+                matched_suffix = suffix
+        if not matched_suffix:
+            continue
+
+        english = translations.get(key, "").strip()
+        if not english:
+            continue
+
+        # Skip if already known.
+        if english in existing_english or english in glossary_terms:
+            continue
+
+        # Determine source text.
+        loc_str = strings.get(key)
+        source_text = ""
+        if loc_str:
+            source_text = loc_str.translations.get(source_lang, "").strip()
+
+        # Determine category from key prefix or suffix default.
+        category = _SUFFIX_CATEGORY[matched_suffix]
+        for cat_name, prefix in categories.items():
+            if key.startswith(prefix):
+                category = cat_name
+                break
+
+        new_suggestions.append(
+            {
+                "english": english,
+                "source": source_text,
+                "source_lang": source_lang,
+                "category": category,
+                "reason": "Auto-detected from name key after translation",
+            }
+        )
+        existing_english.add(english)
+
+    return new_suggestions
 
 
 def load_glossary(path: Optional[Path] = None) -> dict:
