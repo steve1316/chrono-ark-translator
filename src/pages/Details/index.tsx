@@ -400,8 +400,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
      */
     const processedStrings = React.useMemo(() => {
         let result = strings.filter((s) => {
-            // A string is "done" if explicitly translated OR its source is blank.
-            const isDone = s.is_translated || !s.source.trim()
+            // Hide rows with no source text — nothing to translate.
+            if (!s.source.trim()) return false
+
+            const isDone = s.is_translated
             const isPending = isDone && !s.is_synced
             const matchesFilter = filter === "all" || (filter === "missing" && !isDone) || (filter === "pending" && isPending) || (filter === "synced" && s.is_synced)
 
