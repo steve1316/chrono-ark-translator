@@ -1,8 +1,8 @@
 """
-Ollama local LLM translation provider.
+llama.cpp (llama-server) translation provider.
 
-Translates source language text to English using a locally-running Ollama
-instance via its native /api/chat endpoint. No API key or cost.
+Translates source language text to English using a locally-running llama-server
+instance via its OpenAI-compatible /v1/chat/completions endpoint. No API key or cost.
 """
 
 import json
@@ -58,46 +58,44 @@ For suggested_terms: identify any recurring proper nouns, character names, skill
 If no terms to suggest, return an empty array."""
 
 
-class OllamaProvider(TranslationProvider):
-    """Translation provider using a local Ollama instance.
+class LlamaCppProvider(TranslationProvider):
+    """Translation provider using a local llama-server instance.
 
-    Uses Ollama's native /api/chat endpoint to translate game mod text from a
-    source language to English. Supports glossary enforcement, style
-    examples, character context, and automatic glossary term suggestions.
+    Uses llama-server's OpenAI-compatible /v1/chat/completions endpoint to
+    translate game mod text from a source language to English. Supports
+    streaming, glossary enforcement, style examples, character context,
+    and automatic glossary term suggestions.
 
     Attributes:
-        _base_url: Ollama server base URL.
-        _model: Ollama model name to use for requests.
+        _base_url: llama-server base URL.
+        _model: Display-only model name (llama-server ignores this field).
     """
 
     def __init__(self, base_url: Optional[str] = None, model: Optional[str] = None):
-        """Initialize the Ollama provider.
+        """Initialize the llama.cpp provider.
 
         Args:
-            base_url: Ollama server base URL. Defaults to config value.
-            model: Ollama model name. Defaults to config value.
+            base_url: llama-server base URL. Defaults to config value.
+            model: Display-only model name. Defaults to config value.
         """
-        self._base_url = base_url or config.OLLAMA_BASE_URL
-        self._model = model or config.OLLAMA_MODEL
+        self._base_url = base_url or config.LLAMACPP_BASE_URL
+        self._model = model or config.LLAMACPP_MODEL
+
+    def _stop_server(self) -> None:
+        """Stop the managed llama-server process to free GPU memory."""
+        from backend import process_manager
+
+        if process_manager.is_managed("llamacpp"):
+            process_manager.stop_process("llamacpp")
 
     @property
     def name(self) -> str:
-        return f"Ollama ({self._model})"
+        label = self._model or "default"
+        return f"llama.cpp ({label})"
 
     @property
     def supports_streaming(self) -> bool:
         return True
-
-    def _unload_model(self) -> None:
-        """Tell Ollama to unload the model from GPU memory immediately."""
-        try:
-            requests.post(
-                f"{self._base_url}/api/chat",
-                json={"model": self._model, "messages": [], "keep_alive": 0},
-                timeout=5,
-            )
-        except Exception:
-            pass
 
     def build_prompt(
         self,
@@ -109,7 +107,7 @@ class OllamaProvider(TranslationProvider):
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
     ) -> tuple[str, str]:
-        """Build the system and user prompts for Ollama.
+        """Build the system and user prompts for llama-server.
 
         Args:
             entries: List of (key, source_text) tuples to translate.
@@ -157,7 +155,7 @@ class OllamaProvider(TranslationProvider):
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
     ) -> tuple[dict[str, str], list[dict]]:
-        """Translate a batch of strings via Ollama's /api/chat endpoint.
+        """Translate a batch of strings via llama-server.
 
         Args:
             entries: List of (key, source_text) tuples to translate.
@@ -173,7 +171,7 @@ class OllamaProvider(TranslationProvider):
             suggested_terms list of dicts).
 
         Raises:
-            RuntimeError: If Ollama is unreachable.
+            RuntimeError: If llama-server is unreachable.
         """
         system_prompt, user_message = self.build_prompt(
             entries,
@@ -185,24 +183,16 @@ class OllamaProvider(TranslationProvider):
             character_context=character_context,
         )
 
-        # Estimate token count to set an adequate context window.
-        # Ollama defaults to a small num_ctx (2048-4096) which silently
-        # truncates the prompt for large batches.
-        prompt_chars = len(system_prompt) + len(user_message)
-        estimated_tokens = int(prompt_chars / 3) + 8192  # headroom for output
-        num_ctx = max(8192, ((estimated_tokens + 1023) // 1024) * 1024)
+        # Estimate output tokens needed: ~100 tokens per entry for translations + suggestions.
+        estimated_output = max(8192, len(entries) * 100 + 2048)
 
         payload = {
-            "model": self._model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
-            "options": {
-                "num_ctx": num_ctx,
-                "temperature": 0.3,
-                "num_predict": 8192,
-            },
+            "temperature": 0.3,
+            "max_tokens": estimated_output,
             "stream": False,
         }
 
@@ -210,18 +200,20 @@ class OllamaProvider(TranslationProvider):
         for attempt in range(max_retries):
             try:
                 resp = requests.post(
-                    f"{self._base_url}/api/chat",
+                    f"{self._base_url}/v1/chat/completions",
                     json=payload,
                     timeout=600,
                 )
                 resp.raise_for_status()
+                resp.encoding = "utf-8"
                 data = resp.json()
 
-                raw_text = data.get("message", {}).get("content", "")
+                raw_text = data["choices"][0]["message"]["content"]
                 translations, suggestions = self._parse_response(raw_text, entries)
 
-                in_tok = data.get("prompt_eval_count")
-                out_tok = data.get("eval_count")
+                usage = data.get("usage", {})
+                in_tok = usage.get("prompt_tokens")
+                out_tok = usage.get("completion_tokens")
 
                 self.last_raw_responses = getattr(self, "last_raw_responses", [])
                 self.last_raw_responses.append(
@@ -237,10 +229,10 @@ class OllamaProvider(TranslationProvider):
                 return translations, suggestions
 
             except requests.ConnectionError:
-                raise RuntimeError(f"Cannot connect to Ollama at {self._base_url}. Is Ollama running?")
+                raise RuntimeError(f"Cannot connect to llama-server at {self._base_url}. " "Is llama-server running?")
             except requests.HTTPError as e:
                 if attempt == max_retries - 1:
-                    print(f"  Ollama API error after {max_retries} retries: {e}")
+                    print(f"  llama-server API error after {max_retries} retries: {e}")
                     return {}, []
                 wait_time = 2**attempt * 2
                 time.sleep(wait_time)
@@ -258,12 +250,12 @@ class OllamaProvider(TranslationProvider):
         character_context: dict | None = None,
         cancel_event: Event | None = None,
     ) -> Generator[dict, None, None]:
-        """Stream translation via Ollama's `/api/chat` endpoint.
+        """Stream translation via llama-server's /v1/chat/completions endpoint.
 
-        Yields `progress` events every 0.5 s with token counts and speed,
-        followed by a single `complete` event.  If `cancel_event` is set
-        mid-stream, the HTTP connection to Ollama is closed immediately and
-        a `cancelled` event is yielded.
+        Yields progress events every 0.5s with token counts and speed,
+        followed by a single complete event. If `cancel_event` is set
+        mid-stream, the HTTP connection is closed and a cancelled event
+        is yielded.
 
         Args:
             entries: List of (key, source_text) tuples to translate.
@@ -290,64 +282,61 @@ class OllamaProvider(TranslationProvider):
             character_context=character_context,
         )
 
-        prompt_chars = len(system_prompt) + len(user_message)
-        estimated_tokens = int(prompt_chars / 3) + 8192
-        num_ctx = max(8192, ((estimated_tokens + 1023) // 1024) * 1024)
+        estimated_output = max(8192, len(entries) * 100 + 2048)
 
         payload = {
-            "model": self._model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
-            "options": {
-                "num_ctx": num_ctx,
-                "temperature": 0.3,
-                "num_predict": 8192,
-            },
+            "temperature": 0.3,
+            "max_tokens": estimated_output,
             "stream": True,
         }
 
-        yield {"type": "started", "model": self._model, "num_entries": len(entries)}
+        yield {"type": "started", "model": self._model or "llama.cpp", "num_entries": len(entries)}
 
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 resp = requests.post(
-                    f"{self._base_url}/api/chat",
+                    f"{self._base_url}/v1/chat/completions",
                     json=payload,
                     timeout=600,
                     stream=True,
                 )
                 resp.raise_for_status()
+                resp.encoding = "utf-8"
 
                 accumulated_text = ""
                 tokens_generated = 0
                 start_time = time.time()
                 last_progress_time = 0.0
-                in_tok = None
-                out_tok = None
 
                 for line in resp.iter_lines(decode_unicode=True):
                     if cancel_event and cancel_event.is_set():
                         resp.close()
-                        self._unload_model()
+                        self._stop_server()
                         yield {"type": "cancelled"}
                         return
 
                     if not line:
                         continue
+
+                    # SSE format: "data: {...}" or "data: [DONE]"
+                    if not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str.strip() == "[DONE]":
+                        break
+
                     try:
-                        chunk = json.loads(line)
+                        chunk = json.loads(data_str)
                     except json.JSONDecodeError:
                         continue
 
-                    if chunk.get("done"):
-                        in_tok = chunk.get("prompt_eval_count")
-                        out_tok = chunk.get("eval_count")
-                        break
-
-                    token = chunk.get("message", {}).get("content", "")
+                    delta = chunk.get("choices", [{}])[0].get("delta", {})
+                    token = delta.get("content", "")
                     if token:
                         accumulated_text += token
                         tokens_generated += 1
@@ -370,8 +359,8 @@ class OllamaProvider(TranslationProvider):
                     {
                         "batch_index": len(self.last_raw_responses),
                         "model": self._model,
-                        "input_tokens": in_tok,
-                        "output_tokens": out_tok,
+                        "input_tokens": None,
+                        "output_tokens": tokens_generated,
                         "cost_usd": 0.0,
                         "raw_text": accumulated_text,
                     }
@@ -381,17 +370,20 @@ class OllamaProvider(TranslationProvider):
                     "type": "complete",
                     "translations": translations,
                     "suggestions": suggestions,
-                    "input_tokens": in_tok,
-                    "output_tokens": out_tok,
+                    "input_tokens": None,
+                    "output_tokens": tokens_generated,
                 }
                 return
 
             except requests.ConnectionError:
-                yield {"type": "error", "message": f"Cannot connect to Ollama at {self._base_url}. Is Ollama running?"}
+                yield {
+                    "type": "error",
+                    "message": f"Cannot connect to llama-server at {self._base_url}. Is llama-server running?",
+                }
                 return
             except requests.HTTPError as e:
                 if attempt == max_retries - 1:
-                    yield {"type": "error", "message": f"Ollama API error after {max_retries} retries: {e}"}
+                    yield {"type": "error", "message": f"llama-server API error after {max_retries} retries: {e}"}
                     return
                 yield {"type": "retry", "attempt": attempt + 1, "max_retries": max_retries}
                 time.sleep(2**attempt * 2)
@@ -403,7 +395,7 @@ class OllamaProvider(TranslationProvider):
         response_text: str,
         entries: list[tuple[str, str]],
     ) -> tuple[dict[str, str], list[dict]]:
-        """Parse the JSON response from Ollama into translations and suggestions.
+        """Parse the JSON response from llama-server into translations and suggestions.
 
         Strips markdown code fences and extracts the translations dict and
         suggested_terms list from the parsed JSON.
@@ -442,7 +434,7 @@ class OllamaProvider(TranslationProvider):
                 return translations, []
 
         except json.JSONDecodeError:
-            print(f"  Warning: Failed to parse Ollama response as JSON")
+            print(f"  Warning: Failed to parse llama-server response as JSON")
             print(f"  Response: {text[:200]}...")
 
         return {}, []
@@ -479,15 +471,15 @@ class OllamaProvider(TranslationProvider):
 
         cjk_chars = sum(1 for c in full_prompt if "\u2e80" <= c <= "\u9fff" or "\uac00" <= c <= "\ud7af" or "\uff00" <= c <= "\uffef")
         ascii_chars = len(full_prompt) - cjk_chars
-        estimated_input_tokens = int(cjk_chars * 1.5 + ascii_chars / 4) + 100
+        estimated_input_tokens = int(cjk_chars * 1.5 + ascii_chars * 0.35) + 300
 
         output_chars = sum(len(text) for _, text in entries)
-        estimated_output_tokens = int(output_chars * 1.5) + 200
+        estimated_output_tokens = int(output_chars * 1.5) + 500
 
         return {
             "estimated_input_tokens": estimated_input_tokens,
             "estimated_output_tokens": estimated_output_tokens,
             "estimated_cost_usd": 0.0,
-            "model": self._model,
-            "note": f"Ollama local inference — no API cost ({len(entries)} strings, ~{estimated_input_tokens + estimated_output_tokens} tokens)",
+            "model": self._model or "llama.cpp",
+            "note": f"llama.cpp local inference — no API cost ({len(entries)} strings, ~{estimated_input_tokens + estimated_output_tokens} tokens)",
         }

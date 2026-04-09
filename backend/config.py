@@ -32,6 +32,24 @@ OLLAMA_BASE_URL = os.environ.get("CATL_OLLAMA_BASE_URL", "http://localhost:11434
 OLLAMA_MODEL = os.environ.get("CATL_OLLAMA_MODEL", "qwen2.5:7b")
 OLLAMA_VRAM_TIER = os.environ.get("CATL_OLLAMA_VRAM_TIER", "")
 
+# ── llama.cpp Settings ───────────────────────────────────────────────────────
+
+LLAMACPP_BASE_URL = os.environ.get("CATL_LLAMACPP_BASE_URL", "http://localhost:8080")
+LLAMACPP_MODEL = os.environ.get("CATL_LLAMACPP_MODEL", "")
+LLAMACPP_BINARY_PATH = os.environ.get("CATL_LLAMACPP_BINARY_PATH", "llama-server")
+LLAMACPP_MODEL_PATH = os.environ.get("CATL_LLAMACPP_MODEL_PATH", "")
+LLAMACPP_GPU_LAYERS = int(os.environ.get("CATL_LLAMACPP_GPU_LAYERS", "-1"))
+LLAMACPP_CTX_SIZE = int(os.environ.get("CATL_LLAMACPP_CTX_SIZE", "8192"))
+LLAMACPP_VRAM_TIER = os.environ.get("CATL_LLAMACPP_VRAM_TIER", "")
+
+# Directory for downloaded GGUF model files.
+LLAMACPP_MODELS_DIR = Path(
+    os.environ.get(
+        "CATL_LLAMACPP_MODELS_DIR",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "storage", "models"),
+    )
+)
+
 # ── Translation Settings ──────────────────────────────────────────────────────
 
 # Default translation provider (claude, openai, deepl, ollama, manual).

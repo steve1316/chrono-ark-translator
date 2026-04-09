@@ -28,7 +28,10 @@ export type BatchState =
     | { phase: "error"; message: string; completedBatches: number }
 
 /** Providers that support real-time streaming progress. */
-const STREAMING_PROVIDERS = new Set(["ollama"])
+const STREAMING_PROVIDERS = new Set(["ollama", "llamacpp"])
+
+/** Providers whose server should be stopped after translation to free GPU memory. */
+const STOP_AFTER_PROVIDERS = new Set(["llamacpp"])
 
 /**
  * Hook that manages iterative per-batch translation with glossary review
@@ -60,6 +63,13 @@ export function useIterativeTranslation(
     // Ref to break circular dependency between translateBatch <-> handleBatchResult.
     const translateBatchRef = useRef<(batchIndex: number) => Promise<void>>(undefined)
 
+    /** Stop the llama-server process after translation to free GPU memory. */
+    const stopProviderIfNeeded = useCallback(() => {
+        if (STOP_AFTER_PROVIDERS.has(providerRef.current)) {
+            fetch(`${API_BASE}/llamacpp/stop`, { method: "POST" }).catch(() => {})
+        }
+    }, [])
+
     /** Handle a completed batch result (shared by streaming and non-streaming paths). */
     const handleBatchResult = useCallback(
         (
@@ -78,6 +88,7 @@ export function useIterativeTranslation(
                 if (suggestions.length > 0) {
                     setState({ phase: "reviewing", batchIndex, totalBatches, suggestions })
                 } else {
+                    stopProviderIfNeeded()
                     setState({ phase: "complete", totalTranslated: totalTranslatedRef.current })
                 }
             } else if (suggestions.length > 0) {
@@ -256,6 +267,7 @@ export function useIterativeTranslation(
 
         const nextIndex = state.batchIndex + 1
         if (nextIndex >= plan.length) {
+            stopProviderIfNeeded()
             setState({ phase: "complete", totalTranslated: totalTranslatedRef.current })
         } else {
             translateBatch(nextIndex)
@@ -266,12 +278,13 @@ export function useIterativeTranslation(
         cancelledRef.current = true
         abortControllerRef.current?.abort()
         abortControllerRef.current = null
-        // Explicitly tell the backend to cancel so it closes the Ollama connection.
+        // Tell the backend to cancel so it closes the active connection.
         fetch(`${API_BASE}/translate/cancel?mod_id=${encodeURIComponent(modId)}`, {
             method: "POST",
         }).catch(() => {})
+        stopProviderIfNeeded()
         setState({ phase: "idle" })
-    }, [modId])
+    }, [modId, stopProviderIfNeeded])
 
     return {
         state,

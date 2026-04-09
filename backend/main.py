@@ -38,6 +38,7 @@ from backend.translator.claude_provider import ClaudeProvider
 from backend.translator.openai_provider import OpenAIProvider
 from backend.translator.deepl_provider import DeepLProvider
 from backend.translator.ollama_provider import OllamaProvider
+from backend.translator.llamacpp_provider import LlamaCppProvider
 from backend.data.suggestion_manager import add_suggestions
 
 
@@ -59,9 +60,11 @@ def get_provider(provider_name: str) -> TranslationProvider:
         return DeepLProvider()
     elif provider_name == "ollama":
         return OllamaProvider()
+    elif provider_name == "llamacpp":
+        return LlamaCppProvider()
     else:
         print(f"Unknown provider: {provider_name}")
-        print("Available: claude, openai, deepl, ollama")
+        print("Available: claude, openai, deepl, ollama, llamacpp")
         sys.exit(1)
 
 
