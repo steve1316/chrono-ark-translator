@@ -7,7 +7,7 @@ interface DashboardPageProps {
     mods: ModStatus[]
     onModSelect: (modId: string) => void
     onModSync: (modId: string) => void
-    onRefresh: () => void
+    onRefresh: () => Promise<void> | void
 }
 
 /**
@@ -21,7 +21,22 @@ interface DashboardPageProps {
 const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModSync, onRefresh }) => {
     const [search, setSearch] = useState("")
     const [cardWidth, setCardWidth] = useState<number | undefined>(undefined)
+    const [refreshing, setRefreshing] = useState(false)
     const gridWrapperRef = useRef<HTMLDivElement>(null)
+
+    /**
+     * Wraps the parent-provided onRefresh callback with local loading state
+     * so the Refresh button shows a "Refreshing…" label and is disabled
+     * while the (potentially slow) deep-refresh request is in flight.
+     */
+    const handleRefresh = async () => {
+        setRefreshing(true)
+        try {
+            await onRefresh()
+        } finally {
+            setRefreshing(false)
+        }
+    }
 
     const filteredMods = useMemo(() => {
         const query = search.trim().toLowerCase()
@@ -65,8 +80,8 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-                    <button className="btn btn-outline" onClick={onRefresh}>
-                        Refresh
+                    <button className="btn btn-outline" onClick={handleRefresh} disabled={refreshing}>
+                        {refreshing ? "Refreshing…" : "Refresh"}
                     </button>
                 </div>
             </div>

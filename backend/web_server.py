@@ -384,6 +384,112 @@ async def get_mods():
     return results
 
 
+def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
+    """Re-extract strings and recalculate translation progress for a mod.
+
+    Mirrors the progress-update logic in `get_mod_detail`: extracts all
+    localization strings from the mod's files on disk, layers any saved
+    user translations on top, then updates the `ProgressTracker` snapshot
+    so that `get_status` returns accurate totals/translated counts.
+
+    A string is considered translated when it has a non-empty English value
+    **or** its source text is blank (nothing to translate).
+
+    Args:
+        mod_id: Workshop identifier of the mod (e.g. "12345").
+        mod_path: Filesystem path to the mod's workshop directory.
+    """
+    strings, _ = _adapter.extract_strings(mod_path)
+    _merge_gdata_originals(mod_id, strings)
+
+    # Apply saved translations.
+    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
+    translations = {}
+    if translations_path.exists():
+        try:
+            with open(translations_path, "r", encoding="utf-8") as f:
+                translations = json.load(f)
+        except Exception:
+            pass
+
+    for key, english in translations.items():
+        if key in strings:
+            strings[key].translations["English"] = english
+
+    # Update the progress snapshot.
+    tracker = ProgressTracker()
+    tracker.update(mod_id, strings, _adapter.source_languages)
+
+    # Compute translated keys the same way get_mod_detail does.
+    translated_keys = []
+    for key, loc_str in strings.items():
+        source_lang = _adapter.detect_source_language(loc_str)
+        source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
+        english = loc_str.translations.get("English", "")
+        if bool(english) or not source_text.strip():
+            translated_keys.append(key)
+
+    tracker.set_translated(mod_id, translated_keys)
+
+
+@app.post("/api/mods/refresh")
+async def refresh_mods():
+    """Rescan all mods and recalculate translation progress from disk.
+
+    Unlike `GET /api/mods` which reads cached progress snapshots, this
+    endpoint performs a full re-extraction of every mod's localization
+    strings and recomputes translated/total counts from scratch — the same
+    work the detail page (`GET /api/mods/{mod_id}`) does per mod.
+
+    This is more expensive than a simple listing but guarantees the
+    returned counts are up-to-date even for mods whose detail page has
+    never been opened.
+
+    Returns:
+        A JSON array of `ModStatus` dicts identical in shape to the
+        `GET /api/mods` response, with freshly recalculated progress
+        numbers and `has_changes` sync flags.
+    """
+    mods = _adapter.scan_mods()
+
+    for mod in mods:
+        _recalculate_mod_progress(mod.mod_id, mod.path)
+
+    # Now read back the freshly-updated stats via the normal listing.
+    tracker = ProgressTracker()
+    results = []
+    for mod in mods:
+        status = tracker.get_status(mod.mod_id)
+        preview_img = _find_mod_preview_image(mod.path)
+
+        translations_path = config.STORAGE_PATH / "mods" / mod.mod_id / "translations.json"
+        if translations_path.exists():
+            current_hash = _compute_export_snapshot(mod.mod_id, mod.path)
+            last_hash = _load_last_export_hash(mod.mod_id)
+            has_changes = current_hash != last_hash
+        else:
+            has_changes = False
+
+        results.append(
+            {
+                "id": mod.mod_id,
+                "name": mod.name,
+                "author": mod.author,
+                "has_csv": mod.has_loc_files,
+                "has_dll": mod.has_dll,
+                "total": status["total"],
+                "translated": status["translated"],
+                "untranslated": status["untranslated"],
+                "percentage": status["percentage"],
+                "last_updated": status["last_updated"],
+                "url": _adapter.get_mod_url(mod.mod_id),
+                "preview_image": f"/workshop/{mod.mod_id}/{preview_img.name}" if preview_img else None,
+                "has_changes": has_changes,
+            }
+        )
+    return results
+
+
 @app.get("/api/mods/{mod_id}")
 async def get_mod_detail(mod_id: str):
     """Get detailed string data for a specific mod.
