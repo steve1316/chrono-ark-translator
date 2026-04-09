@@ -18,9 +18,10 @@ interface EditableCellProps {
  * Display mode: shows the value (or placeholder) as plain text. Clicking
  * anywhere in the cell enters edit mode.
  *
- * Edit mode: renders an <input> that auto-focuses. The edit is committed on
- * blur or Enter, and cancelled (reverted) on Escape. The `onSave` callback
- * is only called if the value actually changed, avoiding unnecessary API calls.
+ * Edit mode: renders a <textarea> that auto-focuses. The edit is committed on
+ * blur or Ctrl+Enter, and cancelled (reverted) on Escape. The `onSave`
+ * callback is only called if the value actually changed, avoiding unnecessary
+ * API calls.
  *
  * @param value - The current persisted value displayed in the cell.
  * @param onSave - Callback invoked when the user commits a change.
@@ -30,7 +31,9 @@ interface EditableCellProps {
 const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, placeholder }) => {
     const [isEditing, setIsEditing] = useState(false)
     const [tempValue, setTempValue] = useState(value)
-    const inputRef = useRef<HTMLInputElement>(null)
+    const [cellHeight, setCellHeight] = useState<number | undefined>(undefined)
+    const inputRef = useRef<HTMLTextAreaElement>(null)
+    const cellRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         if (isEditing && inputRef.current) {
@@ -53,7 +56,8 @@ const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, placeholder 
      * @param e - Keyboard event.
      */
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter") {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault()
             handleBlur()
         } else if (e.key === "Escape") {
             setTempValue(value)
@@ -63,9 +67,8 @@ const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, placeholder 
 
     if (isEditing) {
         return (
-            <input
+            <textarea
                 ref={inputRef}
-                type="text"
                 value={tempValue}
                 onChange={(e) => setTempValue(e.target.value)}
                 onBlur={handleBlur}
@@ -73,12 +76,17 @@ const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, placeholder 
                 className="edit-input"
                 style={{
                     width: "100%",
+                    minHeight: cellHeight ?? "1.2em",
                     padding: "4px 8px",
                     background: "rgba(0,0,0,0.4)",
                     border: "1px solid var(--accent-primary)",
                     color: "var(--text-main)",
                     borderRadius: "4px",
                     outline: "none",
+                    resize: "vertical",
+                    fontFamily: "inherit",
+                    fontSize: "inherit",
+                    boxSizing: "border-box",
                 }}
             />
         )
@@ -86,12 +94,14 @@ const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, placeholder 
 
     return (
         <div
+            ref={cellRef}
             onClick={() => {
+                setCellHeight(cellRef.current?.offsetHeight)
                 setIsEditing(true)
                 setTempValue(value)
             }}
             className="clickable-cell"
-            style={{ minHeight: "1.2em", cursor: "text" }}
+            style={{ minHeight: "1.2em", cursor: "text", whiteSpace: "pre-wrap" }}
         >
             {value ? <span>{value}</span> : <span style={{ color: "var(--text-dim)", fontStyle: "italic" }}>{placeholder}</span>}
         </div>
