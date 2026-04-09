@@ -64,6 +64,8 @@ export type LocString = {
     original_english: string
     /** Whether this string has been synced (exported) to the mod's CSV files. */
     is_synced: boolean
+    /** The source file (CSV/JSON/DLL) this string was extracted from. */
+    source_file: string
 }
 
 /**

@@ -19,7 +19,7 @@ interface ModDetailProps {
 }
 
 /** Columns that support click-to-sort in the strings table. */
-type SortField = "is_translated" | "key" | "source" | "english"
+type SortField = "is_translated" | "key" | "source_file" | "source" | "english"
 
 /**
  * Sort direction for a column: ascending, descending, or null (unsorted).
@@ -52,6 +52,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({
         status: 80,
         key: 300,
+        source_file: 150,
         source: 500,
         english: 500,
     })
@@ -399,8 +400,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             const isDone = s.is_translated || !s.source.trim()
             const matchesFilter = filter === "all" || (filter === "translated" && isDone) || (filter === "untranslated" && !isDone)
 
-            // Case-insensitive search across all three text columns.
-            const matchesSearch = s.key.toLowerCase().includes(search.toLowerCase()) || s.source.toLowerCase().includes(search.toLowerCase()) || s.english.toLowerCase().includes(search.toLowerCase())
+            // Case-insensitive search across all text columns.
+            const matchesSearch =
+                s.key.toLowerCase().includes(search.toLowerCase()) ||
+                s.source_file.toLowerCase().includes(search.toLowerCase()) ||
+                s.source.toLowerCase().includes(search.toLowerCase()) ||
+                s.english.toLowerCase().includes(search.toLowerCase())
 
             return matchesFilter && matchesSearch
         })
@@ -1389,12 +1394,16 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 Status {getSortIcon("is_translated")}
                                 <div className="resizer" onPointerDown={(e) => onResizeStart(e, "status")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
                             </th>
+                            <th className="sortable-th" onClick={() => handleSort("source_file")} style={{ width: columnWidths.source_file }}>
+                                Source {getSortIcon("source_file")}
+                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "source_file")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
+                            </th>
                             <th className="sortable-th" onClick={() => handleSort("key")} style={{ width: columnWidths.key }}>
                                 Key {getSortIcon("key")}
                                 <div className="resizer" onPointerDown={(e) => onResizeStart(e, "key")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
                             </th>
                             <th className="sortable-th" onClick={() => handleSort("source")} style={{ width: columnWidths.source }}>
-                                Source ({strings[0]?.source_lang || "Source"}) {getSortIcon("source")}
+                                Original ({strings[0]?.source_lang || "Source"}) {getSortIcon("source")}
                                 <div className="resizer" onPointerDown={(e) => onResizeStart(e, "source")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
                             </th>
                             <th className="sortable-th" onClick={() => handleSort("english")} style={{ width: columnWidths.english }}>
@@ -1416,6 +1425,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                         <span className={`status-badge ${s.is_synced && !hasOverride ? "status-synced" : isDone ? "status-translated" : "status-missing"}`}>
                                             {s.is_synced && !hasOverride ? "SYNCED" : isDone ? "OK" : "MISSING"}
                                         </span>
+                                    </td>
+                                    <td className="key-cell" title={s.source_file} style={{ maxWidth: columnWidths.source_file }}>
+                                        {s.source_file}
                                     </td>
                                     <td className="key-cell" title={s.key} style={{ maxWidth: columnWidths.key }}>
                                         {s.key}

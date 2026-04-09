@@ -591,6 +591,7 @@ async def get_mod_detail(mod_id: str):
                 "is_translated": is_done,
                 "original_english": original_english_map.get(key, "") if has_override else english,
                 "is_synced": is_synced,
+                "source_file": loc_str.source_file,
             }
         )
 
