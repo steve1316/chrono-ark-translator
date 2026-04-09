@@ -833,6 +833,7 @@ async def preview_translation(req: TranslationRequest):
     mod_path = matching[0].path
 
     strings, _ = _adapter.extract_strings(mod_path)
+    _merge_gdata_originals(req.mod_id, strings)
 
     # Apply saved translations so user edits (including clears) are respected.
     translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
@@ -1112,6 +1113,7 @@ async def translate_batch(req: BatchTranslationRequest):
     mod_path = matching[0].path
 
     strings, _ = _adapter.extract_strings(mod_path)
+    _merge_gdata_originals(req.mod_id, strings)
 
     # Apply saved translations so user edits (including clears) are respected.
     translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
@@ -1265,6 +1267,7 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
     mod_path = matching[0].path
 
     strings, _ = _adapter.extract_strings(mod_path)
+    _merge_gdata_originals(req.mod_id, strings)
 
     translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
     if translations_path.exists():
