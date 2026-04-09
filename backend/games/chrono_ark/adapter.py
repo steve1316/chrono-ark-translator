@@ -273,21 +273,24 @@ class ChronoArkAdapter(GameAdapter):
         # that aren't already covered by the CSVs.
         gdata_strings = gdata_extractor.extract_mod_gdata_strings(mod_path)
 
-        # Build a set of suffixes from CSV keys for fast substring lookup.
-        # JSON dialogue keys like "Text_Battle_Cri_0" are duplicates when the
-        # CSV already has "Character/xxx_Text_Battle_Cri_0".
-        csv_suffixes: set[str] = set()
+        # Build lookup structures from CSV keys for duplicate detection.
+        # JSON keys are duplicates when the CSV already has the same key
+        # (case-insensitive) or a prefixed form like
+        # "Character/xxx_Text_Battle_Cri_0" for JSON "Text_Battle_Cri_0".
+        csv_keys_lower: set[str] = set()
+        csv_suffixes_lower: set[str] = set()
         for csv_key in strings:
+            csv_keys_lower.add(csv_key.lower())
             if "/" in csv_key:
-                csv_suffixes.add(csv_key.split("/", 1)[1])
+                csv_suffixes_lower.add(csv_key.split("/", 1)[1].lower())
 
         for key, loc_str in gdata_strings.items():
-            if key in strings:
+            if key in strings or key.lower() in csv_keys_lower:
                 continue
             # Skip if this key appears as a suffix of any CSV key
             # (with a `_` boundary to avoid false matches).
-            needle = "_" + key
-            if any(suffix.endswith(needle) for suffix in csv_suffixes):
+            needle = "_" + key.lower()
+            if any(suffix.endswith(needle) for suffix in csv_suffixes_lower):
                 continue
             strings[key] = loc_str
 
