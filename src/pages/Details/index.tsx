@@ -333,7 +333,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             })
             if (res.ok) {
                 // Optimistic update: mark translated if English is non-empty or source is blank.
-                setStrings((prev) => prev.map((s) => (s.key === key ? { ...s, english: newValue, is_translated: !!newValue || !s.source.trim() } : s)))
+                setStrings((prev) => prev.map((s) => (s.key === key ? { ...s, english: newValue, is_translated: !!newValue || !s.source.trim(), is_synced: false } : s)))
                 fetchExportStatus()
             }
         } catch (err) {
