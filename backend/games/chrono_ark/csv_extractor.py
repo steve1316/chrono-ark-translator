@@ -306,9 +306,9 @@ def find_all_csv_files(mod_path: Path) -> list[Path]:
     found = []
     loc_dir = mod_path / "Localization"
 
-    # Localization/ directory (including subdirs for backups).
+    # Localization/ directory (top-level only, skip nested folders).
     if loc_dir.exists():
-        for csv_file in loc_dir.rglob("*.csv"):
+        for csv_file in loc_dir.glob("*.csv"):
             found.append(csv_file)
 
     # Top-level Lang*.csv files.
