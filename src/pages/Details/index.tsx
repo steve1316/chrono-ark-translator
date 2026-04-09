@@ -5,6 +5,7 @@ import type { LocString, TermSuggestion } from "../../shared_types"
 import { API_BASE } from "../../config"
 import GlossarySuggestionModal from "../../components/GlossarySuggestionModal"
 import TranslationConfirmModal from "../../components/TranslationConfirmModal"
+import ConfirmModal from "../../components/ConfirmModal"
 import EditableCell from "../../components/EditableCell"
 import { useIterativeTranslation } from "../../hooks/useIterativeTranslation"
 import type { BatchDescriptor } from "../../hooks/useIterativeTranslation"
@@ -102,6 +103,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [activeResponseIdx, setActiveResponseIdx] = useState(0)
     const [showHistory, setShowHistory] = useState(false)
     const [historyEntries, setHistoryEntries] = useState<{ id: string; reason: string; created_at: string; files: string[] }[]>([])
+    const [confirmModal, setConfirmModal] = useState<{
+        type: "export" | "resync" | "reset" | "clear-translations" | "delete-all-glossary" | "restore-backup" | "delete-backup"
+        message: string | React.ReactNode
+        entryId?: string
+        entryDate?: string
+    } | null>(null)
 
     /** Callback fired by the iterative translation hook after each batch completes. */
     const handleBatchTranslated = useCallback((translations: Record<string, string>) => {
@@ -433,18 +440,21 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
      * written. If duplicate files existed, they are consolidated (merged then deleted)
      * as part of the export.
      */
-    const handleExport = async (resync = false) => {
+    const handleExportConfirm = (resync: boolean) => {
         if (!modId) return
-        // Build a warning message that includes duplicate files if present.
         const dupeWarning =
             duplicateFiles.length > 0
                 ? `\n\nThis will also consolidate ${duplicateFiles.length} duplicate file(s):\n${duplicateFiles.join("\n")}\n\nDuplicate files will be deleted after merging.`
                 : ""
         const resyncNote = resync ? "This will restore the original files and re-apply all translations from scratch.\n\n" : ""
-        if (!window.confirm(`${resyncNote}This will overwrite the mod's localization files (CSVs and/or gdata JSONs) with your translations.${dupeWarning} Continue?`)) {
-            return
-        }
+        setConfirmModal({
+            type: resync ? "resync" : "export",
+            message: `${resyncNote}This will overwrite the mod's localization files (CSVs and/or gdata JSONs) with your translations.${dupeWarning} Continue?`,
+        })
+    }
 
+    const handleExport = async (resync = false) => {
+        if (!modId) return
         setExporting(true)
         try {
             const url = resync ? `${API_BASE}/mods/${modId}/export?resync=true` : `${API_BASE}/mods/${modId}/export`
@@ -459,16 +469,16 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                 if (data.gdata_files_written?.length) {
                     parts.push(`${data.gdata_files_written.length} gdata JSON file(s): ${data.gdata_files_written.join(", ")}`)
                 }
-                alert(`Synced ${data.applied} translations to ${parts.join("\n")}${removedMsg}`)
+                setTranslateBanner({ type: "success", message: `Synced ${data.applied} translations to ${parts.join("\n")}${removedMsg}` })
                 fetchExportStatus()
                 fetchModDetail()
             } else {
                 const error = await res.json()
-                alert(`Export failed: ${error.detail || "Unknown error"}`)
+                setTranslateBanner({ type: "error", message: `Export failed: ${error.detail || "Unknown error"}` })
             }
         } catch (err) {
             console.error("Failed to export translations:", err)
-            alert("Failed to export translations. Check console for details.")
+            setTranslateBanner({ type: "error", message: "Failed to export translations. Check console for details." })
         } finally {
             setExporting(false)
         }
@@ -479,20 +489,25 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
      * original CSV files (if they were backed up before the first export).
      * POST `/api/mods/:modId/reset`.
      */
+    const handleResetConfirm = () => {
+        setConfirmModal({
+            type: "reset",
+            message: (
+                <>
+                    Are you sure you want to reset this mod? This will:
+                    <ul style={{ margin: "0.75rem 0", paddingLeft: "1.25rem" }}>
+                        <li>Delete all translation progress and extracted strings</li>
+                        <li>Restore the original CSV and gdata JSON files (if previously synced)</li>
+                    </ul>
+                    Character context and glossary will be preserved.
+                    <br />A backup will be created first.
+                </>
+            ),
+        })
+    }
+
     const handleReset = async () => {
         if (!modId) return
-        if (
-            !window.confirm(
-                "Are you sure you want to reset this mod? This will:\n\n" +
-                    "• Delete all translation progress and extracted strings\n" +
-                    "• Restore the original CSV and gdata JSON files (if previously synced)\n\n" +
-                    "Character context and glossary will be preserved.\n" +
-                    "A backup will be created first."
-            )
-        ) {
-            return
-        }
-
         try {
             const res = await fetch(`${API_BASE}/mods/${modId}/reset`, {
                 method: "POST",
@@ -508,11 +523,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                 setTranslateBanner({ type: "success", message: `Reset complete.${csvMsg}${gdataMsg}` })
             } else {
                 const error = await res.json()
-                alert(`Failed to reset: ${error.detail || "Unknown error"}`)
+                setTranslateBanner({ type: "error", message: `Failed to reset: ${error.detail || "Unknown error"}` })
             }
         } catch (err) {
             console.error("Failed to reset:", err)
-            alert("Failed to reset. Check console for details.")
+            setTranslateBanner({ type: "error", message: "Failed to reset. Check console for details." })
         }
     }
 
@@ -524,12 +539,15 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
      * Unlike `handleClearCache`, this preserves the extracted source strings and
      * mod metadata — only the English column is wiped.
      */
+    const handleClearTranslationsConfirm = () => {
+        setConfirmModal({
+            type: "clear-translations",
+            message: "Are you sure you want to clear all English translations? This will allow all rows to be sent to the AI provider.",
+        })
+    }
+
     const handleClearTranslations = async () => {
         if (!modId) return
-        if (!window.confirm("Are you sure you want to clear all English translations? This will allow all rows to be sent to the AI provider.")) {
-            return
-        }
-
         try {
             const res = await fetch(`${API_BASE}/mods/${modId}/clear-translations`, {
                 method: "POST",
@@ -539,11 +557,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                 fetchExportStatus()
             } else {
                 const error = await res.json()
-                alert(`Failed to clear translations: ${error.detail || "Unknown error"}`)
+                setTranslateBanner({ type: "error", message: `Failed to clear translations: ${error.detail || "Unknown error"}` })
             }
         } catch (err) {
             console.error("Failed to clear translations:", err)
-            alert("Failed to clear translations. Check console for details.")
+            setTranslateBanner({ type: "error", message: "Failed to clear translations. Check console for details." })
         }
     }
 
@@ -560,7 +578,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             const res = await fetch(`${API_BASE}/mods/${modId}/open`, { method: "POST" })
             if (!res.ok) {
                 const error = await res.json()
-                alert(`Failed to open folder: ${error.detail || "Unknown error"}`)
+                setTranslateBanner({ type: "error", message: `Failed to open folder: ${error.detail || "Unknown error"}` })
             }
         } catch (err) {
             console.error("Failed to open folder:", err)
