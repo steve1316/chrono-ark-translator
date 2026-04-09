@@ -433,45 +433,45 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
 
 
 @app.post("/api/mods/refresh")
-async def refresh_mods():
+async def refresh_mods(request: Request):
     """Rescan all mods and recalculate translation progress from disk.
 
-    Unlike `GET /api/mods` which reads cached progress snapshots, this
-    endpoint performs a full re-extraction of every mod's localization
-    strings and recomputes translated/total counts from scratch — the same
-    work the detail page (`GET /api/mods/{mod_id}`) does per mod.
+    Streams SSE events so the frontend can display a progress indicator.
+    Each mod emits a `progress` event with `current`/`total` counts
+    and the mod name.  The final event carries the complete results list.
 
-    This is more expensive than a simple listing but guarantees the
-    returned counts are up-to-date even for mods whose detail page has
-    never been opened.
+    The generator checks `request.is_disconnected` between mods so that
+    navigating away or refreshing the page aborts the work early.
 
     Returns:
-        A JSON array of `ModStatus` dicts identical in shape to the
-        `GET /api/mods` response, with freshly recalculated progress
-        numbers and `has_changes` sync flags.
+        A `StreamingResponse` of `text/event-stream` SSE events.
     """
     mods = _adapter.scan_mods()
 
-    for mod in mods:
-        _recalculate_mod_progress(mod.mod_id, mod.path)
+    async def event_stream():
+        tracker = ProgressTracker()
+        results = []
+        total = len(mods)
 
-    # Now read back the freshly-updated stats via the normal listing.
-    tracker = ProgressTracker()
-    results = []
-    for mod in mods:
-        status = tracker.get_status(mod.mod_id)
-        preview_img = _find_mod_preview_image(mod.path)
+        for i, mod in enumerate(mods):
+            # Abort early if the client disconnected.
+            if await request.is_disconnected():
+                return
 
-        translations_path = config.STORAGE_PATH / "mods" / mod.mod_id / "translations.json"
-        if translations_path.exists():
-            current_hash = _compute_export_snapshot(mod.mod_id, mod.path)
-            last_hash = _load_last_export_hash(mod.mod_id)
-            has_changes = current_hash != last_hash
-        else:
-            has_changes = False
+            _recalculate_mod_progress(mod.mod_id, mod.path)
 
-        results.append(
-            {
+            status = tracker.get_status(mod.mod_id)
+            preview_img = _find_mod_preview_image(mod.path)
+
+            translations_path = config.STORAGE_PATH / "mods" / mod.mod_id / "translations.json"
+            if translations_path.exists():
+                current_hash = _compute_export_snapshot(mod.mod_id, mod.path)
+                last_hash = _load_last_export_hash(mod.mod_id)
+                has_changes = current_hash != last_hash
+            else:
+                has_changes = False
+
+            mod_result = {
                 "id": mod.mod_id,
                 "name": mod.name,
                 "author": mod.author,
@@ -486,8 +486,14 @@ async def refresh_mods():
                 "preview_image": f"/workshop/{mod.mod_id}/{preview_img.name}" if preview_img else None,
                 "has_changes": has_changes,
             }
-        )
-    return results
+            results.append(mod_result)
+
+            progress_event = {"current": i + 1, "total": total, "mod_name": mod.name}
+            yield f"data: {json.dumps(progress_event)}\n\n"
+
+        yield f"data: {json.dumps({'done': True, 'results': results})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.get("/api/mods/{mod_id}")

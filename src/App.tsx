@@ -39,28 +39,6 @@ function App() {
     }
 
     /**
-     * Deep-refreshes all mods by recalculating translation progress from disk.
-     *
-     * Hits `POST /api/mods/refresh` which re-extracts every mod's localization
-     * strings and recomputes translated/total counts from scratch, matching the
-     * same progress logic the detail page uses.  This is slower than
-     * {@link fetchMods} (which reads cached snapshots) but guarantees accurate
-     * counts even for mods whose detail page has never been opened.
-     *
-     * Called by the Dashboard "Refresh" button.  On failure the error is logged
-     * but the UI keeps its previous value.
-     */
-    const refreshMods = async () => {
-        try {
-            const res = await fetch(`${API_BASE}/mods/refresh`, { method: "POST" })
-            const data = await res.json()
-            setMods(data)
-        } catch (err) {
-            console.error("Failed to refresh mods:", err)
-        }
-    }
-
-    /**
      * Fetches global translation statistics from the backend.
      *
      * Hits `GET /api/stats` and expects a JSON {@link Stats} object containing
@@ -130,7 +108,7 @@ function App() {
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
                         {/* --- Dashboard: mod grid overview --- */}
-                        <Route path="/dashboard" element={<DashboardPage mods={mods} onModSelect={(modId) => navigate(`/mods/${modId}`)} onModSync={handleModSync} onRefresh={refreshMods} />} />
+                        <Route path="/dashboard" element={<DashboardPage mods={mods} onModSelect={(modId) => navigate(`/mods/${modId}`)} onModSync={handleModSync} onRefresh={setMods} />} />
 
                         {/* --- Mod detail: string editor and translation actions --- */}
                         <Route path="/mods/:modId" element={<ModDetail onBack={() => navigate("/dashboard")} />} />

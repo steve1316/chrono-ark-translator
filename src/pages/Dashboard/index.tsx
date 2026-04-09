@@ -2,12 +2,13 @@ import React, { useState, useMemo, useEffect, useRef } from "react"
 import { FaSearch } from "react-icons/fa"
 import ModGrid from "../../components/ModGrid"
 import type { ModStatus } from "../../shared_types"
+import { API_BASE } from "../../config"
 
 interface DashboardPageProps {
     mods: ModStatus[]
     onModSelect: (modId: string) => void
     onModSync: (modId: string) => void
-    onRefresh: () => Promise<void> | void
+    onRefresh: (mods: ModStatus[]) => void
 }
 
 /**
@@ -15,26 +16,81 @@ interface DashboardPageProps {
  * @param mods - The list of mods to display.
  * @param onModSelect - The callback function to handle mod selection.
  * @param onModSync - The callback function to handle mod sync.
- * @param onRefresh - The callback function to handle refresh.
+ * @param onRefresh - Callback to update the parent mods state with fresh data.
  * @returns A React component that displays a grid of all mods and their translation progress.
  */
 const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModSync, onRefresh }) => {
     const [search, setSearch] = useState("")
     const [cardWidth, setCardWidth] = useState<number | undefined>(undefined)
     const [refreshing, setRefreshing] = useState(false)
+    const [refreshProgress, setRefreshProgress] = useState<{ current: number; total: number; mod_name: string } | null>(null)
+    const abortRef = useRef<AbortController | null>(null)
     const gridWrapperRef = useRef<HTMLDivElement>(null)
 
+    // Abort any in-flight refresh when the component unmounts (page refresh / navigation).
+    useEffect(() => {
+        return () => {
+            abortRef.current?.abort()
+        }
+    }, [])
+
     /**
-     * Wraps the parent-provided onRefresh callback with local loading state
-     * so the Refresh button shows a "Refreshing…" label and is disabled
-     * while the (potentially slow) deep-refresh request is in flight.
+     * Deep-refreshes every mod by streaming progress from POST /api/mods/refresh.
+     *
+     * The endpoint re-extracts each mod's localization strings and recomputes
+     * translated/total counts from scratch, emitting an SSE progress event per
+     * mod (used to update the button label) and a final event with the complete
+     * results list (forwarded to onRefresh to update App-level state).
+     *
+     * An AbortController is attached so the request is cancelled automatically
+     * when the component unmounts (navigation / page refresh) or when the user
+     * clicks Refresh again while a previous run is still in progress.
      */
     const handleRefresh = async () => {
+        // Abort a previous refresh if one is still running.
+        abortRef.current?.abort()
+
+        const controller = new AbortController()
+        abortRef.current = controller
+
         setRefreshing(true)
+        setRefreshProgress(null)
+
         try {
-            await onRefresh()
+            const res = await fetch(`${API_BASE}/mods/refresh`, {
+                method: "POST",
+                signal: controller.signal,
+            })
+            const reader = res.body?.getReader()
+            const decoder = new TextDecoder()
+            if (!reader) return
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                const text = decoder.decode(value)
+                for (const line of text.split("\n")) {
+                    if (!line.startsWith("data: ")) continue
+                    try {
+                        const event = JSON.parse(line.slice(6))
+                        if (event.done) {
+                            onRefresh(event.results)
+                        } else {
+                            setRefreshProgress(event)
+                        }
+                    } catch {
+                        /* skip malformed lines */
+                    }
+                }
+            }
+        } catch (err) {
+            if ((err as Error).name !== "AbortError") {
+                console.error("Failed to refresh mods:", err)
+            }
         } finally {
             setRefreshing(false)
+            setRefreshProgress(null)
+            abortRef.current = null
         }
     }
 
@@ -81,7 +137,11 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
                         />
                     </div>
                     <button className="btn btn-outline" onClick={handleRefresh} disabled={refreshing}>
-                        {refreshing ? "Refreshing…" : "Refresh"}
+                        {refreshing && refreshProgress
+                            ? `Refreshing (${refreshProgress.current}/${refreshProgress.total})…`
+                            : refreshing
+                              ? "Refreshing…"
+                              : "Refresh"}
                     </button>
                 </div>
             </div>
