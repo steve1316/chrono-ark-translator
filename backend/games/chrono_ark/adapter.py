@@ -220,9 +220,24 @@ class ChronoArkAdapter(GameAdapter):
         # Always try gdata JSON and DLL extraction, merging any entries
         # that aren't already covered by the CSVs.
         gdata_strings = gdata_extractor.extract_mod_gdata_strings(mod_path)
+
+        # Build a set of suffixes from CSV keys for fast substring lookup.
+        # JSON dialogue keys like "Text_Battle_Cri_0" are duplicates when the
+        # CSV already has "Character/xxx_Text_Battle_Cri_0".
+        csv_suffixes: set[str] = set()
+        for csv_key in strings:
+            if "/" in csv_key:
+                csv_suffixes.add(csv_key.split("/", 1)[1])
+
         for key, loc_str in gdata_strings.items():
-            if key not in strings:
-                strings[key] = loc_str
+            if key in strings:
+                continue
+            # Skip if this key appears as a suffix of any CSV key
+            # (with a `_` boundary to avoid false matches).
+            needle = "_" + key
+            if any(suffix.endswith(needle) for suffix in csv_suffixes):
+                continue
+            strings[key] = loc_str
 
         dll_strings = dll_extractor.extract_mod_dll_loc_strings(
             mod_path,
