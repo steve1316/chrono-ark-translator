@@ -117,6 +117,29 @@ def _is_valid_key(key: str) -> bool:
     return bool(re.match(r"^[A-Za-z0-9_\-\./]+$", key))
 
 
+def _drop_redundant_desc_keys(strings: dict[str, LocString]) -> dict[str, LocString]:
+    """Remove keys ending with `_Desc` when a `_Description` variant exists.
+
+    The CSV files contain both `xxx_Desc` and `xxx_Description` rows with
+    identical values. We keep only the `_Description` form.
+
+    Args:
+        strings: Dictionary of localization strings.
+
+    Returns:
+        Filtered dictionary with redundant `_Desc` keys removed.
+    """
+    to_remove = []
+    for key in strings:
+        if key.endswith("_Desc"):
+            description_key = key[:-5] + "_Description"
+            if description_key in strings:
+                to_remove.append(key)
+    for key in to_remove:
+        del strings[key]
+    return strings
+
+
 def _parse_csv_content(file_path: Path) -> list[LocString]:
     """Parse a localization CSV with heuristic row stitching.
 
@@ -260,6 +283,7 @@ def extract_base_game_strings(
 
         print(f"  Parsed {csv_filename}: {len(entries)} entries")
 
+    _drop_redundant_desc_keys(all_strings)
     print(f"  Total base game strings: {len(all_strings)}")
     return all_strings
 
@@ -391,6 +415,7 @@ def extract_mod_strings(mod_path: Path) -> tuple[dict[str, LocString], list[str]
         except ValueError:
             variant_rel_paths.append(str(v))
 
+    _drop_redundant_desc_keys(all_strings)
     return all_strings, variant_rel_paths
 
 

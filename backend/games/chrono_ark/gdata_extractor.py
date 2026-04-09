@@ -16,9 +16,9 @@ from backend.models import LocString
 _FIELD_SUFFIXES: dict[str, str] = {
     "Name": "_Name",
     "name": "_Name",
-    "Description": "_Desc",
-    "Desc": "_Desc",
-    "Des": "_Desc",
+    "Description": "_Description",
+    "Desc": "_Description",
+    "Des": "_Description",
     "PassiveName": "_PassiveName",
     "PassiveDes": "_PassiveDesc",
     "SelectInfo": "_SelectInfo",
