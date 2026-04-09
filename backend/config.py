@@ -63,6 +63,11 @@ BATCH_SIZE = int(os.environ.get("CATL_BATCH_SIZE", "100"))
 # Only these categories from the base glossary are sent to the LLM.
 GLOSSARY_CATEGORIES = os.environ.get("CATL_GLOSSARY_CATEGORIES", "buffs,characters").split(",")
 
+# ── Mod Filtering ─────────────────────────────────────────────────────────────
+
+# Comma-separated list of workshop mod IDs to hide from the dashboard.
+IGNORED_MODS: list[str] = [m.strip() for m in os.environ.get("CATL_IGNORED_MODS", "").split(",") if m.strip()]
+
 # ── Game Selection ─────────────────────────────────────────────────────────────
 
 # Active game adapter ID. See games/ directory for available adapters.

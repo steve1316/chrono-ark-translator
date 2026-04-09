@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { FaEye, FaEyeSlash, FaCheck, FaExclamationTriangle, FaChevronDown, FaChevronRight, FaDownload, FaPlay, FaStop } from "react-icons/fa"
+import { FaEye, FaEyeSlash, FaCheck, FaExclamationTriangle, FaChevronDown, FaChevronRight, FaDownload, FaPlay, FaStop, FaTimes } from "react-icons/fa"
 import { API_BASE } from "../../config"
 
 /** Tracks user-entered API key values (empty string = no pending change). */
@@ -102,6 +102,11 @@ const SettingsPage: React.FC = () => {
     const [saveSuccess, setSaveSuccess] = useState(false)
     const [loading, setLoading] = useState(true)
 
+    // Ignored mods state
+    const [ignoredMods, setIgnoredMods] = useState<string[]>([])
+    const [originalIgnoredMods, setOriginalIgnoredMods] = useState<string[]>([])
+    const [newIgnoredMod, setNewIgnoredMod] = useState("")
+
     // Ollama-specific state
     const [ollamaStatus, setOllamaStatus] = useState<string>("unknown")
     const [ollamaModels, setOllamaModels] = useState<string[]>([])
@@ -160,7 +165,8 @@ const SettingsPage: React.FC = () => {
         llamacppModelPath !== originalLlamacppModelPath ||
         llamacppGpuLayers !== originalLlamacppGpuLayers ||
         llamacppCtxSize !== originalLlamacppCtxSize ||
-        llamacppVramTier !== originalLlamacppVramTier
+        llamacppVramTier !== originalLlamacppVramTier ||
+        JSON.stringify(ignoredMods) !== JSON.stringify(originalIgnoredMods)
 
     // Fetch current settings from the backend on mount.
     // Uses AbortController so React StrictMode's double-mount doesn't
@@ -197,6 +203,8 @@ const SettingsPage: React.FC = () => {
                 setOriginalLlamacppGpuLayers(data.llamacpp_gpu_layers ?? -1)
                 setLlamacppCtxSize(data.llamacpp_ctx_size ?? 8192)
                 setOriginalLlamacppCtxSize(data.llamacpp_ctx_size ?? 8192)
+                setIgnoredMods(data.ignored_mods ?? [])
+                setOriginalIgnoredMods(data.ignored_mods ?? [])
                 setOllamaManaged(data.ollama_managed ?? false)
                 setLlamacppVramTier(data.llamacpp_vram_tier || "")
                 setOriginalLlamacppVramTier(data.llamacpp_vram_tier || "")
@@ -289,6 +297,7 @@ const SettingsPage: React.FC = () => {
         if (llamacppGpuLayers !== originalLlamacppGpuLayers) payload.llamacpp_gpu_layers = llamacppGpuLayers
         if (llamacppCtxSize !== originalLlamacppCtxSize) payload.llamacpp_ctx_size = llamacppCtxSize
         if (llamacppVramTier !== originalLlamacppVramTier) payload.llamacpp_vram_tier = llamacppVramTier
+        if (JSON.stringify(ignoredMods) !== JSON.stringify(originalIgnoredMods)) payload.ignored_mods = ignoredMods
 
         try {
             const res = await fetch(`${API_BASE}/settings`, {
@@ -331,6 +340,8 @@ const SettingsPage: React.FC = () => {
             setOllamaManaged(data.ollama_managed ?? false)
             setLlamacppVramTier(data.llamacpp_vram_tier || "")
             setOriginalLlamacppVramTier(data.llamacpp_vram_tier || "")
+            setIgnoredMods(data.ignored_mods ?? [])
+            setOriginalIgnoredMods(data.ignored_mods ?? [])
             setSaveSuccess(true)
             setTimeout(() => setSaveSuccess(false), 3000)
         } catch (err) {
@@ -1302,6 +1313,87 @@ const SettingsPage: React.FC = () => {
                         width: "120px",
                     }}
                 />
+            </div>
+
+            {/* Ignored Mods */}
+            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
+                <h3 style={{ margin: "0 0 0.5rem 0", color: "var(--text-main)" }}>Ignored Mods</h3>
+                <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginBottom: "1rem" }}>
+                    Workshop mod IDs listed here will be hidden from the dashboard. Useful for system mods, English-only mods, or mods you don't need to translate.
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                    <input
+                        type="text"
+                        placeholder="Workshop mod ID"
+                        value={newIgnoredMod}
+                        onChange={(e) => setNewIgnoredMod(e.target.value.trim())}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && newIgnoredMod && !ignoredMods.includes(newIgnoredMod)) {
+                                setIgnoredMods([...ignoredMods, newIgnoredMod])
+                                setNewIgnoredMod("")
+                            }
+                        }}
+                        style={{
+                            padding: "0.75rem",
+                            borderRadius: "8px",
+                            border: "1px solid var(--glass-border)",
+                            background: "rgba(0, 0, 0, 0.2)",
+                            color: "var(--text-main)",
+                            fontSize: "0.9rem",
+                            flex: 1,
+                        }}
+                    />
+                    <button
+                        className="btn btn-primary"
+                        disabled={!newIgnoredMod || ignoredMods.includes(newIgnoredMod)}
+                        onClick={() => {
+                            if (newIgnoredMod && !ignoredMods.includes(newIgnoredMod)) {
+                                setIgnoredMods([...ignoredMods, newIgnoredMod])
+                                setNewIgnoredMod("")
+                            }
+                        }}
+                    >
+                        Add
+                    </button>
+                </div>
+                {ignoredMods.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                        {ignoredMods.map((id) => (
+                            <span
+                                key={id}
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.4rem",
+                                    padding: "0.35rem 0.6rem",
+                                    borderRadius: "6px",
+                                    background: "rgba(255, 255, 255, 0.08)",
+                                    border: "1px solid var(--glass-border)",
+                                    color: "var(--text-main)",
+                                    fontSize: "0.85rem",
+                                }}
+                            >
+                                {id}
+                                <button
+                                    onClick={() => setIgnoredMods(ignoredMods.filter((m) => m !== id))}
+                                    style={{
+                                        background: "none",
+                                        border: "none",
+                                        color: "var(--text-dim)",
+                                        cursor: "pointer",
+                                        padding: "0",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        fontSize: "0.75rem",
+                                    }}
+                                    title="Remove"
+                                >
+                                    <FaTimes />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Save */}

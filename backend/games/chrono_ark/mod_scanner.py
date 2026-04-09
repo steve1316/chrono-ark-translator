@@ -101,6 +101,7 @@ def scan_workshop(
     workshop_path: Path,
     metadata_filename: str,
     skip_dlls: set[str],
+    ignored_ids: set[str] | None = None,
 ) -> list[ModInfo]:
     """
     Scan the Steam Workshop directory to discover all installed mods.
@@ -109,6 +110,7 @@ def scan_workshop(
         workshop_path: Path to the workshop content directory.
         metadata_filename: Name of the metadata JSON file.
         skip_dlls: Set of DLL filenames to skip.
+        ignored_ids: Optional set of mod IDs to skip entirely.
 
     Returns:
         List of ModInfo for all discovered mods, sorted by mod_id.
@@ -117,9 +119,10 @@ def scan_workshop(
         print(f"Workshop path not found: {workshop_path}")
         return []
 
+    skip = ignored_ids or set()
     mods = []
     for mod_dir in sorted(workshop_path.iterdir()):
-        if mod_dir.is_dir():
+        if mod_dir.is_dir() and mod_dir.name not in skip:
             info = classify_mod(mod_dir, metadata_filename, skip_dlls)
             mods.append(info)
 

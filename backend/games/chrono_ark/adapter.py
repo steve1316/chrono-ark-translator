@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional
 from backend.models import LocString
 from backend.games.base import GameAdapter, ModInfo
+from backend import config
 from backend.games.chrono_ark import csv_extractor, dll_extractor, gdata_extractor, mod_scanner
 
 
@@ -248,6 +249,7 @@ class ChronoArkAdapter(GameAdapter):
             workshop_path=workshop_path,
             metadata_filename=self._METADATA_FILENAME,
             skip_dlls=self._SKIP_DLLS,
+            ignored_ids=set(config.IGNORED_MODS),
         )
 
     def extract_strings(self, mod_path: Path) -> tuple[dict[str, LocString], list[str]]:

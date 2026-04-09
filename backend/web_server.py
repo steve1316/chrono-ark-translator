@@ -193,6 +193,7 @@ class SettingsResponse(BaseModel):
         llamacpp_ctx_size: Context window size for llama-server.
         ollama_managed: Whether this app spawned the running Ollama process.
         llamacpp_managed: Whether this app spawned the running llama-server process.
+        ignored_mods: List of workshop mod IDs hidden from the dashboard.
     """
 
     provider: str
@@ -213,6 +214,7 @@ class SettingsResponse(BaseModel):
     llamacpp_vram_tier: str
     ollama_managed: bool
     llamacpp_managed: bool
+    ignored_mods: list[str]
 
 
 class SettingsUpdate(BaseModel):
@@ -236,6 +238,7 @@ class SettingsUpdate(BaseModel):
         llamacpp_model_path: New GGUF model file path.
         llamacpp_gpu_layers: New GPU layer count (-1 = all).
         llamacpp_ctx_size: New context window size.
+        ignored_mods: New list of workshop mod IDs to hide from the dashboard.
     """
 
     provider: Optional[str] = None
@@ -253,6 +256,7 @@ class SettingsUpdate(BaseModel):
     llamacpp_gpu_layers: Optional[int] = None
     llamacpp_ctx_size: Optional[int] = None
     llamacpp_vram_tier: Optional[str] = None
+    ignored_mods: Optional[list[str]] = None
 
 
 # --- Helpers ---
@@ -2996,6 +3000,7 @@ async def get_settings():
         llamacpp_vram_tier=config.LLAMACPP_VRAM_TIER,
         ollama_managed=is_managed("ollama"),
         llamacpp_managed=is_managed("llamacpp"),
+        ignored_mods=config.IGNORED_MODS,
     )
 
 
@@ -3067,6 +3072,10 @@ async def update_settings(payload: SettingsUpdate):
     if payload.llamacpp_vram_tier is not None:
         config.LLAMACPP_VRAM_TIER = payload.llamacpp_vram_tier
         env_updates["CATL_LLAMACPP_VRAM_TIER"] = payload.llamacpp_vram_tier
+
+    if payload.ignored_mods is not None:
+        config.IGNORED_MODS = payload.ignored_mods
+        env_updates["CATL_IGNORED_MODS"] = ",".join(payload.ignored_mods)
 
     if env_updates:
         _update_env_file(env_updates)
