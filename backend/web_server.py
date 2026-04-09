@@ -603,6 +603,7 @@ async def get_mod_detail(mod_id: str):
                 "is_translated": is_done,
                 "original_english": pre_export_english.get(key, original_english_map.get(key, "")) if is_synced else original_english_map.get(key, ""),
                 "is_synced": is_synced,
+                "synced_english": english if is_synced else "",
                 "source_file": loc_str.source_file,
             }
         )
