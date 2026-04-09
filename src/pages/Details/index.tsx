@@ -730,7 +730,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 )}
                             </div>
                             {modAuthor && <p style={{ color: "var(--text-dim)", marginTop: "0.25rem" }}>by {modAuthor}</p>}
-                            <p>{processedStrings.length} total strings found</p>
+                            <p>
+                                {strings.filter((s) => s.is_translated || !s.source.trim()).length} / {strings.length} total strings translated
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -1414,16 +1416,15 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                     </thead>
                     <tbody>
                         {processedStrings.map((s) => {
-                            // hasOverride: true when the current English differs from what was originally in the CSV (user or AI changed it).
-                            const hasOverride = s.english !== s.original_english
+                            const hasOverride = !s.is_synced && s.english !== s.original_english
                             const isDone = s.is_translated || !s.source.trim()
                             // Row background: green for synced, yellow for unsynced overrides
-                            const rowStyle = s.is_synced && !hasOverride ? { backgroundColor: "rgba(52, 211, 153, 0.1)" } : hasOverride ? { backgroundColor: "rgba(255, 220, 40, 0.15)" } : undefined
+                            const rowStyle = s.is_synced ? { backgroundColor: "rgba(52, 211, 153, 0.1)" } : hasOverride ? { backgroundColor: "rgba(255, 220, 40, 0.15)" } : undefined
                             return (
                                 <tr key={s.key} style={rowStyle}>
                                     <td>
-                                        <span className={`status-badge ${s.is_synced && !hasOverride ? "status-synced" : isDone ? "status-translated" : "status-missing"}`}>
-                                            {s.is_synced && !hasOverride ? "SYNCED" : isDone ? "OK" : "MISSING"}
+                                        <span className={`status-badge ${s.is_synced ? "status-synced" : isDone ? "status-translated" : "status-missing"}`}>
+                                            {s.is_synced ? "SYNCED" : isDone ? "OK" : "MISSING"}
                                         </span>
                                     </td>
                                     <td className="key-cell" title={s.source_file} style={{ maxWidth: columnWidths.source_file }}>
@@ -1437,10 +1438,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                     </td>
                                     <td className="english-cell" style={{ maxWidth: columnWidths.english, position: "relative" }}>
                                         {/* Show previous translation above the editable field when overridden or synced. */}
-                                        {hasOverride && <div className="prev-translation">{s.original_english || "(no previous translation)"}</div>}
-                                        {s.is_synced && !hasOverride && s.original_english && s.original_english !== s.english && (
-                                            <div className="prev-translation" style={{ color: "rgba(52, 211, 153, 0.6)" }}>
-                                                {s.original_english || "(no original)"}
+                                        {s.original_english && s.original_english !== s.english && (
+                                            <div className="prev-translation" style={s.is_synced ? { color: "rgba(52, 211, 153, 0.6)" } : undefined}>
+                                                {s.original_english}
                                             </div>
                                         )}
                                         <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />

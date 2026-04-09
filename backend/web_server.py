@@ -557,6 +557,19 @@ async def get_mod_detail(mod_id: str):
         if current_hash != last_hash:
             synced_keys = set()
 
+    # Load pre-export English values saved at export time so the UI can
+    # show a diff for synced rows (the CSV now contains the translated
+    # values, so we need the snapshot from before the export).
+    pre_export_english: dict[str, str] = {}
+    if synced_keys:
+        pre_export_path = config.STORAGE_PATH / "mods" / mod_id / "pre_export_english.json"
+        if pre_export_path.exists():
+            try:
+                with open(pre_export_path, "r", encoding="utf-8") as f:
+                    pre_export_english = json.load(f)
+            except Exception:
+                pass
+
     # Apply saved translations so user edits (including clears) are respected.
     for key, english in translations.items():
         if key in strings:
@@ -578,7 +591,6 @@ async def get_mod_detail(mod_id: str):
         if is_done:
             translated_keys.append(key)
 
-        has_override = key in translations
         is_synced = key in synced_keys
         results.append(
             {
@@ -589,7 +601,7 @@ async def get_mod_detail(mod_id: str):
                 "source_lang": source_lang,
                 "english": english,
                 "is_translated": is_done,
-                "original_english": original_english_map.get(key, "") if has_override else english,
+                "original_english": pre_export_english.get(key, original_english_map.get(key, "")) if is_synced else original_english_map.get(key, ""),
                 "is_synced": is_synced,
                 "source_file": loc_str.source_file,
             }
@@ -806,6 +818,7 @@ async def reset_mod(mod_id: str):
         "progress.json",
         "synced_keys.json",
         "last_export.json",
+        "pre_export_english.json",
         "last_api_responses.json",
     ]
     dirs_to_delete = ["original_csvs", "original_gdata"]
@@ -1764,6 +1777,13 @@ async def export_mod(mod_id: str, resync: bool = False):
     # Extract current strings from the mod.
     strings, variant_files = _adapter.extract_strings(mod_path)
 
+    # Capture pre-export English values so we can show a diff in the UI.
+    pre_export_english = {
+        key: loc_str.translations.get("English", "")
+        for key, loc_str in strings.items()
+        if key in translations
+    }
+
     # Apply translations to the English column.
     applied = 0
     for key, english in translations.items():
@@ -1851,6 +1871,11 @@ async def export_mod(mod_id: str, resync: bool = False):
     synced_keys_path.parent.mkdir(parents=True, exist_ok=True)
     with open(synced_keys_path, "w", encoding="utf-8") as f:
         json.dump(list(translations.keys()), f, ensure_ascii=False)
+
+    # Save pre-export English values so the UI can show a diff for synced rows.
+    pre_export_path = config.STORAGE_PATH / "mods" / mod_id / "pre_export_english.json"
+    with open(pre_export_path, "w", encoding="utf-8") as f:
+        json.dump(pre_export_english, f, ensure_ascii=False)
 
     return {
         "status": "success",
