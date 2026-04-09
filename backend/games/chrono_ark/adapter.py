@@ -18,6 +18,7 @@ from backend.games.chrono_ark import csv_extractor, dll_extractor, gdata_extract
 # Suffix pairs where both forms may coexist across CSV and gdata sources.
 # Each tuple is (short_suffix, long_suffix).
 _DESC_SUFFIX_PAIRS = [
+    ("_Des", "_Description"),
     ("_Desc", "_Description"),
     ("_PassiveDes", "_PassiveDesc"),
 ]
@@ -26,8 +27,8 @@ _DESC_SUFFIX_PAIRS = [
 def _drop_cross_source_duplicates(strings: dict[str, LocString]) -> None:
     """Remove duplicate description keys, preferring CSV-sourced entries.
 
-    When both suffix variants exist (e.g. `_Desc` and `_Description`, or
-    `_PassiveDes` and `_PassiveDesc`), the CSV-sourced key is kept and
+    When both suffix variants exist (e.g. `_Des`/`_Desc` and `_Description`,
+    or `_PassiveDes` and `_PassiveDesc`), the CSV-sourced key is kept and
     the other is dropped. If both come from the same source type, the
     longer (more canonical) form is kept.
 
