@@ -807,7 +807,7 @@ async def reset_mod(mod_id: str):
         "last_export.json",
         "last_api_responses.json",
     ]
-    dirs_to_delete = ["history", "original_csvs", "original_gdata"]
+    dirs_to_delete = ["original_csvs", "original_gdata"]
 
     try:
         for filename in files_to_delete:
