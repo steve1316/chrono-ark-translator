@@ -14,6 +14,56 @@ from backend.games.base import GameAdapter, ModInfo
 from backend.games.chrono_ark import csv_extractor, dll_extractor, gdata_extractor, mod_scanner
 
 
+# Suffix pairs where both forms may coexist across CSV and gdata sources.
+# Each tuple is (short_suffix, long_suffix).
+_DESC_SUFFIX_PAIRS = [
+    ("_Desc", "_Description"),
+    ("_PassiveDes", "_PassiveDesc"),
+]
+
+
+def _drop_cross_source_duplicates(strings: dict[str, LocString]) -> None:
+    """Remove duplicate description keys, preferring CSV-sourced entries.
+
+    When both suffix variants exist (e.g. `_Desc` and `_Description`, or
+    `_PassiveDes` and `_PassiveDesc`), the CSV-sourced key is kept and
+    the other is dropped. If both come from the same source type, the
+    longer (more canonical) form is kept.
+
+    Args:
+        strings: Dictionary of localization strings, modified in place.
+    """
+    to_remove: list[str] = []
+    for key in list(strings.keys()):
+        for short_suffix, long_suffix in _DESC_SUFFIX_PAIRS:
+            if key.endswith(short_suffix):
+                other_key = key[: -len(short_suffix)] + long_suffix
+            elif key.endswith(long_suffix):
+                other_key = key[: -len(long_suffix)] + short_suffix
+            else:
+                continue
+
+            if other_key not in strings or other_key in to_remove:
+                break
+
+            this_is_csv = strings[key].source_file.endswith(".csv")
+            other_is_csv = strings[other_key].source_file.endswith(".csv")
+
+            if this_is_csv and not other_is_csv:
+                to_remove.append(other_key)
+            elif other_is_csv and not this_is_csv:
+                to_remove.append(key)
+            elif key.endswith(short_suffix):
+                # Same source type — prefer the longer form.
+                to_remove.append(key)
+            else:
+                to_remove.append(other_key)
+            break
+
+    for key in to_remove:
+        strings.pop(key, None)
+
+
 class ChronoArkAdapter(GameAdapter):
     """Game adapter for Chrono Ark.
 
@@ -247,6 +297,7 @@ class ChronoArkAdapter(GameAdapter):
             if key not in strings:
                 strings[key] = loc_str
 
+        _drop_cross_source_duplicates(strings)
         return strings, variants
 
     def extract_base_game_strings(self, game_path: Optional[Path] = None) -> dict[str, LocString]:

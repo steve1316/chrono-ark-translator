@@ -118,22 +118,25 @@ def _is_valid_key(key: str) -> bool:
 
 
 def _drop_redundant_desc_keys(strings: dict[str, LocString]) -> dict[str, LocString]:
-    """Remove keys ending with `_Desc` when a `_Description` variant exists.
+    """Remove redundant description keys when both variants exist in the CSV.
 
-    The CSV files contain both `xxx_Desc` and `xxx_Description` rows with
-    identical values. We keep only the `_Description` form.
+    When the CSV contains both `xxx_Desc` and `xxx_Description`, or both
+    `xxx_PassiveDes` and `xxx_PassiveDesc`, this drops the shorter form
+    since they carry identical values.
 
     Args:
         strings: Dictionary of localization strings.
 
     Returns:
-        Filtered dictionary with redundant `_Desc` keys removed.
+        Filtered dictionary with redundant keys removed.
     """
     to_remove = []
     for key in strings:
         if key.endswith("_Desc"):
-            description_key = key[:-5] + "_Description"
-            if description_key in strings:
+            if key[:-5] + "_Description" in strings:
+                to_remove.append(key)
+        elif key.endswith("_PassiveDes"):
+            if key[:-11] + "_PassiveDesc" in strings:
                 to_remove.append(key)
     for key in to_remove:
         del strings[key]
