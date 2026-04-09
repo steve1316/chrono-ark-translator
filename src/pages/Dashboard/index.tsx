@@ -137,11 +137,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
                         />
                     </div>
                     <button className="btn btn-outline" onClick={handleRefresh} disabled={refreshing}>
-                        {refreshing && refreshProgress
-                            ? `Refreshing (${refreshProgress.current}/${refreshProgress.total})…`
-                            : refreshing
-                              ? "Refreshing…"
-                              : "Refresh"}
+                        {refreshing && refreshProgress ? `Refreshing (${refreshProgress.current}/${refreshProgress.total})…` : refreshing ? "Refreshing…" : "Refresh"}
                     </button>
                 </div>
             </div>
