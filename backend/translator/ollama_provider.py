@@ -14,7 +14,6 @@ from backend import config
 from backend.translator.base import TranslationProvider
 
 
-
 class OllamaProvider(TranslationProvider):
     """Translation provider using a local Ollama instance.
 

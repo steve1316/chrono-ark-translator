@@ -14,7 +14,6 @@ from backend import config
 from backend.translator.base import TranslationProvider
 
 
-
 class LlamaCppProvider(TranslationProvider):
     """Translation provider using a local llama-server instance.
 

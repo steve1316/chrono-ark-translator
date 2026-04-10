@@ -11,7 +11,6 @@ from backend import config
 from backend.translator.base import TranslationProvider
 
 
-
 class OpenAIProvider(TranslationProvider):
     """Translation provider using OpenAI's GPT API.
 
