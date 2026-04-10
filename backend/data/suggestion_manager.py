@@ -76,13 +76,3 @@ def remove_suggestions(mod_id: str, terms: list[str], storage_path: Optional[Pat
     existing = load_suggestions(mod_id, storage_path)
     filtered = [s for s in existing if s.get("english") not in terms]
     save_suggestions(mod_id, filtered, storage_path)
-
-
-def clear_suggestions(mod_id: str, storage_path: Optional[Path] = None) -> None:
-    """Remove all pending suggestions for a mod.
-
-    Args:
-        mod_id: The mod's Workshop ID.
-        storage_path: Base storage path override. Defaults to config.STORAGE_PATH.
-    """
-    save_suggestions(mod_id, [], storage_path)

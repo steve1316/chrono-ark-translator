@@ -44,7 +44,7 @@ from backend.data.suggestion_manager import (
     load_suggestions,
     add_suggestions,
     remove_suggestions,
-    clear_suggestions,
+    save_suggestions,
 )
 from backend.data.character_context import load_character_context, save_character_context
 from backend.data.history_manager import create_backup, list_backups, restore_backup, delete_backup
@@ -2324,7 +2324,7 @@ async def dismiss_suggestions(mod_id: str, action: SuggestionAction):
         A dict with `{"status": "success"}`.
     """
     if action.all:
-        clear_suggestions(mod_id)
+        save_suggestions(mod_id, [])
     else:
         remove_suggestions(mod_id, action.terms)
     return {"status": "success"}
