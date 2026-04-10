@@ -1007,10 +1007,16 @@ async def estimate_all_translation_costs(request: Request):
 
             # Treat ALL strings as needing translation (ignore existing English).
             # Detect source language once per string to avoid redundant calls.
+            # Fall back to Chinese for gdata/DLL strings that only have an
+            # English key in their translations dict.
             by_lang: dict[str, list[tuple[str, str]]] = {}
             entry_count = 0
             for key, loc_str in strings.items():
                 lang = _adapter.detect_source_language(loc_str)
+                if lang is None:
+                    english = loc_str.translations.get("English", "").strip()
+                    if english:
+                        lang = "Chinese"
                 if lang is not None:
                     entry_count += 1
                     if lang not in by_lang:
