@@ -15,12 +15,17 @@ from backend import config
 
 
 def _translations_path(mod_id: str, storage_path: Optional[Path] = None) -> Path:
+    """Build the path to a mod's `translations.json` file.
+
+    Args:
+        mod_id: The mod's Workshop ID.
+        storage_path: Base storage path override. Defaults to `config.STORAGE_PATH`.
+
+    Returns:
+        Path to the mod's translations JSON file.
+    """
     base = storage_path or config.STORAGE_PATH
     return base / "mods" / mod_id / "translations.json"
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _normalize_entry(value: str | dict) -> dict:
@@ -39,7 +44,14 @@ def _normalize_entry(value: str | dict) -> dict:
 
 
 def _load_raw_data(path: Path) -> dict:
-    """Load raw JSON from disk, returning empty dict if missing or corrupt."""
+    """Load raw JSON from disk, returning empty dict if missing or corrupt.
+
+    Args:
+        path: Filesystem path to the JSON file.
+
+    Returns:
+        Parsed JSON dict, or an empty dict on any read/parse failure.
+    """
     if not path.exists():
         return {}
     try:
@@ -50,7 +62,14 @@ def _load_raw_data(path: Path) -> dict:
 
 
 def _save_raw_data(path: Path, data: dict) -> None:
-    """Write the full timestamped dict to disk."""
+    """Write the full timestamped dict to disk.
+
+    Creates parent directories if they don't exist.
+
+    Args:
+        path: Filesystem path to write the JSON file.
+        data: The translations dict to serialize.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
@@ -118,7 +137,7 @@ def save_translations_bulk(
     """
     path = _translations_path(mod_id, storage_path)
     existing = {k: _normalize_entry(v) for k, v in _load_raw_data(path).items()}
-    now = _now()
+    now = datetime.now(timezone.utc).isoformat()
 
     for key, text in new_entries.items():
         if key in existing:
@@ -150,7 +169,7 @@ def update_single_translation(
     """
     path = _translations_path(mod_id, storage_path)
     existing = {k: _normalize_entry(v) for k, v in _load_raw_data(path).items()}
-    now = _now()
+    now = datetime.now(timezone.utc).isoformat()
 
     if key in existing:
         existing[key]["text"] = text
@@ -178,7 +197,7 @@ def clear_all_translations(
     """
     path = _translations_path(mod_id, storage_path)
     existing = {k: _normalize_entry(v) for k, v in _load_raw_data(path).items()}
-    now = _now()
+    now = datetime.now(timezone.utc).isoformat()
 
     for key in keys:
         if key in existing:
@@ -212,7 +231,7 @@ def replace_in_translations(
     """
     path = _translations_path(mod_id, storage_path)
     existing = {k: _normalize_entry(v) for k, v in _load_raw_data(path).items()}
-    now = _now()
+    now = datetime.now(timezone.utc).isoformat()
     replaced = 0
 
     for entry in existing.values():
