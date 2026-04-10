@@ -23,6 +23,32 @@ _DESC_SUFFIX_PAIRS = [
     ("_PassiveDes", "_PassiveDesc"),
 ]
 
+# All known field suffixes in localization keys (longest first so that
+# e.g. `_PassiveName` matches before `_Name`).
+_KNOWN_SUFFIXES = (
+    "_PassiveName", "_PassiveDesc", "_PassiveDes",
+    "_Description", "_SelectInfo",
+    "_Flavor", "_Name", "_Desc", "_Des",
+)
+
+
+def _item_base(key: str) -> str | None:
+    """Extract the item base (prefix/item_id) from a localization key.
+
+    Strips known field suffixes to find the common base for duplicate
+    detection across sources that use different suffix conventions.
+
+    Args:
+        key: Localization key like `SkillExtended/Roland_Rare_Icon_Description`.
+
+    Returns:
+        The base without the field suffix, or None if no known suffix matches.
+    """
+    for suffix in _KNOWN_SUFFIXES:
+        if key.endswith(suffix):
+            return key[: -len(suffix)]
+    return None
+
 
 def _drop_cross_source_duplicates(strings: dict[str, LocString]) -> None:
     """Remove duplicate description keys, preferring CSV-sourced entries.
@@ -280,10 +306,18 @@ class ChronoArkAdapter(GameAdapter):
         # "Character/xxx_Text_Battle_Cri_0" for JSON "Text_Battle_Cri_0".
         csv_keys_lower: set[str] = set()
         csv_suffixes_lower: set[str] = set()
-        for csv_key in strings:
+        # Map item base → set of source texts for cross-suffix dedup.
+        # Catches cases like CSV `_Name` vs JSON `_Description` for the
+        # same item when the source text is identical.
+        csv_base_texts: dict[str, set[str]] = {}
+        for csv_key, csv_loc in strings.items():
             csv_keys_lower.add(csv_key.lower())
             if "/" in csv_key:
                 csv_suffixes_lower.add(csv_key.split("/", 1)[1].lower())
+            base = _item_base(csv_key)
+            if base is not None:
+                texts = csv_base_texts.setdefault(base, set())
+                texts.update(v for v in csv_loc.translations.values() if v)
 
         for key, loc_str in gdata_strings.items():
             if key in strings or key.lower() in csv_keys_lower:
@@ -293,6 +327,15 @@ class ChronoArkAdapter(GameAdapter):
             needle = "_" + key.lower()
             if any(suffix.endswith(needle) for suffix in csv_suffixes_lower):
                 continue
+            # Skip if the same item already has a CSV entry with matching
+            # source text under a different suffix.
+            base = _item_base(key)
+            if base is not None:
+                csv_texts = csv_base_texts.get(base)
+                if csv_texts and any(
+                    v in csv_texts for v in loc_str.translations.values() if v
+                ):
+                    continue
             strings[key] = loc_str
 
         dll_strings = dll_extractor.extract_mod_dll_loc_strings(
