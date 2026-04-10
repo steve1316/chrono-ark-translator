@@ -26,9 +26,15 @@ _DESC_SUFFIX_PAIRS = [
 # All known field suffixes in localization keys (longest first so that
 # e.g. `_PassiveName` matches before `_Name`).
 _KNOWN_SUFFIXES = (
-    "_PassiveName", "_PassiveDesc", "_PassiveDes",
-    "_Description", "_SelectInfo",
-    "_Flavor", "_Name", "_Desc", "_Des",
+    "_PassiveName",
+    "_PassiveDesc",
+    "_PassiveDes",
+    "_Description",
+    "_SelectInfo",
+    "_Flavor",
+    "_Name",
+    "_Desc",
+    "_Des",
 )
 
 
@@ -336,9 +342,7 @@ class ChronoArkAdapter(GameAdapter):
             base = _item_base(key)
             if base is not None:
                 csv_texts = csv_base_texts.get(base)
-                if csv_texts and any(
-                    v in csv_texts for v in loc_str.translations.values() if v
-                ):
+                if csv_texts and any(v in csv_texts for v in loc_str.translations.values() if v):
                     continue
             strings[key] = loc_str
 
