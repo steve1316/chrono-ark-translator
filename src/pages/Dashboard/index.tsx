@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react"
 import { FaSearch } from "react-icons/fa"
 import ModGrid from "../../components/ModGrid"
+import EstimateTotalCostModal from "../../components/EstimateTotalCostModal"
 import type { ModStatus } from "../../shared_types"
 import { API_BASE } from "../../config"
 
@@ -26,11 +27,25 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
     const [refreshProgress, setRefreshProgress] = useState<{ current: number; total: number; mod_name: string } | null>(null)
     const abortRef = useRef<AbortController | null>(null)
     const gridWrapperRef = useRef<HTMLDivElement>(null)
+    const [estimating, setEstimating] = useState(false)
+    const [estimateProgress, setEstimateProgress] = useState<{ current: number; total: number; mod_name: string } | null>(null)
+    const [estimateResults, setEstimateResults] = useState<
+        {
+            mod_id: string
+            mod_name: string
+            total_strings: number
+            provider: string
+            estimates: Record<string, { estimated_input_tokens: number; estimated_output_tokens: number; estimated_cost_usd: number; model: string; note: string }>
+        }[]
+    >([])
+    const [showEstimateModal, setShowEstimateModal] = useState(false)
+    const estimateAbortRef = useRef<AbortController | null>(null)
 
     // Abort any in-flight refresh when the component unmounts (page refresh / navigation).
     useEffect(() => {
         return () => {
             abortRef.current?.abort()
+            estimateAbortRef.current?.abort()
         }
     }, [])
 
@@ -94,6 +109,75 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
         }
     }
 
+    /**
+     * Estimates translation costs for all mods by streaming progress from POST /api/translate/estimate-all.
+     *
+     * The endpoint computes token and cost estimates per mod for each configured
+     * provider, emitting an SSE progress event per mod and a final done event.
+     * Results are accumulated and shown in the EstimateTotalCostModal.
+     *
+     * An AbortController is attached so the request is cancelled automatically
+     * when the component unmounts or when the handler is invoked again while a
+     * previous run is still in progress.
+     */
+    const handleEstimate = async () => {
+        estimateAbortRef.current?.abort()
+
+        const controller = new AbortController()
+        estimateAbortRef.current = controller
+
+        setEstimating(true)
+        setEstimateProgress(null)
+        setEstimateResults([])
+
+        try {
+            const res = await fetch(`${API_BASE}/translate/estimate-all`, {
+                method: "POST",
+                signal: controller.signal,
+            })
+            const reader = res.body?.getReader()
+            const decoder = new TextDecoder()
+            if (!reader) return
+
+            const accumulated: typeof estimateResults = []
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                const text = decoder.decode(value)
+                for (const line of text.split("\n")) {
+                    if (!line.startsWith("data: ")) continue
+                    try {
+                        const event = JSON.parse(line.slice(6))
+                        if (event.done) {
+                            setShowEstimateModal(true)
+                        } else {
+                            accumulated.push({
+                                mod_id: event.mod_id,
+                                mod_name: event.mod_name,
+                                total_strings: event.total_strings,
+                                provider: event.provider,
+                                estimates: event.estimates,
+                            })
+                            setEstimateResults([...accumulated])
+                            setEstimateProgress({ current: event.current, total: event.total, mod_name: event.mod_name })
+                        }
+                    } catch {
+                        /* skip malformed lines */
+                    }
+                }
+            }
+        } catch (err) {
+            if ((err as Error).name !== "AbortError") {
+                console.error("Failed to estimate costs:", err)
+            }
+        } finally {
+            setEstimating(false)
+            setEstimateProgress(null)
+            estimateAbortRef.current = null
+        }
+    }
+
     const filteredMods = useMemo(() => {
         const query = search.trim().toLowerCase()
         if (!query) return mods
@@ -139,12 +223,16 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
                     <button className="btn btn-outline" onClick={handleRefresh} disabled={refreshing}>
                         {refreshing && refreshProgress ? `Refreshing (${refreshProgress.current}/${refreshProgress.total})…` : refreshing ? "Refreshing…" : "Refresh"}
                     </button>
+                    <button className="btn btn-outline" onClick={handleEstimate} disabled={estimating || refreshing}>
+                        {estimating && estimateProgress ? `Estimating (${estimateProgress.current}/${estimateProgress.total})…` : estimating ? "Estimating…" : "Estimate Total Cost"}
+                    </button>
                 </div>
             </div>
 
             <div ref={gridWrapperRef}>
                 <ModGrid mods={filteredMods} onModSelect={onModSelect} onModSync={onModSync} searchQuery={search.trim()} />
             </div>
+            {showEstimateModal && <EstimateTotalCostModal results={estimateResults} onClose={() => setShowEstimateModal(false)} />}
         </>
     )
 }
