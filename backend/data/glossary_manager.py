@@ -53,39 +53,8 @@ _SUFFIX_CATEGORY: dict[str, str] = {
 _IGNORED_NAME_KEY_PREFIXES = ("SkillExtended/",)
 
 
-def _identity(english: str) -> str:
-    """Return the English value unchanged.
-
-    Args:
-        english: The English term text.
-
-    Returns:
-        The same string, unmodified.
-    """
-    return english
-
-
-def _clean_stat_desc(english: str) -> str:
-    """Strip sprite tags and stat placeholders from a `System/StatDesc` value.
-
-    For example, `"<sprite=0>Weakening Accuracy {0}%"` becomes
-    `"Weakening Accuracy"`.
-
-    Args:
-        english: Raw English text from a `System/StatDesc` key.
-
-    Returns:
-        Cleaned term name with tags and placeholders removed.
-    """
-    return _STAT_DESC_CLEANUP.sub("", english).strip()
-
-
-def _classify_mechanic_key(key: str):
-    """Determine whether a localization key represents a mechanic term.
-
-    Checks the key against known mechanic patterns and returns a callable
-    that transforms the raw English value into a clean term name. Returns
-    None for non-mechanic keys.
+def _mechanic_english(key: str, english: str) -> str | None:
+    """Return the cleaned mechanic term name if the key is a mechanic pattern.
 
     Mechanic patterns:
     - `Battle/Keyword/xxx` (excluding `_Desc` suffixes)
@@ -95,25 +64,25 @@ def _classify_mechanic_key(key: str):
 
     Args:
         key: The localization key to classify.
+        english: The raw English value from the localization data.
 
     Returns:
-        A callable `(str) -> str` that transforms the English value into
-        the final term name, or None if the key is not a mechanic pattern.
+        The cleaned English term name, or None if the key is not a
+        mechanic pattern.
     """
     if key in _MECHANIC_IGNORED_KEYS:
         return None
 
     if key in _MECHANIC_EXACT_KEYS:
-        fixed = _MECHANIC_EXACT_KEYS[key]
-        return lambda _eng: fixed
+        return _MECHANIC_EXACT_KEYS[key]
 
     if any(key.startswith(p) for p in _MECHANIC_PREFIXES):
         if key.endswith("_Desc"):
             return None
-        return _identity
+        return english
 
     if key.startswith("System/StatDesc/"):
-        return _clean_stat_desc
+        return _STAT_DESC_CLEANUP.sub("", english).strip()
 
     return None
 
@@ -157,19 +126,18 @@ def build_glossary_from_base_game(
 
     for key, loc_str in base_strings.items():
         is_name_key = any(key.endswith(suffix) for suffix in _NAME_KEY_SUFFIXES)
-        is_mechanic = _classify_mechanic_key(key) is not None
-
-        if not is_name_key and not is_mechanic:
-            continue
 
         english = loc_str.translations.get("English", "").strip().split("\n")[0].strip()
         if not english:
             continue
 
         # Determine the category and clean up the English term.
-        if is_mechanic:
+        mechanic_term = _mechanic_english(key, english)
+        if mechanic_term is not None:
             category = "mechanics"
-            english = _classify_mechanic_key(key)(english)
+            english = mechanic_term
+        elif not is_name_key:
+            continue
         else:
             category = "other"
             for cat_name, prefix in term_categories.items():
