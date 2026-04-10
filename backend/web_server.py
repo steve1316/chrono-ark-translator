@@ -527,12 +527,7 @@ async def get_mod_detail(mod_id: str):
     Raises:
         HTTPException: 404 if no mod with the given id is found.
     """
-    # Find the mod path by scanning.
-    mods = _adapter.scan_mods()
-    matching = [m for m in mods if m.mod_id == mod_id]
-    if not matching:
-        raise HTTPException(status_code=404, detail="Mod not found")
-    mod_path = matching[0].path
+    mod_path = _find_mod_path(mod_id)
 
     # Extract current strings
     strings, duplicate_files = _adapter.extract_strings(mod_path)
@@ -709,11 +704,7 @@ async def sync_mod(mod_id: str):
     Raises:
         HTTPException: 404 if no mod with the given id is found.
     """
-    mods = _adapter.scan_mods()
-    matching = [m for m in mods if m.mod_id == mod_id]
-    if not matching:
-        raise HTTPException(status_code=404, detail="Mod not found")
-    mod_path = matching[0].path
+    mod_path = _find_mod_path(mod_id)
 
     strings, _ = _adapter.extract_strings(mod_path)
     output_path = config.STORAGE_PATH / "mods" / mod_id / "source.json"
@@ -741,12 +732,9 @@ async def clear_translations(mod_id: str):
     Raises:
         HTTPException: 404 if no mod with the given id is found.
     """
-    mods = _adapter.scan_mods()
-    matching = [m for m in mods if m.mod_id == mod_id]
-    if not matching:
-        raise HTTPException(status_code=404, detail="Mod not found")
+    mod_path = _find_mod_path(mod_id)
 
-    strings, _ = _adapter.extract_strings(matching[0].path)
+    strings, _ = _adapter.extract_strings(mod_path)
 
     # Back up before clearing.
     create_backup(mod_id, "Before clearing English translations")
@@ -911,11 +899,7 @@ async def estimate_translation(req: TranslationRequest):
     Raises:
         HTTPException: 404 if no mod with the given id is found.
     """
-    mods = _adapter.scan_mods()
-    matching = [m for m in mods if m.mod_id == req.mod_id]
-    if not matching:
-        raise HTTPException(status_code=404, detail="Mod not found")
-    mod_path = matching[0].path
+    mod_path = _find_mod_path(req.mod_id)
 
     strings, _ = _adapter.extract_strings(mod_path)
     untranslated = _adapter.get_untranslated(strings)
@@ -1064,11 +1048,7 @@ async def preview_translation(req: TranslationRequest):
     Raises:
         HTTPException: 404 if no mod with the given id is found.
     """
-    mods = _adapter.scan_mods()
-    matching = [m for m in mods if m.mod_id == req.mod_id]
-    if not matching:
-        raise HTTPException(status_code=404, detail="Mod not found")
-    mod_path = matching[0].path
+    mod_path = _find_mod_path(req.mod_id)
 
     strings, _ = _adapter.extract_strings(mod_path)
     _merge_gdata_originals(req.mod_id, strings)
@@ -1229,11 +1209,7 @@ async def translate_mod(req: TranslationRequest):
         HTTPException: 404 if no mod with the given id is found.
         HTTPException: 502 if the translation provider returns an error.
     """
-    mods = _adapter.scan_mods()
-    matching = [m for m in mods if m.mod_id == req.mod_id]
-    if not matching:
-        raise HTTPException(status_code=404, detail="Mod not found")
-    mod_path = matching[0].path
+    mod_path = _find_mod_path(req.mod_id)
 
     strings, _ = _adapter.extract_strings(mod_path)
 
@@ -1381,11 +1357,7 @@ async def translate_batch(req: BatchTranslationRequest):
         HTTPException: 400 if none of the provided keys have translatable text.
         HTTPException: 502 if the translation provider returns an error.
     """
-    mods = _adapter.scan_mods()
-    matching = [m for m in mods if m.mod_id == req.mod_id]
-    if not matching:
-        raise HTTPException(status_code=404, detail="Mod not found")
-    mod_path = matching[0].path
+    mod_path = _find_mod_path(req.mod_id)
 
     strings, _ = _adapter.extract_strings(mod_path)
     _merge_gdata_originals(req.mod_id, strings)
@@ -1550,11 +1522,7 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
         request: The underlying Starlette request, used to detect client
             disconnection so the Ollama process can be stopped early.
     """
-    mods = _adapter.scan_mods()
-    matching = [m for m in mods if m.mod_id == req.mod_id]
-    if not matching:
-        raise HTTPException(status_code=404, detail="Mod not found")
-    mod_path = matching[0].path
+    mod_path = _find_mod_path(req.mod_id)
 
     strings, _ = _adapter.extract_strings(mod_path)
     _merge_gdata_originals(req.mod_id, strings)
