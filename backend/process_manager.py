@@ -16,7 +16,17 @@ _processes: dict[str, tuple[subprocess.Popen, object, object]] = {}
 
 
 def is_managed(name: str) -> bool:
-    """Return True if we spawned and are tracking a live process by this name."""
+    """Check whether a live process is tracked under the given name.
+
+    If the process has exited since it was started, it is automatically
+    cleaned up and this returns False.
+
+    Args:
+        name: Registry key (e.g. `"ollama"`, `"llamacpp"`).
+
+    Returns:
+        True if the process is still running, False otherwise.
+    """
     entry = _processes.get(name)
     if entry is None:
         return False
@@ -68,11 +78,15 @@ def start_process(name: str, args: list[str], log_dir: Path) -> tuple[bool, str]
 def stop_process(name: str) -> tuple[bool, str]:
     """Stop a managed process by name.
 
+    Sends SIGTERM first and waits up to 5 seconds. If the process does
+    not exit, it is forcefully killed with SIGKILL.
+
     Args:
         name: Registry key of the process to stop.
 
     Returns:
-        `(success, message)` tuple.
+        `(success, message)` tuple. Returns failure if the process was
+        not started by this app or has already exited.
     """
     entry = _processes.get(name)
     if entry is None:
@@ -98,7 +112,11 @@ def stop_process(name: str) -> tuple[bool, str]:
 
 
 def _cleanup(name: str) -> None:
-    """Remove a process from the registry and close its log file handles."""
+    """Remove a process from the registry and close its log file handles.
+
+    Args:
+        name: Registry key of the process to clean up.
+    """
     entry = _processes.pop(name, None)
     if entry is None:
         return
