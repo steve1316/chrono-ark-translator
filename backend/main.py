@@ -228,7 +228,7 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
     if not needs_translation:
         print("All translations found in translation memory!")
-        _apply_translations(mod_id, strings, cached_translations, tm)
+        _apply_translations(mod_id, cached_translations, tm)
         return
 
     # Get provider.
@@ -311,7 +311,7 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
     print(f"\n  Translation memory: {tm_stats['total_entries']} entries " f"({tm_stats['hit_rate_percent']}% hit rate this session)")
 
     # Apply translations.
-    _apply_translations(mod_id, strings, all_translations, tm)
+    _apply_translations(mod_id, all_translations, tm)
 
     # Store any glossary term suggestions.
     if all_suggestions:
@@ -321,7 +321,6 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
 def _apply_translations(
     mod_id: str,
-    strings: dict,
     translations: dict[str, str],
     tm: TranslationMemory,
 ) -> None:
@@ -330,7 +329,6 @@ def _apply_translations(
 
     Args:
         mod_id: The mod's Workshop ID.
-        strings: Original LocString dict.
         translations: Key→English translation mappings.
         tm: TranslationMemory instance.
     """
