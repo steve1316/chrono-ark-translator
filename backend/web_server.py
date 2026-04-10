@@ -9,6 +9,7 @@ import asyncio
 import hashlib
 import os
 import json
+from datetime import datetime, timezone
 import subprocess
 import tempfile
 import threading
@@ -46,6 +47,13 @@ from backend.data.suggestion_manager import (
 )
 from backend.data.character_context import load_character_context, save_character_context
 from backend.data.history_manager import create_backup, list_backups, restore_backup, delete_backup
+from backend.data.translation_store import (
+    load_translations,
+    save_translations_bulk,
+    update_single_translation,
+    clear_all_translations,
+    replace_in_translations,
+)
 from backend.main import get_provider, save_extracted_strings
 from backend.process_manager import start_process, stop_process, is_managed
 
@@ -57,6 +65,15 @@ app = FastAPI(title="Chrono Ark Translator API")
 
 # Active translation cancel events, keyed by mod_id.
 _active_translations: dict[str, threading.Event] = {}
+
+
+def _stamp_raw_responses(responses: list[dict]) -> list[dict]:
+    """Add a timestamp to each raw API response dict."""
+    now = datetime.now(timezone.utc).isoformat()
+    for r in responses:
+        r["timestamp"] = now
+    return responses
+
 
 # Enable CORS for Vite development server
 app.add_middleware(
@@ -361,8 +378,8 @@ async def get_mods():
         preview_img = _find_mod_preview_image(mod.path)
 
         # Check whether this mod has unsynced translation changes.
-        translations_path = config.STORAGE_PATH / "mods" / mod.mod_id / "translations.json"
-        if translations_path.exists():
+        saved = load_translations(mod.mod_id)
+        if saved:
             current_hash = _compute_export_snapshot(mod.mod_id, mod.path)
             last_hash = _load_last_export_hash(mod.mod_id)
             has_changes = current_hash != last_hash
@@ -408,15 +425,7 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
     _merge_gdata_originals(mod_id, strings)
 
     # Apply saved translations.
-    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
-    translations = {}
-    if translations_path.exists():
-        try:
-            with open(translations_path, "r", encoding="utf-8") as f:
-                translations = json.load(f)
-        except Exception:
-            pass
-
+    translations = load_translations(mod_id)
     for key, english in translations.items():
         if key in strings:
             strings[key].translations["English"] = english
@@ -468,8 +477,8 @@ async def refresh_mods(request: Request):
             status = tracker.get_status(mod.mod_id)
             preview_img = _find_mod_preview_image(mod.path)
 
-            translations_path = config.STORAGE_PATH / "mods" / mod.mod_id / "translations.json"
-            if translations_path.exists():
+            saved = load_translations(mod.mod_id)
+            if saved:
                 current_hash = _compute_export_snapshot(mod.mod_id, mod.path)
                 last_hash = _load_last_export_hash(mod.mod_id)
                 has_changes = current_hash != last_hash
@@ -532,14 +541,7 @@ async def get_mod_detail(mod_id: str):
     _merge_gdata_originals(mod_id, strings)
 
     # Load existing translations if any
-    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
-    translations = {}
-    if translations_path.exists():
-        try:
-            with open(translations_path, "r", encoding="utf-8") as f:
-                translations = json.load(f)
-        except Exception:
-            pass
+    translations = load_translations(mod_id)
 
     # Load translation provider info per key.
     providers_path = config.STORAGE_PATH / "mods" / mod_id / "translation_providers.json"
@@ -655,18 +657,7 @@ async def update_string(mod_id: str, update: TranslationUpdate):
     Returns:
         A dict with `{"status": "success"}` on success.
     """
-    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
-    translations_path.parent.mkdir(parents=True, exist_ok=True)
-
-    translations = {}
-    if translations_path.exists():
-        with open(translations_path, "r", encoding="utf-8") as f:
-            translations = json.load(f)
-
-    translations[update.key] = update.english
-
-    with open(translations_path, "w", encoding="utf-8") as f:
-        json.dump(translations, f, indent=2, ensure_ascii=False)
+    update_single_translation(mod_id, update.key, update.english)
 
     # Track that this key was manually edited.
     providers_path = config.STORAGE_PATH / "mods" / mod_id / "translation_providers.json"
@@ -761,22 +752,18 @@ async def clear_translations(mod_id: str):
 
     # Write empty overrides for every key that has an English value in the CSV
     # so the original CSV values don't show through.
-    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
-    translations_path.parent.mkdir(parents=True, exist_ok=True)
-    overrides = {}
+    keys_to_clear: list[str] = []
     for key, loc_str in strings.items():
         if loc_str.translations.get("English", ""):
-            overrides[key] = ""
+            keys_to_clear.append(key)
 
     # Also clear any previously saved translations.
-    if translations_path.exists():
-        with open(translations_path, "r", encoding="utf-8") as f:
-            existing = json.load(f)
-        for key in existing:
-            overrides[key] = ""
+    existing = load_translations(mod_id)
+    for key in existing:
+        if key not in keys_to_clear:
+            keys_to_clear.append(key)
 
-    with open(translations_path, "w", encoding="utf-8") as f:
-        json.dump(overrides, f, indent=2, ensure_ascii=False)
+    clear_all_translations(mod_id, keys_to_clear)
 
     # Clear synced state since all translations have been wiped.
     for filename in ("synced_keys.json", "pre_export_english.json"):
@@ -1088,16 +1075,10 @@ async def preview_translation(req: TranslationRequest):
     _merge_gdata_originals(req.mod_id, strings)
 
     # Apply saved translations so user edits (including clears) are respected.
-    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
-    if translations_path.exists():
-        try:
-            with open(translations_path, "r", encoding="utf-8") as f:
-                saved = json.load(f)
-            for key, english in saved.items():
-                if key in strings:
-                    strings[key].translations["English"] = english
-        except Exception:
-            pass
+    saved = load_translations(req.mod_id)
+    for key, english in saved.items():
+        if key in strings:
+            strings[key].translations["English"] = english
 
     untranslated = _adapter.get_untranslated(strings)
 
@@ -1217,16 +1198,10 @@ async def translate_mod(req: TranslationRequest):
     strings, _ = _adapter.extract_strings(mod_path)
 
     # Apply saved translations so user edits (including clears) are respected.
-    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
-    if translations_path.exists():
-        try:
-            with open(translations_path, "r", encoding="utf-8") as f:
-                saved = json.load(f)
-            for key, english in saved.items():
-                if key in strings:
-                    strings[key].translations["English"] = english
-        except Exception:
-            pass
+    saved = load_translations(req.mod_id)
+    for key, english in saved.items():
+        if key in strings:
+            strings[key].translations["English"] = english
 
     untranslated = _adapter.get_untranslated(strings)
 
@@ -1294,23 +1269,14 @@ async def translate_mod(req: TranslationRequest):
     # Save raw API responses for inspection
     raw_responses = getattr(provider, "last_raw_responses", [])
     if raw_responses:
+        _stamp_raw_responses(raw_responses)
         responses_path = config.STORAGE_PATH / "mods" / req.mod_id / "last_api_responses.json"
         responses_path.parent.mkdir(parents=True, exist_ok=True)
         with open(responses_path, "w", encoding="utf-8") as f:
             json.dump(raw_responses, f, indent=2, ensure_ascii=False)
 
     # Save translations.
-    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
-    translations_path.parent.mkdir(parents=True, exist_ok=True)
-
-    existing = {}
-    if translations_path.exists():
-        with open(translations_path, "r", encoding="utf-8") as f:
-            existing = json.load(f)
-    existing.update(all_translations)
-
-    with open(translations_path, "w", encoding="utf-8") as f:
-        json.dump(existing, f, indent=2, ensure_ascii=False)
+    save_translations_bulk(req.mod_id, all_translations)
 
     # Update progress.
     tracker = ProgressTracker()
@@ -1385,16 +1351,10 @@ async def translate_batch(req: BatchTranslationRequest):
     _merge_gdata_originals(req.mod_id, strings)
 
     # Apply saved translations so user edits (including clears) are respected.
-    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
-    if translations_path.exists():
-        try:
-            with open(translations_path, "r", encoding="utf-8") as f:
-                saved = json.load(f)
-            for key, english in saved.items():
-                if key in strings:
-                    strings[key].translations["English"] = english
-        except Exception:
-            pass
+    saved = load_translations(req.mod_id)
+    for key, english in saved.items():
+        if key in strings:
+            strings[key].translations["English"] = english
 
     # Build entries list from the explicit keys.
     entries: list[tuple[str, str]] = []
@@ -1458,6 +1418,7 @@ async def translate_batch(req: BatchTranslationRequest):
     # Append raw API responses for inspection (accumulate across batches).
     raw_responses = getattr(provider, "last_raw_responses", [])
     if raw_responses:
+        _stamp_raw_responses(raw_responses)
         responses_path = config.STORAGE_PATH / "mods" / req.mod_id / "last_api_responses.json"
         responses_path.parent.mkdir(parents=True, exist_ok=True)
         existing_responses = []
@@ -1472,15 +1433,7 @@ async def translate_batch(req: BatchTranslationRequest):
             json.dump(existing_responses, f, indent=2, ensure_ascii=False)
 
     # Save translations incrementally.
-    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
-    translations_path.parent.mkdir(parents=True, exist_ok=True)
-    existing = {}
-    if translations_path.exists():
-        with open(translations_path, "r", encoding="utf-8") as f:
-            existing = json.load(f)
-    existing.update(translations)
-    with open(translations_path, "w", encoding="utf-8") as f:
-        json.dump(existing, f, indent=2, ensure_ascii=False)
+    save_translations_bulk(req.mod_id, translations)
 
     # Track which provider translated each key.
     providers_path = config.STORAGE_PATH / "mods" / req.mod_id / "translation_providers.json"
@@ -1566,16 +1519,10 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
     strings, _ = _adapter.extract_strings(mod_path)
     _merge_gdata_originals(req.mod_id, strings)
 
-    translations_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
-    if translations_path.exists():
-        try:
-            with open(translations_path, "r", encoding="utf-8") as f:
-                saved = json.load(f)
-            for key, english in saved.items():
-                if key in strings:
-                    strings[key].translations["English"] = english
-        except Exception:
-            pass
+    saved = load_translations(req.mod_id)
+    for key, english in saved.items():
+        if key in strings:
+            strings[key].translations["English"] = english
 
     entries: list[tuple[str, str]] = []
     for key in req.keys:
@@ -1668,6 +1615,7 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
 
                 raw_responses = getattr(provider, "last_raw_responses", [])
                 if raw_responses:
+                    _stamp_raw_responses(raw_responses)
                     responses_path = config.STORAGE_PATH / "mods" / req.mod_id / "last_api_responses.json"
                     responses_path.parent.mkdir(parents=True, exist_ok=True)
                     existing_responses = []
@@ -1681,15 +1629,7 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
                     with open(responses_path, "w", encoding="utf-8") as f:
                         json.dump(existing_responses, f, indent=2, ensure_ascii=False)
 
-                trans_path = config.STORAGE_PATH / "mods" / req.mod_id / "translations.json"
-                trans_path.parent.mkdir(parents=True, exist_ok=True)
-                existing = {}
-                if trans_path.exists():
-                    with open(trans_path, "r", encoding="utf-8") as f:
-                        existing = json.load(f)
-                existing.update(translations)
-                with open(trans_path, "w", encoding="utf-8") as f:
-                    json.dump(existing, f, indent=2, ensure_ascii=False)
+                save_translations_bulk(req.mod_id, translations)
 
                 tracker = ProgressTracker()
                 tracker.mark_translated(req.mod_id, list(translations.keys()))
@@ -1776,10 +1716,11 @@ def _compute_export_snapshot(mod_id: str, mod_path: Path) -> str:
     """
     h = hashlib.sha256()
 
-    # Hash translations.json content.
-    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
-    if translations_path.exists():
-        h.update(translations_path.read_bytes())
+    # Hash translation text content only (excludes timestamps so metadata
+    # changes don't trigger a false "needs export" signal).
+    flat = load_translations(mod_id)
+    if flat:
+        h.update(json.dumps(flat, sort_keys=True).encode("utf-8"))
 
     # Hash each mod CSV file.
     for csv_path in sorted(_get_mod_csv_paths(mod_path)):
@@ -1857,16 +1798,7 @@ async def get_export_status(mod_id: str):
     mod_path = _find_mod_path(mod_id)
 
     # No translations at all — nothing to sync.
-    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
-    if not translations_path.exists():
-        return {"has_changes": False}
-
-    try:
-        with open(translations_path, "r", encoding="utf-8") as f:
-            translations = json.load(f)
-    except Exception:
-        return {"has_changes": False}
-
+    translations = load_translations(mod_id)
     if not translations:
         return {"has_changes": False}
 
@@ -1949,15 +1881,9 @@ async def export_mod(mod_id: str, resync: bool = False):
                 shutil.copy2(json_path, original_gdata_dir / json_path.name)
 
     # Load saved translations.
-    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
-    if not translations_path.exists():
-        raise HTTPException(status_code=400, detail="No translations found for this mod")
-
-    with open(translations_path, "r", encoding="utf-8") as f:
-        translations = json.load(f)
-
+    translations = load_translations(mod_id)
     if not translations:
-        raise HTTPException(status_code=400, detail="No translations to export")
+        raise HTTPException(status_code=400, detail="No translations found for this mod")
 
     # Extract current strings from the mod.
     strings, variant_files = _adapter.extract_strings(mod_path)
@@ -2219,12 +2145,9 @@ async def glossary_replace_preview(mod_id: str, req: GlossaryReplacePreview):
     Returns:
         A dict with `affected` (list of dicts with key, old_text, new_text).
     """
-    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
-    if not translations_path.exists():
+    translations = load_translations(mod_id)
+    if not translations:
         return {"affected": []}
-
-    with open(translations_path, "r", encoding="utf-8") as f:
-        translations = json.load(f)
 
     affected = []
     for key, english in translations.items():
@@ -2247,26 +2170,10 @@ async def glossary_replace_apply(mod_id: str, req: GlossaryReplacePreview):
     Returns:
         A dict with `status` and the count of `replaced` translations.
     """
-    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
-    if not translations_path.exists():
-        return {"status": "success", "replaced": 0}
-
-    with open(translations_path, "r", encoding="utf-8") as f:
-        translations = json.load(f)
-
     # Back up before applying replacements.
     create_backup(mod_id, f"Before replacing '{req.old_english}' with '{req.new_english}'")
 
-    replaced = 0
-    for key in translations:
-        if req.old_english in translations[key]:
-            new_text = translations[key].replace(req.old_english, req.new_english)
-            if new_text != translations[key]:
-                translations[key] = new_text
-                replaced += 1
-
-    with open(translations_path, "w", encoding="utf-8") as f:
-        json.dump(translations, f, indent=2, ensure_ascii=False)
+    replaced = replace_in_translations(mod_id, req.old_english, req.new_english)
 
     return {"status": "success", "replaced": replaced}
 

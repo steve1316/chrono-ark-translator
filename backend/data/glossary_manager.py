@@ -8,6 +8,7 @@ that overlay the base game glossary.
 """
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from backend import config
@@ -111,19 +112,25 @@ def build_glossary_from_base_game(
             if text:
                 source_mappings[lang] = text
 
+        now = datetime.now(timezone.utc).isoformat()
         glossary["terms"][english] = {
             "category": category,
             "key": key,
             "source_mappings": source_mappings,
+            "created_at": now,
+            "updated_at": now,
         }
 
     # Add seed mechanic terms (don't overwrite existing entries).
     for term in MECHANIC_SEED_TERMS:
         if term not in glossary["terms"]:
+            now = datetime.now(timezone.utc).isoformat()
             glossary["terms"][term] = {
                 "category": "mechanics",
                 "key": "",
                 "source_mappings": {},
+                "created_at": now,
+                "updated_at": now,
             }
 
     return glossary
@@ -263,7 +270,7 @@ def add_glossary_term(
         glossary: The glossary dictionary to modify.
         english_term: The canonical English term.
         source_mappings: Optional source language mappings.
-        category: Term category (e.g., "characters", "buffs", "custom").
+        category: Term category (e.g., "characters", "buffs/debuffs", "custom").
 
     Returns:
         The modified glossary dictionary.
@@ -271,10 +278,16 @@ def add_glossary_term(
     if "terms" not in glossary:
         glossary["terms"] = {}
 
+    now = datetime.now(timezone.utc).isoformat()
+    existing = glossary["terms"].get(english_term)
+    created_at = existing.get("created_at", now) if existing else now
+
     glossary["terms"][english_term] = {
         "category": category,
         "key": "",
         "source_mappings": source_mappings or {},
+        "created_at": created_at,
+        "updated_at": now,
     }
 
     return glossary

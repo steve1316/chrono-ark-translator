@@ -31,6 +31,7 @@ from backend.data.glossary_manager import (
 )
 from backend.data.progress_tracker import ProgressTracker
 from backend.data.translation_memory import TranslationMemory
+from backend.data.translation_store import load_translations, save_translations_bulk
 from backend.games.registry import get_adapter, list_games
 from backend.games.base import GameAdapter
 from backend.translator.base import TranslationProvider
@@ -335,18 +336,13 @@ def _apply_translations(
         tm: TranslationMemory instance.
     """
     # Save translations to the mod's storage.
-    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
-    translations_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(translations_path, "w", encoding="utf-8") as f:
-        json.dump(translations, f, indent=2, ensure_ascii=False)
+    save_translations_bulk(mod_id, translations)
 
     # Update progress tracker.
     tracker = ProgressTracker()
     tracker.mark_translated(mod_id, list(translations.keys()))
 
     print(f"\n  Applied {len(translations)} translations")
-    print(f"  Saved to {translations_path}")
 
     # Save translation memory.
     tm.save()
@@ -470,13 +466,10 @@ def cmd_export(args: argparse.Namespace, adapter: GameAdapter) -> None:
     strings, _ = adapter.extract_strings(mod_path)
 
     # Load saved translations.
-    translations_path = config.STORAGE_PATH / "mods" / mod_id / "translations.json"
-    if not translations_path.exists():
+    translations = load_translations(mod_id)
+    if not translations:
         print(f"No translations found for mod {mod_id}. Run 'translate --mod {mod_id}' first.")
         sys.exit(1)
-
-    with open(translations_path, "r", encoding="utf-8") as f:
-        translations = json.load(f)
 
     # Apply translations to the English column.
     for key, english in translations.items():

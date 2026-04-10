@@ -100,6 +100,10 @@ export type GlossaryTerm = {
     key: string
     /** Maps source language name to its native text (e.g., { "Korean": "화염구" }). */
     source_mappings: Record<string, string>
+    /** ISO timestamp of when this term was first created. */
+    created_at?: string
+    /** ISO timestamp of when this term was last modified. */
+    updated_at?: string
 }
 
 /**

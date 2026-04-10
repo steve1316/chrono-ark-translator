@@ -50,6 +50,19 @@ def test_build_glossary_includes_seed_terms(sample_base_strings, glossary_catego
         assert terms[term]["category"] == "mechanics"
 
 
+def test_build_glossary_sets_timestamps(sample_base_strings, glossary_categories):
+    glossary = build_glossary_from_base_game(
+        sample_base_strings,
+        glossary_categories,
+        ["Korean", "Chinese"],
+    )
+    for term, info in glossary["terms"].items():
+        assert "created_at" in info, f"Missing created_at on {term}"
+        assert "updated_at" in info, f"Missing updated_at on {term}"
+        assert info["created_at"] is not None
+        assert info["updated_at"] is not None
+
+
 def test_save_and_load_glossary(tmp_storage):
     glossary = {"terms": {"Test": {"category": "custom", "key": "", "source_mappings": {}}}}
     path = tmp_storage / "glossary.json"
@@ -63,6 +76,16 @@ def test_add_glossary_term():
     add_glossary_term(glossary, "Fire Bolt", {"Korean": "화염구"}, category="skills")
     assert "Fire Bolt" in glossary["terms"]
     assert glossary["terms"]["Fire Bolt"]["source_mappings"]["Korean"] == "화염구"
+    assert glossary["terms"]["Fire Bolt"]["created_at"] is not None
+    assert glossary["terms"]["Fire Bolt"]["updated_at"] is not None
+
+
+def test_add_glossary_term_preserves_created_at():
+    glossary = {"terms": {}}
+    add_glossary_term(glossary, "Fire Bolt", {"Korean": "화염구"}, category="skills")
+    original_created = glossary["terms"]["Fire Bolt"]["created_at"]
+    add_glossary_term(glossary, "Fire Bolt", {"Korean": "화염구", "Chinese": "火球术"}, category="skills")
+    assert glossary["terms"]["Fire Bolt"]["created_at"] == original_created
 
 
 def test_glossary_prompt_format():
@@ -163,7 +186,7 @@ def test_combined_glossary_prompt_mod_overrides_base():
     """When a mod term overrides a base term, only the mod version appears."""
     base = {
         "terms": {
-            "Fire": {"category": "buffs", "key": "", "source_mappings": {"Korean": "불 (base)"}},
+            "Fire": {"category": "buffs/debuffs", "key": "", "source_mappings": {"Korean": "불 (base)"}},
         }
     }
     mod = {
@@ -180,7 +203,7 @@ def test_combined_glossary_prompt_empty_mod():
     """With no mod terms, only filtered base terms appear."""
     base = {
         "terms": {
-            "Shield Up": {"category": "buffs", "key": "", "source_mappings": {"Korean": "방패"}},
+            "Shield Up": {"category": "buffs/debuffs", "key": "", "source_mappings": {"Korean": "방패"}},
         }
     }
     mod = {"terms": {}}
