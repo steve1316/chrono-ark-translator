@@ -15,7 +15,15 @@ from backend import config
 
 
 def _history_dir(mod_id: str, storage_path: Optional[Path] = None) -> Path:
-    """Return the history directory for a mod, creating it if needed."""
+    """Return the history directory for a mod, creating it if needed.
+
+    Args:
+        mod_id: The mod's Workshop ID.
+        storage_path: Base storage path override. Defaults to `config.STORAGE_PATH`.
+
+    Returns:
+        Path to the mod's `history/` directory.
+    """
     base = storage_path or config.STORAGE_PATH
     path = base / "mods" / mod_id / "history"
     path.mkdir(parents=True, exist_ok=True)
@@ -169,7 +177,13 @@ def delete_backup(mod_id: str, backup_id: str, storage_path: Optional[Path] = No
 
 
 def _prune_backups(mod_id: str, max_backups: int = 20, storage_path: Optional[Path] = None) -> None:
-    """Remove oldest backups if exceeding the limit."""
+    """Remove oldest backups when the total exceeds `max_backups`.
+
+    Args:
+        mod_id: The mod's Workshop ID.
+        max_backups: Maximum number of backups to retain.
+        storage_path: Base storage path override. Defaults to `config.STORAGE_PATH`.
+    """
     hist_dir = _history_dir(mod_id, storage_path)
     entries = sorted([e for e in hist_dir.iterdir() if e.is_dir()], reverse=True)
     for old_entry in entries[max_backups:]:
