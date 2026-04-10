@@ -299,46 +299,17 @@ class LlamaCppProvider(TranslationProvider):
         yield {"type": "error", "message": "Translation failed after all retries"}
 
     def estimate_cost(self, entries: list[tuple[str, str]], **kwargs) -> dict:
-        """Estimate token usage for translating the given entries.
+        """Return a zero-cost estimate for local llama.cpp inference.
 
         Args:
             entries: List of (key, source_text) tuples.
-            **kwargs: Provider-specific context (`source_lang`,
-                `glossary_prompt`, `game_context`, etc.).
+            **kwargs: Ignored. Accepted for interface compatibility.
 
         Returns:
-            A dict with `estimated_input_tokens`, `estimated_output_tokens`,
-            `estimated_cost_usd` (always 0.0), `model`, and `note`.
+            A dict with `estimated_cost_usd` of 0.0, `model`, and `note`.
         """
-        source_lang = kwargs.get("source_lang", "Korean")
-        glossary_prompt = kwargs.get("glossary_prompt", "")
-        game_context = kwargs.get("game_context", "")
-        format_rules = kwargs.get("format_rules")
-        style_examples = kwargs.get("style_examples")
-        character_context = kwargs.get("character_context")
-
-        system_prompt, user_message = self.build_prompt(
-            entries,
-            source_lang,
-            glossary_prompt,
-            game_context=game_context,
-            format_rules=format_rules,
-            style_examples=style_examples,
-            character_context=character_context,
-        )
-        full_prompt = system_prompt + user_message
-
-        cjk_chars = sum(1 for c in full_prompt if "\u2e80" <= c <= "\u9fff" or "\uac00" <= c <= "\ud7af" or "\uff00" <= c <= "\uffef")
-        ascii_chars = len(full_prompt) - cjk_chars
-        estimated_input_tokens = int(cjk_chars * 1.5 + ascii_chars * 0.35) + 300
-
-        output_chars = sum(len(text) for _, text in entries)
-        estimated_output_tokens = int(output_chars * 1.5) + 500
-
         return {
-            "estimated_input_tokens": estimated_input_tokens,
-            "estimated_output_tokens": estimated_output_tokens,
             "estimated_cost_usd": 0.0,
             "model": self._model or "llama.cpp",
-            "note": f"llama.cpp local inference — no API cost ({len(entries)} strings, ~{estimated_input_tokens + estimated_output_tokens} tokens)",
+            "note": f"llama.cpp local inference — no API cost ({len(entries)} strings)",
         }
