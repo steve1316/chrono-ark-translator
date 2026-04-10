@@ -250,7 +250,6 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
     # Dry run mode — just show cost estimate.
     if args.dry_run:
-        style_examples = adapter.get_style_examples()
         print(f"\n  Provider: {provider.name}")
         for lang, entries in entries_by_lang.items():
             glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
@@ -260,7 +259,7 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
                 glossary_prompt=glossary_prompt,
                 game_context=game_context,
                 format_rules=format_rules,
-                style_examples=style_examples,
+                style_examples=adapter.get_style_examples(lang),
             )
             print(f"\n  {lang} → English ({len(entries)} strings):")
             for k, v in cost.items():
@@ -290,7 +289,7 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
                 glossary_prompt,
                 game_context=game_context,
                 format_rules=format_rules,
-                style_examples=adapter.get_style_examples(),
+                style_examples=adapter.get_style_examples(lang),
             )
             all_translations.update(translations)
             all_suggestions.extend(suggestions)

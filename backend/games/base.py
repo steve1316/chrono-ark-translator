@@ -85,9 +85,12 @@ class GameAdapter(ABC):
         ...
 
     @abstractmethod
-    def get_style_examples(self) -> dict[str, list[tuple[str, str]]]:
+    def get_style_examples(self, source_lang: str = "Korean") -> dict[str, list[tuple[str, str]]]:
         """
         Return curated source->English translation examples for few-shot prompting.
+
+        Args:
+            source_lang: The source language to use for example text.
 
         Returns:
             Dict mapping category name to list of (source_text, english_text) pairs.

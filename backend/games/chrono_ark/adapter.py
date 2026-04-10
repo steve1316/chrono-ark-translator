@@ -176,6 +176,56 @@ class ChronoArkAdapter(GameAdapter):
         "items": "Item_Equip/",
         "passives": "Item_Passive/",
     }
+    _STYLE_EXAMPLES: dict[str, dict[str, list[tuple[str, str]]]] = {
+        "Korean": {
+            "skills": [
+                ("적 전체에게 &a의 피해를 줍니다. 약화 1을 부여합니다.", "Deal &a damage to all enemies. Apply 1 Weakening."),
+                ("아군 한명의 HP를 &a만큼 회복합니다.", "Restore &a HP to an ally."),
+                ("적 하나에게 &a의 피해를 줍니다. 이 스킬은 방어력을 무시합니다.", "Deal &a damage to an enemy. This skill ignores Defense."),
+            ],
+            "buffs/debuffs": [
+                ("다음 공격에 의한 받는 피해가 30% 증가합니다.", "Damage taken from the next attack is increased by 30%."),
+                ("매 턴 시작 시 HP를 &a만큼 회복합니다.", "Restore &a HP at the start of each turn."),
+                ("공격력이 &a만큼 증가합니다.", "Attack is increased by &a."),
+            ],
+            "items": [
+                ("공격 시 100%를 초과하는 명중률은 치명타 확률로 변환됩니다.", "When attacking, any Accuracy exceeding 100% is converted into Critical Chance."),
+                ("전투 시작 시 모든 아군의 방어력이 &a 증가합니다.", "At the start of battle, all allies gain &a Defense."),
+            ],
+        },
+        "Chinese": {
+            "skills": [
+                ("对所有敌人造成&a点伤害。施加1层弱化。", "Deal &a damage to all enemies. Apply 1 Weakening."),
+                ("恢复一名友军&a点HP。", "Restore &a HP to an ally."),
+                ("对一名敌人造成&a点伤害。此技能无视防御力。", "Deal &a damage to an enemy. This skill ignores Defense."),
+            ],
+            "buffs/debuffs": [
+                ("下次攻击受到的伤害增加30%。", "Damage taken from the next attack is increased by 30%."),
+                ("每回合开始时恢复&a点HP。", "Restore &a HP at the start of each turn."),
+                ("攻击力增加&a。", "Attack is increased by &a."),
+            ],
+            "items": [
+                ("攻击时超过100%的命中率将转化为暴击率。", "When attacking, any Accuracy exceeding 100% is converted into Critical Chance."),
+                ("战斗开始时所有友军防御力增加&a。", "At the start of battle, all allies gain &a Defense."),
+            ],
+        },
+        "Japanese": {
+            "skills": [
+                ("敵全体に&aのダメージを与えます。弱体化を1付与します。", "Deal &a damage to all enemies. Apply 1 Weakening."),
+                ("味方1人のHPを&a回復します。", "Restore &a HP to an ally."),
+                ("敵1体に&aのダメージを与えます。このスキルは防御力を無視します。", "Deal &a damage to an enemy. This skill ignores Defense."),
+            ],
+            "buffs/debuffs": [
+                ("次の攻撃による被ダメージが30%増加します。", "Damage taken from the next attack is increased by 30%."),
+                ("毎ターン開始時にHPを&a回復します。", "Restore &a HP at the start of each turn."),
+                ("攻撃力が&a増加します。", "Attack is increased by &a."),
+            ],
+            "items": [
+                ("攻撃時、100%を超える命中率はクリティカル率に変換されます。", "When attacking, any Accuracy exceeding 100% is converted into Critical Chance."),
+                ("戦闘開始時、全味方の防御力が&a増加します。", "At the start of battle, all allies gain &a Defense."),
+            ],
+        },
+    }
 
     @staticmethod
     def csv_for_key(key: str) -> str:
@@ -249,23 +299,11 @@ class ChronoArkAdapter(GameAdapter):
             "End sentences with periods: Even if the original source text does not end sentences with punctuation, always add a period at the end of each English sentence or description line. Exception: single-word names or titles should NOT have periods.",
         ]
 
-    def get_style_examples(self) -> dict[str, list[tuple[str, str]]]:
-        return {
-            "skills": [
-                ("적 전체에게 &a의 피해를 줍니다. 약화 1을 부여합니다.", "Deal &a damage to all enemies. Apply 1 Weakening."),
-                ("아군 한명의 HP를 &a만큼 회복합니다.", "Restore &a HP to an ally."),
-                ("적 하나에게 &a의 피해를 줍니다. 이 스킬은 방어력을 무시합니다.", "Deal &a damage to an enemy. This skill ignores Defense."),
-            ],
-            "buffs/debuffs": [
-                ("다음 공격에 의한 받는 피해가 30% 증가합니다.", "Damage taken from the next attack is increased by 30%."),
-                ("매 턴 시작 시 HP를 &a만큼 회복합니다.", "Restore &a HP at the start of each turn."),
-                ("공격력이 &a만큼 증가합니다.", "Attack is increased by &a."),
-            ],
-            "items": [
-                ("공격 시 100%를 초과하는 명중률은 치명타 확률로 변환됩니다.", "When attacking, any Accuracy exceeding 100% is converted into Critical Chance."),
-                ("전투 시작 시 모든 아군의 방어력이 &a 증가합니다.", "At the start of battle, all allies gain &a Defense."),
-            ],
-        }
+    def get_style_examples(self, source_lang: str = "Korean") -> dict[str, list[tuple[str, str]]]:
+        examples = self._STYLE_EXAMPLES.get(source_lang)
+        if examples is None:
+            examples = self._STYLE_EXAMPLES["Korean"]
+        return examples
 
     def scan_mods(self, search_path: Optional[Path] = None) -> list[ModInfo]:
         """Discover all installed Chrono Ark workshop mods.

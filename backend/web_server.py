@@ -32,6 +32,7 @@ from backend.data.glossary_manager import (
     load_glossary,
     save_glossary,
     add_glossary_term,
+    get_glossary_prompt,
     get_combined_glossary_prompt,
     load_mod_glossary,
     save_mod_glossary,
@@ -940,7 +941,6 @@ async def estimate_translation(req: TranslationRequest):
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
     format_rules = _adapter.get_format_preservation_rules()
-    style_examples = _adapter.get_style_examples()
 
     estimates = {}
     for lang, entries in by_lang.items():
@@ -951,7 +951,7 @@ async def estimate_translation(req: TranslationRequest):
             glossary_prompt=glossary_prompt,
             game_context=game_context,
             format_rules=format_rules,
-            style_examples=style_examples,
+            style_examples=_adapter.get_style_examples(lang),
             character_context=character_context,
         )
 
@@ -984,7 +984,6 @@ async def estimate_all_translation_costs(request: Request):
         base_glossary = load_glossary()
         game_context = _adapter.get_translation_context()
         format_rules = _adapter.get_format_preservation_rules()
-        style_examples = _adapter.get_style_examples()
 
         for i, mod in enumerate(mods):
             if await request.is_disconnected():
@@ -1024,7 +1023,7 @@ async def estimate_all_translation_costs(request: Request):
                         glossary_prompt=glossary_prompt,
                         game_context=game_context,
                         format_rules=format_rules,
-                        style_examples=style_examples,
+                        style_examples=_adapter.get_style_examples(lang),
                         character_context=character_context,
                     )
 
@@ -1094,7 +1093,6 @@ async def preview_translation(req: TranslationRequest):
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
     format_rules = _adapter.get_format_preservation_rules()
-    style_examples = _adapter.get_style_examples()
 
     by_lang: dict[str, list] = {}
     for key, loc_str in untranslated.items():
@@ -1110,6 +1108,7 @@ async def preview_translation(req: TranslationRequest):
     total_batches = 0
     for lang, entries in by_lang.items():
         glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
+        style_examples = _adapter.get_style_examples(lang)
         num_batches = (len(entries) + batch_size - 1) // batch_size
         total_batches += num_batches
         user_messages: list[str] = []
@@ -1168,6 +1167,47 @@ async def preview_translation(req: TranslationRequest):
     }
 
 
+@app.get("/api/translate/system-prompt")
+async def get_system_prompt(source_lang: str = "Korean"):
+    """Return the current system prompt that would be sent to the provider.
+
+    Builds the prompt using the active provider, base glossary, game context,
+    format rules, and style examples. No mod or entries are needed.
+
+    Args:
+        source_lang: Source language to use in the prompt template.
+
+    Returns:
+        A dict with `provider`, `source_lang`, and `system_prompt`.
+    """
+    provider_name = config.TRANSLATION_PROVIDER
+    provider = get_provider(provider_name)
+
+    base_glossary = load_glossary()
+    glossary_prompt = get_glossary_prompt(
+        base_glossary,
+        allowed_categories=config.GLOSSARY_CATEGORIES,
+        source_lang=source_lang,
+    )
+    game_context = _adapter.get_translation_context()
+    format_rules = _adapter.get_format_preservation_rules()
+
+    system_prompt, _ = provider.build_prompt(
+        entries=[("Example/Key_Name", "예시 텍스트")],
+        source_lang=source_lang,
+        glossary_prompt=glossary_prompt,
+        game_context=game_context,
+        format_rules=format_rules,
+        style_examples=_adapter.get_style_examples(source_lang),
+    )
+
+    return {
+        "provider": provider.name,
+        "source_lang": source_lang,
+        "system_prompt": system_prompt,
+    }
+
+
 @app.post("/api/translate")
 async def translate_mod(req: TranslationRequest):
     """Trigger translation for a mod.
@@ -1218,7 +1258,6 @@ async def translate_mod(req: TranslationRequest):
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
     format_rules = _adapter.get_format_preservation_rules()
-    style_examples = _adapter.get_style_examples()
 
     # Translate.
     tm = TranslationMemory()
@@ -1244,6 +1283,7 @@ async def translate_mod(req: TranslationRequest):
     try:
         for lang, entries in by_lang.items():
             glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
+            style_examples = _adapter.get_style_examples(lang)
             for i in range(0, len(entries), batch_size):
                 batch = entries[i : i + batch_size]
                 translations, suggestions = provider.translate_batch(
@@ -1389,7 +1429,7 @@ async def translate_batch(req: BatchTranslationRequest):
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
     format_rules = _adapter.get_format_preservation_rules()
-    style_examples = _adapter.get_style_examples()
+    style_examples = _adapter.get_style_examples(req.source_lang)
 
     tm = TranslationMemory()
 
@@ -1554,7 +1594,7 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
     format_rules = _adapter.get_format_preservation_rules()
-    style_examples = _adapter.get_style_examples()
+    style_examples = _adapter.get_style_examples(req.source_lang)
 
     tm = TranslationMemory()
 
