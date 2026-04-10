@@ -71,6 +71,20 @@ def sample_base_strings():
             translations={"Korean": "루시", "English": "Lucy", "Chinese": "露西"},
             source_file="LangDataDB.csv",
         ),
+        "SkillExtended/SE_Heal_Name": LocString(
+            key="SkillExtended/SE_Heal_Name",
+            type="Text",
+            desc="",
+            translations={"Korean": "치유", "English": "Heal", "Chinese": "治愈"},
+            source_file="LangDataDB.csv",
+        ),
+        "Character/Lucy_PassiveName": LocString(
+            key="Character/Lucy_PassiveName",
+            type="Text",
+            desc="",
+            translations={"Korean": "루시의 축복", "English": "Lucy's Blessing", "Chinese": "露西的祝福"},
+            source_file="LangDataDB.csv",
+        ),
     }
 
 
@@ -80,7 +94,7 @@ def glossary_categories():
     return {
         "characters": "Character/",
         "buffs/debuffs": "Buff/",
-        "skills": "Skill/",
+        "skills": ["Skill/", "SkillExtended/"],
         "items": "Item_Equip/",
         "passives": "Item_Passive/",
     }

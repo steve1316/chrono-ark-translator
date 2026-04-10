@@ -120,6 +120,12 @@ class GameAdapter(ABC):
         """
         ...
 
+    @property
+    @abstractmethod
+    def base_game_path(self) -> Optional[Path]:
+        """Filesystem path to the base game's data directory, or None if unknown."""
+        ...
+
     @abstractmethod
     def extract_base_game_strings(self, game_path: Optional[Path] = None) -> dict[str, LocString]:
         """Extract strings from the base game (for glossary building).
@@ -160,13 +166,13 @@ class GameAdapter(ABC):
         ...
 
     @abstractmethod
-    def get_glossary_categories(self) -> dict[str, str]:
+    def get_glossary_categories(self) -> dict[str, str | list[str]]:
         """Return category_name -> key_prefix mappings for auto-glossary.
 
         Returns:
             Dictionary mapping category name (e.g. `"characters"`) to
-            the localization key prefix used to identify entries of that
-            category (e.g. `"Character/"`).
+            a single key prefix string or a list of prefix strings used
+            to identify entries of that category.
         """
         ...
 

@@ -64,7 +64,10 @@ const GlossaryPage: React.FC = () => {
         return Object.entries(glossary.terms)
             .filter(([english, info]) => {
                 // Match against the English key or any source mapping value.
-                const matchesSearch = english.toLowerCase().includes(search.toLowerCase()) || Object.values(info.source_mappings).some((v) => v.toLowerCase().includes(search.toLowerCase()))
+                const matchesSearch =
+                    english.toLowerCase().includes(search.toLowerCase()) ||
+                    info.key.toLowerCase().includes(search.toLowerCase()) ||
+                    Object.values(info.source_mappings).some((v) => v.toLowerCase().includes(search.toLowerCase()))
                 const matchesCategory = categoryFilter === "all" || info.category === categoryFilter
                 return matchesSearch && matchesCategory
             })
@@ -132,6 +135,8 @@ const GlossaryPage: React.FC = () => {
                         <tr style={{ background: "var(--bg-color)" }}>
                             <th style={{ padding: "0.75rem 1rem", textAlign: "left", borderBottom: "1px solid var(--glass-border)", width: "200px" }}>English Term</th>
                             <th style={{ padding: "0.75rem 1rem", textAlign: "left", borderBottom: "1px solid var(--glass-border)", width: "120px" }}>Category</th>
+                            <th style={{ padding: "0.75rem 1rem", textAlign: "left", borderBottom: "1px solid var(--glass-border)", width: "150px" }}>Source File</th>
+                            <th style={{ padding: "0.75rem 1rem", textAlign: "left", borderBottom: "1px solid var(--glass-border)", width: "250px" }}>Key</th>
                             <th style={{ padding: "0.75rem 1rem", textAlign: "left", borderBottom: "1px solid var(--glass-border)" }}>Source Mappings</th>
                         </tr>
                     </thead>
@@ -140,6 +145,23 @@ const GlossaryPage: React.FC = () => {
                             <tr key={english} style={{ borderBottom: "1px solid var(--glass-border)" }}>
                                 <td style={{ padding: "0.5rem 1rem", fontWeight: 500 }}>{english}</td>
                                 <td style={{ padding: "0.5rem 1rem", textTransform: "capitalize", color: "var(--text-dim)" }}>{info.category}</td>
+                                <td style={{ padding: "0.5rem 1rem", color: "var(--text-dim)", fontSize: "0.9rem" }}>
+                                    {info.source_file ? (
+                                        <a
+                                            href="#"
+                                            onClick={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                fetch(`${API_BASE}/open-base-game-file/${encodeURIComponent(info.source_file!)}`, { method: "POST" })
+                                            }}
+                                        >
+                                            {info.source_file}
+                                        </a>
+                                    ) : (
+                                        "—"
+                                    )}
+                                </td>
+                                <td style={{ padding: "0.5rem 1rem", color: "var(--text-dim)", fontSize: "0.85rem", fontFamily: "monospace" }}>{info.key || "—"}</td>
                                 <td style={{ padding: "0.5rem 1rem", color: "var(--text-dim)", fontSize: "0.9rem" }}>
                                     {/* Render each source-language mapping as "lang: text" pairs inline. */}
                                     {Object.entries(info.source_mappings).map(([lang, text]) => (
@@ -153,7 +175,7 @@ const GlossaryPage: React.FC = () => {
                         {/* Empty-state row when filters yield no results. */}
                         {filteredTerms.length === 0 && (
                             <tr>
-                                <td colSpan={3} style={{ padding: "2rem", textAlign: "center", color: "var(--text-dim)" }}>
+                                <td colSpan={5} style={{ padding: "2rem", textAlign: "center", color: "var(--text-dim)" }}>
                                     No matching terms found.
                                 </td>
                             </tr>

@@ -1845,6 +1845,32 @@ async def open_source_file(mod_id: str, filename: str):
     raise HTTPException(status_code=404, detail=f"Source file not found: {filename}")
 
 
+@app.post("/api/open-base-game-file/{filename}")
+async def open_base_game_file(filename: str):
+    """Open Explorer to the base game source file's location with it selected.
+
+    Args:
+        filename: The source filename (e.g. `LangDataDB.csv`).
+
+    Returns:
+        A dict with the resolved file path.
+
+    Raises:
+        HTTPException: 400 if base game path is not configured, 404 if
+            the file is not found.
+    """
+    base_path = _adapter.base_game_path
+    if base_path is None:
+        raise HTTPException(status_code=400, detail="Base game path not configured")
+
+    candidate = base_path / filename
+    if not candidate.is_file():
+        raise HTTPException(status_code=404, detail=f"Base game file not found: {filename}")
+
+    subprocess.Popen(["explorer", "/select,", str(candidate)])
+    return {"path": str(candidate)}
+
+
 @app.post("/api/mods/{mod_id}/export")
 async def export_mod(mod_id: str, resync: bool = False):
     """Write saved translations back into the mod's original CSV files.

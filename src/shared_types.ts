@@ -98,6 +98,8 @@ export type GlossaryTerm = {
     category: string
     /** Localization key that originally defined this term, or empty string for manual entries. */
     key: string
+    /** CSV filename this term was extracted from, or empty string for manual/seed entries. */
+    source_file?: string
     /** Maps source language name to its native text (e.g., { "Korean": "화염구" }). */
     source_mappings: Record<string, string>
     /** ISO timestamp of when this term was first created. */

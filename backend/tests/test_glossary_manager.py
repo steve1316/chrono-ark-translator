@@ -21,8 +21,16 @@ def test_build_glossary_extracts_name_keys(sample_base_strings, glossary_categor
     assert "Armor Increased" in terms
     assert "Fire Bolt" in terms
     assert "Lucy" in terms
+    assert "Heal" in terms
     # Description keys should NOT be extracted.
     assert "Defense is increased." not in terms
+    # Source file should be stored from the LocString.
+    assert terms["Armor Increased"]["source_file"] == "LangDataDB.csv"
+    assert terms["Lucy"]["source_file"] == "LangDataDB.csv"
+    # SkillExtended/ keys should be categorized as skills.
+    assert terms["Heal"]["category"] == "skills"
+    # _PassiveName suffix overrides Character/ prefix to passives.
+    assert terms["Lucy's Blessing"]["category"] == "passives"
 
 
 def test_build_glossary_extracts_keyword_entries(sample_base_strings, glossary_categories):
@@ -44,10 +52,11 @@ def test_build_glossary_includes_seed_terms(sample_base_strings, glossary_catego
         ["Korean", "Chinese"],
     )
     terms = glossary["terms"]
-    # Seed terms should be present.
+    # Seed terms should be present with empty source_file.
     for term in ["Debuff", "Damage", "Accuracy"]:
         assert term in terms
         assert terms[term]["category"] == "mechanics"
+        assert terms[term]["source_file"] == ""
 
 
 def test_build_glossary_sets_timestamps(sample_base_strings, glossary_categories):

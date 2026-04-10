@@ -166,7 +166,7 @@ class ChronoArkAdapter(GameAdapter):
     _GLOSSARY_CATEGORIES = {
         "characters": "Character/",
         "buffs/debuffs": "Buff/",
-        "skills": "Skill/",
+        "skills": ["Skill/", "SkillExtended/"],
         "items": "Item_Equip/",
         "passives": "Item_Passive/",
     }
@@ -208,6 +208,10 @@ class ChronoArkAdapter(GameAdapter):
         if prefix in _DATA_PREFIXES:
             return "LangDataDB.csv"
         return "LangSystemDB.csv"
+
+    @property
+    def base_game_path(self) -> Optional[Path]:
+        return self._BASE_GAME_PATH
 
     @property
     def game_id(self) -> str:
@@ -392,13 +396,13 @@ class ChronoArkAdapter(GameAdapter):
         """
         return csv_extractor.get_untranslated_strings(strings, self._SOURCE_LANGUAGES)
 
-    def get_glossary_categories(self) -> dict[str, str]:
+    def get_glossary_categories(self) -> dict[str, str | list[str]]:
         """Return Chrono Ark glossary category-to-key-prefix mappings.
 
         Returns:
             Dictionary mapping category names (e.g. `"characters"`,
             `"skills"`) to their localization key prefixes
-            (e.g. `"Character/"`, `"Skill/"`).
+            (e.g. `"Character/"`, `["Skill/", "SkillExtended/"]`).
         """
         return self._GLOSSARY_CATEGORIES
 

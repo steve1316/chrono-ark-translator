@@ -50,7 +50,7 @@ MECHANIC_SEED_TERMS = {
 # Suffix-to-category mapping for mod name-key auto-detection.
 _SUFFIX_CATEGORY: dict[str, str] = {
     "_PassiveName": "passives",
-    "_SkinName": "characters",
+    "_SkinName": "other",
     "_Name": "names",
     "_name": "names",
 }
@@ -59,9 +59,16 @@ _SUFFIX_CATEGORY: dict[str, str] = {
 _IGNORED_NAME_KEY_PREFIXES = ("SkillExtended/",)
 
 
+def _matches_prefix(key: str, prefix: str | list[str]) -> bool:
+    """Check if a key starts with any of the given prefix(es)."""
+    if isinstance(prefix, list):
+        return any(key.startswith(p) for p in prefix)
+    return key.startswith(prefix)
+
+
 def build_glossary_from_base_game(
     base_strings: dict[str, LocString],
-    term_categories: dict[str, str],
+    term_categories: dict[str, str | list[str]],
     source_languages: list[str],
     keyword_prefixes: list[str] | None = None,
 ) -> dict[str, dict]:
@@ -101,9 +108,16 @@ def build_glossary_from_base_game(
         else:
             category = "other"
             for cat_name, prefix in term_categories.items():
-                if key.startswith(prefix):
+                if _matches_prefix(key, prefix):
                     category = cat_name
                     break
+            # Suffix and specific key patterns override prefix-based category.
+            if key.endswith("_PassiveName"):
+                category = "passives"
+            elif key.endswith("_SkinName"):
+                category = "other"
+            elif key.startswith("Character/AllyDoll_"):
+                category = "other"
 
         # Build source language mappings.
         source_mappings = {}
@@ -116,6 +130,7 @@ def build_glossary_from_base_game(
         glossary["terms"][english] = {
             "category": category,
             "key": key,
+            "source_file": loc_str.source_file,
             "source_mappings": source_mappings,
             "created_at": now,
             "updated_at": now,
@@ -128,6 +143,7 @@ def build_glossary_from_base_game(
             glossary["terms"][term] = {
                 "category": "mechanics",
                 "key": "",
+                "source_file": "",
                 "source_mappings": {},
                 "created_at": now,
                 "updated_at": now,
@@ -143,7 +159,7 @@ def extract_name_key_suggestions(
     source_lang: str,
     existing_suggestions: list[dict],
     mod_glossary: dict,
-    term_categories: dict[str, str] | None = None,
+    term_categories: dict[str, str | list[str]] | None = None,
 ) -> list[dict]:
     """Extract glossary suggestions from translated name keys.
 
@@ -200,7 +216,7 @@ def extract_name_key_suggestions(
         # Determine category from key prefix or suffix default.
         category = _SUFFIX_CATEGORY[matched_suffix]
         for cat_name, prefix in categories.items():
-            if key.startswith(prefix):
+            if _matches_prefix(key, prefix):
                 category = cat_name
                 break
 
@@ -285,6 +301,7 @@ def add_glossary_term(
     glossary["terms"][english_term] = {
         "category": category,
         "key": "",
+        "source_file": "",
         "source_mappings": source_mappings or {},
         "created_at": created_at,
         "updated_at": now,
