@@ -994,6 +994,10 @@ async def estimate_all_translation_costs(request: Request):
 
     async def event_stream():
         total = len(mods)
+        base_glossary = load_glossary()
+        game_context = _adapter.get_translation_context()
+        format_rules = _adapter.get_format_preservation_rules()
+        style_examples = _adapter.get_style_examples()
 
         for i, mod in enumerate(mods):
             if await request.is_disconnected():
@@ -1002,25 +1006,22 @@ async def estimate_all_translation_costs(request: Request):
             strings, _ = _adapter.extract_strings(mod.path)
 
             # Treat ALL strings as needing translation (ignore existing English).
-            # Keep only strings that have at least one source language with content.
-            all_entries = {key: loc_str for key, loc_str in strings.items() if _adapter.detect_source_language(loc_str) is not None}
-
-            estimates = {}
-            if all_entries:
-                by_lang: dict[str, list[tuple[str, str]]] = {}
-                for key, loc_str in all_entries.items():
-                    lang = _adapter.detect_source_language(loc_str)
+            # Detect source language once per string to avoid redundant calls.
+            by_lang: dict[str, list[tuple[str, str]]] = {}
+            entry_count = 0
+            for key, loc_str in strings.items():
+                lang = _adapter.detect_source_language(loc_str)
+                if lang is not None:
+                    entry_count += 1
                     if lang not in by_lang:
                         by_lang[lang] = []
                     by_lang[lang].append((key, loc_str.translations.get(lang, "")))
 
-                base_glossary = load_glossary()
+            estimates = {}
+            if by_lang:
                 mod_glossary = load_mod_glossary(mod.mod_id)
-                game_context = _adapter.get_translation_context()
                 char_ctx = load_character_context(mod.mod_id)
                 character_context = char_ctx if any(char_ctx.values()) else None
-                format_rules = _adapter.get_format_preservation_rules()
-                style_examples = _adapter.get_style_examples()
 
                 for lang, entries in by_lang.items():
                     glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
@@ -1039,7 +1040,7 @@ async def estimate_all_translation_costs(request: Request):
                 "total": total,
                 "mod_id": mod.mod_id,
                 "mod_name": mod.name,
-                "total_strings": len(all_entries),
+                "total_strings": entry_count,
                 "provider": provider.name,
                 "estimates": estimates,
             }
