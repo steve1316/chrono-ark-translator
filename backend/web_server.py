@@ -971,6 +971,85 @@ async def estimate_translation(req: TranslationRequest):
     return {"total_strings": len(untranslated), "provider": provider.name, "estimates": estimates}
 
 
+@app.post("/api/translate/estimate-all")
+async def estimate_all_translation_costs(request: Request):
+    """Estimate translation cost for all mods, treating every string as untranslated.
+
+    Streams SSE progress events as each mod is processed. Each event
+    contains the mod's id, name, string count, and per-language cost
+    estimates. The final event carries `done: true`.
+
+    The generator checks `request.is_disconnected` between mods so that
+    navigating away or refreshing the page aborts the work early.
+
+    Args:
+        request: The Starlette request, used for disconnect detection.
+
+    Returns:
+        A `StreamingResponse` of `text/event-stream` SSE events.
+    """
+    mods = _adapter.scan_mods()
+    provider_name = config.TRANSLATION_PROVIDER
+    provider = get_provider(provider_name)
+
+    async def event_stream():
+        total = len(mods)
+
+        for i, mod in enumerate(mods):
+            if await request.is_disconnected():
+                return
+
+            strings, _ = _adapter.extract_strings(mod.path)
+
+            # Treat ALL strings as needing translation (ignore existing English).
+            # Keep only strings that have at least one source language with content.
+            all_entries = {key: loc_str for key, loc_str in strings.items() if _adapter.detect_source_language(loc_str) is not None}
+
+            estimates = {}
+            if all_entries:
+                by_lang: dict[str, list[tuple[str, str]]] = {}
+                for key, loc_str in all_entries.items():
+                    lang = _adapter.detect_source_language(loc_str)
+                    if lang not in by_lang:
+                        by_lang[lang] = []
+                    by_lang[lang].append((key, loc_str.translations.get(lang, "")))
+
+                base_glossary = load_glossary()
+                mod_glossary = load_mod_glossary(mod.mod_id)
+                game_context = _adapter.get_translation_context()
+                char_ctx = load_character_context(mod.mod_id)
+                character_context = char_ctx if any(char_ctx.values()) else None
+                format_rules = _adapter.get_format_preservation_rules()
+                style_examples = _adapter.get_style_examples()
+
+                for lang, entries in by_lang.items():
+                    glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
+                    estimates[lang] = provider.estimate_cost(
+                        entries,
+                        source_lang=lang,
+                        glossary_prompt=glossary_prompt,
+                        game_context=game_context,
+                        format_rules=format_rules,
+                        style_examples=style_examples,
+                        character_context=character_context,
+                    )
+
+            event = {
+                "current": i + 1,
+                "total": total,
+                "mod_id": mod.mod_id,
+                "mod_name": mod.name,
+                "total_strings": len(all_entries),
+                "provider": provider.name,
+                "estimates": estimates,
+            }
+            yield f"data: {json.dumps(event)}\n\n"
+
+        yield f"data: {json.dumps({'done': True})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
 @app.post("/api/translate/preview")
 async def preview_translation(req: TranslationRequest):
     """Preview the translation prompt that will be sent to the provider.
