@@ -50,18 +50,39 @@ def sample_base_strings():
             translations={"Korean": "적에게 &a의 피해를 줍니다.", "English": "Deal &a damage to an enemy.", "Chinese": "对敌人造成&a点伤害。"},
             source_file="LangDataDB.csv",
         ),
-        "SkillKeyword/Quick_Name": LocString(
-            key="SkillKeyword/Quick_Name",
+        "Battle/Keyword/Innate": LocString(
+            key="Battle/Keyword/Innate",
             type="Text",
             desc="",
-            translations={"Korean": "신속", "English": "Swiftness", "Chinese": "迅捷"},
+            translations={"Korean": "고유", "English": "Innate", "Chinese": "固有"},
             source_file="LangSystemDB.csv",
         ),
-        "Battle/Keyword/Quick_Desc": LocString(
-            key="Battle/Keyword/Quick_Desc",
+        "Battle/Keyword/Innate_Desc": LocString(
+            key="Battle/Keyword/Innate_Desc",
             type="Text",
             desc="",
-            translations={"Korean": "적의 행동 카운트를 무시합니다.", "English": "Ignores enemy Action Counts. Does not Overload.", "Chinese": "无视敌人的行动计数。"},
+            translations={"Korean": "이 스킬은 항상 손에 있습니다.", "English": "This skill is always in your hand.", "Chinese": "此技能始终在手中。"},
+            source_file="LangSystemDB.csv",
+        ),
+        "Battle/SkillTooltip/Accuracy": LocString(
+            key="Battle/SkillTooltip/Accuracy",
+            type="Text",
+            desc="",
+            translations={"Korean": "명중률", "English": "Accuracy", "Chinese": "命中率"},
+            source_file="LangSystemDB.csv",
+        ),
+        "System/Debuff": LocString(
+            key="System/Debuff",
+            type="Text",
+            desc="",
+            translations={"Korean": "디버프", "English": "Debuff", "Chinese": "减益"},
+            source_file="LangSystemDB.csv",
+        ),
+        "System/StatDesc/CritChance": LocString(
+            key="System/StatDesc/CritChance",
+            type="Text",
+            desc="",
+            translations={"Korean": "치명타 확률 {0}%", "English": "Critical Hit Chance {0}%", "Chinese": "暴击率 {0}%"},
             source_file="LangSystemDB.csv",
         ),
         "Character/Lucy_Name": LocString(

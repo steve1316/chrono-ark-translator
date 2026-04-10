@@ -33,30 +33,28 @@ def test_build_glossary_extracts_name_keys(sample_base_strings, glossary_categor
     assert terms["Lucy's Blessing"]["category"] == "passives"
 
 
-def test_build_glossary_extracts_keyword_entries(sample_base_strings, glossary_categories):
-    glossary = build_glossary_from_base_game(
-        sample_base_strings,
-        glossary_categories,
-        ["Korean", "Chinese"],
-        keyword_prefixes=["SkillKeyword/", "Battle/Keyword/"],
-    )
-    terms = glossary["terms"]
-    assert "Swiftness" in terms
-    assert terms["Swiftness"]["category"] == "mechanics"
-
-
-def test_build_glossary_includes_seed_terms(sample_base_strings, glossary_categories):
+def test_build_glossary_extracts_mechanic_keys(sample_base_strings, glossary_categories):
     glossary = build_glossary_from_base_game(
         sample_base_strings,
         glossary_categories,
         ["Korean", "Chinese"],
     )
     terms = glossary["terms"]
-    # Seed terms should be present with empty source_file.
-    for term in ["Debuff", "Damage", "Accuracy"]:
-        assert term in terms
-        assert terms[term]["category"] == "mechanics"
-        assert terms[term]["source_file"] == ""
+    # Battle/Keyword/ entries (without _Desc) are mechanics.
+    assert "Innate" in terms
+    assert terms["Innate"]["category"] == "mechanics"
+    # _Desc keys should NOT be extracted.
+    assert "This skill is always in your hand." not in terms
+    # Battle/SkillTooltip/ entries are mechanics.
+    assert "Accuracy" in terms
+    assert terms["Accuracy"]["category"] == "mechanics"
+    # Exact key System/Debuff maps to "Debuff".
+    assert "Debuff" in terms
+    assert terms["Debuff"]["category"] == "mechanics"
+    assert terms["Debuff"]["source_file"] == "LangSystemDB.csv"
+    # System/StatDesc/ values are cleaned of sprites and placeholders.
+    assert "Critical Hit Chance" in terms
+    assert terms["Critical Hit Chance"]["category"] == "mechanics"
 
 
 def test_build_glossary_sets_timestamps(sample_base_strings, glossary_categories):

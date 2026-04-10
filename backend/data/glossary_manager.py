@@ -8,6 +8,7 @@ that overlay the base game glossary.
 """
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -18,34 +19,27 @@ from backend.models import LocString
 # Common game terms to auto-extract from the base game.
 _NAME_KEY_SUFFIXES = ("_Name", "_name", "_PassiveName", "_SkinName")
 
-# Keyword key prefixes that contain game mechanic terms.
-_KEYWORD_PREFIXES = ("SkillKeyword/", "Battle/Keyword/")
+# Key patterns that yield mechanic terms. Each entry is a prefix; the
+# English value of matching keys is used as the term name.
+_MECHANIC_PREFIXES = ("Battle/Keyword/", "Battle/SkillTooltip/")
 
-# Universal game mechanic terms to seed into the base glossary.
-MECHANIC_SEED_TERMS = {
-    "Debuff": "A negative status effect",
-    "Buff": "A positive status effect",
-    "Weakening": "Reduces target's damage",
-    "Armor Reduced": "Lowers target's defense",
-    "Damage": "Amount of harm dealt",
-    "Accuracy": "Chance to hit",
-    "Critical Chance": "Chance for critical hit",
-    "Overload": "Exceeding action limit",
-    "Swiftness": "Ignores action counts",
-    "Action Count": "Number of actions per turn",
-    "Defense": "Damage reduction stat",
-    "HP": "Health points",
-    "Shield": "Temporary damage absorption",
-    "Apply": "Inflict a status effect",
-    "Deal": "Inflict damage",
-    "Restore": "Recover HP or resource",
-    "Increase": "Raise a stat value",
-    "Decrease": "Lower a stat value",
-    "Remove": "Clear a status effect",
-    "Penetration": "Ignore defense",
-    "Exhaust": "Card is removed after use",
-    "Dispose": "Card is removed from deck",
+# Exact keys that map to a specific mechanic term.
+_MECHANIC_EXACT_KEYS: dict[str, str] = {
+    "System/Debuff": "Debuff",
+    "UI/CharStat/PartyStat_MP": "Mana",
 }
+
+# Mechanic-pattern keys to skip (not actual mechanic terms).
+_MECHANIC_IGNORED_KEYS = {
+    "Battle/Keyword/Autodelete",
+    "Battle/Keyword/CutScene",
+    "Battle/Keyword/PlusSkillView",
+    "Battle/Keyword/Quick_Desc_Casual",
+}
+
+# Regex to strip sprite tags and stat placeholders from System/StatDesc values.
+_STAT_DESC_CLEANUP = re.compile(r"<sprite[^>]*>|\{0\}%?")
+
 
 # Suffix-to-category mapping for mod name-key auto-detection.
 _SUFFIX_CATEGORY: dict[str, str] = {
@@ -59,8 +53,81 @@ _SUFFIX_CATEGORY: dict[str, str] = {
 _IGNORED_NAME_KEY_PREFIXES = ("SkillExtended/",)
 
 
+def _identity(english: str) -> str:
+    """Return the English value unchanged.
+
+    Args:
+        english: The English term text.
+
+    Returns:
+        The same string, unmodified.
+    """
+    return english
+
+
+def _clean_stat_desc(english: str) -> str:
+    """Strip sprite tags and stat placeholders from a `System/StatDesc` value.
+
+    For example, `"<sprite=0>Weakening Accuracy {0}%"` becomes
+    `"Weakening Accuracy"`.
+
+    Args:
+        english: Raw English text from a `System/StatDesc` key.
+
+    Returns:
+        Cleaned term name with tags and placeholders removed.
+    """
+    return _STAT_DESC_CLEANUP.sub("", english).strip()
+
+
+def _classify_mechanic_key(key: str):
+    """Determine whether a localization key represents a mechanic term.
+
+    Checks the key against known mechanic patterns and returns a callable
+    that transforms the raw English value into a clean term name. Returns
+    None for non-mechanic keys.
+
+    Mechanic patterns:
+    - `Battle/Keyword/xxx` (excluding `_Desc` suffixes)
+    - `Battle/SkillTooltip/xxx`
+    - `System/StatDesc/xxx` (cleaned of sprite tags and placeholders)
+    - Exact keys in `_MECHANIC_EXACT_KEYS`
+
+    Args:
+        key: The localization key to classify.
+
+    Returns:
+        A callable `(str) -> str` that transforms the English value into
+        the final term name, or None if the key is not a mechanic pattern.
+    """
+    if key in _MECHANIC_IGNORED_KEYS:
+        return None
+
+    if key in _MECHANIC_EXACT_KEYS:
+        fixed = _MECHANIC_EXACT_KEYS[key]
+        return lambda _eng: fixed
+
+    if any(key.startswith(p) for p in _MECHANIC_PREFIXES):
+        if key.endswith("_Desc"):
+            return None
+        return _identity
+
+    if key.startswith("System/StatDesc/"):
+        return _clean_stat_desc
+
+    return None
+
+
 def _matches_prefix(key: str, prefix: str | list[str]) -> bool:
-    """Check if a key starts with any of the given prefix(es)."""
+    """Check if a key starts with any of the given prefix(es).
+
+    Args:
+        key: The localization key to test.
+        prefix: A single prefix string or a list of prefix strings.
+
+    Returns:
+        True if the key starts with any of the given prefixes.
+    """
     if isinstance(prefix, list):
         return any(key.startswith(p) for p in prefix)
     return key.startswith(prefix)
@@ -70,41 +137,39 @@ def build_glossary_from_base_game(
     base_strings: dict[str, LocString],
     term_categories: dict[str, str | list[str]],
     source_languages: list[str],
-    keyword_prefixes: list[str] | None = None,
 ) -> dict[str, dict]:
     """
     Auto-build a glossary from the base game's localization data.
 
     Extracts name entries (keys ending in _Name, _name, _PassiveName, or
-    _SkinName), keyword entries (matching keyword_prefixes), and seeds
-    universal mechanic terms.
+    _SkinName) and mechanic terms from keyword keys, skill tooltip keys,
+    stat description keys, and specific exact keys.
 
     Args:
         base_strings: Dictionary of base game LocString objects.
         term_categories: Category name -> key prefix mappings.
         source_languages: List of source language names to include.
-        keyword_prefixes: Optional list of key prefixes for mechanic keywords.
 
     Returns:
         Glossary dictionary.
     """
     glossary: dict[str, dict] = {"terms": {}}
-    kw_prefixes = keyword_prefixes or list(_KEYWORD_PREFIXES)
 
     for key, loc_str in base_strings.items():
         is_name_key = any(key.endswith(suffix) for suffix in _NAME_KEY_SUFFIXES)
-        is_keyword = any(key.startswith(p) for p in kw_prefixes) and is_name_key
+        is_mechanic = _classify_mechanic_key(key) is not None
 
-        if not is_name_key and not is_keyword:
+        if not is_name_key and not is_mechanic:
             continue
 
         english = loc_str.translations.get("English", "").strip().split("\n")[0].strip()
         if not english:
             continue
 
-        # Determine the category.
-        if is_keyword:
+        # Determine the category and clean up the English term.
+        if is_mechanic:
             category = "mechanics"
+            english = _classify_mechanic_key(key)(english)
         else:
             category = "other"
             for cat_name, prefix in term_categories.items():
@@ -118,6 +183,9 @@ def build_glossary_from_base_game(
                 category = "other"
             elif key.startswith("Character/AllyDoll_"):
                 category = "other"
+
+        if not english:
+            continue
 
         # Build source language mappings.
         source_mappings = {}
@@ -135,19 +203,6 @@ def build_glossary_from_base_game(
             "created_at": now,
             "updated_at": now,
         }
-
-    # Add seed mechanic terms (don't overwrite existing entries).
-    for term in MECHANIC_SEED_TERMS:
-        if term not in glossary["terms"]:
-            now = datetime.now(timezone.utc).isoformat()
-            glossary["terms"][term] = {
-                "category": "mechanics",
-                "key": "",
-                "source_file": "",
-                "source_mappings": {},
-                "created_at": now,
-                "updated_at": now,
-            }
 
     return glossary
 
