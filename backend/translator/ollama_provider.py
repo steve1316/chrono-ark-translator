@@ -12,50 +12,7 @@ from typing import Generator, Optional
 import requests
 from backend import config
 from backend.translator.base import TranslationProvider
-from backend.translator.claude_provider import build_style_examples_section, build_character_context_section
 
-
-_SYSTEM_PROMPT_TEMPLATE = """You are a professional game translator specializing in translating {source_lang} text into English for the game {game_context}.
-
-## Translation Rules
-
-{format_rules_section}
-
-{style_examples_section}
-
-{glossary_section}
-
-{character_context_section}
-
-## Output Format
-
-Return a valid JSON object with this structure:
-```json
-{{
-  "translations": {{
-    "Buff/B_Example_Name": "Example Buff",
-    "Buff/B_Example_Description": "Deals &a damage to all enemies."
-  }},
-  "suggested_terms": [
-    {{
-      "english": "Term Name",
-      "source": "원본 텍스트",
-      "source_lang": "{source_lang}",
-      "category": "characters|skills|buffs|items|mechanics",
-      "reason": "Brief reason why this should be a glossary term"
-    }}
-  ]
-}}
-```
-
-Translate ONLY the values. Keys must remain unchanged.
-
-For suggested_terms: identify any recurring proper nouns, character names, skill names, status effects, or game-specific terms that should be added to the glossary for consistency. Only suggest terms that:
-- Appear in multiple strings or are clearly important named entities
-- Are NOT already in the glossary above
-- Are proper nouns, skill/buff/item names, or game mechanics
-
-If no terms to suggest, return an empty array."""
 
 
 class OllamaProvider(TranslationProvider):
@@ -98,57 +55,6 @@ class OllamaProvider(TranslationProvider):
             )
         except Exception:
             pass
-
-    def build_prompt(
-        self,
-        entries: list[tuple[str, str]],
-        source_lang: str,
-        glossary_prompt: str,
-        game_context: str = "",
-        format_rules: list[str] | None = None,
-        style_examples: dict[str, list[tuple[str, str]]] | None = None,
-        character_context: dict | None = None,
-    ) -> tuple[str, str]:
-        """Build the system and user prompts for Ollama.
-
-        Args:
-            entries: List of (key, source_text) tuples to translate.
-            source_lang: Name of the source language (e.g. `"Korean"`).
-            glossary_prompt: Formatted glossary context for the LLM.
-            game_context: Game description for the system prompt.
-            format_rules: Game-specific formatting preservation rules.
-            style_examples: Dict of category -> [(source, english)] pairs.
-            character_context: Character background info dict.
-
-        Returns:
-            A tuple of (system_prompt, user_message).
-        """
-        glossary_section = glossary_prompt if glossary_prompt else "No glossary available."
-        rules = format_rules or []
-        format_rules_section = "\n".join(f"{i+1}. **{rule}**" for i, rule in enumerate(rules)) if rules else ""
-        style_examples_section = build_style_examples_section(style_examples or {})
-        character_context_section = build_character_context_section(character_context)
-
-        system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
-            source_lang=source_lang,
-            game_context=game_context or "a video game",
-            format_rules_section=format_rules_section,
-            style_examples_section=style_examples_section,
-            glossary_section=glossary_section,
-            character_context_section=character_context_section,
-        )
-        # Collapse runs of blank lines left by empty template sections.
-        while "\n\n\n" in system_prompt:
-            system_prompt = system_prompt.replace("\n\n\n", "\n\n")
-
-        user_lines = [f"Translate the following {source_lang} strings to English:\n"]
-        for key, source_text in entries:
-            escaped = source_text.replace("\n", "\\n")
-            user_lines.append(f"**{key}**: {escaped}")
-        user_lines.append('\nReturn a JSON object with "translations" and "suggested_terms".')
-        user_message = "\n".join(user_lines)
-
-        return system_prompt, user_message
 
     def translate_batch(
         self,
@@ -400,55 +306,6 @@ class OllamaProvider(TranslationProvider):
                 time.sleep(2**attempt * 2)
 
         yield {"type": "error", "message": "Translation failed after all retries"}
-
-    def _parse_response(
-        self,
-        response_text: str,
-        entries: list[tuple[str, str]],
-    ) -> tuple[dict[str, str], list[dict]]:
-        """Parse the JSON response from Ollama into translations and suggestions.
-
-        Strips markdown code fences and extracts the translations dict and
-        suggested_terms list from the parsed JSON.
-
-        Args:
-            response_text: Raw text response from the LLM.
-            entries: Original (key, source_text) tuples, used to validate
-                returned keys.
-
-        Returns:
-            A tuple of (translations dict, suggestions list). Returns
-            empty collections if parsing fails.
-        """
-        text = response_text.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        text = text.strip()
-
-        try:
-            result = json.loads(text)
-            if isinstance(result, dict):
-                expected_keys = {k for k, _ in entries}
-
-                if "translations" in result and isinstance(result["translations"], dict):
-                    translations = {k: v.replace("\\n", "\n") for k, v in result["translations"].items() if k in expected_keys and isinstance(v, str)}
-                    suggestions = result.get("suggested_terms", [])
-                    if not isinstance(suggestions, list):
-                        suggestions = []
-                    return translations, suggestions
-
-                translations = {k: v.replace("\\n", "\n") for k, v in result.items() if k in expected_keys and isinstance(v, str)}
-                return translations, []
-
-        except json.JSONDecodeError:
-            print(f"  Warning: Failed to parse Ollama response as JSON")
-            print(f"  Response: {text[:200]}...")
-
-        return {}, []
 
     def estimate_cost(self, entries: list[tuple[str, str]], **kwargs) -> dict:
         """Estimate token usage for translating the given entries.

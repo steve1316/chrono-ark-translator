@@ -1,5 +1,6 @@
 import json
-from backend.translator.claude_provider import ClaudeProvider, build_style_examples_section, build_character_context_section
+from backend.translator.claude_provider import ClaudeProvider
+from backend.translator.base import build_style_examples_section, build_character_context_section
 
 
 def test_parse_response_new_format():
