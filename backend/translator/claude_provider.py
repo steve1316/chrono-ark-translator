@@ -59,11 +59,11 @@ def build_style_examples_section(examples: dict[str, list[tuple[str, str]]]) -> 
     """Format style examples as a prompt section for the LLM.
 
     Builds a Markdown section showing source/English pairs grouped by category
-    (`"skills"`, `"buffs"`, `"items"`, `"dialogue"`) so the LLM can match the game's existing
+    (`"skills"`, `"buffs/debuffs"`, `"items"`, `"dialogue"`) so the LLM can match the game's existing
     translation style.
 
     Args:
-        examples: Dict mapping category name (e.g., `"skills"`, `"buffs"`) to a
+        examples: Dict mapping category name (e.g., `"skills"`, `"buffs/debuffs"`) to a
             list of (source_text, english_text) example pairs.
 
     Returns:
@@ -77,7 +77,7 @@ def build_style_examples_section(examples: dict[str, list[tuple[str, str]]]) -> 
 
     category_titles = {
         "skills": "Skill Descriptions",
-        "buffs": "Buff/Debuff Descriptions",
+        "buffs/debuffs": "Buff/Debuff Descriptions",
         "items": "Item Descriptions",
         "dialogue": "Character Dialogue",
     }

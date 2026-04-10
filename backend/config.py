@@ -61,7 +61,7 @@ BATCH_SIZE = int(os.environ.get("CATL_BATCH_SIZE", "100"))
 
 # Glossary categories to include in the translation prompt.
 # Only these categories from the base glossary are sent to the LLM.
-GLOSSARY_CATEGORIES = os.environ.get("CATL_GLOSSARY_CATEGORIES", "buffs,characters").split(",")
+GLOSSARY_CATEGORIES = os.environ.get("CATL_GLOSSARY_CATEGORIES", "buffs/debuffs,characters").split(",")
 
 # ── Mod Filtering ─────────────────────────────────────────────────────────────
 

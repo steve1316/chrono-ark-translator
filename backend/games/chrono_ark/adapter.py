@@ -139,7 +139,7 @@ class ChronoArkAdapter(GameAdapter):
     _METADATA_FILENAME = "ChronoArkMod.json"
     _GLOSSARY_CATEGORIES = {
         "characters": "Character/",
-        "buffs": "Buff/",
+        "buffs/debuffs": "Buff/",
         "skills": "Skill/",
         "items": "Item_Equip/",
         "passives": "Item_Passive/",
@@ -220,7 +220,7 @@ class ChronoArkAdapter(GameAdapter):
                 ("아군 한명의 HP를 &a만큼 회복합니다.", "Restore &a HP to an ally."),
                 ("적 하나에게 &a의 피해를 줍니다. 이 스킬은 방어력을 무시합니다.", "Deal &a damage to an enemy. This skill ignores Defense."),
             ],
-            "buffs": [
+            "buffs/debuffs": [
                 ("다음 공격에 의한 받는 피해가 30% 증가합니다.", "Damage taken from the next attack is increased by 30%."),
                 ("매 턴 시작 시 HP를 &a만큼 회복합니다.", "Restore &a HP at the start of each turn."),
                 ("공격력이 &a만큼 증가합니다.", "Attack is increased by &a."),

@@ -38,7 +38,7 @@ def test_parse_response_with_markdown_code_block():
 def test_build_style_examples_section():
     examples = {
         "skills": [("적에게 피해를 줍니다.", "Deal damage to an enemy.")],
-        "buffs": [("공격력 증가", "Attack is increased.")],
+        "buffs/debuffs": [("공격력 증가", "Attack is increased.")],
     }
     section = build_style_examples_section(examples)
     assert "Deal damage to an enemy." in section

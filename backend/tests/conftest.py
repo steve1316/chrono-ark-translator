@@ -79,7 +79,7 @@ def glossary_categories():
     """Standard Chrono Ark glossary categories."""
     return {
         "characters": "Character/",
-        "buffs": "Buff/",
+        "buffs/debuffs": "Buff/",
         "skills": "Skill/",
         "items": "Item_Equip/",
         "passives": "Item_Passive/",

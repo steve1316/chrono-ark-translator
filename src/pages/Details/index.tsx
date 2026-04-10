@@ -1079,7 +1079,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             <option value="custom">Custom</option>
                             <option value="characters">Characters</option>
                             <option value="skills">Skills</option>
-                            <option value="buffs">Buffs</option>
+                            <option value="buffs/debuffs">Buffs/Debuffs</option>
                             <option value="items">Items</option>
                             <option value="mechanics">Mechanics</option>
                         </select>
@@ -1168,7 +1168,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                     <option value="custom">Custom</option>
                                                     <option value="characters">Characters</option>
                                                     <option value="skills">Skills</option>
-                                                    <option value="buffs">Buffs</option>
+                                                    <option value="buffs/debuffs">Buffs/Debuffs</option>
                                                     <option value="items">Items</option>
                                                     <option value="mechanics">Mechanics</option>
                                                 </select>
