@@ -3,7 +3,7 @@ Manages history backups for mod translation data.
 
 Creates timestamped snapshots before destructive operations so the user
 can restore previous states. Each backup captures translations.json,
-glossary.json, and pending_suggestions.json.
+glossary.json, pending_suggestions.json, and sync state files.
 """
 
 import json
@@ -52,6 +52,8 @@ def create_backup(mod_id: str, reason: str, storage_path: Optional[Path] = None)
         "glossary.json",
         "pending_suggestions.json",
         "progress.json",
+        "synced_keys.json",
+        "pre_export_english.json",
     ]
     backed_up = False
     for filename in files_to_backup:
@@ -131,10 +133,19 @@ def restore_backup(mod_id: str, backup_id: str, storage_path: Optional[Path] = N
     if meta_path.exists():
         with open(meta_path, "r", encoding="utf-8") as f:
             meta = json.load(f)
-        for filename in meta.get("files", []):
+        backed_up_files = set(meta.get("files", []))
+        for filename in backed_up_files:
             src = backup_dir / filename
             if src.exists():
                 shutil.copy2(src, mod_dir / filename)
+
+        # Remove sync state files that weren't in the backup so stale
+        # data from the current state doesn't persist after restore.
+        for sync_file in ("synced_keys.json", "pre_export_english.json"):
+            if sync_file not in backed_up_files:
+                target = mod_dir / sync_file
+                if target.exists():
+                    target.unlink()
 
     return True
 
