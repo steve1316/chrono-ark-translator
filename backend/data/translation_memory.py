@@ -121,11 +121,3 @@ class TranslationMemory:
             "session_misses": self._misses,
             "hit_rate_percent": round(hit_rate, 1),
         }
-
-    def __len__(self) -> int:
-        """Return the number of stored translations.
-
-        Returns:
-            Count of cached translation entries.
-        """
-        return len(self._entries)
