@@ -150,6 +150,11 @@ const SettingsPage: React.FC = () => {
     const [llamacppInstalling, setLlamacppInstalling] = useState(false)
     const [llamacppInstallProgress, setLlamacppInstallProgress] = useState<{ status: string; file?: string; completed?: number; total?: number } | null>(null)
 
+    // System prompt preview state
+    const [systemPrompt, setSystemPrompt] = useState("")
+    const [promptSourceLang, setPromptSourceLang] = useState("Chinese")
+    const [promptLoading, setPromptLoading] = useState(false)
+
     const isChanged =
         provider !== originalProvider ||
         batchSize !== originalBatchSize ||
@@ -646,6 +651,64 @@ const SettingsPage: React.FC = () => {
                     <h1>Settings</h1>
                     <p>API Keys and Provider Configuration</p>
                 </div>
+            </div>
+
+            {/* System Prompt Preview */}
+            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
+                <h2 style={{ marginBottom: "1rem" }}>System Prompt Preview</h2>
+                <p style={{ color: "var(--text-dim)", fontSize: "0.9rem", marginBottom: "1rem" }}>
+                    View the system prompt sent to the translation provider. Uses the base glossary and current provider settings.
+                </p>
+                <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", marginBottom: "1rem" }}>
+                    <label style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>Source Language:</label>
+                    <select
+                        value={promptSourceLang}
+                        onChange={(e) => setPromptSourceLang(e.target.value)}
+                        className="btn-outline"
+                        style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)" }}
+                    >
+                        <option value="Chinese">Chinese</option>
+                        <option value="Korean">Korean</option>
+                        <option value="Japanese">Japanese</option>
+                    </select>
+                    <button
+                        className="btn btn-outline"
+                        onClick={async () => {
+                            setPromptLoading(true)
+                            try {
+                                const res = await fetch(`${API_BASE}/translate/system-prompt?source_lang=${encodeURIComponent(promptSourceLang)}`)
+                                const data = await res.json()
+                                setSystemPrompt(data.system_prompt || "")
+                            } catch (err) {
+                                console.error("Failed to fetch system prompt:", err)
+                                setSystemPrompt("Error fetching system prompt.")
+                            } finally {
+                                setPromptLoading(false)
+                            }
+                        }}
+                        disabled={promptLoading}
+                    >
+                        {promptLoading ? "Loading..." : "Load Prompt"}
+                    </button>
+                </div>
+                {systemPrompt && (
+                    <pre
+                        style={{
+                            background: "rgba(0,0,0,0.3)",
+                            border: "1px solid var(--glass-border)",
+                            borderRadius: "8px",
+                            padding: "1rem",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            fontSize: "0.85rem",
+                            color: "var(--text-main)",
+                            maxHeight: "500px",
+                            overflow: "auto",
+                        }}
+                    >
+                        {systemPrompt}
+                    </pre>
+                )}
             </div>
 
             {/* Provider Selection */}
