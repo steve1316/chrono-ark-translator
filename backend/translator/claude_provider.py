@@ -202,6 +202,9 @@ class ClaudeProvider(TranslationProvider):
             glossary_section=glossary_section,
             character_context_section=character_context_section,
         )
+        # Collapse runs of blank lines left by empty template sections.
+        while "\n\n\n" in system_prompt:
+            system_prompt = system_prompt.replace("\n\n\n", "\n\n")
 
         user_lines = [f"Translate the following {source_lang} strings to English:\n"]
         for key, source_text in entries:
