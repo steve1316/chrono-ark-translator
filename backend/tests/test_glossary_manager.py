@@ -210,7 +210,7 @@ def test_combined_glossary_prompt_empty_mod():
     """With no mod terms, only filtered base terms appear."""
     base = {
         "terms": {
-            "Shield Up": {"category": "buffs/debuffs", "key": "", "source_mappings": {"Korean": "방패"}},
+            "Shield Up": {"category": "mechanics", "key": "", "source_mappings": {"Korean": "방패"}},
         }
     }
     mod = {"terms": {}}
