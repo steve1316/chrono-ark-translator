@@ -142,7 +142,7 @@ class ProgressTracker:
                 uses all non-English translation keys found.
 
         Returns:
-            ProgressDiff describing what changed.
+            `ProgressDiff` describing what changed.
         """
         old_snapshot = self._load_snapshot(mod_id)
         old_hashes = old_snapshot.get("hashes", {})
@@ -273,18 +273,3 @@ class ProgressTracker:
             "percentage": round(percentage, 1),
             "last_updated": snapshot.get("last_updated", "never"),
         }
-
-    def get_diff(self, mod_id: str) -> Optional[ProgressDiff]:
-        """
-        Get the diff from the last update without modifying the snapshot.
-
-        This is a read-only operation. Call update() to compute a fresh diff.
-
-        Args:
-            mod_id: The mod's Workshop ID.
-
-        Returns:
-            None (use update() to compute diffs). This method exists for
-            API consistency but diffs are computed during update().
-        """
-        return None
