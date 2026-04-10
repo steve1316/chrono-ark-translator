@@ -69,7 +69,15 @@ _active_translations: dict[str, threading.Event] = {}
 
 
 def _stamp_raw_responses(responses: list[dict]) -> list[dict]:
-    """Add a timestamp to each raw API response dict."""
+    """Add an ISO-8601 UTC timestamp to each raw API response dict.
+
+    Args:
+        responses: List of response dicts from the translation provider.
+
+    Returns:
+        The same list, modified in-place with a `timestamp` key added to
+        each dict.
+    """
     now = datetime.now(timezone.utc).isoformat()
     for r in responses:
         r["timestamp"] = now
@@ -1716,11 +1724,19 @@ def _get_mod_csv_paths(mod_path: Path) -> list[Path]:
 
 
 def _compute_export_snapshot(mod_id: str, mod_path: Path) -> str:
-    """
-    Compute a hash representing the current state of translations + mod CSVs.
+    """Compute a SHA-256 hash of the current translations and mod CSVs.
 
-    Combines the translations.json content with the mod's CSV file contents
-    so we can detect changes on either side (new translations or mod author updates).
+    Combines the `translations.json` content with the mod's CSV file contents
+    so we can detect changes on either side (new translations or mod author
+    updates). Excludes timestamps so metadata-only changes don't trigger a
+    false "needs export" signal.
+
+    Args:
+        mod_id: The mod's Workshop ID.
+        mod_path: Filesystem path to the mod's root directory.
+
+    Returns:
+        Hex-digest hash string representing the current state.
     """
     h = hashlib.sha256()
 
@@ -2402,7 +2418,15 @@ _ENV_PATH = Path(__file__).parent / ".env"
 
 
 def _mask_key(key: str) -> str:
-    """Return a masked version of an API key, or empty string if unset."""
+    """Return a masked version of an API key for safe display.
+
+    Args:
+        key: The raw API key string.
+
+    Returns:
+        A string like `"••••ab12"` showing only the last 4 characters,
+        or an empty string if the key is not set.
+    """
     if not key or not key.strip():
         return ""
     return "••••" + key[-4:]
@@ -2630,7 +2654,14 @@ async def stop_ollama():
 
 
 def _llamacpp_binary() -> Path | None:
-    """Return the path to llama-server if it exists, or None."""
+    """Locate the llama-server binary.
+
+    Checks, in order: the configured path from settings, the managed
+    install location (`storage/bin/`), and the system PATH.
+
+    Returns:
+        Path to the llama-server executable, or None if not found.
+    """
     # Check configured path first
     configured = Path(config.LLAMACPP_BINARY_PATH)
     if configured.is_file():
