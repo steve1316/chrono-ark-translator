@@ -479,14 +479,3 @@ class ChronoArkAdapter(GameAdapter):
             List of JSON filenames that were modified.
         """
         return gdata_extractor.export_gdata_translations(mod_path, translations)
-
-    def get_mod_url(self, mod_id: str) -> Optional[str]:
-        """Return the Steam Workshop URL for a Chrono Ark mod.
-
-        Args:
-            mod_id: Steam Workshop item ID.
-
-        Returns:
-            Steam Workshop file details URL for the given mod.
-        """
-        return f"https://steamcommunity.com/sharedfiles/filedetails/?id={mod_id}"

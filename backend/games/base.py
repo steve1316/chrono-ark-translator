@@ -189,15 +189,13 @@ class GameAdapter(ABC):
         """
         ...
 
-    @abstractmethod
     def get_mod_url(self, mod_id: str) -> Optional[str]:
-        """Return an external URL for the mod, or None.
+        """Return the Steam Workshop URL for a mod.
 
         Args:
-            mod_id: Unique identifier for the mod.
+            mod_id: Steam Workshop item ID.
 
         Returns:
-            URL string linking to the mod's external page, or None if
-            no URL is available.
+            Steam Workshop URL for the given mod.
         """
-        ...
+        return f"https://steamcommunity.com/sharedfiles/filedetails/?id={mod_id}"
