@@ -50,9 +50,12 @@ MECHANIC_SEED_TERMS = {
 _SUFFIX_CATEGORY: dict[str, str] = {
     "_PassiveName": "passives",
     "_SkinName": "characters",
-    "_Name": "other",
-    "_name": "other",
+    "_Name": "names",
+    "_name": "names",
 }
+
+# Key prefixes whose `_Name` values are descriptions, not actual names.
+_IGNORED_NAME_KEY_PREFIXES = ("SkillExtended/",)
 
 
 def build_glossary_from_base_game(
@@ -167,6 +170,10 @@ def extract_name_key_suggestions(
             if key.endswith(suffix) and len(suffix) > len(matched_suffix):
                 matched_suffix = suffix
         if not matched_suffix:
+            continue
+
+        # Skip prefixes whose _Name fields hold descriptions, not names.
+        if any(key.startswith(p) for p in _IGNORED_NAME_KEY_PREFIXES):
             continue
 
         english = translations.get(key, "").strip()
