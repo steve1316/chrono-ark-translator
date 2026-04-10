@@ -1812,6 +1812,39 @@ async def get_export_status(mod_id: str):
     }
 
 
+@app.post("/api/mods/{mod_id}/open-source-file/{filename}")
+async def open_source_file(mod_id: str, filename: str):
+    """Open a mod's source file in the OS default application.
+
+    Looks for the file in the mod's Localization directory (for CSVs) or
+    gdata/Add directory (for JSONs), then opens it with `os.startfile`.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        filename: The source filename (e.g. `LangDataDB.csv` or `B_Roland_Rare_S.json`).
+
+    Returns:
+        A dict with the resolved file path.
+
+    Raises:
+        HTTPException: 404 if the file is not found in the mod directory.
+    """
+    mod_path = _find_mod_path(mod_id)
+
+    candidates = [
+        mod_path / "Localization" / filename,
+        mod_path / "gdata" / "Add" / filename,
+        mod_path / filename,
+    ]
+
+    for candidate in candidates:
+        if candidate.is_file():
+            os.startfile(candidate)
+            return {"path": str(candidate)}
+
+    raise HTTPException(status_code=404, detail=f"Source file not found: {filename}")
+
+
 @app.post("/api/mods/{mod_id}/export")
 async def export_mod(mod_id: str, resync: bool = False):
     """Write saved translations back into the mod's original CSV files.

@@ -1447,7 +1447,16 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                         {s.translated_by || "—"}
                                     </td>
                                     <td className="key-cell" title={s.source_file} style={{ maxWidth: columnWidths.source_file }}>
-                                        {s.source_file}
+                                        <a
+                                            href="#"
+                                            onClick={(e) => {
+                                                e.preventDefault()
+                                                e.stopPropagation()
+                                                fetch(`${API_BASE}/mods/${modId}/open-source-file/${encodeURIComponent(s.source_file)}`, { method: "POST" })
+                                            }}
+                                        >
+                                            {s.source_file}
+                                        </a>
                                     </td>
                                     <td className="key-cell" title={s.key} style={{ maxWidth: columnWidths.key }}>
                                         {s.key}
