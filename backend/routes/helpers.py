@@ -238,6 +238,26 @@ def _compute_export_snapshot(mod_id: str, mod_path: Path) -> str:
     return h.hexdigest()
 
 
+def _compute_csv_snapshot(mod_path: Path) -> str:
+    """Compute a SHA-256 hash of only the mod's CSV files.
+
+    Unlike `_compute_export_snapshot`, this excludes translations so it
+    can detect mod-author CSV updates without being affected by new
+    user translations.
+
+    Args:
+        mod_path: Filesystem path to the mod's root directory.
+
+    Returns:
+        Hex-digest hash string representing the current CSV state.
+    """
+    h = hashlib.sha256()
+    for csv_path in sorted(_get_mod_csv_paths(mod_path)):
+        h.update(csv_path.name.encode("utf-8"))
+        h.update(csv_path.read_bytes())
+    return h.hexdigest()
+
+
 def _load_last_export_hash(mod_id: str) -> str:
     """Load the snapshot hash saved after the last successful export.
 
