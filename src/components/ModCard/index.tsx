@@ -2,6 +2,7 @@ import React from "react"
 import { FaExclamationCircle, FaSteam, FaSync } from "react-icons/fa"
 import type { ModStatus } from "../../shared_types"
 import { API_BASE } from "../../config"
+import { highlightMatch } from "../../utils/text"
 
 /**
  * Props accepted by the {@link ModCard} component.
@@ -15,25 +16,6 @@ interface ModCardProps {
     onSync: (modId: string) => void
     /** Current search query for highlighting matching characters in name/author. */
     searchQuery?: string
-}
-
-/**
- * Wraps substrings matching `query` in a highlight span. Returns the original
- * text unchanged when the query is empty.
- */
-function highlightMatch(text: string, query: string): React.ReactNode {
-    if (!query) return text
-    const lower = text.toLowerCase()
-    const q = query.toLowerCase()
-    const idx = lower.indexOf(q)
-    if (idx === -1) return text
-    return (
-        <>
-            {text.slice(0, idx)}
-            <span style={{ background: "rgba(56, 189, 248, 0.3)", borderRadius: "2px" }}>{text.slice(idx, idx + query.length)}</span>
-            {text.slice(idx + query.length)}
-        </>
-    )
 }
 
 /**
