@@ -4,6 +4,7 @@ import ModGrid from "../../components/ModGrid"
 import EstimateTotalCostModal from "../../components/EstimateTotalCostModal"
 import type { ModStatus } from "../../shared_types"
 import { API_BASE } from "../../config"
+import { filterMods } from "../../utils/modFilters"
 
 interface DashboardPageProps {
     mods: ModStatus[]
@@ -178,11 +179,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
         }
     }
 
-    const filteredMods = useMemo(() => {
-        const query = search.trim().toLowerCase()
-        if (!query) return mods
-        return mods.filter((mod) => mod.name.toLowerCase().includes(query) || (mod.author ?? "").toLowerCase().includes(query))
-    }, [mods, search])
+    const filteredMods = useMemo(() => filterMods(mods, search), [mods, search])
 
     // Observe the first mod card's width so the search bar can match it exactly.
     useEffect(() => {
