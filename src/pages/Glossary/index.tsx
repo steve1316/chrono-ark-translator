@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react"
 import { FaSearch } from "react-icons/fa"
 import { API_BASE } from "../../config"
 import type { Glossary } from "../../shared_types"
+import { extractCategories, filterGlossaryTerms } from "../../utils/glossaryFilters"
 
 /**
  * Displays the base-game terminology glossary in a searchable, filterable table.
@@ -40,13 +41,7 @@ const GlossaryPage: React.FC = () => {
      * Used to render the category filter buttons. Recomputed only when the
      * glossary data changes.
      */
-    const categories = useMemo(() => {
-        const cats = new Set<string>()
-        for (const term of Object.values(glossary.terms)) {
-            cats.add(term.category)
-        }
-        return Array.from(cats).sort()
-    }, [glossary])
+    const categories = useMemo(() => extractCategories(glossary.terms), [glossary])
 
     /**
      * Filtered and sorted glossary entries, recomputed whenever the glossary,
@@ -60,19 +55,7 @@ const GlossaryPage: React.FC = () => {
      *
      * Results are sorted alphabetically by the English term.
      */
-    const filteredTerms = useMemo(() => {
-        return Object.entries(glossary.terms)
-            .filter(([english, info]) => {
-                // Match against the English key or any source mapping value.
-                const matchesSearch =
-                    english.toLowerCase().includes(search.toLowerCase()) ||
-                    info.key.toLowerCase().includes(search.toLowerCase()) ||
-                    Object.values(info.source_mappings).some((v) => v.toLowerCase().includes(search.toLowerCase()))
-                const matchesCategory = categoryFilter === "all" || info.category === categoryFilter
-                return matchesSearch && matchesCategory
-            })
-            .sort(([a], [b]) => a.localeCompare(b))
-    }, [glossary, search, categoryFilter])
+    const filteredTerms = useMemo(() => filterGlossaryTerms(glossary.terms, search, categoryFilter), [glossary, search, categoryFilter])
 
     if (loading) {
         return (
