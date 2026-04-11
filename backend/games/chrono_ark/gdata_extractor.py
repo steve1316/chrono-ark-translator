@@ -24,6 +24,9 @@ _FIELD_SUFFIXES: dict[str, str] = {
     "PassiveDes": "_PassiveDesc",
     "SelectInfo": "_SelectInfo",
     "Flavor": "_Flavor",
+    "SkinName": "_SkinName",
+    "SkinDesc": "_SkinDesc",
+    "UnlockString": "_UnlockString",
 }
 
 # Schema names used as key prefixes (matches base-game CSV convention).
@@ -33,8 +36,24 @@ _SCHEMA_PREFIX: dict[str, str] = {
     "Item_Equip": "Item_Equip",
     "Item_Passive": "Item_Passive",
     "Character": "Character",
+    "Character_Skin": "Character_Skin",
     "SkillExtended": "SkillExtended",
     "SkillKeyword": "SkillKeyword",
+    "SimpleCampDialogue": "SimpleCampDialogue",
+    "Item_Consume": "Item_Consume",
+    "Item_Active": "Item_Active",
+    "Item_Scroll": "Item_Scroll",
+    "Item_Misc": "Item_Misc",
+    "Item_Potions": "Item_Potions",
+    "Item_Friendship": "Item_Friendship",
+    "Enemy": "Enemy",
+    "RandomEvent": "RandomEvent",
+    "CurseList": "CurseList",
+    "EnchantList": "EnchantList",
+    "SpecialKey": "SpecialKey",
+    "SpecialRule": "SpecialRule",
+    "UnlockWindow": "UnlockWindow",
+    "ArkUpgrade": "ArkUpgrade",
 }
 
 # Character fields that hold string arrays (dialogue lines).
@@ -47,10 +66,14 @@ _DIALOGUE_ARRAY_FIELDS = {
     "Text_Battle_Cri",
     "Text_Battle_Healed",
     "Text_Field_Idle",
+    "Text_Field_GetItem",
+    "Text_Field_Potion_N",
+    "Text_Field_Potion_P",
     "Text_PharosLeader",
     "Text_Ex",
     "Text_EquipGet",
     "Text_BangBangKaBang",
+    "Dialogues",
 }
 
 
@@ -114,7 +137,7 @@ def _extract_gdata_file(file_path: Path) -> dict[str, LocString]:
                     line = line.strip()
                     if not line:
                         continue
-                    loc_key = f"{field_name}_{idx}"
+                    loc_key = f"{prefix}/{item_id}_{field_name}_{idx}"
                     lang = "Chinese" if _has_cjk(line) else "English"
                     results[loc_key] = LocString(
                         key=loc_key,
@@ -125,7 +148,7 @@ def _extract_gdata_file(file_path: Path) -> dict[str, LocString]:
                     )
             elif isinstance(arr, str) and arr.strip():
                 # Some dialogue fields might be a single string.
-                loc_key = field_name
+                loc_key = f"{prefix}/{item_id}_{field_name}"
                 text = arr.strip()
                 lang = "Chinese" if _has_cjk(text) else "English"
                 results[loc_key] = LocString(
@@ -199,12 +222,12 @@ def export_gdata_translations(
 
                 if isinstance(arr, list):
                     for idx in range(len(arr)):
-                        loc_key = f"{field_name}_{idx}"
+                        loc_key = f"{prefix}/{item_id}_{field_name}_{idx}"
                         if loc_key in translations:
                             arr[idx] = translations[loc_key]
                             modified = True
                 elif isinstance(arr, str):
-                    loc_key = field_name
+                    loc_key = f"{prefix}/{item_id}_{field_name}"
                     if loc_key in translations:
                         obj[field_name] = translations[loc_key]
                         modified = True
