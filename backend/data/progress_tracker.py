@@ -186,9 +186,9 @@ class ProgressTracker:
         # Save the updated snapshot.
         new_snapshot = {
             "hashes": new_hashes,
-            "translated": sorted((old_translated & current_keys) | empty_source_keys),
+            "translated": sorted((old_translated & current_keys) - empty_source_keys),
             "last_updated": datetime.now(timezone.utc).isoformat(),
-            "total_keys": len(current_keys),
+            "total_keys": len(current_keys) - len(empty_source_keys),
         }
         self._save_snapshot(mod_id, new_snapshot)
 
@@ -250,16 +250,6 @@ class ProgressTracker:
         snapshot = self._load_snapshot(mod_id)
         total = snapshot.get("total_keys", 0)
         translated_set = set(snapshot.get("translated", []))
-
-        # Also count keys that have empty source hashes.
-        # This fixes the dashboard for mods that haven't been re-scanned
-        # since the empty-source logic was added.
-        hashes = snapshot.get("hashes", {})
-        empty_hashes = {hashlib.sha256(("|" * i).encode("utf-8")).hexdigest() for i in range(5)}  # Covers up to 5 source languages
-
-        for key, h in hashes.items():
-            if h in empty_hashes:
-                translated_set.add(key)
 
         translated = len(translated_set)
         untranslated = total - translated

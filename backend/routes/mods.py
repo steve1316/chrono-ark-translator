@@ -251,7 +251,7 @@ async def get_mod_detail(mod_id: str):
         english = loc_str.translations.get("English", "")
 
         is_done = bool(english) or not source_text.strip()
-        if is_done:
+        if source_text.strip() and bool(english):
             translated_keys.append(key)
 
         has_override = key in translations

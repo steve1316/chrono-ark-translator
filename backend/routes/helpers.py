@@ -345,7 +345,7 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
         source_lang = _adapter.detect_source_language(loc_str)
         source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
         english = loc_str.translations.get("English", "")
-        if bool(english) or not source_text.strip():
+        if source_text.strip() and bool(english):
             translated_keys.append(key)
 
     tracker.set_translated(mod_id, translated_keys)
