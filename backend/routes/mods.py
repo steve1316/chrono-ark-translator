@@ -16,6 +16,7 @@ from backend.routes.helpers import (
     _find_mod_path,
     _find_mod_preview_image,
     _compute_export_snapshot,
+    _compute_csv_snapshot,
     _load_last_export_hash,
     _save_last_export_hash,
     _merge_gdata_originals,
@@ -198,13 +199,26 @@ async def get_mod_detail(mod_id: str):
         except Exception:
             pass
 
-    # If export snapshot has drifted (CSV files deleted/changed, new
-    # translations), the per-row synced status is stale — clear it.
+    # If the mod's CSV files changed since the last export (mod author
+    # update), the synced status is stale — clear it.  We intentionally
+    # ignore translation changes here so that adding new translations
+    # does not invalidate previously synced rows.
     if synced_keys:
-        current_hash = _compute_export_snapshot(mod_id, mod_path)
-        last_hash = _load_last_export_hash(mod_id)
-        if current_hash != last_hash:
-            synced_keys = set()
+        csv_hash_path = config.STORAGE_PATH / "mods" / mod_id / "last_csv_hash.json"
+        if csv_hash_path.exists():
+            try:
+                with open(csv_hash_path, "r", encoding="utf-8") as f:
+                    last_csv_hash = json.load(f).get("hash", "")
+            except Exception:
+                last_csv_hash = ""
+            if _compute_csv_snapshot(mod_path) != last_csv_hash:
+                synced_keys = set()
+        else:
+            # No CSV hash saved yet — fall back to full snapshot check.
+            current_hash = _compute_export_snapshot(mod_id, mod_path)
+            last_hash = _load_last_export_hash(mod_id)
+            if current_hash != last_hash:
+                synced_keys = set()
 
     # Load pre-export English values saved at export time so the UI can
     # show a diff for synced rows (the CSV now contains the translated
@@ -391,7 +405,7 @@ async def clear_translations(mod_id: str):
     clear_all_translations(mod_id, keys_to_clear)
 
     # Clear synced state since all translations have been wiped.
-    for filename in ("synced_keys.json", "pre_export_english.json"):
+    for filename in ("synced_keys.json", "pre_export_english.json", "last_csv_hash.json"):
         path = config.STORAGE_PATH / "mods" / mod_id / filename
         if path.exists():
             path.unlink()
@@ -470,6 +484,7 @@ async def reset_mod(mod_id: str):
         "progress.json",
         "synced_keys.json",
         "last_export.json",
+        "last_csv_hash.json",
         "pre_export_english.json",
         "last_api_responses.json",
     ]
@@ -710,11 +725,17 @@ async def export_mod(mod_id: str, resync: bool = False):
     snapshot_hash = _compute_export_snapshot(mod_id, mod_path)
     _save_last_export_hash(mod_id, snapshot_hash)
 
+    # Save CSV-only hash so synced-key invalidation only triggers on
+    # mod-author CSV changes, not on new user translations.
+    csv_hash_path = config.STORAGE_PATH / "mods" / mod_id / "last_csv_hash.json"
+    with open(csv_hash_path, "w", encoding="utf-8") as f:
+        json.dump({"hash": _compute_csv_snapshot(mod_path)}, f)
+
     # Save the set of synced keys so the UI can highlight them.
     synced_keys_path = config.STORAGE_PATH / "mods" / mod_id / "synced_keys.json"
     synced_keys_path.parent.mkdir(parents=True, exist_ok=True)
     with open(synced_keys_path, "w", encoding="utf-8") as f:
-        json.dump(list(translations.keys()), f, ensure_ascii=False)
+        json.dump([k for k, v in translations.items() if v], f, ensure_ascii=False)
 
     # Save pre-export English values so the UI can show a diff for synced rows.
     pre_export_path = config.STORAGE_PATH / "mods" / mod_id / "pre_export_english.json"
