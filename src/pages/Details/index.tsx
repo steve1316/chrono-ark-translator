@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react"
 import { useParams } from "react-router-dom"
 import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook, FaFolderOpen, FaExclamationCircle } from "react-icons/fa"
 import type { LocString, TermSuggestion } from "../../shared_types"
+import { getRowStatus, getRowStyle, filterStrings, sortStrings } from "../../utils/stringFilters"
+import type { SortField, SortDirection } from "../../utils/stringFilters"
 import { API_BASE } from "../../config"
 import GlossarySuggestionModal from "../../components/GlossarySuggestionModal"
 import TranslationConfirmModal from "../../components/TranslationConfirmModal"
@@ -18,14 +20,6 @@ interface ModDetailProps {
     onBack: () => void
 }
 
-/** Columns that support click-to-sort in the strings table. */
-type SortField = "is_translated" | "translated_by" | "key" | "source_file" | "source" | "english"
-
-/**
- * Sort direction for a column: ascending, descending, or null (unsorted).
- * Clicking a column header cycles through asc -> desc -> null.
- */
-type SortDirection = "asc" | "desc" | null
 
 /**
  * Detail view for a specific mod, showing all translatable strings.
@@ -404,38 +398,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
      * translate), matching the same logic used in `handleSaveString`.
      */
     const processedStrings = React.useMemo(() => {
-        let result = strings.filter((s) => {
-            // Hide rows with no source text — nothing to translate.
-            if (!s.source.trim()) return false
-
-            const isDone = s.is_translated
-            const isPending = isDone && !s.is_synced
-            const matchesFilter = filter === "all" || (filter === "missing" && !isDone) || (filter === "pending" && isPending) || (filter === "synced" && s.is_synced)
-
-            // Case-insensitive search across all text columns.
-            const matchesSearch =
-                s.key.toLowerCase().includes(search.toLowerCase()) ||
-                s.source_file.toLowerCase().includes(search.toLowerCase()) ||
-                s.source.toLowerCase().includes(search.toLowerCase()) ||
-                s.english.toLowerCase().includes(search.toLowerCase())
-
-            return matchesFilter && matchesSearch
-        })
-
-        // Apply sorting only when a direction is active (null means unsorted).
-        if (sortConfig.direction) {
-            result.sort((a, b) => {
-                const aValue = a[sortConfig.key]
-                const bValue = b[sortConfig.key]
-
-                if (aValue === bValue) return 0
-
-                const comparison = aValue < bValue ? -1 : 1
-                return sortConfig.direction === "asc" ? comparison : -comparison
-            })
-        }
-
-        return result
+        return sortStrings(filterStrings(strings, filter, search), sortConfig)
     }, [strings, filter, search, sortConfig])
 
     /**
@@ -1432,16 +1395,21 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                     </thead>
                     <tbody>
                         {processedStrings.map((s) => {
-                            const hasOverride = !s.is_synced && s.english !== s.original_english
-                            const isDone = s.is_translated || !s.source.trim()
-                            // Row background: green for synced, yellow for unsynced overrides
-                            const rowStyle = s.is_synced ? { backgroundColor: "rgba(52, 211, 153, 0.1)" } : hasOverride ? { backgroundColor: "rgba(255, 220, 40, 0.15)" } : undefined
+                            const status = getRowStatus(s)
+                            const rowStyle = getRowStyle(s)
+                            const isUntranslatable = status === "untranslatable"
                             return (
                                 <tr key={s.key} style={rowStyle}>
                                     <td>
-                                        <span className={`status-badge ${s.is_synced ? "status-synced" : isDone ? "status-translated" : "status-missing"}`}>
-                                            {s.is_synced ? "SYNCED" : isDone ? "PENDING" : "MISSING"}
-                                        </span>
+                                        {isUntranslatable ? (
+                                            <span className="status-badge status-untranslatable" title={s.untranslatable_reason}>
+                                                N/A
+                                            </span>
+                                        ) : (
+                                            <span className={`status-badge ${status === "synced" ? "status-synced" : status === "pending" ? "status-translated" : "status-missing"}`}>
+                                                {status === "synced" ? "SYNCED" : status === "pending" ? "PENDING" : "MISSING"}
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="key-cell" title={s.translated_by} style={{ maxWidth: columnWidths.translated_by }}>
                                         {s.translated_by || "—"}
@@ -1465,13 +1433,21 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                         {s.source}
                                     </td>
                                     <td className="english-cell" style={{ maxWidth: columnWidths.english, position: "relative" }}>
-                                        {/* Show previous translation above the editable field when overridden or synced. */}
-                                        {s.original_english && s.original_english !== s.english && (
-                                            <div className="prev-translation" style={s.is_synced ? { color: "rgba(52, 211, 153, 0.6)" } : undefined}>
-                                                {s.original_english}
-                                            </div>
+                                        {isUntranslatable ? (
+                                            <span className="untranslatable-hint" title={s.untranslatable_reason}>
+                                                {s.untranslatable_reason}
+                                            </span>
+                                        ) : (
+                                            <>
+                                                {/* Show previous translation above the editable field when overridden or synced. */}
+                                                {s.original_english && s.original_english !== s.english && (
+                                                    <div className="prev-translation" style={s.is_synced ? { color: "rgba(52, 211, 153, 0.6)" } : undefined}>
+                                                        {s.original_english}
+                                                    </div>
+                                                )}
+                                                <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
+                                            </>
                                         )}
-                                        <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
                                     </td>
                                 </tr>
                             )

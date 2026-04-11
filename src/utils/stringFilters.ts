@@ -1,0 +1,108 @@
+import type { LocString } from "../shared_types"
+
+export type RowStatus = "synced" | "pending" | "missing" | "untranslatable"
+
+export type FilterTab = "all" | "missing" | "pending" | "synced"
+
+export type SortField = "is_translated" | "translated_by" | "key" | "source_file" | "source" | "english"
+
+export type SortDirection = "asc" | "desc" | null
+
+export type SortConfig = { key: SortField; direction: SortDirection }
+
+/**
+ * Determine the display status for a string table row.
+ *
+ * Args:
+ *     s: The localization string to evaluate.
+ *
+ * Returns:
+ *     The row status used for badge rendering.
+ */
+export function getRowStatus(s: LocString): RowStatus {
+    if (s.untranslatable_reason) return "untranslatable"
+    if (s.is_synced) return "synced"
+    if (s.is_translated || !s.source.trim()) return "pending"
+    return "missing"
+}
+
+/**
+ * Determine the background style for a string table row.
+ *
+ * Args:
+ *     s: The localization string to evaluate.
+ *
+ * Returns:
+ *     A CSS style object with backgroundColor, or undefined for default rows.
+ */
+export function getRowStyle(s: LocString): React.CSSProperties | undefined {
+    if (s.untranslatable_reason) return { backgroundColor: "rgba(148, 163, 184, 0.1)" }
+    if (s.is_synced) return { backgroundColor: "rgba(52, 211, 153, 0.1)" }
+    const hasOverride = !s.is_synced && s.english !== s.original_english
+    if (hasOverride) return { backgroundColor: "rgba(255, 220, 40, 0.15)" }
+    return undefined
+}
+
+/**
+ * Filter strings by status tab and free-text search.
+ * Rows with empty source text are always hidden.
+ *
+ * Args:
+ *     strings: All localization strings.
+ *     filter: The active filter tab.
+ *     search: Free-text search query.
+ *
+ * Returns:
+ *     Filtered array of strings.
+ */
+export function filterStrings(strings: LocString[], filter: FilterTab, search: string): LocString[] {
+    const q = search.toLowerCase()
+    return strings.filter((s) => {
+        if (!s.source.trim()) return false
+
+        const isDone = s.is_translated
+        const isPending = isDone && !s.is_synced
+        const isUntranslatable = !!s.untranslatable_reason
+        const matchesFilter =
+            filter === "all" ||
+            (filter === "missing" && !isDone && !isUntranslatable) ||
+            (filter === "pending" && isPending) ||
+            (filter === "synced" && s.is_synced)
+
+        if (!matchesFilter) return false
+
+        if (!q) return true
+        return (
+            s.key.toLowerCase().includes(q) ||
+            s.source_file.toLowerCase().includes(q) ||
+            s.source.toLowerCase().includes(q) ||
+            s.english.toLowerCase().includes(q)
+        )
+    })
+}
+
+/**
+ * Sort strings by the given column and direction.
+ * Returns a new sorted array (does not mutate).
+ *
+ * Args:
+ *     strings: Array of strings to sort.
+ *     config: Sort column and direction.
+ *
+ * Returns:
+ *     Sorted copy of the array. Returns a shallow copy if direction is null.
+ */
+export function sortStrings(strings: LocString[], config: SortConfig): LocString[] {
+    const result = [...strings]
+    if (!config.direction) return result
+
+    result.sort((a, b) => {
+        const aValue = a[config.key]
+        const bValue = b[config.key]
+        if (aValue === bValue) return 0
+        const comparison = aValue < bValue ? -1 : 1
+        return config.direction === "asc" ? comparison : -comparison
+    })
+
+    return result
+}
