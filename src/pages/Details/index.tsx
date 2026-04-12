@@ -84,6 +84,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     }>({ source_game: "", character_name: "", background: "" })
     const [showCharacterContext, setShowCharacterContext] = useState(false)
     const [characterContextSaved, setCharacterContextSaved] = useState(false)
+    const [sourceLangOverride, setSourceLangOverride] = useState<string | null>(null)
 
     const [exporting, setExporting] = useState(false)
     const [showApiResponses, setShowApiResponses] = useState(false)
@@ -272,10 +273,25 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             setModPreviewImage(data.preview_image ?? null)
             setModUrl(data.url ?? null)
             setDuplicateFiles(data.duplicate_files ?? [])
+            setSourceLangOverride(data.source_language_override ?? null)
         } catch (err) {
             console.error("Failed to fetch mod detail:", err)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const saveSourceLanguage = async (lang: string | null) => {
+        setSourceLangOverride(lang)
+        try {
+            await fetch(`${API_BASE}/mods/${modId}/source-language`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ source_language: lang }),
+            })
+            fetchModDetail(true)
+        } catch (err) {
+            console.error("Failed to save source language:", err)
         }
     }
 
@@ -704,6 +720,26 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 )}
                             </div>
                             {modAuthor && <p style={{ color: "var(--text-dim)", marginTop: "0.25rem" }}>by {modAuthor}</p>}
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+                                <label style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Source Language:</label>
+                                <select
+                                    value={sourceLangOverride || "Chinese"}
+                                    onChange={(e) => saveSourceLanguage(e.target.value)}
+                                    style={{
+                                        padding: "0.3rem 0.5rem",
+                                        borderRadius: "6px",
+                                        background: "rgba(0,0,0,0.2)",
+                                        border: "1px solid var(--glass-border)",
+                                        color: "var(--text-main)",
+                                        fontSize: "0.85rem",
+                                    }}
+                                >
+                                    <option value="Chinese">Chinese</option>
+                                    <option value="Korean">Korean</option>
+                                    <option value="Japanese">Japanese</option>
+                                    <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
+                                </select>
+                            </div>
                             <p>
                                 {strings.filter((s) => s.source.trim() && !s.untranslatable_reason && s.is_translated).length} / {strings.filter((s) => s.source.trim() && !s.untranslatable_reason).length} total strings translated
                             </p>
@@ -1383,7 +1419,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 <div className="resizer" onPointerDown={(e) => onResizeStart(e, "key")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
                             </th>
                             <th className="sortable-th" onClick={() => handleSort("source")} style={{ width: columnWidths.source }}>
-                                Original ({strings[0]?.source_lang || "Source"}) {getSortIcon("source")}
+                                Original ({sourceLangOverride || "Chinese"}) {getSortIcon("source")}
                                 <div className="resizer" onPointerDown={(e) => onResizeStart(e, "source")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
                             </th>
                             <th className="sortable-th" onClick={() => handleSort("english")} style={{ width: columnWidths.english }}>
