@@ -18,6 +18,8 @@ class LocString:
         translations: Mapping of language name to translated text.
             E.g. `{"Korean": "...", "English": "...", "Chinese": "..."}`.
         source_file: Which CSV file this entry came from.
+        untranslatable_reason: If non-empty, this string cannot be translated
+            through the CSV pipeline. Contains a user-facing explanation.
     """
 
     key: str
@@ -25,3 +27,4 @@ class LocString:
     desc: str
     translations: dict[str, str] = field(default_factory=dict)
     source_file: str = ""
+    untranslatable_reason: str = ""

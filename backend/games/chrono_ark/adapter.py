@@ -240,6 +240,7 @@ class ChronoArkAdapter(GameAdapter):
             "ArkUpgrade",
             "Buff",
             "Character",
+            "DLL",
             "Character_Skin",
             "CurseList",
             "EnchantList",
@@ -389,6 +390,27 @@ class ChronoArkAdapter(GameAdapter):
             self._SKIP_DLLS,
         )
         for key, loc_str in dll_strings.items():
+            if key not in strings:
+                strings[key] = loc_str
+
+        # Extract orphan CJK strings from DLLs that lack localization keys
+        # (e.g. property assignments like `this.PassiveDes = "中文"`).
+        orphan_strings = dll_extractor.extract_mod_dll_orphan_strings(
+            mod_path,
+            self._SKIP_DLLS,
+            dll_strings,
+            self._DLL_MIN_STRING_LENGTH,
+        )
+        # Deduplicate against all existing source texts.
+        existing_values: set[str] = set()
+        for loc_str in strings.values():
+            for val in loc_str.translations.values():
+                if val:
+                    existing_values.add(val)
+        for key, loc_str in orphan_strings.items():
+            chinese = loc_str.translations.get("Chinese", "")
+            if chinese in existing_values:
+                continue
             if key not in strings:
                 strings[key] = loc_str
 

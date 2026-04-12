@@ -8,6 +8,7 @@ Includes IL-level analysis to find consecutive `ldstr` pairs, which
 represent key/value arguments to localization registration calls.
 """
 
+import hashlib
 import re
 import struct
 from pathlib import Path
@@ -176,6 +177,69 @@ def extract_dll_loc_strings(
     return results
 
 
+def extract_dll_orphan_strings(
+    dll_path: Path,
+    paired_values: set[str],
+    source_file_label: str = "",
+    min_string_length: int = 4,
+) -> dict[str, LocString]:
+    """Extract CJK strings from a .NET assembly that lack localization keys.
+
+    Some mods (e.g. mod 2959784510 / Amethyst) set translatable text via
+    property assignments in C# rather than localization registration calls,
+    producing CJK strings in the #US heap with no accompanying ASCII key.
+    This function captures those "orphan" strings and assigns deterministic
+    hash-based keys so they can be included in the translation pipeline.
+
+    Args:
+        dll_path: Path to the .NET DLL file.
+        paired_values: Set of CJK string values already captured by
+            `extract_dll_loc_strings` (excluded from results).
+        source_file_label: Value to set on `LocString.source_file`.
+        min_string_length: Minimum length for a string to be considered.
+
+    Returns:
+        Dictionary mapping synthetic key (`DLL/{stem}/{hash8}`) to LocString.
+    """
+    dotnet_file = _load_dotnet_pe(dll_path)
+    if not dotnet_file:
+        return {}
+
+    us_map = _build_us_heap_map(dotnet_file)
+    if not us_map:
+        return {}
+
+    stem = dll_path.stem
+    results: dict[str, LocString] = {}
+
+    for text in us_map.values():
+        if not _has_cjk(text):
+            continue
+        if _is_noise_string(text, min_string_length):
+            continue
+        if text in paired_values:
+            continue
+
+        hash8 = hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
+        key = f"DLL/{stem}/{hash8}"
+        if key not in results:
+            results[key] = LocString(
+                key=key,
+                type="Text",
+                desc="",
+                translations={"Chinese": text},
+                source_file=source_file_label,
+                untranslatable_reason=(
+                    "Hardcoded in the mod's compiled DLL. The game only"
+                    " recognizes localization keys registered through its API,"
+                    " so this text cannot be replaced via CSV translation."
+                    " The mod author would need to externalize it."
+                ),
+            )
+
+    return results
+
+
 def _is_noise_string(s: str, min_string_length: int) -> bool:
     """
     Determine if a string is likely .NET metadata noise rather than
@@ -326,5 +390,56 @@ def extract_mod_dll_loc_strings(
         loc_strings = extract_dll_loc_strings(dll_file, source_file_label=dll_file.name)
         all_strings.update(loc_strings)
         print(f"    Found {len(loc_strings)} localization key-value pairs")
+
+    return all_strings
+
+
+def extract_mod_dll_orphan_strings(
+    mod_path: Path,
+    skip_dlls: set[str],
+    paired_strings: dict[str, LocString],
+    min_string_length: int = 4,
+) -> dict[str, LocString]:
+    """Extract orphan CJK strings from a mod's DLL assemblies.
+
+    Captures CJK strings that were not found as key-value `ldstr` pairs
+    by `extract_mod_dll_loc_strings`. See `extract_dll_orphan_strings`
+    for background on why these strings exist.
+
+    Args:
+        mod_path: Path to the mod's root directory.
+        skip_dlls: Set of DLL filenames to skip.
+        paired_strings: LocStrings already captured by the paired extraction
+            pass. Their Chinese values are excluded from orphan results.
+        min_string_length: Minimum length for a string to be considered.
+
+    Returns:
+        Dictionary mapping synthetic key to LocString.
+    """
+    assemblies_dir = mod_path / "Assemblies"
+    if not assemblies_dir.exists():
+        return {}
+
+    paired_values: set[str] = set()
+    for loc_str in paired_strings.values():
+        val = loc_str.translations.get("Chinese", "")
+        if val:
+            paired_values.add(val)
+
+    all_strings: dict[str, LocString] = {}
+
+    for dll_file in assemblies_dir.glob("*.dll"):
+        if not _is_mod_dll(dll_file.name, skip_dlls):
+            continue
+
+        orphans = extract_dll_orphan_strings(
+            dll_file,
+            paired_values,
+            source_file_label=dll_file.name,
+            min_string_length=min_string_length,
+        )
+        all_strings.update(orphans)
+        if orphans:
+            print(f"    Found {len(orphans)} orphan CJK strings in {dll_file.name}")
 
     return all_strings
