@@ -22,6 +22,7 @@ from backend.data.suggestion_manager import add_suggestions, load_suggestions
 from backend.data.translation_memory import TranslationMemory
 from backend.data.translation_store import load_translations, save_translations_bulk
 from backend.main import get_provider
+from backend.data.mod_settings import load_source_language_override
 from backend.routes.helpers import (
     _adapter,
     _active_translations,
@@ -30,6 +31,7 @@ from backend.routes.helpers import (
     _find_mod_path,
     _merge_gdata_originals,
     _stamp_raw_responses,
+    resolve_source_language,
 )
 from backend.routes.llamacpp import _ensure_llamacpp_running
 from backend.routes.models import BatchTranslationRequest, TranslationRequest
@@ -65,9 +67,10 @@ async def estimate_translation(req: TranslationRequest):
     provider = get_provider(provider_name)
 
     # Group by language
+    lang_override = load_source_language_override(req.mod_id)
     by_lang = {}
     for key, loc_str in untranslated.items():
-        lang = _adapter.detect_source_language(loc_str)
+        lang = resolve_source_language(loc_str, lang_override)
         if lang not in by_lang:
             by_lang[lang] = []
         by_lang[lang].append((key, loc_str.translations.get(lang, "")))
@@ -133,10 +136,11 @@ async def estimate_all_translation_costs(request: Request):
             # Detect source language once per string to avoid redundant calls.
             # Fall back to Chinese for gdata/DLL strings that only have an
             # English key in their translations dict.
+            mod_lang_override = load_source_language_override(mod.mod_id)
             by_lang: dict[str, list[tuple[str, str]]] = {}
             entry_count = 0
             for key, loc_str in strings.items():
-                lang = _adapter.detect_source_language(loc_str)
+                lang = resolve_source_language(loc_str, mod_lang_override)
                 if lang is None:
                     english = loc_str.translations.get("English", "").strip()
                     if english:
@@ -228,9 +232,10 @@ async def preview_translation(req: TranslationRequest):
     character_context = char_ctx if any(char_ctx.values()) else None
     format_rules = _adapter.get_format_preservation_rules()
 
+    lang_override = load_source_language_override(req.mod_id)
     by_lang: dict[str, list] = {}
     for key, loc_str in untranslated.items():
-        lang = _adapter.detect_source_language(loc_str)
+        lang = resolve_source_language(loc_str, lang_override)
         if lang:
             if lang not in by_lang:
                 by_lang[lang] = []
@@ -394,9 +399,10 @@ async def translate_mod(req: TranslationRequest):
     all_translations: dict[str, str] = {}
     all_suggestions: list[dict] = []
 
+    lang_override = load_source_language_override(req.mod_id)
     by_lang: dict[str, list] = {}
     for key, loc_str in untranslated.items():
-        lang = _adapter.detect_source_language(loc_str)
+        lang = resolve_source_language(loc_str, lang_override)
         if lang:
             if lang not in by_lang:
                 by_lang[lang] = []
