@@ -133,6 +133,27 @@ def test_fix_oversized_row_merges_korean_with_commas():
     assert "中文" in fixed[col_indices["Chinese"]]
 
 
+def test_extract_mod_strings_keys_with_spaces(tmp_path):
+    """Keys containing spaces (e.g. character names) must not be merged."""
+    _write_csv(
+        tmp_path / "Localization" / "LangDataDB.csv",
+        [
+            "Buff/B_1_Name,Text,,영시,Spiritual vision,,灵视,靈視",
+            "Character/Suzakuin Momiji_name,Text,,스자쿠인 모미지,Suzakuin Momiji,,朱雀院红叶,朱雀院紅葉",
+            "Character/Suzakuin Momiji_PassiveName,Text,,신안극수,God's eye,,神眼极手,神眼極手",
+        ],
+    )
+    strings, _ = extract_mod_strings(tmp_path)
+    # Each key should be a separate entry.
+    assert "Buff/B_1_Name" in strings
+    assert "Character/Suzakuin Momiji_name" in strings
+    assert "Character/Suzakuin Momiji_PassiveName" in strings
+    # Values must not leak between entries.
+    assert strings["Buff/B_1_Name"].translations["Chinese"] == "灵视"
+    assert strings["Buff/B_1_Name"].translations["English"] == "Spiritual vision"
+    assert strings["Character/Suzakuin Momiji_name"].translations["Korean"] == "스자쿠인 모미지"
+
+
 def test_extract_mod_strings_handles_unquoted_commas(tmp_path):
     """End-to-end: a CSV with unquoted commas in Korean parses correctly."""
     # Real Chrono Ark CSVs have a trailing comma on every line, producing an

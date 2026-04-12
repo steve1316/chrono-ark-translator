@@ -156,7 +156,7 @@ def _parse_csv_content(file_path: Path) -> list[LocString]:
         List of LocString objects extracted from the file.
     """
     # regex for a valid key: starts with alphanumeric, no spaces, optional /
-    key_pattern = re.compile(r"^[A-Za-z0-9_\-\./]+$")
+    key_pattern = re.compile(r"^[A-Za-z0-9_\-\.]+/[A-Za-z0-9_\-\./ ]+$")
 
     results = []
 
