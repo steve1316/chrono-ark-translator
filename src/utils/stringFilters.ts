@@ -12,12 +12,8 @@ export type SortConfig = { key: SortField; direction: SortDirection }
 
 /**
  * Determine the display status for a string table row.
- *
- * Args:
- *     s: The localization string to evaluate.
- *
- * Returns:
- *     The row status used for badge rendering.
+ * @param s - The localization string to evaluate.
+ * @returns The row status used for badge rendering.
  */
 export function getRowStatus(s: LocString): RowStatus {
     if (s.untranslatable_reason) return "untranslatable"
@@ -28,12 +24,8 @@ export function getRowStatus(s: LocString): RowStatus {
 
 /**
  * Determine the background style for a string table row.
- *
- * Args:
- *     s: The localization string to evaluate.
- *
- * Returns:
- *     A CSS style object with backgroundColor, or undefined for default rows.
+ * @param s - The localization string to evaluate.
+ * @returns A CSS style object with backgroundColor, or undefined for default rows.
  */
 export function getRowStyle(s: LocString): React.CSSProperties | undefined {
     if (s.untranslatable_reason) return { backgroundColor: "rgba(148, 163, 184, 0.1)" }
@@ -46,14 +38,10 @@ export function getRowStyle(s: LocString): React.CSSProperties | undefined {
 /**
  * Filter strings by status tab and free-text search.
  * Rows with empty source text are always hidden.
- *
- * Args:
- *     strings: All localization strings.
- *     filter: The active filter tab.
- *     search: Free-text search query.
- *
- * Returns:
- *     Filtered array of strings.
+ * @param strings - All localization strings.
+ * @param filter - The active filter tab.
+ * @param search - Free-text search query.
+ * @returns Filtered array of strings.
  */
 export function filterStrings(strings: LocString[], filter: FilterTab, search: string): LocString[] {
     const q = search.toLowerCase()
@@ -84,13 +72,9 @@ export function filterStrings(strings: LocString[], filter: FilterTab, search: s
 /**
  * Sort strings by the given column and direction.
  * Returns a new sorted array (does not mutate).
- *
- * Args:
- *     strings: Array of strings to sort.
- *     config: Sort column and direction.
- *
- * Returns:
- *     Sorted copy of the array. Returns a shallow copy if direction is null.
+ * @param strings - Array of strings to sort.
+ * @param config - Sort column and direction.
+ * @returns Sorted copy of the array. Returns a shallow copy if direction is null.
  */
 export function sortStrings(strings: LocString[], config: SortConfig): LocString[] {
     const result = [...strings]
