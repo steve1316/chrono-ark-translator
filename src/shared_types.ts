@@ -70,6 +70,8 @@ export type LocString = {
     source_file: string
     /** Which translation provider produced this translation (e.g., "claude", "ollama", "manual"), or empty if unknown. */
     translated_by: string
+    /** If non-empty, this string cannot be translated via CSV and this field explains why. */
+    untranslatable_reason: string
 }
 
 /**

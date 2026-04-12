@@ -152,11 +152,16 @@ class ProgressTracker:
 
         diff = ProgressDiff()
 
-        # Build new hash map and detect empty sources.
+        # Build new hash map and detect empty/untranslatable sources.
         new_hashes = {}
-        empty_source_keys = set()
+        excluded_keys = set()
         for key, loc_str in current_strings.items():
             new_hashes[key] = self._hash_source_text(loc_str, langs)
+
+            # Untranslatable strings (e.g. hardcoded DLL text) don't count.
+            if loc_str.untranslatable_reason:
+                excluded_keys.add(key)
+                continue
 
             # If no source language has content, it's an empty source string.
             has_source = False
@@ -165,7 +170,7 @@ class ProgressTracker:
                     has_source = True
                     break
             if not has_source:
-                empty_source_keys.add(key)
+                excluded_keys.add(key)
 
         # Compare.
         current_keys = set(new_hashes.keys())
@@ -186,9 +191,9 @@ class ProgressTracker:
         # Save the updated snapshot.
         new_snapshot = {
             "hashes": new_hashes,
-            "translated": sorted((old_translated & current_keys) - empty_source_keys),
+            "translated": sorted((old_translated & current_keys) - excluded_keys),
             "last_updated": datetime.now(timezone.utc).isoformat(),
-            "total_keys": len(current_keys) - len(empty_source_keys),
+            "total_keys": len(current_keys) - len(excluded_keys),
         }
         self._save_snapshot(mod_id, new_snapshot)
 

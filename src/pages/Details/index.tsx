@@ -20,7 +20,6 @@ interface ModDetailProps {
     onBack: () => void
 }
 
-
 /**
  * Detail view for a specific mod, showing all translatable strings.
  * @param onBack - Callback to return to the dashboard.
@@ -1445,7 +1444,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                         {s.original_english}
                                                     </div>
                                                 )}
-                                                <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
+                                                <EditableCell
+                                                    value={s.english}
+                                                    onSave={(val) => handleSaveString(s.key, val)}
+                                                    placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."}
+                                                />
                                             </>
                                         )}
                                     </td>

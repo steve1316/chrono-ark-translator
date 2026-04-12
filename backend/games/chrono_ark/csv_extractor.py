@@ -463,6 +463,8 @@ def get_untranslated_strings(
     """
     untranslated = {}
     for key, loc_str in strings.items():
+        if loc_str.untranslatable_reason:
+            continue
         english = loc_str.translations.get("English", "").strip()
         if not english and detect_source_language(loc_str, source_languages) is not None:
             untranslated[key] = loc_str

@@ -273,6 +273,7 @@ async def get_mod_detail(mod_id: str):
                 "synced_english": english if is_synced else "",
                 "source_file": loc_str.source_file,
                 "translated_by": translation_providers.get(key, ""),
+                "untranslatable_reason": loc_str.untranslatable_reason,
             }
         )
 
