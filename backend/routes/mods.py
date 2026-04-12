@@ -22,8 +22,10 @@ from backend.routes.helpers import (
     _merge_gdata_originals,
     _get_mod_csv_paths,
     _recalculate_mod_progress,
+    resolve_source_language,
 )
-from backend.routes.models import TranslationUpdate, CharacterContext
+from backend.routes.models import TranslationUpdate, CharacterContext, SourceLanguageOverride
+from backend.data.mod_settings import load_source_language_override, save_source_language_override
 from backend.data.translation_store import (
     load_translations,
     update_single_translation,
@@ -243,10 +245,11 @@ async def get_mod_detail(mod_id: str):
     tracker.update(mod_id, strings, _adapter.source_languages)
 
     # Build result list and collect actually-translated keys.
+    lang_override = load_source_language_override(mod_id)
     translated_keys = []
     results = []
     for key, loc_str in strings.items():
-        source_lang = _adapter.detect_source_language(loc_str)
+        source_lang = resolve_source_language(loc_str, lang_override)
         source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
         english = loc_str.translations.get("English", "")
 
@@ -289,6 +292,7 @@ async def get_mod_detail(mod_id: str):
         "preview_image": f"/workshop/{mod_id}/{preview_img.name}" if preview_img else None,
         "strings": results,
         "duplicate_files": duplicate_files,
+        "source_language_override": lang_override,
     }
 
 
@@ -329,7 +333,8 @@ async def update_string(mod_id: str, update: TranslationUpdate):
         strings, _ = _adapter.extract_strings(matching[0].path)
         if update.key in strings:
             loc_str = strings[update.key]
-            source_lang = _adapter.detect_source_language(loc_str)
+            lang_override = load_source_language_override(mod_id)
+            source_lang = resolve_source_language(loc_str, lang_override)
             source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
 
             is_done = bool(update.english) or not source_text.strip()
@@ -417,9 +422,10 @@ async def clear_translations(mod_id: str):
     tracker.update(mod_id, strings, _adapter.source_languages)
 
     # Mark untranslated everything EXCEPT keys with empty sources.
+    lang_override = load_source_language_override(mod_id)
     done_keys = []
     for key, loc_str in strings.items():
-        source_lang = _adapter.detect_source_language(loc_str)
+        source_lang = resolve_source_language(loc_str, lang_override)
         source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
         if not source_text.strip():
             done_keys.append(key)
@@ -841,6 +847,35 @@ async def set_character_context(mod_id: str, ctx: CharacterContext):
         A dict with `{"status": "saved"}`.
     """
     save_character_context(mod_id, ctx.model_dump())
+    return {"status": "saved"}
+
+
+@router.get("/mods/{mod_id}/source-language")
+async def get_source_language(mod_id: str):
+    """Return the source language override for a mod.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with `source_language` set to the override language name,
+        or None if auto-detect is active.
+    """
+    return {"source_language": load_source_language_override(mod_id)}
+
+
+@router.post("/mods/{mod_id}/source-language")
+async def set_source_language(mod_id: str, body: SourceLanguageOverride):
+    """Save a source language override for a mod.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        body: The override payload with `source_language`.
+
+    Returns:
+        A dict with `{"status": "saved"}`.
+    """
+    save_source_language_override(mod_id, body.source_language)
     return {"status": "saved"}
 
 
