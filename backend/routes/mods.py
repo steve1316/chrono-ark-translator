@@ -358,6 +358,7 @@ async def sync_mod(mod_id: str):
     mod_path = _find_mod_path(mod_id)
 
     strings, _ = _adapter.extract_strings(mod_path)
+    _merge_gdata_originals(mod_id, strings)
     output_path = config.STORAGE_PATH / "mods" / mod_id / "source.json"
     save_extracted_strings(strings, output_path)
 

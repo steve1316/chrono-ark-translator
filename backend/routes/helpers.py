@@ -161,12 +161,12 @@ def _find_mod_path(mod_id: str) -> Path:
 
 
 def _merge_gdata_originals(mod_id: str, strings: dict[str, "LocString"]) -> None:
-    """Restore original Chinese source text for gdata entries from backup.
+    """Restore original source text for gdata entries from backup.
 
     After exporting translations into gdata JSON files, re-extraction
-    picks up the English text but loses the Chinese source.  This helper
-    reads the backed-up originals and merges the Chinese text back into
-    any entry that only has English.
+    picks up the English text but loses the original source language.
+    This helper reads the backed-up originals and merges any missing
+    source-language translations back into the live entries.
     """
     from backend.games.chrono_ark import gdata_extractor
 
@@ -179,13 +179,14 @@ def _merge_gdata_originals(mod_id: str, strings: dict[str, "LocString"]) -> None
     for json_file in sorted(backup_dir.glob("*.json")):
         originals.update(gdata_extractor._extract_gdata_file(json_file))
 
-    # Merge: if the live entry has only English, add the original Chinese.
+    # Merge: restore any source-language translations missing from live.
     for key, orig in originals.items():
         if key not in strings:
             continue
         live = strings[key]
-        if "Chinese" not in live.translations and "Chinese" in orig.translations:
-            live.translations["Chinese"] = orig.translations["Chinese"]
+        for lang, text in orig.translations.items():
+            if lang != "English" and lang not in live.translations:
+                live.translations[lang] = text
 
 
 def _find_mod_preview_image(mod_path: Path) -> Optional[Path]:
