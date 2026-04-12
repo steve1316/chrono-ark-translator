@@ -105,6 +105,17 @@ class CharacterContext(BaseModel):
     background: str = ""
 
 
+class SourceLanguageOverride(BaseModel):
+    """Payload for setting a per-mod source language override.
+
+    Attributes:
+        source_language: Language name to use (e.g. `"Korean"`), or None
+            to revert to auto-detection.
+    """
+
+    source_language: Optional[str] = None
+
+
 class SettingsResponse(BaseModel):
     """Current application settings returned by GET /api/settings.
 
