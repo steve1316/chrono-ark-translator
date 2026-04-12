@@ -15,6 +15,11 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 
+# ── Server ────────────────────────────────────────────────────────────────────
+
+# Port for the FastAPI backend (also consumed by the Vite frontend via define).
+API_PORT = int(os.environ.get("CATL_API_PORT", "8008"))
+
 # ── Paths ──────────────────────────────────────────────────────────────────────
 
 # Local storage directory for extracted data, translations, and glossary.

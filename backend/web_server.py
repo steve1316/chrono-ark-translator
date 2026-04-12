@@ -11,6 +11,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from backend import config
 from backend.routes.helpers import _adapter
 from backend.routes import mods, translation, glossary, ollama, llamacpp, settings
 
@@ -46,7 +47,7 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=8000,
+        port=config.API_PORT,
         log_config={
             "version": 1,
             "disable_existing_loggers": False,
