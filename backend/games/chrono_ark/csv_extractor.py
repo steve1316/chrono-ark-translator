@@ -229,6 +229,12 @@ def _parse_csv_content(file_path: Path) -> list[LocString]:
         if not key:
             continue
 
+        # Skip DLL orphan keys that were erroneously written to CSV by a
+        # prior export.  These are untranslatable and must only appear via
+        # the DLL orphan extraction pass (which sets untranslatable_reason).
+        if key.startswith("DLL/"):
+            continue
+
         entry_type = row[col_indices["Type"]].strip() if "Type" in col_indices and col_indices["Type"] < len(row) else ""
         desc = row[col_indices["Desc"]].strip() if "Desc" in col_indices and col_indices["Desc"] < len(row) else ""
 

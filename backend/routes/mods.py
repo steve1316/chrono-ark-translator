@@ -657,6 +657,9 @@ async def export_mod(mod_id: str, resync: bool = False):
     gdata_translations: dict[str, str] = {}
     by_source: dict[str, list] = {}
     for key, loc_str in strings.items():
+        # Skip untranslatable strings — the game cannot use them.
+        if loc_str.untranslatable_reason:
+            continue
         source = loc_str.source_file or _adapter.csv_for_key(loc_str.key)
         if source.lower().endswith(".json"):
             english = loc_str.translations.get("English", "")
