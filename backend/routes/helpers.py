@@ -4,6 +4,8 @@ Centralises module-level singletons (game adapter, cancel-event dicts,
 env-file path) and pure-logic helpers that multiple routers depend on.
 """
 
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import json
@@ -11,13 +13,17 @@ import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from backend.models import LocString
 
 from fastapi import HTTPException
 
 from backend import config
 from backend.games.registry import get_adapter
 from backend.games.base import GameAdapter
+from backend.data.mod_settings import load_source_language_override
 from backend.data.progress_tracker import ProgressTracker
 from backend.data.translation_store import load_translations
 
@@ -40,6 +46,27 @@ _ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
+
+
+def resolve_source_language(
+    loc_str: LocString,
+    override: str | None,
+) -> str | None:
+    """Determine source language for a string, respecting a per-mod override.
+
+    If an override is set and the string has content in that language column,
+    the override is used. Otherwise falls back to auto-detection.
+
+    Args:
+        loc_str: The localization string to check.
+        override: Per-mod language override, or None for auto-detect.
+
+    Returns:
+        The source language name, or None if no source text is found.
+    """
+    if override and override in loc_str.translations and loc_str.translations[override]:
+        return override
+    return _adapter.detect_source_language(loc_str)
 
 
 def _stamp_raw_responses(responses: list[dict]) -> list[dict]:
@@ -341,9 +368,10 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
     tracker.update(mod_id, strings, _adapter.source_languages)
 
     # Compute translated keys the same way get_mod_detail does.
+    lang_override = load_source_language_override(mod_id)
     translated_keys = []
     for key, loc_str in strings.items():
-        source_lang = _adapter.detect_source_language(loc_str)
+        source_lang = resolve_source_language(loc_str, lang_override)
         source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
         english = loc_str.translations.get("English", "")
         if source_text.strip() and bool(english):
