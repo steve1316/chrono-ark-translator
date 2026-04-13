@@ -87,6 +87,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [sourceLangOverride, setSourceLangOverride] = useState<string | null>(null)
 
     const [exporting, setExporting] = useState(false)
+    const [scanning, setScanning] = useState(false)
     const [showApiResponses, setShowApiResponses] = useState(false)
     const [replacePreview, setReplacePreview] = useState<{
         oldTerm: string
@@ -789,6 +790,32 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 </span>
                             </button>
                         )}
+                        <button
+                            className="btn btn-outline"
+                            disabled={scanning}
+                            onClick={async () => {
+                                setScanning(true)
+                                try {
+                                    const res = await fetch(`${API_BASE}/mods/${modId}/glossary/suggestions/scan`, { method: "POST" })
+                                    if (res.ok) {
+                                        const data = await res.json()
+                                        if (data.new > 0) {
+                                            fetchSuggestions()
+                                            setTranslateBanner({ type: "success", message: `Found ${data.new} new glossary term suggestion(s).` })
+                                        } else {
+                                            setTranslateBanner({ type: "success", message: "No new glossary terms found." })
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.error("Failed to scan for terms:", err)
+                                } finally {
+                                    setScanning(false)
+                                }
+                            }}
+                            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+                        >
+                            <FaBook /> {scanning ? "Scanning..." : "Scan for Terms"}
+                        </button>
                         <button className="btn btn-outline" onClick={fetchApiResponses} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             API Responses
                         </button>
