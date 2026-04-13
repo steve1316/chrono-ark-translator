@@ -1037,6 +1037,31 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 </button>
                                 <button
                                     className="btn btn-outline"
+                                    style={{ padding: "0.2rem 0.6rem", fontSize: "0.75rem", color: "var(--accent-primary)", borderColor: "rgba(138,180,248,0.3)" }}
+                                    onClick={() => {
+                                        const affected: { key: string; old_text: string; new_text: string }[] = []
+                                        for (const [english, info] of Object.entries(modGlossary)) {
+                                            const sourceText = Object.values(info.source_mappings || {})[0] || ""
+                                            if (!sourceText) continue
+                                            for (const s of strings) {
+                                                if (affected.some((a) => a.key === s.key)) continue
+                                                if (s.english) continue
+                                                if (s.source === sourceText) {
+                                                    affected.push({ key: s.key, old_text: "", new_text: english })
+                                                }
+                                            }
+                                        }
+                                        if (affected.length === 0) {
+                                            setTranslateBanner({ type: "success", message: "No untranslated strings match glossary terms." })
+                                        } else {
+                                            setReplacePreview({ oldTerm: "", newTerm: "glossary terms", sourceText: "", needsInput: false, affected })
+                                        }
+                                    }}
+                                >
+                                    Apply All
+                                </button>
+                                <button
+                                    className="btn btn-outline"
                                     style={{ padding: "0.2rem 0.6rem", fontSize: "0.75rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
                                     onClick={() => {
                                         setConfirmModal({
