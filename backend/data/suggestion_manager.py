@@ -57,11 +57,12 @@ def add_suggestions(mod_id: str, new_suggestions: list[dict], storage_path: Opti
         storage_path: Base storage path override. Defaults to config.STORAGE_PATH.
     """
     existing = load_suggestions(mod_id, storage_path)
-    existing_terms = {s["english"] for s in existing if "english" in s}
+    existing_terms = {s["english"].lower() for s in existing if "english" in s}
     for suggestion in new_suggestions:
-        if suggestion.get("english") and suggestion["english"] not in existing_terms:
+        term = suggestion.get("english", "")
+        if term and term.lower() not in existing_terms:
             existing.append(suggestion)
-            existing_terms.add(suggestion["english"])
+            existing_terms.add(term.lower())
     save_suggestions(mod_id, existing, storage_path)
 
 
