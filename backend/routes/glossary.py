@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from backend.data.glossary_manager import (
     add_glossary_term,
+    extract_name_key_suggestions,
     load_glossary,
     load_mod_glossary,
     merge_glossaries,
@@ -11,12 +12,15 @@ from backend.data.glossary_manager import (
     save_mod_glossary,
 )
 from backend.data.history_manager import create_backup
+from backend.data.mod_settings import load_source_language_override
 from backend.data.suggestion_manager import (
+    add_suggestions,
     load_suggestions,
     remove_suggestions,
     save_suggestions,
 )
 from backend.data.translation_store import load_translations, replace_in_translations
+from backend.routes.helpers import _adapter, _find_mod_path, _merge_gdata_originals, resolve_source_language
 from backend.routes.models import (
     GlossaryReplacePreview,
     GlossaryTerm,
@@ -235,3 +239,64 @@ async def dismiss_suggestions(mod_id: str, action: SuggestionAction):
     else:
         remove_suggestions(mod_id, action.terms)
     return {"status": "success"}
+
+
+@router.post("/mods/{mod_id}/glossary/suggestions/scan")
+async def scan_for_suggestions(mod_id: str):
+    """Scan translated strings for glossary-worthy terms using name-key detection.
+
+    Runs the same `extract_name_key_suggestions` logic that normally fires
+    after AI translation, but against all already-translated strings. This
+    lets the user discover terms without triggering a translation run.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with `status` and the count of `new` suggestions found.
+    """
+    mod_path = _find_mod_path(mod_id)
+    strings, _ = _adapter.extract_strings(mod_path)
+    _merge_gdata_originals(mod_id, strings)
+
+    saved = load_translations(mod_id)
+    for key, english in saved.items():
+        if key in strings:
+            strings[key].translations["English"] = english
+
+    lang_override = load_source_language_override(mod_id)
+    mod_glossary = load_mod_glossary(mod_id)
+    existing_suggestions = load_suggestions(mod_id)
+
+    # Build a translations dict and group translated keys by source language.
+    translations: dict[str, str] = {}
+    by_lang: dict[str, list[str]] = {}
+    for key, loc_str in strings.items():
+        english = loc_str.translations.get("English", "").strip()
+        if not english:
+            continue
+        source_lang = resolve_source_language(loc_str, lang_override)
+        if not source_lang:
+            continue
+        translations[key] = english
+        by_lang.setdefault(source_lang, []).append(key)
+
+    new_suggestions: list[dict] = []
+    combined_existing = existing_suggestions + new_suggestions
+    for lang, keys in by_lang.items():
+        found = extract_name_key_suggestions(
+            translated_keys=keys,
+            strings=strings,
+            translations=translations,
+            source_lang=lang,
+            existing_suggestions=combined_existing,
+            mod_glossary=mod_glossary,
+            term_categories=_adapter.get_glossary_categories(),
+        )
+        new_suggestions.extend(found)
+        combined_existing.extend(found)
+
+    if new_suggestions:
+        add_suggestions(mod_id, new_suggestions)
+
+    return {"status": "success", "new": len(new_suggestions)}
