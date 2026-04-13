@@ -27,6 +27,7 @@ _MECHANIC_PREFIXES = ("Battle/Keyword/", "Battle/SkillTooltip/")
 _MECHANIC_EXACT_KEYS: dict[str, str] = {
     "System/Debuff": "Debuff",
     "UI/CharStat/PartyStat_MP": "Mana",
+    "UI/Battle/Buff/Barrier": "Barrier",
 }
 
 # Manual mechanic terms that appear within other strings but have no
