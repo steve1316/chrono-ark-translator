@@ -182,8 +182,18 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                                     {/* Left side: term details. */}
                                     <div>
-                                        {/* English translation proposed by the AI. */}
-                                        <div style={{ fontWeight: 600, fontSize: "1.1rem" }}>{suggestion.english}</div>
+                                        {/* English translation proposed by the AI, or edit showing old → new. */}
+                                        <div style={{ fontWeight: 600, fontSize: "1.1rem" }}>
+                                            {suggestion.edit_of ? (
+                                                <>
+                                                    <span style={{ textDecoration: "line-through", color: "var(--text-dim)" }}>{suggestion.edit_of}</span>
+                                                    <span style={{ margin: "0 0.5rem", color: "var(--text-dim)" }}>&rarr;</span>
+                                                    {suggestion.english}
+                                                </>
+                                            ) : (
+                                                suggestion.english
+                                            )}
+                                        </div>
                                         {/* Original source text and its language. */}
                                         <div style={{ color: "var(--text-dim)", marginTop: "0.25rem" }}>
                                             {suggestion.source_lang}: {suggestion.source}

@@ -134,6 +134,8 @@ export type TermSuggestion = {
     category: string
     /** Human-readable explanation of why this term was suggested. */
     reason: string
+    /** If this is an edit suggestion, the original term being replaced. */
+    edit_of?: string
 }
 
 /**
