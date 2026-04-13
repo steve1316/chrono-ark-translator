@@ -268,6 +268,84 @@ def extract_name_key_suggestions(
     return new_suggestions
 
 
+# Categories whose terms should be title-cased (proper nouns / names).
+_TITLE_CASE_CATEGORIES = {"characters", "names", "skills", "passives", "items", "buffs/debuffs"}
+
+# Lowercase words that should stay lowercase in title case (articles, etc.).
+_TITLE_CASE_MINOR_WORDS = {"a", "an", "the", "and", "but", "or", "nor", "for", "in", "on", "at", "to", "of", "by", "is"}
+
+
+def _title_case(text: str) -> str:
+    """Convert text to title case, keeping minor words lowercase unless first.
+
+    Args:
+        text: The input text to title-case.
+
+    Returns:
+        The title-cased text.
+    """
+    words = text.split()
+    result = []
+    for i, word in enumerate(words):
+        if i == 0 or word.lower() not in _TITLE_CASE_MINOR_WORDS:
+            result.append(word.capitalize())
+        else:
+            result.append(word.lower())
+    return " ".join(result)
+
+
+def suggest_glossary_edits(
+    mod_glossary: dict,
+    existing_suggestions: list[dict],
+) -> list[dict]:
+    """Suggest edits to existing glossary terms, such as title-casing names.
+
+    Scans glossary terms in name-related categories and suggests title-cased
+    versions for terms that aren't already title-cased.
+
+    Args:
+        mod_glossary: The mod's current glossary dict.
+        existing_suggestions: Already-pending suggestion dicts for dedup.
+
+    Returns:
+        List of edit suggestion dicts with an `edit_of` field referencing
+        the original term.
+    """
+    existing_english = {s.get("english", "").lower() for s in existing_suggestions}
+    terms = mod_glossary.get("terms", {})
+    edits: list[dict] = []
+
+    for english, info in terms.items():
+        category = info.get("category", "")
+        if category not in _TITLE_CASE_CATEGORIES:
+            continue
+
+        title_cased = _title_case(english)
+        if title_cased == english:
+            continue
+
+        if title_cased.lower() in existing_english:
+            continue
+
+        mappings = info.get("source_mappings", {})
+        source_lang = next(iter(mappings), "")
+        source_text = mappings.get(source_lang, "") if source_lang else ""
+
+        edits.append(
+            {
+                "english": title_cased,
+                "source": source_text,
+                "source_lang": source_lang,
+                "category": category,
+                "reason": f"Title case: '{english}' -> '{title_cased}'",
+                "edit_of": english,
+            }
+        )
+        existing_english.add(title_cased.lower())
+
+    return edits
+
+
 def load_glossary(path: Optional[Path] = None) -> dict:
     """
     Load the glossary from a JSON file.
