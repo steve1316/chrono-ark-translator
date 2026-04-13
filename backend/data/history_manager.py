@@ -45,16 +45,7 @@ def create_backup(mod_id: str, reason: str, storage_path: Optional[Path] = None)
     base = storage_path or config.STORAGE_PATH
     mod_dir = base / "mods" / mod_id
 
-    # Only back up if there's meaningful data
-    translations_path = mod_dir / "translations.json"
-    if not translations_path.exists():
-        return None
-
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    backup_dir = _history_dir(mod_id, storage_path) / timestamp
-    backup_dir.mkdir(parents=True, exist_ok=True)
-
-    # Copy files that exist
+    # Only back up if there's meaningful data.
     files_to_backup = [
         "translations.json",
         "glossary.json",
@@ -63,7 +54,17 @@ def create_backup(mod_id: str, reason: str, storage_path: Optional[Path] = None)
         "synced_keys.json",
         "last_csv_hash.json",
         "pre_export_english.json",
+        "character_context.json",
+        "mod_settings.json",
     ]
+    if not any((mod_dir / f).exists() for f in files_to_backup):
+        return None
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    backup_dir = _history_dir(mod_id, storage_path) / timestamp
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy files that exist.
     backed_up = False
     for filename in files_to_backup:
         src = mod_dir / filename
