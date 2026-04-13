@@ -308,6 +308,7 @@ async def update_string(mod_id: str, update: TranslationUpdate):
     Returns:
         A dict with `{"status": "success"}` on success.
     """
+    create_backup(mod_id, "Before manual translation edit")
     update_single_translation(mod_id, update.key, update.english)
 
     # Track that this key was manually edited.
@@ -361,6 +362,8 @@ async def sync_mod(mod_id: str):
         HTTPException: 404 if no mod with the given id is found.
     """
     mod_path = _find_mod_path(mod_id)
+
+    create_backup(mod_id, "Before sync")
 
     strings, _ = _adapter.extract_strings(mod_path)
     _merge_gdata_originals(mod_id, strings)
@@ -599,6 +602,9 @@ async def export_mod(mod_id: str, resync: bool = False):
         HTTPException: 404 if the mod is not found.
     """
     mod_path = _find_mod_path(mod_id)
+
+    reason = "Before re-sync export" if resync else "Before export"
+    create_backup(mod_id, reason)
 
     original_csv_dir = config.STORAGE_PATH / "mods" / mod_id / "original_csvs"
     original_gdata_dir = config.STORAGE_PATH / "mods" / mod_id / "original_gdata"
@@ -846,6 +852,7 @@ async def set_character_context(mod_id: str, ctx: CharacterContext):
     Returns:
         A dict with `{"status": "saved"}`.
     """
+    create_backup(mod_id, "Before updating character context")
     save_character_context(mod_id, ctx.model_dump())
     return {"status": "saved"}
 
