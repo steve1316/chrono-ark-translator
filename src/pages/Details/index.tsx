@@ -1002,36 +1002,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                 </div>
             )}
 
-            {/* --- Search & Filter Bar --- */}
-            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
-                <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-                    <div style={{ flex: 1 }}>
-                        <input
-                            type="text"
-                            placeholder="Search keys or text..."
-                            className="btn-outline"
-                            style={{ width: "100%", padding: "0.75rem", borderRadius: "8px", background: "rgba(0,0,0,0.2)" }}
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
-                    </div>
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                        <button className={`btn ${filter === "all" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("all")}>
-                            All
-                        </button>
-                        <button className={`btn ${filter === "missing" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("missing")}>
-                            Missing
-                        </button>
-                        <button className={`btn ${filter === "pending" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("pending")}>
-                            Pending
-                        </button>
-                        <button className={`btn ${filter === "synced" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("synced")}>
-                            Synced
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             {/* --- Glossary Panel ---
                 Inline panel for managing mod-specific glossary terms.
                 Users can add new terms (English + source text + language + category)
@@ -1414,6 +1384,36 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                     )}
                 </div>
             )}
+
+            {/* --- Search & Filter Bar --- */}
+            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
+                <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                    <div style={{ flex: 1 }}>
+                        <input
+                            type="text"
+                            placeholder="Search keys or text..."
+                            className="btn-outline"
+                            style={{ width: "100%", padding: "0.75rem", borderRadius: "8px", background: "rgba(0,0,0,0.2)" }}
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                        <button className={`btn ${filter === "all" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("all")}>
+                            All
+                        </button>
+                        <button className={`btn ${filter === "missing" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("missing")}>
+                            Missing
+                        </button>
+                        <button className={`btn ${filter === "pending" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("pending")}>
+                            Pending
+                        </button>
+                        <button className={`btn ${filter === "synced" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("synced")}>
+                            Synced
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             {/* --- Strings Table ---
                 The main data table showing all localization strings. Features:
