@@ -275,23 +275,38 @@ _TITLE_CASE_CATEGORIES = {"characters", "names", "skills", "passives", "items", 
 _TITLE_CASE_MINOR_WORDS = {"a", "an", "the", "and", "but", "or", "nor", "for", "in", "on", "at", "to", "of", "by", "is"}
 
 
+_TAG_PATTERN = re.compile(r"(<[^>]+>)")
+
+
 def _title_case(text: str) -> str:
-    """Convert text to title case, keeping minor words lowercase unless first.
+    """Convert text to title case, preserving markup tags like `<color=...>`.
+
+    Tags are kept as-is. Only the text segments between tags are title-cased,
+    with minor words kept lowercase unless they are the first visible word.
 
     Args:
         text: The input text to title-case.
 
     Returns:
-        The title-cased text.
+        The title-cased text with tags preserved.
     """
-    words = text.split()
+    parts = _TAG_PATTERN.split(text)
     result = []
-    for i, word in enumerate(words):
-        if i == 0 or word.lower() not in _TITLE_CASE_MINOR_WORDS:
-            result.append(word.capitalize())
-        else:
-            result.append(word.lower())
-    return " ".join(result)
+    first_word_seen = False
+    for part in parts:
+        if _TAG_PATTERN.fullmatch(part):
+            result.append(part)
+            continue
+        words = part.split()
+        cased = []
+        for word in words:
+            if not first_word_seen or word.lower() not in _TITLE_CASE_MINOR_WORDS:
+                cased.append(word.capitalize())
+            else:
+                cased.append(word.lower())
+            first_word_seen = True
+        result.append(" ".join(cased))
+    return "".join(result)
 
 
 def suggest_glossary_edits(

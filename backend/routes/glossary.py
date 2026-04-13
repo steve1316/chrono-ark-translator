@@ -346,13 +346,31 @@ async def scan_for_suggestions(mod_id: str):
         new_suggestions.extend(found)
         combined_existing.extend(found)
 
-    # Suggest edits (e.g. title-casing) for existing glossary terms.
-    edit_suggestions = suggest_glossary_edits(
-        mod_glossary, existing_suggestions + new_suggestions,
-    )
-    new_suggestions.extend(edit_suggestions)
-
     if new_suggestions:
         add_suggestions(mod_id, new_suggestions)
 
     return {"status": "success", "new": len(new_suggestions)}
+
+
+@router.post("/mods/{mod_id}/glossary/suggest-edits")
+async def suggest_edits(mod_id: str):
+    """Suggest edits to existing glossary terms, such as title-casing names.
+
+    Scans the mod's glossary for terms in name-related categories that
+    aren't properly title-cased and adds them as edit suggestions.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with `status` and the count of `new` edit suggestions.
+    """
+    mod_glossary = load_mod_glossary(mod_id)
+    existing_suggestions = load_suggestions(mod_id)
+
+    edits = suggest_glossary_edits(mod_glossary, existing_suggestions)
+
+    if edits:
+        add_suggestions(mod_id, edits)
+
+    return {"status": "success", "new": len(edits)}

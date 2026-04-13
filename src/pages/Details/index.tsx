@@ -1012,18 +1012,42 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                         <h3 style={{ margin: 0 }}>Mod Glossary Terms</h3>
                         {Object.keys(modGlossary).length > 0 && (
-                            <button
-                                className="btn btn-outline"
-                                style={{ padding: "0.2rem 0.6rem", fontSize: "0.75rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
-                                onClick={() => {
-                                    setConfirmModal({
-                                        type: "delete-all-glossary",
-                                        message: `Delete all ${Object.keys(modGlossary).length} glossary term(s)?`,
-                                    })
-                                }}
-                            >
-                                Delete All
-                            </button>
+                            <div style={{ display: "flex", gap: "0.5rem" }}>
+                                <button
+                                    className="btn btn-outline"
+                                    style={{ padding: "0.2rem 0.6rem", fontSize: "0.75rem" }}
+                                    onClick={async () => {
+                                        try {
+                                            const res = await fetch(`${API_BASE}/mods/${modId}/glossary/suggest-edits`, { method: "POST" })
+                                            if (res.ok) {
+                                                const data = await res.json()
+                                                if (data.new > 0) {
+                                                    fetchSuggestions()
+                                                    setTranslateBanner({ type: "success", message: `Found ${data.new} edit suggestion(s).` })
+                                                } else {
+                                                    setTranslateBanner({ type: "success", message: "No edits to suggest." })
+                                                }
+                                            }
+                                        } catch (err) {
+                                            console.error("Failed to suggest edits:", err)
+                                        }
+                                    }}
+                                >
+                                    Suggest Edits
+                                </button>
+                                <button
+                                    className="btn btn-outline"
+                                    style={{ padding: "0.2rem 0.6rem", fontSize: "0.75rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
+                                    onClick={() => {
+                                        setConfirmModal({
+                                            type: "delete-all-glossary",
+                                            message: `Delete all ${Object.keys(modGlossary).length} glossary term(s)?`,
+                                        })
+                                    }}
+                                >
+                                    Delete All
+                                </button>
+                            </div>
                         )}
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
