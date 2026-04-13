@@ -4,8 +4,6 @@ import json
 import os
 import shutil
 import subprocess
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
@@ -308,7 +306,7 @@ async def update_string(mod_id: str, update: TranslationUpdate):
     Returns:
         A dict with `{"status": "success"}` on success.
     """
-    create_backup(mod_id, "Before manual translation edit")
+    create_backup(mod_id, f"Before manual edit of '{update.key}'")
     update_single_translation(mod_id, update.key, update.english)
 
     # Track that this key was manually edited.
