@@ -88,6 +88,7 @@ body {
     margin: 0;
     padding: 2rem;
     width: 100%;
+    min-width: 0;
 }
 
 .dashboard-header {
@@ -452,6 +453,8 @@ th {
 
 .sidebar {
     width: 280px;
+    min-width: 280px;
+    flex-shrink: 0;
     border-right: 1px solid var(--glass-border);
     padding: 2rem 1.5rem;
     display: flex;
