@@ -742,7 +742,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 </select>
                             </div>
                             <p>
-                                {strings.filter((s) => s.source.trim() && !s.untranslatable_reason && s.is_translated).length} / {strings.filter((s) => s.source.trim() && !s.untranslatable_reason).length} total strings translated
+                                {strings.filter((s) => s.source.trim() && !s.untranslatable_reason && s.is_translated).length} /{" "}
+                                {strings.filter((s) => s.source.trim() && !s.untranslatable_reason).length} total strings translated
                             </p>
                         </div>
                     </div>
@@ -1789,11 +1790,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
                                                 <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{item.key}</div>
                                                 <button
-                                                    onClick={() =>
-                                                        setReplacePreview((prev) =>
-                                                            prev ? { ...prev, affected: prev.affected.filter((a) => a.key !== item.key) } : null
-                                                        )
-                                                    }
+                                                    onClick={() => setReplacePreview((prev) => (prev ? { ...prev, affected: prev.affected.filter((a) => a.key !== item.key) } : null))}
                                                     style={{
                                                         background: "none",
                                                         border: "none",
