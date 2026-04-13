@@ -87,6 +87,7 @@ async def update_mod_glossary(mod_id: str, term: ModGlossaryTerm):
     Returns:
         A dict with `{"status": "success"}`.
     """
+    create_backup(mod_id, f"Before adding glossary term '{term.english}'")
     glossary = load_mod_glossary(mod_id)
     add_glossary_term(glossary, term.english, term.source_mappings, term.category)
     save_mod_glossary(mod_id, glossary)
@@ -108,6 +109,7 @@ async def delete_mod_glossary_term(mod_id: str, term: str):
     """
     glossary = load_mod_glossary(mod_id)
     if term in glossary.get("terms", {}):
+        create_backup(mod_id, f"Before removing glossary term '{term}'")
         del glossary["terms"][term]
         save_mod_glossary(mod_id, glossary)
     return {"status": "success"}
@@ -129,11 +131,15 @@ async def delete_mod_glossary_terms(mod_id: str, action: SuggestionAction):
     terms = glossary.get("terms", {})
     if action.all:
         count = len(terms)
+        if count > 0:
+            create_backup(mod_id, "Before deleting all glossary terms")
         glossary["terms"] = {}
     else:
         count = 0
         for term in action.terms:
             if term in terms:
+                if count == 0:
+                    create_backup(mod_id, "Before removing glossary term(s)")
                 del terms[term]
                 count += 1
     save_mod_glossary(mod_id, glossary)
@@ -152,6 +158,8 @@ async def delete_all_mod_glossary_terms(mod_id: str):
     """
     glossary = load_mod_glossary(mod_id)
     count = len(glossary.get("terms", {}))
+    if count > 0:
+        create_backup(mod_id, "Before deleting all glossary terms")
     glossary["terms"] = {}
     save_mod_glossary(mod_id, glossary)
     return {"status": "success", "deleted": count}
@@ -252,6 +260,9 @@ async def accept_suggestions(mod_id: str, action: SuggestionAction):
     glossary = load_mod_glossary(mod_id)
 
     terms_to_accept = {s["english"] for s in suggestions} if action.all else set(action.terms)
+
+    if terms_to_accept:
+        create_backup(mod_id, "Before accepting glossary suggestions")
 
     for suggestion in suggestions:
         if suggestion.get("english") in terms_to_accept:
