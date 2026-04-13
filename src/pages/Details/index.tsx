@@ -1786,7 +1786,28 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                             key={item.key}
                                             style={{ padding: "0.75rem", marginBottom: "0.5rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}
                                         >
-                                            <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", marginBottom: "0.25rem" }}>{item.key}</div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+                                                <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{item.key}</div>
+                                                <button
+                                                    onClick={() =>
+                                                        setReplacePreview((prev) =>
+                                                            prev ? { ...prev, affected: prev.affected.filter((a) => a.key !== item.key) } : null
+                                                        )
+                                                    }
+                                                    style={{
+                                                        background: "none",
+                                                        border: "none",
+                                                        color: "var(--text-dim)",
+                                                        cursor: "pointer",
+                                                        fontSize: "1.1rem",
+                                                        padding: "0 0.25rem",
+                                                        lineHeight: 1,
+                                                    }}
+                                                    title="Dismiss this row"
+                                                >
+                                                    &times;
+                                                </button>
+                                            </div>
                                             {item.old_text !== item.new_text ? (
                                                 <>
                                                     <div style={{ marginBottom: "0.25rem" }}>
