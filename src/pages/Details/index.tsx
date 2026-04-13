@@ -1388,15 +1388,36 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             {/* --- Search & Filter Bar --- */}
             <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
                 <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, position: "relative" }}>
                         <input
                             type="text"
                             placeholder="Search keys or text..."
                             className="btn-outline"
-                            style={{ width: "100%", padding: "0.75rem", borderRadius: "8px", background: "rgba(0,0,0,0.2)" }}
+                            style={{ width: "100%", padding: "0.75rem", paddingRight: "2.5rem", borderRadius: "8px", background: "rgba(0,0,0,0.2)", boxSizing: "border-box" }}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
+                        {search && (
+                            <button
+                                onClick={() => setSearch("")}
+                                style={{
+                                    position: "absolute",
+                                    right: "0.5rem",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    background: "none",
+                                    border: "none",
+                                    color: "var(--text-dim)",
+                                    cursor: "pointer",
+                                    fontSize: "1.1rem",
+                                    padding: "0.25rem",
+                                    lineHeight: 1,
+                                }}
+                                title="Clear search"
+                            >
+                                &times;
+                            </button>
+                        )}
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem" }}>
                         <button className={`btn ${filter === "all" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("all")}>
