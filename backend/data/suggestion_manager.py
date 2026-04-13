@@ -5,9 +5,12 @@ Stores suggestions per mod until the user accepts or dismisses them.
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Optional
 from backend import config
+
+_TAG_RE = re.compile(r"<[^>]+>")
 
 
 def load_suggestions(mod_id: str, storage_path: Optional[Path] = None) -> list[dict]:
@@ -57,12 +60,13 @@ def add_suggestions(mod_id: str, new_suggestions: list[dict], storage_path: Opti
         storage_path: Base storage path override. Defaults to config.STORAGE_PATH.
     """
     existing = load_suggestions(mod_id, storage_path)
-    existing_terms = {s["english"].lower() for s in existing if "english" in s}
+    existing_terms = {_TAG_RE.sub("", s["english"]).lower() for s in existing if "english" in s}
     for suggestion in new_suggestions:
         term = suggestion.get("english", "")
-        if term and term.lower() not in existing_terms:
+        stripped = _TAG_RE.sub("", term).lower()
+        if term and stripped not in existing_terms:
             existing.append(suggestion)
-            existing_terms.add(term.lower())
+            existing_terms.add(stripped)
     save_suggestions(mod_id, existing, storage_path)
 
 

@@ -228,8 +228,8 @@ def extract_name_key_suggestions(
     Returns:
         List of new suggestion dicts ready to be stored.
     """
-    existing_english = {s.get("english", "").lower() for s in existing_suggestions}
-    glossary_terms = {t.lower() for t in mod_glossary.get("terms", {}).keys()}
+    existing_english = {_TAG_PATTERN.sub("", s.get("english", "")).lower() for s in existing_suggestions}
+    glossary_terms = {_TAG_PATTERN.sub("", t).lower() for t in mod_glossary.get("terms", {}).keys()}
     existing_sources: set[str] = set()
     for s in existing_suggestions:
         src = s.get("source", "").strip()
@@ -255,8 +255,9 @@ def extract_name_key_suggestions(
         if not english:
             continue
 
-        # Skip if already known (case-insensitive).
-        if english.lower() in existing_english or english.lower() in glossary_terms:
+        # Skip if already known (case-insensitive, ignoring markup tags).
+        stripped = _TAG_PATTERN.sub("", english).lower()
+        if stripped in existing_english or stripped in glossary_terms:
             continue
 
         # Determine source text.
@@ -285,7 +286,7 @@ def extract_name_key_suggestions(
                 "reason": "Auto-detected from name key after translation",
             }
         )
-        existing_english.add(english.lower())
+        existing_english.add(stripped)
         if source_text:
             existing_sources.add(source_text)
 
