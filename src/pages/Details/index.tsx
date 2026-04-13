@@ -1045,14 +1045,13 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                             if (!sourceText) continue
                                             for (const s of strings) {
                                                 if (affected.some((a) => a.key === s.key)) continue
-                                                if (s.english) continue
-                                                if (s.source === sourceText) {
-                                                    affected.push({ key: s.key, old_text: "", new_text: english })
-                                                }
+                                                if (s.source !== sourceText) continue
+                                                if (s.english === english) continue
+                                                affected.push({ key: s.key, old_text: s.english, new_text: english })
                                             }
                                         }
                                         if (affected.length === 0) {
-                                            setTranslateBanner({ type: "success", message: "No untranslated strings match glossary terms." })
+                                            setTranslateBanner({ type: "success", message: "No strings need updating from glossary terms." })
                                         } else {
                                             setReplacePreview({ oldTerm: "", newTerm: "glossary terms", sourceText: "", needsInput: false, affected })
                                         }
