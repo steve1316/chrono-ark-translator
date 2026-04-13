@@ -1173,7 +1173,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                     onClick={async () => {
                                                         // Delete old term if english name changed
                                                         if (editTermEnglish !== english) {
-                                                            await fetch(`${API_BASE}/mods/${modId}/glossary/${encodeURIComponent(english)}`, { method: "DELETE" })
+                                                            await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
+                                                                method: "POST",
+                                                                headers: { "Content-Type": "application/json" },
+                                                                body: JSON.stringify({ terms: [english] }),
+                                                            })
                                                         }
                                                         await fetch(`${API_BASE}/mods/${modId}/glossary`, {
                                                             method: "POST",
@@ -1258,7 +1262,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                         className="btn btn-outline"
                                                         style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
                                                         onClick={async () => {
-                                                            await fetch(`${API_BASE}/mods/${modId}/glossary/${encodeURIComponent(english)}`, { method: "DELETE" })
+                                                            await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
+                                                                method: "POST",
+                                                                headers: { "Content-Type": "application/json" },
+                                                                body: JSON.stringify({ terms: [english] }),
+                                                            })
                                                             fetchModGlossary()
                                                         }}
                                                     >
@@ -2029,9 +2037,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 handleClearTranslations()
                                 break
                             case "delete-all-glossary":
-                                for (const term of Object.keys(modGlossary)) {
-                                    await fetch(`${API_BASE}/mods/${modId}/glossary/${encodeURIComponent(term)}`, { method: "DELETE" })
-                                }
+                                await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ all: true }),
+                                })
                                 fetchModGlossary()
                                 break
                             case "restore-backup":

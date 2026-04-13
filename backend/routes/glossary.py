@@ -92,7 +92,7 @@ async def update_mod_glossary(mod_id: str, term: ModGlossaryTerm):
     return {"status": "success"}
 
 
-@router.delete("/mods/{mod_id}/glossary/{term}")
+@router.delete("/mods/{mod_id}/glossary/{term:path}")
 async def delete_mod_glossary_term(mod_id: str, term: str):
     """Remove a term from a mod's glossary.
 
@@ -110,6 +110,50 @@ async def delete_mod_glossary_term(mod_id: str, term: str):
         del glossary["terms"][term]
         save_mod_glossary(mod_id, glossary)
     return {"status": "success"}
+
+
+@router.post("/mods/{mod_id}/glossary/delete")
+async def delete_mod_glossary_terms(mod_id: str, action: SuggestionAction):
+    """Remove specific terms or all terms from a mod's glossary.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        action: Specifies which terms to delete, either by listing
+            specific terms or setting `all` to True.
+
+    Returns:
+        A dict with `status` and the count of `deleted` terms.
+    """
+    glossary = load_mod_glossary(mod_id)
+    terms = glossary.get("terms", {})
+    if action.all:
+        count = len(terms)
+        glossary["terms"] = {}
+    else:
+        count = 0
+        for term in action.terms:
+            if term in terms:
+                del terms[term]
+                count += 1
+    save_mod_glossary(mod_id, glossary)
+    return {"status": "success", "deleted": count}
+
+
+@router.delete("/mods/{mod_id}/glossary")
+async def delete_all_mod_glossary_terms(mod_id: str):
+    """Remove all terms from a mod's glossary.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with `status` and the count of `deleted` terms.
+    """
+    glossary = load_mod_glossary(mod_id)
+    count = len(glossary.get("terms", {}))
+    glossary["terms"] = {}
+    save_mod_glossary(mod_id, glossary)
+    return {"status": "success", "deleted": count}
 
 
 @router.post("/mods/{mod_id}/glossary/replace-preview")
