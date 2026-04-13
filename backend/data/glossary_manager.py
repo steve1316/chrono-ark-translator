@@ -29,6 +29,17 @@ _MECHANIC_EXACT_KEYS: dict[str, str] = {
     "UI/CharStat/PartyStat_MP": "Mana",
 }
 
+# Manual mechanic terms that appear within other strings but have no
+# dedicated key. Each entry maps the English term to its known source
+# language translations.
+_MANUAL_MECHANIC_TERMS: dict[str, dict[str, str]] = {
+    "Exchange": {"Chinese": "交换", "Korean": "교환", "Japanese": "交換"},
+    "Action Count": {"Chinese": "行动次数", "Korean": "행동 횟수", "Japanese": "行動回数"},
+    "Discarded": {"Chinese": "丢弃", "Korean": "버림", "Japanese": "捨てた"},
+    "Fixed Ability": {"Chinese": "固有能力", "Korean": "고유 능력", "Japanese": "固有能力"},
+    "Standby": {"Chinese": "待机", "Korean": "대기", "Japanese": "待機"},
+}
+
 # Mechanic-pattern keys to skip (not actual mechanic terms).
 _MECHANIC_IGNORED_KEYS = {
     "Battle/Keyword/Autodelete",
@@ -171,6 +182,19 @@ def build_glossary_from_base_game(
             "created_at": now,
             "updated_at": now,
         }
+
+    # Add manual mechanic terms that have no dedicated key.
+    now = datetime.now(timezone.utc).isoformat()
+    for english, mappings in _MANUAL_MECHANIC_TERMS.items():
+        if english not in glossary["terms"]:
+            glossary["terms"][english] = {
+                "category": "mechanics",
+                "key": "",
+                "source_file": "LangSystemDB.csv",
+                "source_mappings": {lang: text for lang, text in mappings.items() if lang in source_languages},
+                "created_at": now,
+                "updated_at": now,
+            }
 
     return glossary
 
