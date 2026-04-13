@@ -10,6 +10,7 @@ from backend.data.glossary_manager import (
     merge_glossaries,
     save_glossary,
     save_mod_glossary,
+    suggest_glossary_edits,
 )
 from backend.data.history_manager import create_backup
 from backend.data.mod_settings import load_source_language_override
@@ -254,6 +255,11 @@ async def accept_suggestions(mod_id: str, action: SuggestionAction):
 
     for suggestion in suggestions:
         if suggestion.get("english") in terms_to_accept:
+            # If this is an edit suggestion, remove the old term first.
+            edit_of = suggestion.get("edit_of")
+            if edit_of and edit_of in glossary.get("terms", {}):
+                del glossary["terms"][edit_of]
+
             add_glossary_term(
                 glossary,
                 suggestion["english"],
@@ -339,6 +345,12 @@ async def scan_for_suggestions(mod_id: str):
         )
         new_suggestions.extend(found)
         combined_existing.extend(found)
+
+    # Suggest edits (e.g. title-casing) for existing glossary terms.
+    edit_suggestions = suggest_glossary_edits(
+        mod_glossary, existing_suggestions + new_suggestions,
+    )
+    new_suggestions.extend(edit_suggestions)
 
     if new_suggestions:
         add_suggestions(mod_id, new_suggestions)
