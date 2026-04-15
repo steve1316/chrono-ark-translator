@@ -662,86 +662,80 @@ async def export_mod(mod_id: str, resync: bool = False):
             strings[key].translations["English"] = english
             applied += 1
 
-    # Separate gdata JSON-sourced strings from CSV/DLL-sourced strings.
-    # JSON strings get written back into the original gdata files; the
-    # rest go into standard localization CSVs.
-    gdata_translations: dict[str, str] = {}
-    by_source: dict[str, list] = {}
-    for key, loc_str in strings.items():
-        # Skip untranslatable strings — the game cannot use them.
-        if loc_str.untranslatable_reason:
-            continue
-        source = loc_str.source_file or _adapter.csv_for_key(loc_str.key)
-        if source.lower().endswith(".json"):
-            english = loc_str.translations.get("English", "")
-            if english:
-                gdata_translations[key] = english
-        else:
-            if source.lower().endswith(".dll"):
-                source = _adapter.csv_for_key(loc_str.key)
-            if source not in by_source:
-                by_source[source] = []
-            by_source[source].append(loc_str)
+    # Check if the Harmony injection mod is installed. When present,
+    # translations are written to override JSONs instead of modifying the
+    # original mod CSV/gdata files.
+    overrides_dir = _adapter.get_translation_overrides_dir()
 
     files_written = []
     gdata_files_written = []
-
-    # Write gdata JSON translations back into the original files.
-    if gdata_translations:
-        gdata_files_written = _adapter.export_gdata_strings(mod_path, gdata_translations)
-
-    # Write CSV-sourced and DLL-sourced strings to localization CSVs.
-    for csv_filename, entries in by_source.items():
-
-        # Determine the original file path.
-        loc_path = mod_path / "Localization" / csv_filename
-        top_path = mod_path / csv_filename
-        if loc_path.exists():
-            output_path = loc_path
-        elif top_path.exists():
-            output_path = top_path
-        else:
-            # Default to Localization subdirectory.
-            (mod_path / "Localization").mkdir(parents=True, exist_ok=True)
-            output_path = loc_path
-
-        _adapter.export_strings(output_path, entries)
-        files_written.append(csv_filename)
-
-    # Consolidate: delete variant files.
     files_removed = []
-    if variant_files:
-        for variant_rel in variant_files:
-            variant_path = mod_path / variant_rel
-            if variant_path.exists():
-                variant_path.unlink()
-                files_removed.append(variant_rel)
 
-        # Clean up empty backup directories.
-        for subdir in mod_path.iterdir():
-            if subdir.is_dir() and subdir.name not in ("Localization", "Assemblies"):
-                try:
-                    if not any(subdir.iterdir()):
-                        subdir.rmdir()
-                except (OSError, StopIteration):
-                    pass
+    if not overrides_dir:
+        # No Harmony mod — write translations into the original mod files.
+        gdata_translations: dict[str, str] = {}
+        by_source: dict[str, list] = {}
+        for key, loc_str in strings.items():
+            if loc_str.untranslatable_reason:
+                continue
+            source = loc_str.source_file or _adapter.csv_for_key(loc_str.key)
+            if source.lower().endswith(".json"):
+                english = loc_str.translations.get("English", "")
+                if english:
+                    gdata_translations[key] = english
+            else:
+                if source.lower().endswith(".dll"):
+                    source = _adapter.csv_for_key(loc_str.key)
+                if source not in by_source:
+                    by_source[source] = []
+                by_source[source].append(loc_str)
 
-        loc_dir = mod_path / "Localization"
-        if loc_dir.exists():
-            for subdir in loc_dir.iterdir():
-                if subdir.is_dir():
+        if gdata_translations:
+            gdata_files_written = _adapter.export_gdata_strings(mod_path, gdata_translations)
+
+        for csv_filename, entries in by_source.items():
+            loc_path = mod_path / "Localization" / csv_filename
+            top_path = mod_path / csv_filename
+            if loc_path.exists():
+                output_path = loc_path
+            elif top_path.exists():
+                output_path = top_path
+            else:
+                (mod_path / "Localization").mkdir(parents=True, exist_ok=True)
+                output_path = loc_path
+
+            _adapter.export_strings(output_path, entries)
+            files_written.append(csv_filename)
+
+        # Consolidate: delete variant files.
+        if variant_files:
+            for variant_rel in variant_files:
+                variant_path = mod_path / variant_rel
+                if variant_path.exists():
+                    variant_path.unlink()
+                    files_removed.append(variant_rel)
+
+            for subdir in mod_path.iterdir():
+                if subdir.is_dir() and subdir.name not in ("Localization", "Assemblies"):
                     try:
                         if not any(subdir.iterdir()):
                             subdir.rmdir()
                     except (OSError, StopIteration):
                         pass
 
+            loc_dir = mod_path / "Localization"
+            if loc_dir.exists():
+                for subdir in loc_dir.iterdir():
+                    if subdir.is_dir():
+                        try:
+                            if not any(subdir.iterdir()):
+                                subdir.rmdir()
+                        except (OSError, StopIteration):
+                            pass
+
     # Write translation overrides for the Harmony injection mod.
-    # Keyed overrides: CSV/gdata strings injected into I2.Loc at runtime.
-    # Text overrides: hardcoded DLL strings replaced via TMPro text patch.
     keyed_overrides_written = 0
     text_overrides_written = 0
-    overrides_dir = _adapter.get_translation_overrides_dir()
     if overrides_dir:
         keyed_overrides: dict[str, str] = {}
         text_overrides: dict[str, str] = {}
