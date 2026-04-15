@@ -1,6 +1,7 @@
 """Settings and stats API endpoints for the Chrono Ark Translator."""
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 
 from backend import config
 from backend.process_manager import is_managed
@@ -39,6 +40,8 @@ async def get_settings():
         anthropic_api_key_set=_mask_key(config.ANTHROPIC_API_KEY),
         openai_api_key_set=_mask_key(config.OPENAI_API_KEY),
         deepl_api_key_set=_mask_key(config.DEEPL_API_KEY),
+        claude_model=config.CLAUDE_MODEL,
+        openai_model=config.OPENAI_MODEL,
         ollama_base_url=config.OLLAMA_BASE_URL,
         ollama_model=config.OLLAMA_MODEL,
         ollama_vram_tier=config.OLLAMA_VRAM_TIER,
@@ -84,6 +87,14 @@ async def update_settings(payload: SettingsUpdate):
     if payload.deepl_api_key is not None:
         config.DEEPL_API_KEY = payload.deepl_api_key
         env_updates["CATL_DEEPL_API_KEY"] = payload.deepl_api_key
+
+    if payload.claude_model is not None:
+        config.CLAUDE_MODEL = payload.claude_model
+        env_updates["CATL_CLAUDE_MODEL"] = payload.claude_model
+
+    if payload.openai_model is not None:
+        config.OPENAI_MODEL = payload.openai_model
+        env_updates["CATL_OPENAI_MODEL"] = payload.openai_model
 
     if payload.ollama_base_url is not None:
         config.OLLAMA_BASE_URL = payload.ollama_base_url
@@ -133,6 +144,31 @@ async def update_settings(payload: SettingsUpdate):
         _update_env_file(env_updates)
 
     return await get_settings()
+
+
+@router.get("/models/{provider_id}")
+async def get_provider_models(provider_id: str):
+    """Return the available models and pricing for a given provider.
+
+    Args:
+        provider_id: Provider identifier (`"claude"` or `"openai"`).
+
+    Returns:
+        A JSON object with a `models` list containing model ID, label,
+        and per-MTok pricing.
+
+    Raises:
+        HTTPException: If the provider has no model catalog.
+    """
+    if provider_id == "claude":
+        from backend.translator.claude_provider import CLAUDE_MODELS
+
+        return JSONResponse({"models": [{"id": k, **v} for k, v in CLAUDE_MODELS.items()]})
+    elif provider_id == "openai":
+        from backend.translator.openai_provider import OPENAI_MODELS
+
+        return JSONResponse({"models": [{"id": k, **v} for k, v in OPENAI_MODELS.items()]})
+    raise HTTPException(404, f"No model catalog for provider: {provider_id}")
 
 
 @router.get("/stats")

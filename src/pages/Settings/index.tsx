@@ -15,8 +15,8 @@ interface KeyState {
  * (`null` for providers that don't require credentials).
  */
 const PROVIDERS = [
-    { id: "claude", label: "Claude", description: "claude-sonnet-4-20250514", keyField: "anthropic" as const },
-    { id: "openai", label: "OpenAI", description: "gpt-4o", keyField: "openai" as const },
+    { id: "claude", label: "Claude", description: "Anthropic", keyField: "anthropic" as const },
+    { id: "openai", label: "OpenAI", description: "OpenAI", keyField: "openai" as const },
     { id: "deepl", label: "DeepL", description: "Neural Machine Translation", keyField: "deepl" as const },
     { id: "ollama", label: "Ollama (Local)", description: "Free local AI — no API key needed", keyField: null },
     { id: "llamacpp", label: "llama.cpp (Local)", description: "Direct llama-server connection", keyField: null },
@@ -98,6 +98,13 @@ const SettingsPage: React.FC = () => {
         openai: false,
         deepl: false,
     })
+    const [claudeModel, setClaudeModel] = useState("claude-sonnet-4-6")
+    const [originalClaudeModel, setOriginalClaudeModel] = useState("claude-sonnet-4-6")
+    const [openaiModel, setOpenaiModel] = useState("gpt-4.1")
+    const [originalOpenaiModel, setOriginalOpenaiModel] = useState("gpt-4.1")
+    const [claudeModels, setClaudeModels] = useState<{ id: string; label: string; input_per_mtok: number; output_per_mtok: number }[]>([])
+    const [openaiModels, setOpenaiModels] = useState<{ id: string; label: string; input_per_mtok: number; output_per_mtok: number }[]>([])
+
     const [saving, setSaving] = useState(false)
     const [saveSuccess, setSaveSuccess] = useState(false)
     const [loading, setLoading] = useState(true)
@@ -158,6 +165,8 @@ const SettingsPage: React.FC = () => {
     const isChanged =
         provider !== originalProvider ||
         batchSize !== originalBatchSize ||
+        claudeModel !== originalClaudeModel ||
+        openaiModel !== originalOpenaiModel ||
         apiKeys.anthropic !== "" ||
         apiKeys.openai !== "" ||
         apiKeys.deepl !== "" ||
@@ -210,6 +219,10 @@ const SettingsPage: React.FC = () => {
                 setOriginalLlamacppCtxSize(data.llamacpp_ctx_size ?? 8192)
                 setIgnoredMods(data.ignored_mods ?? [])
                 setOriginalIgnoredMods(data.ignored_mods ?? [])
+                setClaudeModel(data.claude_model || "claude-sonnet-4-6")
+                setOriginalClaudeModel(data.claude_model || "claude-sonnet-4-6")
+                setOpenaiModel(data.openai_model || "gpt-4.1")
+                setOriginalOpenaiModel(data.openai_model || "gpt-4.1")
                 setOllamaManaged(data.ollama_managed ?? false)
                 setLlamacppVramTier(data.llamacpp_vram_tier || "")
                 setOriginalLlamacppVramTier(data.llamacpp_vram_tier || "")
@@ -238,6 +251,18 @@ const SettingsPage: React.FC = () => {
                 }
             })
         return () => controller.abort()
+    }, [])
+
+    // Fetch model catalogs for Claude and OpenAI on mount.
+    useEffect(() => {
+        fetch(`${API_BASE}/models/claude`)
+            .then((r) => r.json())
+            .then((d) => setClaudeModels(d.models))
+            .catch(() => {})
+        fetch(`${API_BASE}/models/openai`)
+            .then((r) => r.json())
+            .then((d) => setOpenaiModels(d.models))
+            .catch(() => {})
     }, [])
 
     // Poll Ollama status when the Ollama provider is selected.
@@ -292,6 +317,8 @@ const SettingsPage: React.FC = () => {
         if (apiKeys.anthropic) payload.anthropic_api_key = apiKeys.anthropic
         if (apiKeys.openai) payload.openai_api_key = apiKeys.openai
         if (apiKeys.deepl) payload.deepl_api_key = apiKeys.deepl
+        if (claudeModel !== originalClaudeModel) payload.claude_model = claudeModel
+        if (openaiModel !== originalOpenaiModel) payload.openai_model = openaiModel
         if (ollamaBaseUrl !== originalOllamaBaseUrl) payload.ollama_base_url = ollamaBaseUrl
         if (ollamaModel !== originalOllamaModel) payload.ollama_model = ollamaModel
         if (ollamaVramTier !== originalOllamaVramTier) payload.ollama_vram_tier = ollamaVramTier
@@ -347,6 +374,10 @@ const SettingsPage: React.FC = () => {
             setOriginalLlamacppVramTier(data.llamacpp_vram_tier || "")
             setIgnoredMods(data.ignored_mods ?? [])
             setOriginalIgnoredMods(data.ignored_mods ?? [])
+            setClaudeModel(data.claude_model || "claude-sonnet-4-6")
+            setOriginalClaudeModel(data.claude_model || "claude-sonnet-4-6")
+            setOpenaiModel(data.openai_model || "gpt-4.1")
+            setOriginalOpenaiModel(data.openai_model || "gpt-4.1")
             setSaveSuccess(true)
             setTimeout(() => setSaveSuccess(false), 3000)
         } catch (err) {
@@ -723,6 +754,34 @@ const SettingsPage: React.FC = () => {
                     ))}
                 </div>
             </div>
+
+            {/* Model Selection for Claude / OpenAI */}
+            {(provider === "claude" || provider === "openai") && (
+                <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
+                    <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-main)" }}>Model</h3>
+                    <select
+                        value={provider === "claude" ? claudeModel : openaiModel}
+                        onChange={(e) => (provider === "claude" ? setClaudeModel(e.target.value) : setOpenaiModel(e.target.value))}
+                        style={{
+                            width: "100%",
+                            padding: "0.75rem 1rem",
+                            background: "rgba(255, 255, 255, 0.05)",
+                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                            borderRadius: "8px",
+                            color: "var(--text-main)",
+                            fontSize: "0.9rem",
+                            cursor: "pointer",
+                            outline: "none",
+                        }}
+                    >
+                        {(provider === "claude" ? claudeModels : openaiModels).map((m) => (
+                            <option key={m.id} value={m.id} style={{ background: "#1a1a2e", color: "var(--text-main)" }}>
+                                {m.label} — ${m.input_per_mtok} / ${m.output_per_mtok} per MTok (in/out)
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
 
             {/* Manual Provider Info */}
             {provider === "manual" && (

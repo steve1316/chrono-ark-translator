@@ -126,6 +126,8 @@ class SettingsResponse(BaseModel):
             or empty string if not configured.
         openai_api_key_set: Masked OpenAI key or empty string.
         deepl_api_key_set: Masked DeepL key or empty string.
+        claude_model: Selected Claude model identifier.
+        openai_model: Selected OpenAI model identifier.
         ollama_base_url: Ollama server base URL.
         ollama_model: Selected Ollama model name.
         ollama_vram_tier: Selected VRAM tier (e.g. `"8gb"`).
@@ -146,6 +148,8 @@ class SettingsResponse(BaseModel):
     anthropic_api_key_set: str
     openai_api_key_set: str
     deepl_api_key_set: str
+    claude_model: str
+    openai_model: str
     ollama_base_url: str
     ollama_model: str
     ollama_vram_tier: str
@@ -174,6 +178,8 @@ class SettingsUpdate(BaseModel):
         anthropic_api_key: New Anthropic API key value.
         openai_api_key: New OpenAI API key value.
         deepl_api_key: New DeepL API key value.
+        claude_model: New Claude model identifier.
+        openai_model: New OpenAI model identifier.
         ollama_base_url: New Ollama base URL.
         ollama_model: New Ollama model name.
         ollama_vram_tier: New VRAM tier selection.
@@ -191,6 +197,8 @@ class SettingsUpdate(BaseModel):
     anthropic_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     deepl_api_key: Optional[str] = None
+    claude_model: Optional[str] = None
+    openai_model: Optional[str] = None
     ollama_base_url: Optional[str] = None
     ollama_model: Optional[str] = None
     ollama_vram_tier: Optional[str] = None
