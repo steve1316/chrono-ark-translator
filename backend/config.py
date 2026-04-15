@@ -31,6 +31,11 @@ ANTHROPIC_API_KEY = os.environ.get("CATL_ANTHROPIC_API_KEY", "")
 OPENAI_API_KEY = os.environ.get("CATL_OPENAI_API_KEY", "")
 DEEPL_API_KEY = os.environ.get("CATL_DEEPL_API_KEY", "")
 
+# ── Model Selection ────────────────────────────────────────────────────────────
+
+CLAUDE_MODEL = os.environ.get("CATL_CLAUDE_MODEL", "claude-sonnet-4-6")
+OPENAI_MODEL = os.environ.get("CATL_OPENAI_MODEL", "gpt-4.1")
+
 # ── Ollama Settings ───────────────────────────────────────────────────────────
 
 OLLAMA_BASE_URL = os.environ.get("CATL_OLLAMA_BASE_URL", "http://localhost:11434")

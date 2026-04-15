@@ -11,6 +11,15 @@ from backend import config
 from backend.translator.base import TranslationProvider
 
 
+CLAUDE_MODELS: dict[str, dict] = {
+    "claude-sonnet-4-6": {"label": "Claude Sonnet 4.6", "input_per_mtok": 3.0, "output_per_mtok": 15.0},
+    "claude-haiku-4-5-20251001": {"label": "Claude Haiku 4.5", "input_per_mtok": 1.0, "output_per_mtok": 5.0},
+    "claude-opus-4-6": {"label": "Claude Opus 4.6", "input_per_mtok": 5.0, "output_per_mtok": 25.0},
+}
+
+_DEFAULT_PRICING = CLAUDE_MODELS["claude-sonnet-4-6"]
+
+
 class ClaudeProvider(TranslationProvider):
     """Translation provider using Anthropic's Claude API.
 
@@ -23,16 +32,17 @@ class ClaudeProvider(TranslationProvider):
         _model: Claude model identifier to use for requests.
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         """Initialize the Claude translation provider.
 
         Args:
             api_key: Anthropic API key. Falls back to the value from
                 `config.ANTHROPIC_API_KEY` when not provided.
-            model: Claude model identifier (default: `"claude-sonnet-4-20250514"`).
+            model: Claude model identifier. Falls back to
+                `config.CLAUDE_MODEL` when not provided.
         """
         self._api_key = api_key or config.ANTHROPIC_API_KEY
-        self._model = model
+        self._model = model or config.CLAUDE_MODEL
 
     @property
     def name(self) -> str:
@@ -107,7 +117,8 @@ class ClaudeProvider(TranslationProvider):
                 out_tok = getattr(response.usage, "output_tokens", None)
                 cost_usd = None
                 if in_tok is not None and out_tok is not None:
-                    cost_usd = in_tok / 1_000_000 * 3.0 + out_tok / 1_000_000 * 15.0
+                    pricing = CLAUDE_MODELS.get(self._model, _DEFAULT_PRICING)
+                    cost_usd = in_tok / 1_000_000 * pricing["input_per_mtok"] + out_tok / 1_000_000 * pricing["output_per_mtok"]
                 self.last_raw_responses.append(
                     {
                         "batch_index": len(self.last_raw_responses),
@@ -194,8 +205,9 @@ class ClaudeProvider(TranslationProvider):
             output_chars = sum(len(text) for _, text in batch)
             total_output_tokens += int(output_chars * 1.5) + 500
 
-        input_cost_per_m = 3.0
-        output_cost_per_m = 15.0
+        pricing = CLAUDE_MODELS.get(self._model, _DEFAULT_PRICING)
+        input_cost_per_m = pricing["input_per_mtok"]
+        output_cost_per_m = pricing["output_per_mtok"]
 
         estimated_cost = total_input_tokens / 1_000_000 * input_cost_per_m + total_output_tokens / 1_000_000 * output_cost_per_m
 

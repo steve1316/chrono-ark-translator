@@ -54,9 +54,9 @@ def get_provider(provider_name: str) -> TranslationProvider:
         The initialized TranslationProvider.
     """
     if provider_name == "claude":
-        return ClaudeProvider()
+        return ClaudeProvider(model=config.CLAUDE_MODEL)
     elif provider_name == "openai":
-        return OpenAIProvider()
+        return OpenAIProvider(model=config.OPENAI_MODEL)
     elif provider_name == "deepl":
         return DeepLProvider()
     elif provider_name == "ollama":
