@@ -1149,10 +1149,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                     ) : (
                         <div style={{ maxHeight: "300px", overflow: "auto", paddingRight: "0.75rem" }}>
                             {Object.entries(modGlossary)
-                                .sort(([a], [b]) => a.localeCompare(b))
-                                .map(([english, info]) => (
-                                    <div key={english} style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--glass-border)" }}>
-                                        {editingTerm === english ? (
+                                .sort(([aKey, aInfo], [bKey, bInfo]) => (aInfo.english || aKey).localeCompare(bInfo.english || bKey))
+                                .map(([termKey, info]) => {
+                                    const english = info.english || termKey
+                                    return (
+                                    <div key={termKey} style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--glass-border)" }}>
+                                        {editingTerm === termKey ? (
                                             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
                                                 <input
                                                     type="text"
@@ -1220,14 +1222,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                     className="btn btn-primary"
                                                     style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
                                                     onClick={async () => {
-                                                        // Delete old term if english name changed
-                                                        if (editTermEnglish !== english) {
-                                                            await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
-                                                                method: "POST",
-                                                                headers: { "Content-Type": "application/json" },
-                                                                body: JSON.stringify({ terms: [english] }),
-                                                            })
-                                                        }
+                                                        // Delete old term when editing
+                                                        await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
+                                                            method: "POST",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify({ terms: [termKey] }),
+                                                        })
                                                         await fetch(`${API_BASE}/mods/${modId}/glossary`, {
                                                             method: "POST",
                                                             headers: { "Content-Type": "application/json" },
@@ -1275,7 +1275,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                         style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem" }}
                                                         onClick={() => {
                                                             setRenamedTerm(null)
-                                                            setEditingTerm(english)
+                                                            setEditingTerm(termKey)
                                                             setEditTermEnglish(english)
                                                             const firstLang = Object.keys(info.source_mappings || {})[0] || "Chinese"
                                                             setEditTermSource((info.source_mappings || {})[firstLang] || "")
@@ -1314,7 +1314,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                             await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
                                                                 method: "POST",
                                                                 headers: { "Content-Type": "application/json" },
-                                                                body: JSON.stringify({ terms: [english] }),
+                                                                body: JSON.stringify({ terms: [termKey] }),
                                                             })
                                                             fetchModGlossary()
                                                         }}
@@ -1325,7 +1325,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                             </div>
                                         )}
                                     </div>
-                                ))}
+                                    )
+                                })}
                         </div>
                     )}
                 </div>

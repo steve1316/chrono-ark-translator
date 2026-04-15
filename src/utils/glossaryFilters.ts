@@ -15,12 +15,12 @@ export function extractCategories(terms: Record<string, GlossaryTerm>): string[]
 
 /**
  * Filter and sort glossary terms by search text and category.
- * Search matches against the English key, the glossary key field,
+ * Search matches against the English text, the glossary key field,
  * and all source mapping values (case-insensitive).
- * @param terms - Map of English term to GlossaryTerm.
+ * @param terms - Map of unique term key to GlossaryTerm.
  * @param search - Free-text search query.
  * @param categoryFilter - Category to filter by, or "all" for no filter.
- * @returns Sorted array of [english, GlossaryTerm] tuples.
+ * @returns Sorted array of [termKey, GlossaryTerm] tuples.
  */
 export function filterGlossaryTerms(
     terms: Record<string, GlossaryTerm>,
@@ -29,7 +29,8 @@ export function filterGlossaryTerms(
 ): [string, GlossaryTerm][] {
     const q = search.toLowerCase()
     return Object.entries(terms)
-        .filter(([english, info]) => {
+        .filter(([termKey, info]) => {
+            const english = info.english || termKey
             const matchesSearch =
                 !q ||
                 english.toLowerCase().includes(q) ||
@@ -38,5 +39,5 @@ export function filterGlossaryTerms(
             const matchesCategory = categoryFilter === "all" || info.category === categoryFilter
             return matchesSearch && matchesCategory
         })
-        .sort(([a], [b]) => a.localeCompare(b))
+        .sort(([aKey, aInfo], [bKey, bInfo]) => (aInfo.english || aKey).localeCompare(bInfo.english || bKey))
 }

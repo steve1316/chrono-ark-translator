@@ -124,9 +124,9 @@ const GlossaryPage: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredTerms.map(([english, info]) => (
-                            <tr key={english} style={{ borderBottom: "1px solid var(--glass-border)" }}>
-                                <td style={{ padding: "0.5rem 1rem", fontWeight: 500 }}>{english}</td>
+                        {filteredTerms.map(([termKey, info]) => (
+                            <tr key={termKey} style={{ borderBottom: "1px solid var(--glass-border)" }}>
+                                <td style={{ padding: "0.5rem 1rem", fontWeight: 500 }}>{info.english || termKey}</td>
                                 <td style={{ padding: "0.5rem 1rem", textTransform: "capitalize", color: "var(--text-dim)" }}>{info.category}</td>
                                 <td style={{ padding: "0.5rem 1rem", color: "var(--text-dim)", fontSize: "0.9rem" }}>
                                     {info.source_file ? (

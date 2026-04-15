@@ -96,6 +96,8 @@ export type Stats = {
  * recurring game terminology (character names, skill names, mechanics, etc.).
  */
 export type GlossaryTerm = {
+    /** Canonical English translation text. */
+    english?: string
     /** Semantic category (e.g., "characters", "skills", "mechanics", "custom"). */
     category: string
     /** Localization key that originally defined this term, or empty string for manual entries. */
@@ -112,7 +114,7 @@ export type GlossaryTerm = {
 
 /**
  * The complete glossary for a mod (or the global glossary), keyed by
- * the canonical English term.
+ * a unique identifier (CSV key for base game terms, source text for mod terms).
  */
 export type Glossary = {
     /** Map from English term to its glossary entry. */
