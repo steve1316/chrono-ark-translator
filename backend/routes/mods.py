@@ -736,6 +736,60 @@ async def export_mod(mod_id: str, resync: bool = False):
                     except (OSError, StopIteration):
                         pass
 
+    # Write translation overrides for the Harmony injection mod.
+    # Keyed overrides: CSV/gdata strings injected into I2.Loc at runtime.
+    # Text overrides: hardcoded DLL strings replaced via TMPro text patch.
+    keyed_overrides_written = 0
+    text_overrides_written = 0
+    overrides_dir = _adapter.get_translation_overrides_dir()
+    if overrides_dir:
+        keyed_overrides: dict[str, str] = {}
+        text_overrides: dict[str, str] = {}
+
+        for key, loc_str in strings.items():
+            english = loc_str.translations.get("English", "")
+            if not english:
+                continue
+
+            if loc_str.untranslatable_reason and key.startswith("DLL/"):
+                # DLL orphan string: map original CJK text to English.
+                chinese = (
+                    loc_str.translations.get("Chinese", "")
+                    or loc_str.translations.get("Chinese-TW [zh-tw]", "")
+                )
+                if chinese:
+                    text_overrides[chinese] = english
+            else:
+                keyed_overrides[key] = english
+
+        if keyed_overrides:
+            keyed_path = overrides_dir / "keyed_overrides.json"
+            existing = {}
+            if keyed_path.exists():
+                try:
+                    with open(keyed_path, "r", encoding="utf-8") as f:
+                        existing = json.load(f)
+                except (json.JSONDecodeError, OSError):
+                    pass
+            existing.update(keyed_overrides)
+            with open(keyed_path, "w", encoding="utf-8") as f:
+                json.dump(existing, f, indent=2, ensure_ascii=False)
+            keyed_overrides_written = len(keyed_overrides)
+
+        if text_overrides:
+            text_path = overrides_dir / "text_overrides.json"
+            existing = {}
+            if text_path.exists():
+                try:
+                    with open(text_path, "r", encoding="utf-8") as f:
+                        existing = json.load(f)
+                except (json.JSONDecodeError, OSError):
+                    pass
+            existing.update(text_overrides)
+            with open(text_path, "w", encoding="utf-8") as f:
+                json.dump(existing, f, indent=2, ensure_ascii=False)
+            text_overrides_written = len(text_overrides)
+
     # Save snapshot hash so export-status knows we're in sync.
     snapshot_hash = _compute_export_snapshot(mod_id, mod_path)
     _save_last_export_hash(mod_id, snapshot_hash)
@@ -763,6 +817,8 @@ async def export_mod(mod_id: str, resync: bool = False):
         "files_written": files_written,
         "gdata_files_written": gdata_files_written,
         "files_removed": files_removed,
+        "keyed_overrides_written": keyed_overrides_written,
+        "text_overrides_written": text_overrides_written,
     }
 
 
