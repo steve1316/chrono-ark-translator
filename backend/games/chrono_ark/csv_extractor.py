@@ -155,8 +155,11 @@ def _parse_csv_content(file_path: Path) -> list[LocString]:
     Returns:
         List of LocString objects extracted from the file.
     """
-    # regex for a valid key: starts with alphanumeric, no spaces, optional /
-    key_pattern = re.compile(r"^[A-Za-z0-9_\-\.]+/[A-Za-z0-9_\-\./ ]+$")
+    # regex for a valid key: alphanumeric characters, underscores, hyphens,
+    # dots, forward slashes.  A slash is NOT required — some mods use flat
+    # keys like ``B_Poca_Level_State_0``.  Spaces are allowed only after a
+    # slash (e.g. ``Character/Suzakuin Momiji_name``).
+    key_pattern = re.compile(r"^[A-Za-z0-9_\-\.][A-Za-z0-9_\-\./]*(?:/[A-Za-z0-9_\-\./ ]+)?$")
 
     results = []
 
