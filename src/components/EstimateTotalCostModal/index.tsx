@@ -23,7 +23,7 @@ interface ModEstimate {
             estimated_output_tokens: number
             /** Estimated total cost in USD for this language */
             estimated_cost_usd: number
-            /** The LLM model name used for the estimate (e.g. `"gpt-4o"`, `"claude-sonnet-4-5"`) */
+            /** The LLM model name used for the estimate (e.g. `"gpt-4.1"`, `"claude-sonnet-4-6"`) */
             model: string
             /** Human-readable note about the estimate (e.g. `"Prices are approximate"`) */
             note: string
