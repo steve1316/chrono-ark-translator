@@ -11,6 +11,19 @@ from backend.data.glossary_manager import (
 )
 
 
+def _find_by_english(terms: dict, english: str) -> dict | None:
+    """Find a glossary entry by its English text field."""
+    for info in terms.values():
+        if info.get("english") == english:
+            return info
+    return None
+
+
+def _has_english(terms: dict, english: str) -> bool:
+    """Check if a glossary entry with the given English text exists."""
+    return _find_by_english(terms, english) is not None
+
+
 def test_build_glossary_extracts_name_keys(sample_base_strings, glossary_categories):
     glossary = build_glossary_from_base_game(
         sample_base_strings,
@@ -18,19 +31,19 @@ def test_build_glossary_extracts_name_keys(sample_base_strings, glossary_categor
         ["Korean", "Chinese"],
     )
     terms = glossary["terms"]
-    assert "Armor Increased" in terms
-    assert "Fire Bolt" in terms
-    assert "Lucy" in terms
-    assert "Heal" in terms
+    assert _has_english(terms, "Armor Increased")
+    assert _has_english(terms, "Fire Bolt")
+    assert _has_english(terms, "Lucy")
+    assert _has_english(terms, "Heal")
     # Description keys should NOT be extracted.
-    assert "Defense is increased." not in terms
+    assert not _has_english(terms, "Defense is increased.")
     # Source file should be stored from the LocString.
-    assert terms["Armor Increased"]["source_file"] == "LangDataDB.csv"
-    assert terms["Lucy"]["source_file"] == "LangDataDB.csv"
+    assert _find_by_english(terms, "Armor Increased")["source_file"] == "LangDataDB.csv"
+    assert _find_by_english(terms, "Lucy")["source_file"] == "LangDataDB.csv"
     # SkillExtended/ keys should be categorized as skills.
-    assert terms["Heal"]["category"] == "skills"
+    assert _find_by_english(terms, "Heal")["category"] == "skills"
     # _PassiveName suffix overrides Character/ prefix to passives.
-    assert terms["Lucy's Blessing"]["category"] == "passives"
+    assert _find_by_english(terms, "Lucy's Blessing")["category"] == "passives"
 
 
 def test_build_glossary_extracts_mechanic_keys(sample_base_strings, glossary_categories):
@@ -41,20 +54,20 @@ def test_build_glossary_extracts_mechanic_keys(sample_base_strings, glossary_cat
     )
     terms = glossary["terms"]
     # Battle/Keyword/ entries (without _Desc) are mechanics.
-    assert "Innate" in terms
-    assert terms["Innate"]["category"] == "mechanics"
+    assert _has_english(terms, "Innate")
+    assert _find_by_english(terms, "Innate")["category"] == "mechanics"
     # _Desc keys should NOT be extracted.
-    assert "This skill is always in your hand." not in terms
+    assert not _has_english(terms, "This skill is always in your hand.")
     # Battle/SkillTooltip/ entries are mechanics.
-    assert "Accuracy" in terms
-    assert terms["Accuracy"]["category"] == "mechanics"
+    assert _has_english(terms, "Accuracy")
+    assert _find_by_english(terms, "Accuracy")["category"] == "mechanics"
     # Exact key System/Debuff maps to "Debuff".
-    assert "Debuff" in terms
-    assert terms["Debuff"]["category"] == "mechanics"
-    assert terms["Debuff"]["source_file"] == "LangSystemDB.csv"
+    assert _has_english(terms, "Debuff")
+    assert _find_by_english(terms, "Debuff")["category"] == "mechanics"
+    assert _find_by_english(terms, "Debuff")["source_file"] == "LangSystemDB.csv"
     # System/StatDesc/ values are cleaned of sprites and placeholders.
-    assert "Critical Hit Chance" in terms
-    assert terms["Critical Hit Chance"]["category"] == "mechanics"
+    assert _has_english(terms, "Critical Hit Chance")
+    assert _find_by_english(terms, "Critical Hit Chance")["category"] == "mechanics"
 
 
 def test_build_glossary_sets_timestamps(sample_base_strings, glossary_categories):
@@ -81,18 +94,21 @@ def test_save_and_load_glossary(tmp_storage):
 def test_add_glossary_term():
     glossary = {"terms": {}}
     add_glossary_term(glossary, "Fire Bolt", {"Korean": "화염구"}, category="skills")
-    assert "Fire Bolt" in glossary["terms"]
-    assert glossary["terms"]["Fire Bolt"]["source_mappings"]["Korean"] == "화염구"
-    assert glossary["terms"]["Fire Bolt"]["created_at"] is not None
-    assert glossary["terms"]["Fire Bolt"]["updated_at"] is not None
+    # Term is keyed by source text, not English.
+    assert "화염구" in glossary["terms"]
+    entry = glossary["terms"]["화염구"]
+    assert entry["english"] == "Fire Bolt"
+    assert entry["source_mappings"]["Korean"] == "화염구"
+    assert entry["created_at"] is not None
+    assert entry["updated_at"] is not None
 
 
 def test_add_glossary_term_preserves_created_at():
     glossary = {"terms": {}}
     add_glossary_term(glossary, "Fire Bolt", {"Korean": "화염구"}, category="skills")
-    original_created = glossary["terms"]["Fire Bolt"]["created_at"]
+    original_created = glossary["terms"]["화염구"]["created_at"]
     add_glossary_term(glossary, "Fire Bolt", {"Korean": "화염구", "Chinese": "火球术"}, category="skills")
-    assert glossary["terms"]["Fire Bolt"]["created_at"] == original_created
+    assert glossary["terms"]["화염구"]["created_at"] == original_created
 
 
 def test_glossary_prompt_format():

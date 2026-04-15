@@ -175,7 +175,8 @@ def build_glossary_from_base_game(
                 source_mappings[lang] = text
 
         now = datetime.now(timezone.utc).isoformat()
-        glossary["terms"][english] = {
+        glossary["terms"][key] = {
+            "english": english,
             "category": category,
             "key": key,
             "source_file": loc_str.source_file,
@@ -187,8 +188,10 @@ def build_glossary_from_base_game(
     # Add manual mechanic terms that have no dedicated key.
     now = datetime.now(timezone.utc).isoformat()
     for english, mappings in _MANUAL_MECHANIC_TERMS.items():
-        if english not in glossary["terms"]:
-            glossary["terms"][english] = {
+        manual_key = f"_manual/{english}"
+        if manual_key not in glossary["terms"]:
+            glossary["terms"][manual_key] = {
+                "english": english,
                 "category": "mechanics",
                 "key": "",
                 "source_file": "LangSystemDB.csv",
@@ -230,7 +233,10 @@ def extract_name_key_suggestions(
         List of new suggestion dicts ready to be stored.
     """
     existing_english = {_TAG_PATTERN.sub("", s.get("english", "")).lower() for s in existing_suggestions}
-    glossary_terms = {_TAG_PATTERN.sub("", t).lower() for t in mod_glossary.get("terms", {}).keys()}
+    glossary_terms = {
+        _TAG_PATTERN.sub("", info.get("english", t)).lower()
+        for t, info in mod_glossary.get("terms", {}).items()
+    }
     existing_sources: set[str] = set()
     for s in existing_suggestions:
         src = s.get("source", "").strip()
@@ -356,7 +362,8 @@ def suggest_glossary_edits(
     terms = mod_glossary.get("terms", {})
     edits: list[dict] = []
 
-    for english, info in terms.items():
+    for term_key, info in terms.items():
+        english = info.get("english", term_key)
         category = info.get("category", "")
         if category not in _TITLE_CASE_CATEGORIES:
             continue
@@ -379,7 +386,7 @@ def suggest_glossary_edits(
                 "source_lang": source_lang,
                 "category": category,
                 "reason": f"Title case: '{english}' -> '{title_cased}'",
-                "edit_of": english,
+                "edit_of": term_key,
             }
         )
         existing_english.add(title_cased.lower())
@@ -448,10 +455,19 @@ def add_glossary_term(
         glossary["terms"] = {}
 
     now = datetime.now(timezone.utc).isoformat()
-    existing = glossary["terms"].get(english_term)
+
+    # Use the first source text as the unique key when available,
+    # otherwise fall back to the English term.
+    if source_mappings:
+        term_key = next(iter(source_mappings.values()))
+    else:
+        term_key = english_term
+
+    existing = glossary["terms"].get(term_key)
     created_at = existing.get("created_at", now) if existing else now
 
-    glossary["terms"][english_term] = {
+    glossary["terms"][term_key] = {
+        "english": english_term,
         "category": category,
         "key": "",
         "source_file": "",
@@ -499,7 +515,8 @@ def get_glossary_prompt(
 
     # Group by category, filtering to allowed categories.
     by_category: dict[str, list[tuple[str, dict]]] = {}
-    for english_term, info in glossary["terms"].items():
+    for term_key, info in glossary["terms"].items():
+        english_term = info.get("english", term_key)
         if exclude_terms and english_term in exclude_terms:
             continue
         cat = info.get("category", "other")
@@ -640,22 +657,22 @@ def print_glossary(glossary: dict) -> None:
         print("Glossary is empty.")
         return
 
-    by_category: dict[str, list[str]] = {}
-    for english_term, info in terms.items():
+    by_category: dict[str, list[tuple[str, dict]]] = {}
+    for term_key, info in terms.items():
         cat = info.get("category", "other")
         if cat not in by_category:
             by_category[cat] = []
-        by_category[cat].append(english_term)
+        by_category[cat].append((term_key, info))
 
     for category, term_list in sorted(by_category.items()):
         print(f"\n=== {category.upper()} ({len(term_list)} terms) ===")
-        for term in sorted(term_list):
-            info = terms[term]
+        for term_key, info in sorted(term_list, key=lambda x: x[0]):
+            english = info.get("english", term_key)
             mappings = info.get("source_mappings", {})
             if mappings:
                 first_mapping = next(iter(mappings.values()))
-                print(f"  {term} ← {first_mapping}")
+                print(f"  {english} ← {first_mapping}")
             else:
-                print(f"  {term}")
+                print(f"  {english}")
 
     print(f"\nTotal: {len(terms)} terms")
