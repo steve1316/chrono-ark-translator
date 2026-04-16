@@ -17,6 +17,27 @@ from backend.models import LocString
 from backend.text_utils import has_cjk as _has_cjk
 
 
+def _detect_cjk_language(text: str) -> str:
+    """Detect the source language of a CJK string by script.
+
+    Uses the presence of script-specific characters to distinguish
+    Japanese (hiragana/katakana), Korean (hangul), and Chinese (CJK
+    ideographs only).
+
+    Args:
+        text: The CJK string to classify.
+
+    Returns:
+        `"Japanese"`, `"Korean"`, or `"Chinese"`.
+    """
+    for c in text:
+        if "\u3040" <= c <= "\u30ff":
+            return "Japanese"
+        if "\uac00" <= c <= "\ud7af":
+            return "Korean"
+    return "Chinese"
+
+
 def _load_dotnet_pe(dll_path: Path):
     """Load a .NET PE file, returning the DotNetPE object or None.
 
@@ -170,7 +191,7 @@ def extract_dll_loc_strings(
                 key=key,
                 type="Text",
                 desc="",
-                translations={"Chinese": value},
+                translations={_detect_cjk_language(value): value},
                 source_file=source_file_label,
             )
 
@@ -227,7 +248,7 @@ def extract_dll_orphan_strings(
                 key=key,
                 type="Text",
                 desc="",
-                translations={"Chinese": text},
+                translations={_detect_cjk_language(text): text},
                 source_file=source_file_label,
                 untranslatable_reason=(
                     "Hardcoded in the mod's compiled DLL. The game only"
@@ -410,7 +431,7 @@ def extract_mod_dll_orphan_strings(
         mod_path: Path to the mod's root directory.
         skip_dlls: Set of DLL filenames to skip.
         paired_strings: LocStrings already captured by the paired extraction
-            pass. Their Chinese values are excluded from orphan results.
+            pass. Their source text values are excluded from orphan results.
         min_string_length: Minimum length for a string to be considered.
 
     Returns:
@@ -422,9 +443,9 @@ def extract_mod_dll_orphan_strings(
 
     paired_values: set[str] = set()
     for loc_str in paired_strings.values():
-        val = loc_str.translations.get("Chinese", "")
-        if val:
-            paired_values.add(val)
+        for val in loc_str.translations.values():
+            if val:
+                paired_values.add(val)
 
     all_strings: dict[str, LocString] = {}
 
