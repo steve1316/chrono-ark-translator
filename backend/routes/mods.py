@@ -243,6 +243,7 @@ async def get_mod_detail(mod_id: str):
     tracker.update(mod_id, strings, _adapter.source_languages)
 
     # Build result list and collect actually-translated keys.
+    has_harmony_mod = _adapter.get_translation_overrides_dir() is not None
     lang_override = load_source_language_override(mod_id)
     translated_keys = []
     results = []
@@ -274,7 +275,7 @@ async def get_mod_detail(mod_id: str):
                 "synced_english": english if is_synced else "",
                 "source_file": loc_str.source_file,
                 "translated_by": translation_providers.get(key, ""),
-                "untranslatable_reason": loc_str.untranslatable_reason,
+                "untranslatable_reason": "" if has_harmony_mod and key.startswith("DLL/") else loc_str.untranslatable_reason,
             }
         )
 
