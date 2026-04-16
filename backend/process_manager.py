@@ -52,8 +52,8 @@ def start_process(name: str, args: list[str], log_dir: Path) -> tuple[bool, str]
         return False, f"{name} is already running (managed by this app)."
 
     log_dir.mkdir(parents=True, exist_ok=True)
-    stdout_log = open(log_dir / f"{name}_stdout.log", "w")
-    stderr_log = open(log_dir / f"{name}_stderr.log", "w")
+    stdout_log = open(log_dir / f"{name}_stdout.log", "w", encoding="utf-8")
+    stderr_log = open(log_dir / f"{name}_stderr.log", "w", encoding="utf-8")
 
     try:
         proc = subprocess.Popen(

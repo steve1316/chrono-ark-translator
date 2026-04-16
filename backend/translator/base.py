@@ -333,7 +333,7 @@ class TranslationProvider(ABC):
 
         except json.JSONDecodeError:
             print(f"  Warning: Failed to parse {self.name} response as JSON")
-            print(f"  Response: {text[:200]}...")
+            print(f"  Response: {ascii(text[:200])}")
 
         return {}, []
 
