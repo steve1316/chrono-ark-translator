@@ -53,8 +53,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
 
     const [hasExportChanges, setHasExportChanges] = useState(false)
     const [hasPreviousSync, setHasPreviousSync] = useState(false)
-    const [duplicateFiles, setDuplicateFiles] = useState<string[]>([])
-    const [showDuplicateDetails, setShowDuplicateDetails] = useState(false)
+
 
     const [suggestions, setSuggestions] = useState<TermSuggestion[]>([])
     const [showSuggestionModal, setShowSuggestionModal] = useState(false)
@@ -259,8 +258,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
 
     /**
      * Fetches the full mod detail including all localization strings, mod metadata,
-     * and duplicate file information.
-     * GET `/api/mods/:modId` -> `{ strings, name, author, preview_image, url, duplicate_files }`.
+     * GET `/api/mods/:modId` -> `{ strings, name, author, preview_image, url }`.
      */
     const fetchModDetail = async (silent = false) => {
         if (!modId) return
@@ -273,7 +271,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             setModAuthor(data.author ?? "")
             setModPreviewImage(data.preview_image ?? null)
             setModUrl(data.url ?? null)
-            setDuplicateFiles(data.duplicate_files ?? [])
             setSourceLangOverride(data.source_language_override ?? null)
         } catch (err) {
             console.error("Failed to fetch mod detail:", err)
@@ -429,23 +426,17 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
 
     /**
      * Writes saved translations back to the mod's original CSV files on disk.
-     * POST `/api/mods/:modId/export` -> `{ applied, files_written, files_removed }`.
+     * POST `/api/mods/:modId/export` -> `{ applied, files_written }`.
      *
-     * Shows a confirmation dialog first (including duplicate file warnings if any).
      * On success, reports how many translations were applied and which files were
-     * written. If duplicate files existed, they are consolidated (merged then deleted)
-     * as part of the export.
+     * written.
      */
     const handleExportConfirm = (resync: boolean) => {
         if (!modId) return
-        const dupeWarning =
-            duplicateFiles.length > 0
-                ? `\n\nThis will also consolidate ${duplicateFiles.length} duplicate file(s):\n${duplicateFiles.join("\n")}\n\nDuplicate files will be deleted after merging.`
-                : ""
         const resyncNote = resync ? "This will restore the original files and re-apply all translations from scratch.\n\n" : ""
         setConfirmModal({
             type: resync ? "resync" : "export",
-            message: `${resyncNote}This will overwrite the mod's localization files (CSVs and/or gdata JSONs) with your translations.${dupeWarning} Continue?`,
+            message: `${resyncNote}This will overwrite the mod's localization files (CSVs and/or gdata JSONs) with your translations. Continue?`,
         })
     }
 
@@ -457,7 +448,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             const res = await fetch(url, { method: "POST" })
             if (res.ok) {
                 const data = await res.json()
-                const removedMsg = data.files_removed?.length ? `\nConsolidated ${data.files_removed.length} duplicate file(s).` : ""
                 const parts: string[] = []
                 if (data.files_written?.length) {
                     parts.push(`${data.files_written.length} CSV file(s): ${data.files_written.join(", ")}`)
@@ -471,7 +461,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                 if (data.text_overrides_written > 0) {
                     parts.push(`${data.text_overrides_written} DLL text override(s) to ModTranslationInjector`)
                 }
-                setTranslateBanner({ type: "success", message: `Synced ${data.applied} translations to ${parts.join("\n")}${removedMsg}` })
+                setTranslateBanner({ type: "success", message: `Synced ${data.applied} translations to ${parts.join("\n")}` })
                 fetchExportStatus()
                 fetchModDetail()
             } else {
@@ -1423,29 +1413,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             Save Context
                         </button>
                     </div>
-                </div>
-            )}
-
-            {/* --- Duplicate Files Warning ---
-                Shown when the backend detects multiple localization CSV files with
-                the same language in the mod directory. Clicking "Sync Changes"
-                will consolidate these duplicates by merging their contents and
-                deleting the extra files. The details are collapsible. */}
-            {duplicateFiles.length > 0 && (
-                <div className="glass-card" style={{ padding: "1rem 1.5rem", marginBottom: "1rem", borderLeft: "3px solid var(--accent-secondary)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }} onClick={() => setShowDuplicateDetails(!showDuplicateDetails)}>
-                        <span style={{ color: "var(--accent-secondary)" }}>
-                            Found {duplicateFiles.length} duplicate localization file{duplicateFiles.length > 1 ? "s" : ""}. These will be consolidated when you sync.
-                        </span>
-                        <span style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>{showDuplicateDetails ? "Hide" : "Show details"}</span>
-                    </div>
-                    {showDuplicateDetails && (
-                        <ul style={{ margin: "0.75rem 0 0 1rem", color: "var(--text-dim)", fontSize: "0.9rem" }}>
-                            {duplicateFiles.map((f) => (
-                                <li key={f}>{f}</li>
-                            ))}
-                        </ul>
-                    )}
                 </div>
             )}
 

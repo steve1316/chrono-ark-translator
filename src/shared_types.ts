@@ -157,6 +157,4 @@ export type ModDetail = {
     preview_image: string | null
     /** All localizable strings extracted from the mod. */
     strings: LocString[]
-    /** List of CSV filenames that appear more than once in the mod's directory tree. */
-    duplicate_files: string[]
 }

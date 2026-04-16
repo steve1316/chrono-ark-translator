@@ -155,10 +155,9 @@ async def get_mod_detail(mod_id: str):
         mod_id: The workshop identifier of the mod.
 
     Returns:
-        A dict with the mod's metadata, a `strings` list containing every
+        A dict with the mod's metadata and a `strings` list containing every
         localization entry (key, source text, English text, translation
-        status), and a `duplicate_files` list of any variant CSV paths
-        that were found.
+        status).
 
     Raises:
         HTTPException: 404 if no mod with the given id is found.
@@ -167,7 +166,7 @@ async def get_mod_detail(mod_id: str):
     mod_path = mod.path
 
     # Extract current strings
-    strings, duplicate_files = _adapter.extract_strings(mod_path)
+    strings, _ = _adapter.extract_strings(mod_path)
 
     # For gdata-sourced mods whose JSONs have already been exported,
     # restore the original Chinese source text from backup.
@@ -238,12 +237,18 @@ async def get_mod_detail(mod_id: str):
         if key in strings:
             strings[key].translations["English"] = english
 
+    # When the Harmony injection mod is installed, DLL strings become
+    # translatable — clear their untranslatable_reason so the progress
+    # tracker includes them in total_keys.
+    has_harmony_mod = _adapter.get_translation_overrides_dir() is not None
+    if has_harmony_mod:
+        for key, loc_str in strings.items():
+            if key.startswith("DLL/") and loc_str.untranslatable_reason:
+                loc_str.untranslatable_reason = ""
+
     # Update progress tracker so dashboard stats reflect this mod's strings.
     tracker = ProgressTracker()
     tracker.update(mod_id, strings, _adapter.source_languages)
-
-    # Build result list and collect actually-translated keys.
-    has_harmony_mod = _adapter.get_translation_overrides_dir() is not None
     lang_override = load_source_language_override(mod_id)
     translated_keys = []
     results = []
@@ -275,7 +280,7 @@ async def get_mod_detail(mod_id: str):
                 "synced_english": english if is_synced else "",
                 "source_file": loc_str.source_file,
                 "translated_by": translation_providers.get(key, ""),
-                "untranslatable_reason": "" if has_harmony_mod and key.startswith("DLL/") else loc_str.untranslatable_reason,
+                "untranslatable_reason": loc_str.untranslatable_reason,
             }
         )
 
@@ -290,7 +295,6 @@ async def get_mod_detail(mod_id: str):
         "url": _adapter.get_mod_url(mod_id),
         "preview_image": f"/workshop/{mod_id}/{preview_img.name}" if preview_img else None,
         "strings": results,
-        "duplicate_files": duplicate_files,
         "source_language_override": lang_override,
     }
 
@@ -578,9 +582,9 @@ async def get_export_status(mod_id: str):
 async def export_mod(mod_id: str, resync: bool = False):
     """Write saved translations back into the mod's original CSV files.
 
-    Applies all stored English translations to the mod's localization CSVs,
-    removes any duplicate variant files, and records an export snapshot so
-    subsequent `get_export_status` calls can detect new changes.
+    Applies all stored English translations to the mod's localization CSVs
+    and records an export snapshot so subsequent `get_export_status` calls
+    can detect new changes.
 
     When `resync` is True, the original CSV and gdata files are restored
     from backups first so that translations are applied on top of a clean
@@ -593,8 +597,7 @@ async def export_mod(mod_id: str, resync: bool = False):
 
     Returns:
         A dict with `status`, the number of `applied` translations,
-        `files_written` (list of CSV filenames updated), and
-        `files_removed` (list of variant file paths deleted).
+        and `files_written` (list of CSV filenames updated).
 
     Raises:
         HTTPException: 400 if no translations exist for the mod.
@@ -651,7 +654,7 @@ async def export_mod(mod_id: str, resync: bool = False):
         raise HTTPException(status_code=400, detail="No translations found for this mod")
 
     # Extract current strings from the mod.
-    strings, variant_files = _adapter.extract_strings(mod_path)
+    strings, _ = _adapter.extract_strings(mod_path)
 
     # Capture pre-export English values so we can show a diff in the UI.
     pre_export_english = {key: loc_str.translations.get("English", "") for key, loc_str in strings.items() if key in translations}
@@ -670,7 +673,6 @@ async def export_mod(mod_id: str, resync: bool = False):
 
     files_written = []
     gdata_files_written = []
-    files_removed = []
 
     if not overrides_dir:
         # No Harmony mod — write translations into the original mod files.
@@ -707,32 +709,6 @@ async def export_mod(mod_id: str, resync: bool = False):
 
             _adapter.export_strings(output_path, entries)
             files_written.append(csv_filename)
-
-        # Consolidate: delete variant files.
-        if variant_files:
-            for variant_rel in variant_files:
-                variant_path = mod_path / variant_rel
-                if variant_path.exists():
-                    variant_path.unlink()
-                    files_removed.append(variant_rel)
-
-            for subdir in mod_path.iterdir():
-                if subdir.is_dir() and subdir.name not in ("Localization", "Assemblies"):
-                    try:
-                        if not any(subdir.iterdir()):
-                            subdir.rmdir()
-                    except (OSError, StopIteration):
-                        pass
-
-            loc_dir = mod_path / "Localization"
-            if loc_dir.exists():
-                for subdir in loc_dir.iterdir():
-                    if subdir.is_dir():
-                        try:
-                            if not any(subdir.iterdir()):
-                                subdir.rmdir()
-                        except (OSError, StopIteration):
-                            pass
 
     # Write translation overrides for the Harmony injection mod.
     # JSON is grouped by mod name: { "ModName": { "key": "English", ... } }
@@ -814,7 +790,6 @@ async def export_mod(mod_id: str, resync: bool = False):
         "applied": applied,
         "files_written": files_written,
         "gdata_files_written": gdata_files_written,
-        "files_removed": files_removed,
         "keyed_overrides_written": keyed_overrides_written,
         "text_overrides_written": text_overrides_written,
     }
