@@ -363,6 +363,15 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
         if key in strings:
             strings[key].translations["English"] = english
 
+    # When the Harmony injection mod is installed, DLL strings become
+    # translatable — clear their untranslatable_reason so the progress
+    # tracker includes them in total_keys.
+    has_harmony_mod = _adapter.get_translation_overrides_dir() is not None
+    if has_harmony_mod:
+        for key, loc_str in strings.items():
+            if key.startswith("DLL/") and loc_str.untranslatable_reason:
+                loc_str.untranslatable_reason = ""
+
     # Update the progress snapshot.
     tracker = ProgressTracker()
     tracker.update(mod_id, strings, _adapter.source_languages)
