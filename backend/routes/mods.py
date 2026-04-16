@@ -747,10 +747,7 @@ async def export_mod(mod_id: str, resync: bool = False):
 
             if loc_str.untranslatable_reason and key.startswith("DLL/"):
                 # DLL orphan string: map original CJK text to English.
-                chinese = (
-                    loc_str.translations.get("Chinese", "")
-                    or loc_str.translations.get("Chinese-TW [zh-tw]", "")
-                )
+                chinese = loc_str.translations.get("Chinese", "") or loc_str.translations.get("Chinese-TW [zh-tw]", "")
                 if chinese:
                     text_overrides[chinese] = english
             else:

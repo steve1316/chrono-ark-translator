@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react"
 import { useParams } from "react-router-dom"
 import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook, FaFolderOpen, FaExclamationCircle } from "react-icons/fa"
-import type { LocString, TermSuggestion } from "../../shared_types"
+import type { GlossaryTerm, LocString, TermSuggestion } from "../../shared_types"
 import { getRowStatus, getRowStyle, filterStrings, sortStrings } from "../../utils/stringFilters"
 import type { SortField, SortDirection } from "../../utils/stringFilters"
 import { API_BASE } from "../../config"
@@ -59,7 +59,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [suggestions, setSuggestions] = useState<TermSuggestion[]>([])
     const [showSuggestionModal, setShowSuggestionModal] = useState(false)
     const [showReviewModal, setShowReviewModal] = useState(false)
-    const [modGlossary, setModGlossary] = useState<Record<string, { category: string; source_mappings: Record<string, string> }>>({})
+    const [modGlossary, setModGlossary] = useState<Record<string, GlossaryTerm>>({})
 
     const [translationPreview, setTranslationPreview] = useState<any>(null)
     const [pendingProvider, setPendingProvider] = useState<string>("")
@@ -1159,178 +1159,178 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 .map(([termKey, info]) => {
                                     const english = info.english || termKey
                                     return (
-                                    <div key={termKey} style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--glass-border)" }}>
-                                        {editingTerm === termKey ? (
-                                            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-                                                <input
-                                                    type="text"
-                                                    value={editTermEnglish}
-                                                    onChange={(e) => setEditTermEnglish(e.target.value)}
-                                                    style={{
-                                                        padding: "0.4rem",
-                                                        borderRadius: "6px",
-                                                        background: "rgba(0,0,0,0.2)",
-                                                        border: "1px solid var(--accent-primary)",
-                                                        color: "var(--text-main)",
-                                                        flex: 1,
-                                                        minWidth: "100px",
-                                                    }}
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={editTermSource}
-                                                    onChange={(e) => setEditTermSource(e.target.value)}
-                                                    placeholder="Source text"
-                                                    style={{
-                                                        padding: "0.4rem",
-                                                        borderRadius: "6px",
-                                                        background: "rgba(0,0,0,0.2)",
-                                                        border: "1px solid var(--accent-primary)",
-                                                        color: "var(--text-main)",
-                                                        flex: 1,
-                                                        minWidth: "100px",
-                                                    }}
-                                                />
-                                                <select
-                                                    value={editTermLang}
-                                                    onChange={(e) => setEditTermLang(e.target.value)}
-                                                    style={{
-                                                        padding: "0.4rem",
-                                                        borderRadius: "6px",
-                                                        background: "rgba(0,0,0,0.2)",
-                                                        border: "1px solid var(--glass-border)",
-                                                        color: "var(--text-main)",
-                                                    }}
-                                                >
-                                                    <option value="Chinese">Chinese</option>
-                                                    <option value="Korean">Korean</option>
-                                                    <option value="Japanese">Japanese</option>
-                                                </select>
-                                                <select
-                                                    value={editTermCategory}
-                                                    onChange={(e) => setEditTermCategory(e.target.value)}
-                                                    style={{
-                                                        padding: "0.4rem",
-                                                        borderRadius: "6px",
-                                                        background: "rgba(0,0,0,0.2)",
-                                                        border: "1px solid var(--glass-border)",
-                                                        color: "var(--text-main)",
-                                                    }}
-                                                >
-                                                    <option value="custom">Custom</option>
-                                                    <option value="characters">Characters</option>
-                                                    <option value="skills">Skills</option>
-                                                    <option value="buffs/debuffs">Buffs/Debuffs</option>
-                                                    <option value="items">Items</option>
-                                                    <option value="mechanics">Mechanics</option>
-                                                </select>
-                                                <button
-                                                    className="btn btn-primary"
-                                                    style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
-                                                    onClick={async () => {
-                                                        // Delete old term when editing
-                                                        await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
-                                                            method: "POST",
-                                                            headers: { "Content-Type": "application/json" },
-                                                            body: JSON.stringify({ terms: [termKey] }),
-                                                        })
-                                                        await fetch(`${API_BASE}/mods/${modId}/glossary`, {
-                                                            method: "POST",
-                                                            headers: { "Content-Type": "application/json" },
-                                                            body: JSON.stringify({ english: editTermEnglish, source_mappings: { [editTermLang]: editTermSource }, category: editTermCategory }),
-                                                        })
-                                                        if (editTermEnglish !== english) {
-                                                            setRenamedTerm({ oldName: english, newName: editTermEnglish })
-                                                        }
-                                                        setEditingTerm(null)
-                                                        fetchModGlossary()
-                                                    }}
-                                                >
-                                                    Save
-                                                </button>
-                                                <button className="btn btn-outline" style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }} onClick={() => setEditingTerm(null)}>
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                                <div>
-                                                    <span style={{ fontWeight: 500 }}>{english}</span>
-                                                    <span style={{ color: "var(--text-dim)", marginLeft: "0.75rem", fontSize: "0.85rem" }}>
-                                                        {Object.entries(info.source_mappings || {})
-                                                            .map(([lang, text]) => `${lang}: ${text}`)
-                                                            .join(", ")}
-                                                    </span>
-                                                    <span
+                                        <div key={termKey} style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--glass-border)" }}>
+                                            {editingTerm === termKey ? (
+                                                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                                                    <input
+                                                        type="text"
+                                                        value={editTermEnglish}
+                                                        onChange={(e) => setEditTermEnglish(e.target.value)}
                                                         style={{
-                                                            marginLeft: "0.75rem",
-                                                            fontSize: "0.75rem",
-                                                            padding: "0.1rem 0.4rem",
-                                                            borderRadius: "4px",
-                                                            background: "rgba(138,180,248,0.15)",
-                                                            color: "var(--accent-primary)",
-                                                            textTransform: "capitalize",
+                                                            padding: "0.4rem",
+                                                            borderRadius: "6px",
+                                                            background: "rgba(0,0,0,0.2)",
+                                                            border: "1px solid var(--accent-primary)",
+                                                            color: "var(--text-main)",
+                                                            flex: 1,
+                                                            minWidth: "100px",
+                                                        }}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={editTermSource}
+                                                        onChange={(e) => setEditTermSource(e.target.value)}
+                                                        placeholder="Source text"
+                                                        style={{
+                                                            padding: "0.4rem",
+                                                            borderRadius: "6px",
+                                                            background: "rgba(0,0,0,0.2)",
+                                                            border: "1px solid var(--accent-primary)",
+                                                            color: "var(--text-main)",
+                                                            flex: 1,
+                                                            minWidth: "100px",
+                                                        }}
+                                                    />
+                                                    <select
+                                                        value={editTermLang}
+                                                        onChange={(e) => setEditTermLang(e.target.value)}
+                                                        style={{
+                                                            padding: "0.4rem",
+                                                            borderRadius: "6px",
+                                                            background: "rgba(0,0,0,0.2)",
+                                                            border: "1px solid var(--glass-border)",
+                                                            color: "var(--text-main)",
                                                         }}
                                                     >
-                                                        {info.category}
-                                                    </span>
-                                                </div>
-                                                <div style={{ display: "flex", gap: "0.35rem" }}>
-                                                    <button
-                                                        className="btn btn-outline"
-                                                        style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem" }}
-                                                        onClick={() => {
-                                                            setRenamedTerm(null)
-                                                            setEditingTerm(termKey)
-                                                            setEditTermEnglish(english)
-                                                            const firstLang = Object.keys(info.source_mappings || {})[0] || "Chinese"
-                                                            setEditTermSource((info.source_mappings || {})[firstLang] || "")
-                                                            setEditTermLang(firstLang)
-                                                            setEditTermCategory(info.category || "custom")
+                                                        <option value="Chinese">Chinese</option>
+                                                        <option value="Korean">Korean</option>
+                                                        <option value="Japanese">Japanese</option>
+                                                    </select>
+                                                    <select
+                                                        value={editTermCategory}
+                                                        onChange={(e) => setEditTermCategory(e.target.value)}
+                                                        style={{
+                                                            padding: "0.4rem",
+                                                            borderRadius: "6px",
+                                                            background: "rgba(0,0,0,0.2)",
+                                                            border: "1px solid var(--glass-border)",
+                                                            color: "var(--text-main)",
                                                         }}
                                                     >
-                                                        Edit
-                                                    </button>
+                                                        <option value="custom">Custom</option>
+                                                        <option value="characters">Characters</option>
+                                                        <option value="skills">Skills</option>
+                                                        <option value="buffs/debuffs">Buffs/Debuffs</option>
+                                                        <option value="items">Items</option>
+                                                        <option value="mechanics">Mechanics</option>
+                                                    </select>
                                                     <button
-                                                        className="btn btn-outline"
-                                                        style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "var(--accent-primary)", borderColor: "rgba(138,180,248,0.3)" }}
-                                                        onClick={() => {
-                                                            const oldEnglish = renamedTerm && renamedTerm.newName === english ? renamedTerm.oldName : ""
-                                                            const sourceText = Object.values(info.source_mappings || {})[0] || ""
-                                                            if (!sourceText) return
-                                                            const sourceMatches = strings.filter((s) => s.source.includes(sourceText))
-                                                            const affected = oldEnglish
-                                                                ? sourceMatches
-                                                                      .filter((s) => s.english.includes(oldEnglish))
-                                                                      .map((s) => ({
-                                                                          key: s.key,
-                                                                          old_text: s.english,
-                                                                          new_text: s.english.replace(new RegExp(oldEnglish.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), english),
-                                                                      }))
-                                                                : sourceMatches.filter((s) => !s.english).map((s) => ({ key: s.key, old_text: s.english, new_text: english }))
-                                                            setReplacePreview({ oldTerm: oldEnglish, newTerm: english, sourceText, needsInput: !oldEnglish, affected })
-                                                        }}
-                                                    >
-                                                        Apply
-                                                    </button>
-                                                    <button
-                                                        className="btn btn-outline"
-                                                        style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
+                                                        className="btn btn-primary"
+                                                        style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
                                                         onClick={async () => {
+                                                            // Delete old term when editing
                                                             await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
                                                                 method: "POST",
                                                                 headers: { "Content-Type": "application/json" },
                                                                 body: JSON.stringify({ terms: [termKey] }),
                                                             })
+                                                            await fetch(`${API_BASE}/mods/${modId}/glossary`, {
+                                                                method: "POST",
+                                                                headers: { "Content-Type": "application/json" },
+                                                                body: JSON.stringify({ english: editTermEnglish, source_mappings: { [editTermLang]: editTermSource }, category: editTermCategory }),
+                                                            })
+                                                            if (editTermEnglish !== english) {
+                                                                setRenamedTerm({ oldName: english, newName: editTermEnglish })
+                                                            }
+                                                            setEditingTerm(null)
                                                             fetchModGlossary()
                                                         }}
                                                     >
-                                                        Remove
+                                                        Save
+                                                    </button>
+                                                    <button className="btn btn-outline" style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }} onClick={() => setEditingTerm(null)}>
+                                                        Cancel
                                                     </button>
                                                 </div>
-                                            </div>
-                                        )}
-                                    </div>
+                                            ) : (
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                    <div>
+                                                        <span style={{ fontWeight: 500 }}>{english}</span>
+                                                        <span style={{ color: "var(--text-dim)", marginLeft: "0.75rem", fontSize: "0.85rem" }}>
+                                                            {Object.entries(info.source_mappings || {})
+                                                                .map(([lang, text]) => `${lang}: ${text}`)
+                                                                .join(", ")}
+                                                        </span>
+                                                        <span
+                                                            style={{
+                                                                marginLeft: "0.75rem",
+                                                                fontSize: "0.75rem",
+                                                                padding: "0.1rem 0.4rem",
+                                                                borderRadius: "4px",
+                                                                background: "rgba(138,180,248,0.15)",
+                                                                color: "var(--accent-primary)",
+                                                                textTransform: "capitalize",
+                                                            }}
+                                                        >
+                                                            {info.category}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ display: "flex", gap: "0.35rem" }}>
+                                                        <button
+                                                            className="btn btn-outline"
+                                                            style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem" }}
+                                                            onClick={() => {
+                                                                setRenamedTerm(null)
+                                                                setEditingTerm(termKey)
+                                                                setEditTermEnglish(english)
+                                                                const firstLang = Object.keys(info.source_mappings || {})[0] || "Chinese"
+                                                                setEditTermSource((info.source_mappings || {})[firstLang] || "")
+                                                                setEditTermLang(firstLang)
+                                                                setEditTermCategory(info.category || "custom")
+                                                            }}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-outline"
+                                                            style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "var(--accent-primary)", borderColor: "rgba(138,180,248,0.3)" }}
+                                                            onClick={() => {
+                                                                const oldEnglish = renamedTerm && renamedTerm.newName === english ? renamedTerm.oldName : ""
+                                                                const sourceText = Object.values(info.source_mappings || {})[0] || ""
+                                                                if (!sourceText) return
+                                                                const sourceMatches = strings.filter((s) => s.source.includes(sourceText))
+                                                                const affected = oldEnglish
+                                                                    ? sourceMatches
+                                                                          .filter((s) => s.english.includes(oldEnglish))
+                                                                          .map((s) => ({
+                                                                              key: s.key,
+                                                                              old_text: s.english,
+                                                                              new_text: s.english.replace(new RegExp(oldEnglish.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), english),
+                                                                          }))
+                                                                    : sourceMatches.filter((s) => !s.english).map((s) => ({ key: s.key, old_text: s.english, new_text: english }))
+                                                                setReplacePreview({ oldTerm: oldEnglish, newTerm: english, sourceText, needsInput: !oldEnglish, affected })
+                                                            }}
+                                                        >
+                                                            Apply
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-outline"
+                                                            style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
+                                                            onClick={async () => {
+                                                                await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
+                                                                    method: "POST",
+                                                                    headers: { "Content-Type": "application/json" },
+                                                                    body: JSON.stringify({ terms: [termKey] }),
+                                                                })
+                                                                fetchModGlossary()
+                                                            }}
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     )
                                 })}
                         </div>

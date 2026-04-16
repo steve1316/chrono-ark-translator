@@ -233,10 +233,7 @@ def extract_name_key_suggestions(
         List of new suggestion dicts ready to be stored.
     """
     existing_english = {_TAG_PATTERN.sub("", s.get("english", "")).lower() for s in existing_suggestions}
-    glossary_terms = {
-        _TAG_PATTERN.sub("", info.get("english", t)).lower()
-        for t, info in mod_glossary.get("terms", {}).items()
-    }
+    glossary_terms = {_TAG_PATTERN.sub("", info.get("english", t)).lower() for t, info in mod_glossary.get("terms", {}).items()}
     existing_sources: set[str] = set()
     for s in existing_suggestions:
         src = s.get("source", "").strip()
