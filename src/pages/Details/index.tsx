@@ -466,10 +466,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                     parts.push(`${data.gdata_files_written.length} gdata JSON file(s): ${data.gdata_files_written.join(", ")}`)
                 }
                 if (data.keyed_overrides_written > 0) {
-                    parts.push(`${data.keyed_overrides_written} keyed override(s) to ModEnglishTranslations`)
+                    parts.push(`${data.keyed_overrides_written} keyed override(s) to ModTranslationInjector`)
                 }
                 if (data.text_overrides_written > 0) {
-                    parts.push(`${data.text_overrides_written} DLL text override(s) to ModEnglishTranslations`)
+                    parts.push(`${data.text_overrides_written} DLL text override(s) to ModTranslationInjector`)
                 }
                 setTranslateBanner({ type: "success", message: `Synced ${data.applied} translations to ${parts.join("\n")}${removedMsg}` })
                 fetchExportStatus()

@@ -267,7 +267,7 @@ class ChronoArkAdapter(GameAdapter):
         return "LangSystemDB.csv"
 
     def get_translation_overrides_dir(self) -> Optional[Path]:
-        """Return the path to the ModEnglishTranslations mod directory.
+        """Return the path to the ModTranslationInjector mod directory.
 
         Derives the game's local Mod directory from `_BASE_GAME_PATH`
         (which points to `ChronoArk_Data/StreamingAssets`).
@@ -276,7 +276,7 @@ class ChronoArkAdapter(GameAdapter):
             Path to the mod directory, or None if it does not exist.
         """
         game_root = self._BASE_GAME_PATH.parent.parent
-        overrides_dir = game_root / "Mod" / "ModEnglishTranslations"
+        overrides_dir = game_root / "Mod" / "ModTranslationInjector"
         if not overrides_dir.exists():
             return None
         return overrides_dir

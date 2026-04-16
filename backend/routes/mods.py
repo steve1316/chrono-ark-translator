@@ -735,9 +735,13 @@ async def export_mod(mod_id: str, resync: bool = False):
                             pass
 
     # Write translation overrides for the Harmony injection mod.
+    # JSON is grouped by mod name: { "ModName": { "key": "English", ... } }
     keyed_overrides_written = 0
     text_overrides_written = 0
     if overrides_dir:
+        mod_info = _find_mod(mod_id)
+        mod_name = mod_info.name
+
         keyed_overrides: dict[str, str] = {}
         text_overrides: dict[str, str] = {}
 
@@ -747,8 +751,10 @@ async def export_mod(mod_id: str, resync: bool = False):
                 continue
 
             if loc_str.untranslatable_reason and key.startswith("DLL/"):
-                # DLL orphan string: map original CJK text to English.
-                chinese = loc_str.translations.get("Chinese", "") or loc_str.translations.get("Chinese-TW [zh-tw]", "")
+                chinese = (
+                    loc_str.translations.get("Chinese", "")
+                    or loc_str.translations.get("Chinese-TW [zh-tw]", "")
+                )
                 if chinese:
                     text_overrides[chinese] = english
             else:
@@ -756,14 +762,14 @@ async def export_mod(mod_id: str, resync: bool = False):
 
         if keyed_overrides:
             keyed_path = overrides_dir / "keyed_overrides.json"
-            existing = {}
+            existing: dict = {}
             if keyed_path.exists():
                 try:
                     with open(keyed_path, "r", encoding="utf-8") as f:
                         existing = json.load(f)
                 except (json.JSONDecodeError, OSError):
                     pass
-            existing.update(keyed_overrides)
+            existing[mod_name] = keyed_overrides
             with open(keyed_path, "w", encoding="utf-8") as f:
                 json.dump(existing, f, indent=2, ensure_ascii=False)
             keyed_overrides_written = len(keyed_overrides)
@@ -777,7 +783,7 @@ async def export_mod(mod_id: str, resync: bool = False):
                         existing = json.load(f)
                 except (json.JSONDecodeError, OSError):
                     pass
-            existing.update(text_overrides)
+            existing[mod_name] = text_overrides
             with open(text_path, "w", encoding="utf-8") as f:
                 json.dump(existing, f, indent=2, ensure_ascii=False)
             text_overrides_written = len(text_overrides)
