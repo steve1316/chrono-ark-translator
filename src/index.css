@@ -456,8 +456,8 @@ th {
 /* --- Sidebar --- */
 
 .sidebar {
-    width: 280px;
-    min-width: 280px;
+    width: 200px;
+    min-width: 200px;
     flex-shrink: 0;
     border-right: 1px solid var(--glass-border);
     padding: 2rem 1.5rem;
