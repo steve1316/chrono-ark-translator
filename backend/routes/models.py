@@ -117,6 +117,17 @@ class SourceLanguageOverride(BaseModel):
     source_language: Optional[str] = None
 
 
+class TargetLanguageOverride(BaseModel):
+    """Payload for setting a per-mod target language override.
+
+    Attributes:
+        target_language: Language name to translate into (e.g. `"Chinese"`),
+            or None to revert to default (English).
+    """
+
+    target_language: Optional[str] = None
+
+
 class SettingsResponse(BaseModel):
     """Current application settings returned by GET /api/settings.
 
