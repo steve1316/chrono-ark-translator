@@ -193,9 +193,12 @@ async def preview_translation(req: TranslationRequest):
     source language so the user can inspect what will be sent before
     committing to a full translation run.
 
+    When `req.retranslate` is True, all translatable strings are included
+    regardless of whether they already have an English translation.
+
     Args:
-        req: Translation request containing the mod id and optional provider
-            override.
+        req: Translation request containing the mod id, optional provider
+            override, and optional retranslate flag.
 
     Returns:
         A dict with `total_strings`, `total_batches`, `batch_size`,
@@ -217,10 +220,20 @@ async def preview_translation(req: TranslationRequest):
         if key in strings:
             strings[key].translations["English"] = english
 
-    untranslated = _adapter.get_untranslated(strings)
+    if req.retranslate:
+        # Re-translate: include all strings that have source text, even if
+        # they already have an English translation.
+        target = {
+            key: loc_str
+            for key, loc_str in strings.items()
+            if not loc_str.untranslatable_reason or key.startswith("DLL/")
+            if _adapter.detect_source_language(loc_str) is not None
+        }
+    else:
+        target = _adapter.get_untranslated(strings)
 
-    if not untranslated:
-        return {"total_strings": 0, "message": "All strings already translated", "previews": {}}
+    if not target:
+        return {"total_strings": 0, "message": "All strings already translated" if not req.retranslate else "No translatable strings found", "previews": {}}
 
     provider_name = req.provider or config.TRANSLATION_PROVIDER
     provider = get_provider(provider_name)
@@ -234,7 +247,7 @@ async def preview_translation(req: TranslationRequest):
 
     lang_override = load_source_language_override(req.mod_id)
     by_lang: dict[str, list] = {}
-    for key, loc_str in untranslated.items():
+    for key, loc_str in target.items():
         lang = resolve_source_language(loc_str, lang_override)
         if lang:
             if lang not in by_lang:
@@ -296,7 +309,7 @@ async def preview_translation(req: TranslationRequest):
             )
 
     return {
-        "total_strings": len(untranslated),
+        "total_strings": len(target),
         "total_batches": total_batches,
         "batch_size": batch_size,
         "provider": provider.name,

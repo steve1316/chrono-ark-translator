@@ -56,6 +56,7 @@ class TranslationRequest(BaseModel):
 
     mod_id: str
     provider: Optional[str] = None
+    retranslate: bool = False
 
 
 class BatchTranslationRequest(BaseModel):
