@@ -162,9 +162,7 @@ def _parse_csv_content(file_path: Path) -> list[LocString]:
     # (e.g. `Character/Suzakuin Momiji_name`).  The range U+00C0–U+024F
     # covers Latin-1 Supplement through Latin Extended-B (á, ē, ǐ, etc.).
     _LATIN = r"A-Za-z0-9\u00C0-\u024F"
-    key_pattern = re.compile(
-        rf"^[{_LATIN}_\-\.][{_LATIN}_\-\./]*(?:/[{_LATIN}_\-\./ ]+)?$"
-    )
+    key_pattern = re.compile(rf"^[{_LATIN}_\-\.][{_LATIN}_\-\./]*(?:/[{_LATIN}_\-\./ ]+)?$")
 
     results = []
 
@@ -230,6 +228,7 @@ def _parse_csv_content(file_path: Path) -> list[LocString]:
                     last_entry.translations[target_lang] = (old_val + "\n" + val).strip()
                 elif target_idx == col_indices.get("Desc"):
                     last_entry.desc = (last_entry.desc + "\n" + val).strip()
+            current_col_offset = min(current_col_offset + len(row) - 1, len(header) - 1)
             continue
 
         # New valid record
