@@ -39,6 +39,9 @@ _MANUAL_MECHANIC_TERMS: dict[str, dict[str, str]] = {
     "Discarded": {"Chinese": "丢弃", "Korean": "버림", "Japanese": "捨てた"},
     "Fixed Ability": {"Chinese": "固有能力", "Korean": "고유 능력", "Japanese": "固有能力"},
     "Standby": {"Chinese": "待机", "Korean": "대기", "Japanese": "待機"},
+    "Mana": {"Chinese": "AP", "Korean": "AP", "Japanese": "AP"},
+    "stack": {"Chinese": "layer", "Korean": "layer", "Japanese": "layer"},
+    "stacks": {"Chinese": "layers", "Korean": "layers", "Japanese": "layers"},
 }
 
 # Mechanic-pattern keys to skip (not actual mechanic terms).
@@ -481,9 +484,15 @@ def get_glossary_prompt(
     allowed_categories: list[str] | None = None,
     source_lang: str | None = None,
     exclude_terms: set[str] | None = None,
+    target_lang: str = "English",
 ) -> str:
     """
     Format the glossary as context for an LLM translation prompt.
+
+    When translating into English (default), shows English terms bold with
+    source language mappings. When translating from English into a CJK
+    language, reverses the direction: shows the target language term bold
+    with the English source mapping.
 
     Args:
         glossary: The glossary dictionary.
@@ -493,6 +502,7 @@ def get_glossary_prompt(
         source_lang: If provided, only include mappings for this language.
             This significantly reduces prompt size.
         exclude_terms: If provided, skip any term whose key is in this set.
+        target_lang: The language being translated into. Defaults to `"English"`.
 
     Returns:
         Formatted string suitable for use as LLM system prompt context.
@@ -503,10 +513,12 @@ def get_glossary_prompt(
     if allowed_categories is None:
         allowed_categories = config.GLOSSARY_CATEGORIES
 
+    reverse = target_lang != "English"
+
     lines = [
         "## Game Terminology Glossary",
         "",
-        "Use these EXACT English terms when translating. Do not paraphrase:",
+        f"Use these EXACT {target_lang} terms when translating. Do not paraphrase:",
         "",
     ]
 
@@ -521,7 +533,12 @@ def get_glossary_prompt(
             continue
 
         mappings = info.get("source_mappings", {})
-        if source_lang:
+        if reverse:
+            # When translating English→CJK, only include terms that have
+            # a mapping for the target language.
+            if target_lang not in mappings:
+                continue
+        elif source_lang:
             # Only include terms that have a mapping for the source language.
             if source_lang not in mappings:
                 continue
@@ -537,7 +554,11 @@ def get_glossary_prompt(
         lines.append(f"### {category.title()}")
         for english_term, info in sorted(terms, key=lambda x: x[0]):
             mappings = info.get("source_mappings", {})
-            if mappings:
+            if reverse:
+                # Show target-language term bold, English as source.
+                target_term = mappings.get(target_lang, english_term)
+                lines.append(f"- **{target_term}** ← English: {english_term}")
+            elif mappings:
                 if source_lang and source_lang in mappings:
                     mapping_str = f"{source_lang}: {mappings[source_lang]}"
                 else:
@@ -554,6 +575,7 @@ def get_combined_glossary_prompt(
     base: dict,
     mod: dict,
     source_lang: str | None = None,
+    target_lang: str = "English",
 ) -> str:
     """
     Build a glossary prompt from base and mod glossaries.
@@ -566,6 +588,7 @@ def get_combined_glossary_prompt(
         base: The base game glossary.
         mod: The mod-specific glossary.
         source_lang: If provided, only include mappings for this language.
+        target_lang: The language being translated into. Defaults to `"English"`.
 
     Returns:
         Combined formatted glossary prompt string.
@@ -577,9 +600,10 @@ def get_combined_glossary_prompt(
         allowed_categories=config.GLOSSARY_CATEGORIES,
         source_lang=source_lang,
         exclude_terms=mod_term_keys,
+        target_lang=target_lang,
     )
     # Pass empty list to disable category filtering for mod terms.
-    mod_prompt = get_glossary_prompt(mod, allowed_categories=[], source_lang=source_lang)
+    mod_prompt = get_glossary_prompt(mod, allowed_categories=[], source_lang=source_lang, target_lang=target_lang)
 
     if base_prompt and mod_prompt:
         # Strip the duplicate header from the mod prompt and append its terms.
