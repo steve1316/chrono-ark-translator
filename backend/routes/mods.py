@@ -57,7 +57,7 @@ async def get_mods():
         # Check whether this mod has unsynced translation changes.
         saved = load_translations(mod.mod_id)
         if saved:
-            current_hash = _compute_export_snapshot(mod.mod_id, mod.path)
+            current_hash = _compute_export_snapshot(mod.mod_id, mod.path, mod.name)
             last_hash = _load_last_export_hash(mod.mod_id)
             has_changes = current_hash != last_hash
         else:
@@ -116,7 +116,7 @@ async def refresh_mods(request: Request):
 
             saved = load_translations(mod.mod_id)
             if saved:
-                current_hash = _compute_export_snapshot(mod.mod_id, mod.path)
+                current_hash = _compute_export_snapshot(mod.mod_id, mod.path, mod.name)
                 last_hash = _load_last_export_hash(mod.mod_id)
                 has_changes = current_hash != last_hash
             else:
@@ -214,7 +214,7 @@ async def get_mod_detail(mod_id: str):
                 synced_keys = set()
         else:
             # No CSV hash saved yet — fall back to full snapshot check.
-            current_hash = _compute_export_snapshot(mod_id, mod_path)
+            current_hash = _compute_export_snapshot(mod_id, mod_path, mod.name)
             last_hash = _load_last_export_hash(mod_id)
             if current_hash != last_hash:
                 synced_keys = set()
@@ -491,6 +491,27 @@ async def reset_mod(mod_id: str):
                 shutil.copy2(src, gdata_dest / src.name)
                 gdata_restored = True
 
+    # Remove this mod's entries from the Harmony injector override JSONs.
+    overrides_cleared = False
+    overrides_dir = _adapter.get_translation_overrides_dir()
+    if overrides_dir:
+        mod_info = _find_mod(mod_id)
+        mod_name = mod_info.name
+        for json_name in ("keyed_overrides.json", "text_overrides.json"):
+            json_path = overrides_dir / json_name
+            if not json_path.exists():
+                continue
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+            if mod_name in data:
+                del data[mod_name]
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                overrides_cleared = True
+
     # Selectively delete only translation-related files and directories,
     # preserving user-configured data (character context, glossary, etc.).
     files_to_delete = [
@@ -517,6 +538,7 @@ async def reset_mod(mod_id: str):
             "status": "success",
             "csv_restored": csv_restored,
             "gdata_restored": gdata_restored,
+            "overrides_cleared": overrides_cleared,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reset: {str(e)}")
@@ -561,7 +583,7 @@ async def get_export_status(mod_id: str):
     Returns:
         A dict with a single `has_changes` boolean.
     """
-    mod_path = _find_mod_path(mod_id)
+    mod = _find_mod(mod_id)
 
     # No translations at all — nothing to sync.
     translations = load_translations(mod_id)
@@ -569,7 +591,7 @@ async def get_export_status(mod_id: str):
         return {"has_changes": False}
 
     # Compare current snapshot against last export.
-    current_hash = _compute_export_snapshot(mod_id, mod_path)
+    current_hash = _compute_export_snapshot(mod_id, mod.path, mod.name)
     last_hash = _load_last_export_hash(mod_id)
 
     return {
@@ -603,7 +625,8 @@ async def export_mod(mod_id: str, resync: bool = False):
         HTTPException: 400 if no translations exist for the mod.
         HTTPException: 404 if the mod is not found.
     """
-    mod_path = _find_mod_path(mod_id)
+    mod = _find_mod(mod_id)
+    mod_path = mod.path
 
     reason = "Before re-sync export" if resync else "Before export"
     create_backup(mod_id, reason)
@@ -681,6 +704,8 @@ async def export_mod(mod_id: str, resync: bool = False):
         for key, loc_str in strings.items():
             if loc_str.untranslatable_reason:
                 continue
+            if key not in translations:
+                continue
             source = loc_str.source_file or _adapter.csv_for_key(loc_str.key)
             if source.lower().endswith(".json"):
                 english = loc_str.translations.get("English", "")
@@ -715,24 +740,27 @@ async def export_mod(mod_id: str, resync: bool = False):
     keyed_overrides_written = 0
     text_overrides_written = 0
     if overrides_dir:
-        mod_info = _find_mod(mod_id)
-        mod_name = mod_info.name
+        mod_name = mod.name
 
         keyed_overrides: dict[str, str] = {}
         text_overrides: dict[str, str] = {}
 
         for key, loc_str in strings.items():
+            if key not in translations:
+                continue
             english = loc_str.translations.get("English", "")
             if not english:
                 continue
 
-            if loc_str.untranslatable_reason and key.startswith("DLL/"):
-                chinese = (
+            if loc_str.source_file.lower().endswith(".dll"):
+                source = (
                     loc_str.translations.get("Chinese", "")
                     or loc_str.translations.get("Chinese-TW [zh-tw]", "")
+                    or loc_str.translations.get("Japanese", "")
+                    or loc_str.translations.get("Korean", "")
                 )
-                if chinese:
-                    text_overrides[chinese] = english
+                if source:
+                    text_overrides[source] = english
             else:
                 keyed_overrides[key] = english
 
@@ -765,7 +793,7 @@ async def export_mod(mod_id: str, resync: bool = False):
             text_overrides_written = len(text_overrides)
 
     # Save snapshot hash so export-status knows we're in sync.
-    snapshot_hash = _compute_export_snapshot(mod_id, mod_path)
+    snapshot_hash = _compute_export_snapshot(mod_id, mod_path, mod.name)
     _save_last_export_hash(mod_id, snapshot_hash)
 
     # Save CSV-only hash so synced-key invalidation only triggers on
