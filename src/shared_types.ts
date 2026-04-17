@@ -22,10 +22,14 @@ export type ModStatus = {
     has_dll: boolean
     /** Total number of localizable strings in the mod. */
     total: number
-    /** Number of strings that have an English translation. */
+    /** Number of strings that have an English translation (user-translated + untouched). */
     translated: number
     /** Number of strings still missing an English translation. */
     untranslated: number
+    /** Number of strings translated by the user/tool. */
+    user_translated: number
+    /** Number of strings that already had English in the raw mod files. */
+    untouched: number
     /** Translation progress as a 0-100 percentage. */
     percentage: number
     /** ISO timestamp of when translation data was last modified. */
@@ -64,6 +68,8 @@ export type LocString = {
     original_english: string
     /** Whether this string has been synced (exported) to the mod's CSV files. */
     is_synced: boolean
+    /** Whether this string already had English in the raw mod files and has not been modified. */
+    is_untouched: boolean
     /** The English value at the time of sync; used to restore synced status if the user re-enters it. */
     synced_english: string
     /** The source file (CSV/JSON/DLL) this string was extracted from. */
