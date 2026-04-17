@@ -128,6 +128,7 @@ class ProgressTracker:
         mod_id: str,
         current_strings: dict[str, LocString],
         source_languages: list[str] | None = None,
+        target_lang: str = "English",
     ) -> ProgressDiff:
         """
         Update the progress snapshot and compute the diff.
@@ -163,14 +164,19 @@ class ProgressTracker:
                 excluded_keys.add(key)
                 continue
 
-            # If no source language has content, it's an empty source string.
+            # If no source language has content, check for strings that
+            # only have target-language text (e.g. English-authored gdata
+            # mods).  Truly empty strings (no content in any language)
+            # are excluded.
             has_source = False
             for lang in langs:
                 if lang in loc_str.translations and loc_str.translations[lang].strip():
                     has_source = True
                     break
             if not has_source:
-                excluded_keys.add(key)
+                target_text = loc_str.translations.get(target_lang, "")
+                if not target_text.strip():
+                    excluded_keys.add(key)
 
         # Compare.
         current_keys = set(new_hashes.keys())

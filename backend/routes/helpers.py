@@ -23,7 +23,7 @@ from fastapi import HTTPException
 from backend import config
 from backend.games.registry import get_adapter
 from backend.games.base import GameAdapter
-from backend.data.mod_settings import load_source_language_override
+from backend.data.mod_settings import load_source_language_override, load_target_language_override
 from backend.data.progress_tracker import ProgressTracker
 from backend.data.translation_store import load_translations
 
@@ -64,8 +64,10 @@ def resolve_source_language(
     Returns:
         The source language name, or None if no source text is found.
     """
-    if override and override in loc_str.translations and loc_str.translations[override]:
-        return override
+    if override:
+        if override in loc_str.translations and loc_str.translations[override]:
+            return override
+        return None
     return _adapter.detect_source_language(loc_str)
 
 
@@ -187,13 +189,22 @@ def _find_mod_path(mod_id: str) -> Path:
     return matching[0].path
 
 
-def _merge_gdata_originals(mod_id: str, strings: dict[str, "LocString"]) -> None:
+def _merge_gdata_originals(
+    mod_id: str,
+    strings: dict[str, "LocString"],
+    target_lang: str = "English",
+) -> None:
     """Restore original source text for gdata entries from backup.
 
     After exporting translations into gdata JSON files, re-extraction
-    picks up the English text but loses the original source language.
+    picks up the target language text but loses the original source language.
     This helper reads the backed-up originals and merges any missing
     source-language translations back into the live entries.
+
+    Args:
+        mod_id: The mod's Workshop ID.
+        strings: Live localization strings to merge into.
+        target_lang: The translation target language (excluded from merge).
     """
     from backend.games.chrono_ark import gdata_extractor
 
@@ -212,7 +223,7 @@ def _merge_gdata_originals(mod_id: str, strings: dict[str, "LocString"]) -> None
             continue
         live = strings[key]
         for lang, text in orig.translations.items():
-            if lang != "English" and lang not in live.translations:
+            if lang != target_lang and lang not in live.translations:
                 live.translations[lang] = text
 
 
@@ -235,9 +246,7 @@ def _find_mod_preview_image(mod_path: Path) -> Optional[Path]:
     return None
 
 
-def _compute_export_snapshot(
-    mod_id: str, mod_path: Path, mod_name: str = ""
-) -> str:
+def _compute_export_snapshot(mod_id: str, mod_path: Path, mod_name: str = "") -> str:
     """Compute a SHA-256 hash of the current translations, mod CSVs, and overrides.
 
     Combines the `translations.json` content with the mod's CSV file contents
@@ -382,13 +391,14 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
         mod_path: Filesystem path to the mod's workshop directory.
     """
     strings, _ = _adapter.extract_strings(mod_path)
-    _merge_gdata_originals(mod_id, strings)
+    target_lang = load_target_language_override(mod_id) or "English"
+    _merge_gdata_originals(mod_id, strings, target_lang=target_lang)
 
     # Apply saved translations.
     translations = load_translations(mod_id)
-    for key, english in translations.items():
+    for key, translated_text in translations.items():
         if key in strings:
-            strings[key].translations["English"] = english
+            strings[key].translations[target_lang] = translated_text
 
     # When the Harmony injection mod is installed, DLL strings become
     # translatable — clear their untranslatable_reason so the progress
@@ -401,7 +411,7 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
 
     # Update the progress snapshot.
     tracker = ProgressTracker()
-    tracker.update(mod_id, strings, _adapter.source_languages)
+    tracker.update(mod_id, strings, _adapter.source_languages, target_lang=target_lang)
 
     # Compute translated keys the same way get_mod_detail does.
     lang_override = load_source_language_override(mod_id)
@@ -409,8 +419,10 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
     for key, loc_str in strings.items():
         source_lang = resolve_source_language(loc_str, lang_override)
         source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
-        english = loc_str.translations.get("English", "")
-        if source_text.strip() and bool(english):
+        target_text = loc_str.translations.get(target_lang, "")
+        if not source_text and target_text:
+            source_text = target_text
+        if source_text.strip() and bool(target_text):
             translated_keys.append(key)
 
     tracker.set_translated(mod_id, translated_keys)
