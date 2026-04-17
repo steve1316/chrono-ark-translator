@@ -130,6 +130,22 @@ def list_backups(mod_id: str, storage_path: Optional[Path] = None) -> list[dict]
                 with open(meta_path, "r", encoding="utf-8") as f:
                     meta = json.load(f)
                 meta["id"] = entry.name
+                # Backfill counts for older backups that lack them.
+                if "translated_count" not in meta:
+                    meta["translated_count"] = 0
+                    meta["total_count"] = 0
+                    meta["glossary_count"] = 0
+                    progress_path = entry / "progress.json"
+                    if progress_path.exists():
+                        with open(progress_path, "r", encoding="utf-8") as pf:
+                            progress = json.load(pf)
+                            meta["total_count"] = progress.get("total_keys", 0)
+                            meta["translated_count"] = len(progress.get("translated", []))
+                    glossary_path = entry / "glossary.json"
+                    if glossary_path.exists():
+                        with open(glossary_path, "r", encoding="utf-8") as gf:
+                            glossary = json.load(gf)
+                            meta["glossary_count"] = len(glossary.get("terms", {}))
                 backups.append(meta)
     return backups
 
@@ -168,13 +184,13 @@ def restore_backup(mod_id: str, backup_id: str, storage_path: Optional[Path] = N
             if src.exists():
                 shutil.copy2(src, mod_dir / filename)
 
-        # Remove sync state files that weren't in the backup so stale
-        # data from the current state doesn't persist after restore.
-        for sync_file in ("synced_keys.json", "last_csv_hash.json", "pre_export_english.json"):
-            if sync_file not in backed_up_files:
-                target = mod_dir / sync_file
-                if target.exists():
-                    target.unlink()
+        # Always remove sync state files after restore. The export
+        # targets (injector JSONs or mod CSVs) won't match the restored
+        # state, so strings should appear as PENDING, not SYNCED.
+        for sync_file in ("synced_keys.json", "last_csv_hash.json", "pre_export_english.json", "last_export.json"):
+            target = mod_dir / sync_file
+            if target.exists():
+                target.unlink()
 
     return True
 
