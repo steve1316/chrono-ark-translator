@@ -76,12 +76,31 @@ def create_backup(mod_id: str, reason: str, storage_path: Optional[Path] = None)
         shutil.rmtree(backup_dir)
         return None
 
+    # Collect translation and glossary counts for the snapshot.
+    translated_count = 0
+    total_count = 0
+    glossary_count = 0
+    progress_path = mod_dir / "progress.json"
+    if progress_path.exists():
+        with open(progress_path, "r", encoding="utf-8") as pf:
+            progress = json.load(pf)
+            total_count = progress.get("total_keys", 0)
+            translated_count = len(progress.get("translated", []))
+    glossary_path = mod_dir / "glossary.json"
+    if glossary_path.exists():
+        with open(glossary_path, "r", encoding="utf-8") as gf:
+            glossary = json.load(gf)
+            glossary_count = len(glossary.get("terms", {}))
+
     # Save metadata
     meta = {
         "timestamp": timestamp,
         "reason": reason,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "files": [f for f in files_to_backup if (mod_dir / f).exists()],
+        "translated_count": translated_count,
+        "total_count": total_count,
+        "glossary_count": glossary_count,
     }
     with open(backup_dir / "meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
