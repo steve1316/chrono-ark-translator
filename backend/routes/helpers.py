@@ -235,17 +235,22 @@ def _find_mod_preview_image(mod_path: Path) -> Optional[Path]:
     return None
 
 
-def _compute_export_snapshot(mod_id: str, mod_path: Path) -> str:
-    """Compute a SHA-256 hash of the current translations and mod CSVs.
+def _compute_export_snapshot(
+    mod_id: str, mod_path: Path, mod_name: str = ""
+) -> str:
+    """Compute a SHA-256 hash of the current translations, mod CSVs, and overrides.
 
     Combines the `translations.json` content with the mod's CSV file contents
-    so we can detect changes on either side (new translations or mod author
-    updates). Excludes timestamps so metadata-only changes don't trigger a
-    false "needs export" signal.
+    and the mod's entries in the Harmony injector override JSONs so we can
+    detect changes on any side (new translations, mod author updates, or
+    external edits to the override files). Excludes timestamps so
+    metadata-only changes don't trigger a false "needs export" signal.
 
     Args:
         mod_id: The mod's Workshop ID.
         mod_path: Filesystem path to the mod's root directory.
+        mod_name: Display name used as the key in override JSONs. When empty,
+            looked up via `_find_mod` only if the overrides directory exists.
 
     Returns:
         Hex-digest hash string representing the current state.
@@ -262,6 +267,28 @@ def _compute_export_snapshot(mod_id: str, mod_path: Path) -> str:
     for csv_path in sorted(_get_mod_csv_paths(mod_path)):
         h.update(csv_path.name.encode("utf-8"))
         h.update(csv_path.read_bytes())
+
+    # Hash this mod's entries in the Harmony injector override JSONs.
+    # Include a sentinel when the overrides directory exists so the hash
+    # changes when the injector is installed or uninstalled.
+    overrides_dir = _adapter.get_translation_overrides_dir()
+    if overrides_dir:
+        h.update(b"overrides_dir_present")
+        if not mod_name:
+            mod_name = _find_mod(mod_id).name
+        for json_name in ("keyed_overrides.json", "text_overrides.json"):
+            json_path = overrides_dir / json_name
+            if not json_path.exists():
+                continue
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+            mod_entries = data.get(mod_name)
+            if mod_entries:
+                h.update(json_name.encode("utf-8"))
+                h.update(json.dumps(mod_entries, sort_keys=True).encode("utf-8"))
 
     return h.hexdigest()
 
