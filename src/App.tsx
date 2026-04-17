@@ -108,7 +108,20 @@ function App() {
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
                         {/* --- Dashboard: mod grid overview --- */}
-                        <Route path="/dashboard" element={<DashboardPage mods={mods} onModSelect={(modId) => { sessionStorage.setItem("lastViewedMod", modId); navigate(`/mods/${modId}`) }} onModSync={handleModSync} onRefresh={setMods} />} />
+                        <Route
+                            path="/dashboard"
+                            element={
+                                <DashboardPage
+                                    mods={mods}
+                                    onModSelect={(modId) => {
+                                        sessionStorage.setItem("lastViewedMod", modId)
+                                        navigate(`/mods/${modId}`)
+                                    }}
+                                    onModSync={handleModSync}
+                                    onRefresh={setMods}
+                                />
+                            }
+                        />
 
                         {/* --- Mod detail: string editor and translation actions --- */}
                         <Route path="/mods/:modId" element={<ModDetail onBack={() => navigate("/dashboard")} />} />
