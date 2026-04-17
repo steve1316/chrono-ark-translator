@@ -12,6 +12,130 @@ import EditableCell from "../../components/EditableCell"
 import { useIterativeTranslation } from "../../hooks/useIterativeTranslation"
 import type { BatchDescriptor } from "../../hooks/useIterativeTranslation"
 
+interface CharacterContextPanelProps {
+    modId: string
+    onHasContextChange: (has: boolean) => void
+}
+
+function CharacterContextPanel({ modId, onHasContextChange }: CharacterContextPanelProps) {
+    const [ctx, setCtx] = useState({ source_game: "", character_name: "", background: "" })
+    const [saved, setSaved] = useState(false)
+
+    useEffect(() => {
+        const fetchCtx = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/mods/${modId}/character-context`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setCtx(data)
+                    onHasContextChange(!!(data.source_game || data.character_name || data.background))
+                }
+            } catch {}
+        }
+        fetchCtx()
+    }, [modId, onHasContextChange])
+
+    const handleSave = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/mods/${modId}/character-context`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(ctx),
+            })
+            if (res.ok) {
+                onHasContextChange(!!(ctx.source_game || ctx.character_name || ctx.background))
+                setSaved(true)
+                setTimeout(() => setSaved(false), 2000)
+            }
+        } catch (err) {
+            console.error("Failed to save character context:", err)
+        }
+    }
+
+    return (
+        <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1rem" }}>
+            <h3 style={{ marginTop: 0, marginBottom: "0.5rem" }}>Character Context</h3>
+            <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: 0, marginBottom: "1rem" }}>
+                This context is included in the translation prompt to help the AI understand the character's lore.
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem" }}>
+                <div style={{ flex: 1 }}>
+                    <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Source Game
+                    </label>
+                    <input
+                        type="text"
+                        placeholder="e.g. Library of Ruina"
+                        value={ctx.source_game}
+                        onChange={(e) => setCtx((prev) => ({ ...prev, source_game: e.target.value }))}
+                        style={{
+                            width: "100%",
+                            padding: "0.5rem",
+                            borderRadius: "6px",
+                            background: "rgba(0,0,0,0.2)",
+                            border: "1px solid var(--glass-border)",
+                            color: "var(--text-main)",
+                            boxSizing: "border-box",
+                        }}
+                    />
+                </div>
+                <div style={{ flex: 1 }}>
+                    <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Character Name
+                    </label>
+                    <input
+                        type="text"
+                        placeholder="e.g. Roland"
+                        value={ctx.character_name}
+                        onChange={(e) => setCtx((prev) => ({ ...prev, character_name: e.target.value }))}
+                        style={{
+                            width: "100%",
+                            padding: "0.5rem",
+                            borderRadius: "6px",
+                            background: "rgba(0,0,0,0.2)",
+                            border: "1px solid var(--glass-border)",
+                            color: "var(--text-main)",
+                            boxSizing: "border-box",
+                        }}
+                    />
+                </div>
+            </div>
+            <div>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Background
+                </label>
+                <textarea
+                    placeholder="Describe the character's personality, role in their source game, and any lore that would help with translation..."
+                    value={ctx.background}
+                    onChange={(e) => setCtx((prev) => ({ ...prev, background: e.target.value }))}
+                    rows={4}
+                    style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        borderRadius: "6px",
+                        background: "rgba(0,0,0,0.2)",
+                        border: "1px solid var(--glass-border)",
+                        color: "var(--text-main)",
+                        resize: "vertical",
+                        fontFamily: "inherit",
+                        boxSizing: "border-box",
+                    }}
+                />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem", alignItems: "center", gap: "0.75rem" }}>
+                {saved && <span style={{ color: "#34d399", fontSize: "0.85rem" }}>Saved!</span>}
+                <button
+                    className="btn btn-primary"
+                    onClick={handleSave}
+                    style={{ background: "rgba(129,230,217,0.15)", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)" }}
+                >
+                    Save Context
+                </button>
+            </div>
+        </div>
+    )
+}
+
 /**
  * Props for the ModDetail component.
  */
@@ -34,7 +158,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [modUrl, setModUrl] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
 
-    const [filter, setFilter] = useState<"all" | "missing" | "pending" | "synced">("all")
+    const [filter, setFilter] = useState<"all" | "missing" | "untouched" | "pending" | "synced">("all")
     const [search, setSearch] = useState("")
 
     const [sortConfig, setSortConfig] = useState<{ key: SortField; direction: SortDirection }>({
@@ -43,11 +167,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     })
 
     const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({
-        status: 80,
-        translated_by: 90,
-        key: 300,
-        source_file: 150,
-        source: 500,
+        status: 120,
+        translated_by: 100,
+        key: 200,
+        source_file: 100,
+        source: 400,
         english: 500,
     })
 
@@ -61,6 +185,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [modGlossary, setModGlossary] = useState<Record<string, GlossaryTerm>>({})
 
     const [translationPreview, setTranslationPreview] = useState<any>(null)
+    const [pendingRetranslate, setPendingRetranslate] = useState(false)
     const [pendingProvider, setPendingProvider] = useState<string>("")
     const [activeProvider, setActiveProvider] = useState<string>("")
     const [showGlossaryPanel, setShowGlossaryPanel] = useState(false)
@@ -76,13 +201,22 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [renamedTerm, setRenamedTerm] = useState<{ oldName: string; newName: string } | null>(null)
     const [translateBanner, setTranslateBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
-    const [characterContext, setCharacterContext] = useState<{
-        source_game: string
-        character_name: string
-        background: string
-    }>({ source_game: "", character_name: "", background: "" })
+    const [showTranslateDropdown, setShowTranslateDropdown] = useState(false)
     const [showCharacterContext, setShowCharacterContext] = useState(false)
-    const [characterContextSaved, setCharacterContextSaved] = useState(false)
+    const [hasCharacterContext, setHasCharacterContext] = useState(false)
+    const handleHasContextChange = useCallback((has: boolean) => setHasCharacterContext(has), [])
+
+    // Preflight: check whether character context exists so the dot indicator shows on mount.
+    useEffect(() => {
+        if (!modId) return
+        fetch(`${API_BASE}/mods/${modId}/character-context`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+                if (data) setHasCharacterContext(!!(data.source_game || data.character_name || data.background))
+            })
+            .catch(() => {})
+    }, [modId])
+
     const [sourceLangOverride, setSourceLangOverride] = useState<string | null>(null)
 
     const [exporting, setExporting] = useState(false)
@@ -98,7 +232,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [apiResponses, setApiResponses] = useState<any[]>([])
     const [activeResponseIdx, setActiveResponseIdx] = useState(0)
     const [showHistory, setShowHistory] = useState(false)
-    const [historyEntries, setHistoryEntries] = useState<{ id: string; reason: string; created_at: string; files: string[] }[]>([])
+    const [historyEntries, setHistoryEntries] = useState<{ id: string; reason: string; created_at: string; files: string[]; translated_count?: number; total_count?: number; glossary_count?: number }[]>([])
     const [confirmModal, setConfirmModal] = useState<{
         type: "export" | "resync" | "reset" | "clear-translations" | "delete-all-glossary" | "restore-backup" | "delete-backup"
         message: string | React.ReactNode
@@ -156,7 +290,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
      *
      * @param provider - The AI provider identifier (e.g. "claude").
      */
-    const handleTranslateClick = async (provider: string) => {
+    const handleTranslateClick = async (provider: string, retranslate = false) => {
         if (!modId) return
         setTranslateBanner(null)
         try {
@@ -164,7 +298,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             const res = await fetch(`${API_BASE}/translate/preview`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ mod_id: modId, provider }),
+                body: JSON.stringify({ mod_id: modId, provider, retranslate }),
             })
             const data = await res.json()
             if (!res.ok) {
@@ -177,6 +311,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             }
             // Store the provider and preview so the confirmation modal can render.
             setPendingProvider(provider)
+            setPendingRetranslate(retranslate)
             setTranslationPreview(data)
         } catch (err) {
             console.error("Failed to fetch translation preview:", err)
@@ -241,22 +376,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     }
 
     /**
-     * Fetches character context metadata for this mod.
-     * GET `/api/mods/:modId/character-context` -> `{ source_game, character_name, background }`.
-     * This context is passed to AI providers to improve translation quality.
-     */
-    const fetchCharacterContext = async () => {
-        if (!modId) return
-        try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/character-context`)
-            if (res.ok) {
-                const data = await res.json()
-                setCharacterContext(data)
-            }
-        } catch {}
-    }
-
-    /**
      * Fetches the full mod detail including all localization strings, mod metadata,
      * GET `/api/mods/:modId` -> `{ strings, name, author, preview_image, url }`.
      */
@@ -299,7 +418,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
         fetchExportStatus()
         fetchSuggestions()
         fetchModGlossary()
-        fetchCharacterContext()
         fetch(`${API_BASE}/settings`)
             .then((r) => r.json())
             .then((data) => setActiveProvider(data.provider))
@@ -456,12 +574,14 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                     parts.push(`${data.gdata_files_written.length} gdata JSON file(s): ${data.gdata_files_written.join(", ")}`)
                 }
                 if (data.keyed_overrides_written > 0) {
-                    parts.push(`${data.keyed_overrides_written} keyed override(s) to ModTranslationInjector`)
+                    parts.push(`${data.keyed_overrides_written} keyed override(s)`)
                 }
                 if (data.text_overrides_written > 0) {
-                    parts.push(`${data.text_overrides_written} DLL text override(s) to ModTranslationInjector`)
+                    parts.push(`${data.text_overrides_written} DLL text override(s)`)
                 }
-                setTranslateBanner({ type: "success", message: `Synced ${data.applied} translations to ${parts.join("\n")}` })
+                const hasInjector = data.keyed_overrides_written > 0 || data.text_overrides_written > 0
+                const target = hasInjector ? " to ModTranslationInjector" : ""
+                setTranslateBanner({ type: "success", message: `Synced ${data.applied} translation(s): ${parts.join(", ")}${target}` })
                 fetchExportStatus()
                 fetchModDetail()
             } else {
@@ -508,11 +628,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                 const data = await res.json()
                 const csvMsg = data.csv_restored ? " Original CSV files restored." : ""
                 const gdataMsg = data.gdata_restored ? " Original gdata JSON files restored." : ""
+                const overridesMsg = data.overrides_cleared ? " Translation overrides removed." : ""
                 fetchModDetail()
                 fetchExportStatus()
                 fetchSuggestions()
                 fetchModGlossary()
-                setTranslateBanner({ type: "success", message: `Reset complete.${csvMsg}${gdataMsg}` })
+                setTranslateBanner({ type: "success", message: `Reset complete.${csvMsg}${gdataMsg}${overridesMsg}` })
             } else {
                 const error = await res.json()
                 setTranslateBanner({ type: "error", message: `Failed to reset: ${error.detail || "Unknown error"}` })
@@ -574,29 +695,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             }
         } catch (err) {
             console.error("Failed to open folder:", err)
-        }
-    }
-
-    /**
-     * Persists the character context metadata to the backend.
-     * POST `/api/mods/:modId/character-context` -> `{ source_game, character_name, background }`.
-     *
-     * On success, shows a transient "Saved!" indicator that auto-clears after 2 seconds.
-     */
-    const handleSaveCharacterContext = async () => {
-        if (!modId) return
-        try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/character-context`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(characterContext),
-            })
-            if (res.ok) {
-                setCharacterContextSaved(true)
-                setTimeout(() => setCharacterContextSaved(false), 2000)
-            }
-        } catch (err) {
-            console.error("Failed to save character context:", err)
         }
     }
 
@@ -818,14 +916,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                         </button>
                         <button
                             className="btn btn-outline"
-                            onClick={() => {
-                                setShowCharacterContext(!showCharacterContext)
-                                if (!showCharacterContext) fetchCharacterContext()
-                            }}
+                            onClick={() => setShowCharacterContext(!showCharacterContext)}
                             style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)", position: "relative" }}
                         >
                             Character Context
-                            {(characterContext.source_game || characterContext.character_name || characterContext.background) && (
+                            {hasCharacterContext && (
                                 <span
                                     style={{
                                         position: "absolute",
@@ -856,9 +951,52 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
 
                     {/* Translation trigger and CSV sync. */}
                     <div className="mod-actions-group">
-                        <button className="btn btn-primary" onClick={() => handleTranslateClick("")} disabled={batchState.phase === "translating" || batchState.phase === "reviewing"}>
-                            Translate{activeProvider ? ` (${activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})` : ""}
-                        </button>
+                        <div style={{ position: "relative", display: "inline-flex" }}>
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => handleTranslateClick("")}
+                                disabled={batchState.phase === "translating" || batchState.phase === "reviewing"}
+                                style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+                            >
+                                Translate{activeProvider ? ` (${activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})` : ""}
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => setShowTranslateDropdown((v) => !v)}
+                                disabled={batchState.phase === "translating" || batchState.phase === "reviewing"}
+                                style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeft: "1px solid rgba(255,255,255,0.2)", padding: "0.5rem 0.4rem" }}
+                            >
+                                &#9662;
+                            </button>
+                            {showTranslateDropdown && (
+                                <div
+                                    style={{
+                                        position: "absolute",
+                                        top: "100%",
+                                        left: 0,
+                                        marginTop: "4px",
+                                        background: "var(--glass-bg)",
+                                        border: "1px solid var(--glass-border)",
+                                        borderRadius: "8px",
+                                        padding: "0.25rem 0",
+                                        zIndex: 20,
+                                        minWidth: "100%",
+                                        whiteSpace: "nowrap",
+                                    }}
+                                >
+                                    <button
+                                        className="btn btn-primary"
+                                        style={{ width: "100%", textAlign: "left", borderRadius: "6px", padding: "0.5rem 1rem" }}
+                                        onClick={() => {
+                                            setShowTranslateDropdown(false)
+                                            handleTranslateClick("", true)
+                                        }}
+                                    >
+                                        Re-Translate All
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                         {hasExportChanges ? (
                             <button className="btn btn-primary" onClick={() => handleExportConfirm(false)} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                                 <FaFileExport />
@@ -1333,88 +1471,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                 (source game, character name, background lore). This context
                 is injected into the AI translation prompt so the provider can
                 produce more accurate, lore-consistent translations. */}
-            {showCharacterContext && (
-                <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1rem" }}>
-                    <h3 style={{ marginTop: 0, marginBottom: "0.5rem" }}>Character Context</h3>
-                    <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: 0, marginBottom: "1rem" }}>
-                        This context is included in the translation prompt to help the AI understand the character's lore.
-                    </p>
-                    <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem" }}>
-                        <div style={{ flex: 1 }}>
-                            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                Source Game
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="e.g. Library of Ruina"
-                                value={characterContext.source_game}
-                                onChange={(e) => setCharacterContext((prev) => ({ ...prev, source_game: e.target.value }))}
-                                style={{
-                                    width: "100%",
-                                    padding: "0.5rem",
-                                    borderRadius: "6px",
-                                    background: "rgba(0,0,0,0.2)",
-                                    border: "1px solid var(--glass-border)",
-                                    color: "var(--text-main)",
-                                    boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                Character Name
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="e.g. Roland"
-                                value={characterContext.character_name}
-                                onChange={(e) => setCharacterContext((prev) => ({ ...prev, character_name: e.target.value }))}
-                                style={{
-                                    width: "100%",
-                                    padding: "0.5rem",
-                                    borderRadius: "6px",
-                                    background: "rgba(0,0,0,0.2)",
-                                    border: "1px solid var(--glass-border)",
-                                    color: "var(--text-main)",
-                                    boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            Background
-                        </label>
-                        <textarea
-                            placeholder="Describe the character's personality, role in their source game, and any lore that would help with translation..."
-                            value={characterContext.background}
-                            onChange={(e) => setCharacterContext((prev) => ({ ...prev, background: e.target.value }))}
-                            rows={4}
-                            style={{
-                                width: "100%",
-                                padding: "0.5rem",
-                                borderRadius: "6px",
-                                background: "rgba(0,0,0,0.2)",
-                                border: "1px solid var(--glass-border)",
-                                color: "var(--text-main)",
-                                resize: "vertical",
-                                fontFamily: "inherit",
-                                boxSizing: "border-box",
-                            }}
-                        />
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem", alignItems: "center", gap: "0.75rem" }}>
-                        {characterContextSaved && <span style={{ color: "#34d399", fontSize: "0.85rem" }}>Saved!</span>}
-                        <button
-                            className="btn btn-primary"
-                            onClick={handleSaveCharacterContext}
-                            style={{ background: "rgba(129,230,217,0.15)", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)" }}
-                        >
-                            Save Context
-                        </button>
-                    </div>
-                </div>
-            )}
+            {showCharacterContext && modId && <CharacterContextPanel modId={modId} onHasContextChange={handleHasContextChange} />}
 
             {/* --- Search & Filter Bar --- */}
             <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
@@ -1456,6 +1513,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                         </button>
                         <button className={`btn ${filter === "missing" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("missing")}>
                             Missing
+                        </button>
+                        <button className={`btn ${filter === "untouched" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("untouched")}>
+                            Untouched
                         </button>
                         <button className={`btn ${filter === "pending" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("pending")}>
                             Pending
@@ -1520,8 +1580,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                 N/A
                                             </span>
                                         ) : (
-                                            <span className={`status-badge ${status === "synced" ? "status-synced" : status === "pending" ? "status-translated" : "status-missing"}`}>
-                                                {status === "synced" ? "SYNCED" : status === "pending" ? "PENDING" : "MISSING"}
+                                            <span
+                                                className={`status-badge ${status === "synced" ? "status-synced" : status === "untouched" ? "status-untouched" : status === "pending" ? "status-translated" : "status-missing"}`}
+                                            >
+                                                {status === "synced" ? "SYNCED" : status === "untouched" ? "UNTOUCHED" : status === "pending" ? "PENDING" : "MISSING"}
                                             </span>
                                         )}
                                     </td>
@@ -1639,7 +1701,19 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                         <div>
                                             <div style={{ fontWeight: 500 }}>{entry.reason}</div>
                                             <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem" }}>{new Date(entry.created_at).toLocaleString()}</div>
-                                            <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.15rem" }}>Files: {entry.files.join(", ")}</div>
+                                            <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.15rem" }}>
+                                                {(entry.total_count ?? 0) > 0 && (
+                                                    <span>
+                                                        {entry.translated_count} / {entry.total_count} strings translated
+                                                    </span>
+                                                )}
+                                                {(entry.total_count ?? 0) > 0 && (entry.glossary_count ?? 0) > 0 && <span> &middot; </span>}
+                                                {(entry.glossary_count ?? 0) > 0 && (
+                                                    <span>
+                                                        {entry.glossary_count} glossary term{entry.glossary_count !== 1 ? "s" : ""}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <div style={{ display: "flex", gap: "0.35rem", flexShrink: 0 }}>
                                             <button
@@ -1987,6 +2061,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             {translationPreview && (
                 <TranslationConfirmModal
                     preview={translationPreview}
+                    title={pendingRetranslate ? "Confirm Re-Translation" : undefined}
                     onConfirm={() => {
                         const plan: BatchDescriptor[] = translationPreview.batch_plan || []
                         setTranslationPreview(null)
