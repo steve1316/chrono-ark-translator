@@ -13,6 +13,8 @@ function makeMod(overrides: Partial<ModStatus> = {}): ModStatus {
         total: 100,
         translated: 75,
         untranslated: 25,
+        user_translated: 50,
+        untouched: 25,
         percentage: 75,
         last_updated: "",
         has_changes: false,
@@ -28,10 +30,12 @@ describe("ModCard", () => {
         expect(screen.getByText("75% Translated")).toBeInTheDocument()
     })
 
-    it("renders progress bar with correct width", () => {
-        const { container } = render(<ModCard mod={makeMod({ percentage: 60 })} onClick={vi.fn()} onSync={vi.fn()} />)
-        const fill = container.querySelector(".progress-bar-fill") as HTMLElement
-        expect(fill.style.width).toBe("60%")
+    it("renders progress bar segments", () => {
+        const { container } = render(<ModCard mod={makeMod({ total: 100, user_translated: 50, untouched: 25 })} onClick={vi.fn()} onSync={vi.fn()} />)
+        const segments = container.querySelectorAll(".progress-bar-bg > div")
+        expect(segments).toHaveLength(2)
+        expect((segments[0] as HTMLElement).style.width).toBe("50%")
+        expect((segments[1] as HTMLElement).style.width).toBe("25%")
     })
 
     it("renders DLL format when has_dll is true", () => {

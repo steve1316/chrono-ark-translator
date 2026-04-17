@@ -34,7 +34,7 @@ interface ModCardProps {
  */
 const ModCard: React.FC<ModCardProps> = React.memo(({ mod, onClick, onSync, searchQuery = "" }) => {
     return (
-        <div className="glass-card mod-card animate-fade-in">
+        <div className="glass-card mod-card animate-fade-in" data-mod-id={mod.id}>
             {/* --- Preview Image --- */}
             {/* Only rendered when the backend has found a preview image for the mod.
                 Images are lazy-loaded to avoid blocking the initial paint of the grid. */}
@@ -61,9 +61,29 @@ const ModCard: React.FC<ModCardProps> = React.memo(({ mod, onClick, onSync, sear
                             {mod.translated} / {mod.total} strings
                         </span>
                     </div>
-                    <div className="progress-bar-bg">
-                        {/* Width driven directly by the percentage; CSS handles the gradient color. */}
-                        <div className="progress-bar-fill" style={{ width: `${mod.percentage}%` }}></div>
+                    <div className="progress-bar-bg" style={{ display: "flex" }}>
+                        {mod.user_translated > 0 && (
+                            <div
+                                title={`${mod.user_translated} translated by you`}
+                                style={{
+                                    height: "100%",
+                                    width: `${(mod.user_translated / mod.total) * 100}%`,
+                                    background: "var(--accent-gradient)",
+                                    transition: "width 1s ease-out",
+                                }}
+                            />
+                        )}
+                        {mod.untouched > 0 && (
+                            <div
+                                title={`${mod.untouched} untouched (pre-existing English)`}
+                                style={{
+                                    height: "100%",
+                                    width: `${(mod.untouched / mod.total) * 100}%`,
+                                    background: "rgba(148, 163, 184, 0.5)",
+                                    transition: "width 1s ease-out",
+                                }}
+                            />
+                        )}
                     </div>
                 </div>
 
