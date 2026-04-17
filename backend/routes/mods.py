@@ -63,6 +63,9 @@ async def get_mods():
         else:
             has_changes = False
 
+        user_translated = sum(1 for v in saved.values() if v)
+        untouched = max(0, status["translated"] - user_translated)
+
         results.append(
             {
                 "id": mod.mod_id,
@@ -73,6 +76,8 @@ async def get_mods():
                 "total": status["total"],
                 "translated": status["translated"],
                 "untranslated": status["untranslated"],
+                "user_translated": user_translated,
+                "untouched": untouched,
                 "percentage": status["percentage"],
                 "last_updated": status["last_updated"],
                 "url": _adapter.get_mod_url(mod.mod_id),
@@ -122,6 +127,9 @@ async def refresh_mods(request: Request):
             else:
                 has_changes = False
 
+            user_translated = sum(1 for v in saved.values() if v)
+            untouched = max(0, status["translated"] - user_translated)
+
             mod_result = {
                 "id": mod.mod_id,
                 "name": mod.name,
@@ -131,6 +139,8 @@ async def refresh_mods(request: Request):
                 "total": status["total"],
                 "translated": status["translated"],
                 "untranslated": status["untranslated"],
+                "user_translated": user_translated,
+                "untouched": untouched,
                 "percentage": status["percentage"],
                 "last_updated": status["last_updated"],
                 "url": _adapter.get_mod_url(mod.mod_id),
@@ -262,10 +272,9 @@ async def get_mod_detail(mod_id: str):
             translated_keys.append(key)
 
         has_override = key in translations
-        # A row is synced if it was explicitly exported OR if its English
-        # value matches the CSV and was never overridden by the user.
         csv_english = original_english_map.get(key, "")
-        is_synced = key in synced_keys or (bool(csv_english) and not has_override and english == csv_english)
+        is_synced = key in synced_keys
+        is_untouched = bool(csv_english) and not has_override and not is_synced and english == csv_english
         results.append(
             {
                 "key": key,
@@ -277,6 +286,7 @@ async def get_mod_detail(mod_id: str):
                 "is_translated": is_done,
                 "original_english": pre_export_english.get(key, original_english_map.get(key, "")) if is_synced else original_english_map.get(key, ""),
                 "is_synced": is_synced,
+                "is_untouched": is_untouched,
                 "synced_english": english if is_synced else "",
                 "source_file": loc_str.source_file,
                 "translated_by": translation_providers.get(key, ""),
