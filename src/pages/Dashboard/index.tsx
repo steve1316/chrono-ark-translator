@@ -181,6 +181,17 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
 
     const filteredMods = useMemo(() => filterMods(mods, search), [mods, search])
 
+    // Scroll to the mod card the user was last viewing when returning from the detail page.
+    useEffect(() => {
+        const lastMod = sessionStorage.getItem("lastViewedMod")
+        if (!lastMod) return
+        sessionStorage.removeItem("lastViewedMod")
+        requestAnimationFrame(() => {
+            const card = document.querySelector(`[data-mod-id="${lastMod}"]`)
+            card?.scrollIntoView({ behavior: "instant", block: "center" })
+        })
+    }, [filteredMods])
+
     // Observe the first mod card's width so the search bar can match it exactly.
     useEffect(() => {
         const wrapper = gridWrapperRef.current
