@@ -22,7 +22,7 @@ from backend.data.suggestion_manager import add_suggestions, load_suggestions
 from backend.data.translation_memory import TranslationMemory
 from backend.data.translation_store import load_translations, save_translations_bulk
 from backend.main import get_provider
-from backend.data.mod_settings import load_source_language_override
+from backend.data.mod_settings import load_source_language_override, load_target_language_override
 from backend.routes.helpers import (
     _adapter,
     _active_translations,
@@ -68,6 +68,7 @@ async def estimate_translation(req: TranslationRequest):
 
     # Group by language
     lang_override = load_source_language_override(req.mod_id)
+    target_lang = load_target_language_override(req.mod_id) or "English"
     by_lang = {}
     for key, loc_str in untranslated.items():
         lang = resolve_source_language(loc_str, lang_override)
@@ -85,7 +86,7 @@ async def estimate_translation(req: TranslationRequest):
 
     estimates = {}
     for lang, entries in by_lang.items():
-        glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
+        glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang, target_lang=target_lang)
         estimates[lang] = provider.estimate_cost(
             entries,
             source_lang=lang,
@@ -94,6 +95,7 @@ async def estimate_translation(req: TranslationRequest):
             format_rules=format_rules,
             style_examples=_adapter.get_style_examples(lang),
             character_context=character_context,
+            target_lang=target_lang,
         )
 
     return {"total_strings": len(untranslated), "provider": provider.name, "estimates": estimates}
@@ -137,6 +139,7 @@ async def estimate_all_translation_costs(request: Request):
             # Fall back to Chinese for gdata/DLL strings that only have an
             # English key in their translations dict.
             mod_lang_override = load_source_language_override(mod.mod_id)
+            mod_target_lang = load_target_language_override(mod.mod_id) or "English"
             by_lang: dict[str, list[tuple[str, str]]] = {}
             entry_count = 0
             for key, loc_str in strings.items():
@@ -144,7 +147,7 @@ async def estimate_all_translation_costs(request: Request):
                 if lang is None:
                     english = loc_str.translations.get("English", "").strip()
                     if english:
-                        lang = "Chinese"
+                        lang = "English"
                 if lang is not None:
                     entry_count += 1
                     if lang not in by_lang:
@@ -158,7 +161,7 @@ async def estimate_all_translation_costs(request: Request):
                 character_context = char_ctx if any(char_ctx.values()) else None
 
                 for lang, entries in by_lang.items():
-                    glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
+                    glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang, target_lang=target_lang)
                     estimates[lang] = provider.estimate_cost(
                         entries,
                         source_lang=lang,
@@ -167,6 +170,7 @@ async def estimate_all_translation_costs(request: Request):
                         format_rules=format_rules,
                         style_examples=_adapter.get_style_examples(lang),
                         character_context=character_context,
+                        target_lang=mod_target_lang,
                     )
 
             event = {
@@ -223,12 +227,7 @@ async def preview_translation(req: TranslationRequest):
     if req.retranslate:
         # Re-translate: include all strings that have source text, even if
         # they already have an English translation.
-        target = {
-            key: loc_str
-            for key, loc_str in strings.items()
-            if not loc_str.untranslatable_reason or key.startswith("DLL/")
-            if _adapter.detect_source_language(loc_str) is not None
-        }
+        target = {key: loc_str for key, loc_str in strings.items() if not loc_str.untranslatable_reason or key.startswith("DLL/") if _adapter.detect_source_language(loc_str) is not None}
     else:
         target = _adapter.get_untranslated(strings)
 
@@ -246,6 +245,7 @@ async def preview_translation(req: TranslationRequest):
     format_rules = _adapter.get_format_preservation_rules()
 
     lang_override = load_source_language_override(req.mod_id)
+    target_lang = load_target_language_override(req.mod_id) or "English"
     by_lang: dict[str, list] = {}
     for key, loc_str in target.items():
         lang = resolve_source_language(loc_str, lang_override)
@@ -259,7 +259,7 @@ async def preview_translation(req: TranslationRequest):
     estimates = {}
     total_batches = 0
     for lang, entries in by_lang.items():
-        glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
+        glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang, target_lang=target_lang)
         style_examples = _adapter.get_style_examples(lang)
         num_batches = (len(entries) + batch_size - 1) // batch_size
         total_batches += num_batches
@@ -275,6 +275,7 @@ async def preview_translation(req: TranslationRequest):
                 format_rules=format_rules,
                 style_examples=style_examples,
                 character_context=character_context,
+                target_lang=target_lang,
             )
             if not system_prompt:
                 system_prompt = sp
@@ -293,6 +294,7 @@ async def preview_translation(req: TranslationRequest):
             format_rules=format_rules,
             style_examples=style_examples,
             character_context=character_context,
+            target_lang=target_lang,
         )
 
     # Build a flat batch plan the frontend can iterate over.
@@ -320,7 +322,7 @@ async def preview_translation(req: TranslationRequest):
 
 
 @router.get("/system-prompt")
-async def get_system_prompt(source_lang: str = "Korean"):
+async def get_system_prompt(source_lang: str = "Korean", target_lang: str = "English"):
     """Return the current system prompt that would be sent to the provider.
 
     Builds the prompt using the active provider, base glossary, game context,
@@ -340,6 +342,7 @@ async def get_system_prompt(source_lang: str = "Korean"):
         base_glossary,
         allowed_categories=config.GLOSSARY_CATEGORIES,
         source_lang=source_lang,
+        target_lang=target_lang,
     )
     game_context = _adapter.get_translation_context()
     format_rules = _adapter.get_format_preservation_rules()
@@ -351,6 +354,7 @@ async def get_system_prompt(source_lang: str = "Korean"):
         game_context=game_context,
         format_rules=format_rules,
         style_examples=_adapter.get_style_examples(source_lang),
+        target_lang=target_lang,
     )
 
     return {
@@ -384,12 +388,13 @@ async def translate_mod(req: TranslationRequest):
     mod_path = _find_mod_path(req.mod_id)
 
     strings, _ = _adapter.extract_strings(mod_path)
+    target_lang = load_target_language_override(req.mod_id) or "English"
 
     # Apply saved translations so user edits (including clears) are respected.
     saved = load_translations(req.mod_id)
     for key, english in saved.items():
         if key in strings:
-            strings[key].translations["English"] = english
+            strings[key].translations[target_lang] = english
 
     untranslated = _adapter.get_untranslated(strings)
 
@@ -429,20 +434,25 @@ async def translate_mod(req: TranslationRequest):
         provider.last_raw_responses = []
 
     batch_size = config.BATCH_SIZE
+    loop = asyncio.get_running_loop()
     try:
         for lang, entries in by_lang.items():
-            glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)
+            glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang, target_lang=target_lang)
             style_examples = _adapter.get_style_examples(lang)
             for i in range(0, len(entries), batch_size):
                 batch = entries[i : i + batch_size]
-                translations, suggestions = provider.translate_batch(
-                    batch,
-                    lang,
-                    glossary_prompt,
-                    game_context=game_context,
-                    format_rules=format_rules,
-                    style_examples=style_examples,
-                    character_context=character_context,
+                translations, suggestions = await loop.run_in_executor(
+                    None,
+                    lambda batch=batch, lang=lang, glossary_prompt=glossary_prompt: provider.translate_batch(
+                        batch,
+                        lang,
+                        glossary_prompt,
+                        game_context=game_context,
+                        format_rules=format_rules,
+                        style_examples=style_examples,
+                        character_context=character_context,
+                        target_lang=target_lang,
+                    ),
                 )
                 _fill_duplicate_translations(translations, batch)
                 all_translations.update(translations)
@@ -534,12 +544,13 @@ async def translate_batch(req: BatchTranslationRequest):
 
     strings, _ = _adapter.extract_strings(mod_path)
     _merge_gdata_originals(req.mod_id, strings)
+    target_lang = load_target_language_override(req.mod_id) or "English"
 
     # Apply saved translations so user edits (including clears) are respected.
     saved = load_translations(req.mod_id)
     for key, english in saved.items():
         if key in strings:
-            strings[key].translations["English"] = english
+            strings[key].translations[target_lang] = english
 
     # Build entries list from the explicit keys.
     entries: list[tuple[str, str]] = []
@@ -568,7 +579,7 @@ async def translate_batch(req: BatchTranslationRequest):
     # Re-load glossaries fresh (picks up terms accepted between batches).
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
-    glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=req.source_lang)
+    glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=req.source_lang, target_lang=target_lang)
 
     game_context = _adapter.get_translation_context()
     char_ctx = load_character_context(req.mod_id)
@@ -578,15 +589,20 @@ async def translate_batch(req: BatchTranslationRequest):
 
     tm = TranslationMemory()
 
+    loop = asyncio.get_running_loop()
     try:
-        translations, suggestions = provider.translate_batch(
-            entries,
-            req.source_lang,
-            glossary_prompt,
-            game_context=game_context,
-            format_rules=format_rules,
-            style_examples=style_examples,
-            character_context=character_context,
+        translations, suggestions = await loop.run_in_executor(
+            None,
+            lambda: provider.translate_batch(
+                entries,
+                req.source_lang,
+                glossary_prompt,
+                game_context=game_context,
+                format_rules=format_rules,
+                style_examples=style_examples,
+                character_context=character_context,
+                target_lang=target_lang,
+            ),
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
@@ -699,11 +715,12 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
 
     strings, _ = _adapter.extract_strings(mod_path)
     _merge_gdata_originals(req.mod_id, strings)
+    target_lang = load_target_language_override(req.mod_id) or "English"
 
     saved = load_translations(req.mod_id)
     for key, english in saved.items():
         if key in strings:
-            strings[key].translations["English"] = english
+            strings[key].translations[target_lang] = english
 
     entries: list[tuple[str, str]] = []
     for key in req.keys:
@@ -729,7 +746,7 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
 
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
-    glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=req.source_lang)
+    glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=req.source_lang, target_lang=target_lang)
 
     game_context = _adapter.get_translation_context()
     char_ctx = load_character_context(req.mod_id)
@@ -756,6 +773,7 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
                     style_examples=style_examples,
                     character_context=character_context,
                     cancel_event=cancel_event,
+                    target_lang=target_lang,
                 ):
                     if cancel_event.is_set():
                         break
