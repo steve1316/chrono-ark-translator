@@ -155,11 +155,16 @@ def _parse_csv_content(file_path: Path) -> list[LocString]:
     Returns:
         List of LocString objects extracted from the file.
     """
-    # regex for a valid key: alphanumeric characters, underscores, hyphens,
-    # dots, forward slashes.  A slash is NOT required — some mods use flat
-    # keys like ``B_Poca_Level_State_0``.  Spaces are allowed only after a
-    # slash (e.g. ``Character/Suzakuin Momiji_name``).
-    key_pattern = re.compile(r"^[A-Za-z0-9_\-\.][A-Za-z0-9_\-\./]*(?:/[A-Za-z0-9_\-\./ ]+)?$")
+    # regex for a valid key: alphanumeric characters (including accented
+    # Latin letters like pinyin diacritics), underscores, hyphens, dots,
+    # forward slashes.  A slash is NOT required — some mods use flat keys
+    # like `B_Poca_Level_State_0`.  Spaces are allowed only after a slash
+    # (e.g. `Character/Suzakuin Momiji_name`).  The range U+00C0–U+024F
+    # covers Latin-1 Supplement through Latin Extended-B (á, ē, ǐ, etc.).
+    _LATIN = r"A-Za-z0-9\u00C0-\u024F"
+    key_pattern = re.compile(
+        rf"^[{_LATIN}_\-\.][{_LATIN}_\-\./]*(?:/[{_LATIN}_\-\./ ]+)?$"
+    )
 
     results = []
 
