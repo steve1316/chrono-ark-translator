@@ -22,8 +22,13 @@ from backend.routes.helpers import (
     _recalculate_mod_progress,
     resolve_source_language,
 )
-from backend.routes.models import TranslationUpdate, CharacterContext, SourceLanguageOverride
-from backend.data.mod_settings import load_source_language_override, save_source_language_override
+from backend.routes.models import TranslationUpdate, CharacterContext, SourceLanguageOverride, TargetLanguageOverride
+from backend.data.mod_settings import (
+    load_source_language_override,
+    load_target_language_override,
+    save_source_language_override,
+    save_target_language_override,
+)
 from backend.data.translation_store import (
     load_translations,
     update_single_translation,
@@ -179,8 +184,9 @@ async def get_mod_detail(mod_id: str):
     strings, _ = _adapter.extract_strings(mod_path)
 
     # For gdata-sourced mods whose JSONs have already been exported,
-    # restore the original Chinese source text from backup.
-    _merge_gdata_originals(mod_id, strings)
+    # restore the original source text from backup.
+    target_lang = load_target_language_override(mod_id) or "English"
+    _merge_gdata_originals(mod_id, strings, target_lang=target_lang)
 
     # Load existing translations if any
     translations = load_translations(mod_id)
@@ -195,8 +201,8 @@ async def get_mod_detail(mod_id: str):
         except Exception:
             pass
 
-    # Capture original CSV English values before applying overrides.
-    original_english_map = {key: loc_str.translations.get("English", "") for key, loc_str in strings.items()}
+    # Capture original target-language values before applying overrides.
+    original_english_map = {key: loc_str.translations.get(target_lang, "") for key, loc_str in strings.items()}
 
     # Load synced keys to identify rows that have been exported to CSV.
     synced_keys_path = config.STORAGE_PATH / "mods" / mod_id / "synced_keys.json"
@@ -243,9 +249,9 @@ async def get_mod_detail(mod_id: str):
                 pass
 
     # Apply saved translations so user edits (including clears) are respected.
-    for key, english in translations.items():
+    for key, translated_text in translations.items():
         if key in strings:
-            strings[key].translations["English"] = english
+            strings[key].translations[target_lang] = translated_text
 
     # When the Harmony injection mod is installed, DLL strings become
     # translatable — clear their untranslatable_reason so the progress
@@ -258,23 +264,30 @@ async def get_mod_detail(mod_id: str):
 
     # Update progress tracker so dashboard stats reflect this mod's strings.
     tracker = ProgressTracker()
-    tracker.update(mod_id, strings, _adapter.source_languages)
+    tracker.update(mod_id, strings, _adapter.source_languages, target_lang=target_lang)
     lang_override = load_source_language_override(mod_id)
     translated_keys = []
     results = []
     for key, loc_str in strings.items():
         source_lang = resolve_source_language(loc_str, lang_override)
         source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
-        english = loc_str.translations.get("English", "")
+        target_text = loc_str.translations.get(target_lang, "")
 
-        is_done = bool(english) or not source_text.strip()
-        if source_text.strip() and bool(english):
+        # When no CJK source exists but the string has content in the
+        # target language (e.g. English-only gdata mods), treat the target
+        # language as the source so the string is visible in the UI.
+        if not source_text and target_text:
+            source_lang = target_lang
+            source_text = target_text
+
+        is_done = bool(target_text) or not source_text.strip()
+        if source_text.strip() and bool(target_text):
             translated_keys.append(key)
 
         has_override = key in translations
-        csv_english = original_english_map.get(key, "")
+        csv_target = original_english_map.get(key, "")
         is_synced = key in synced_keys
-        is_untouched = bool(csv_english) and not has_override and not is_synced and english == csv_english
+        is_untouched = bool(csv_target) and not has_override and not is_synced and target_text == csv_target
         results.append(
             {
                 "key": key,
@@ -282,12 +295,12 @@ async def get_mod_detail(mod_id: str):
                 "desc": loc_str.desc,
                 "source": source_text,
                 "source_lang": source_lang,
-                "english": english,
+                "english": target_text,
                 "is_translated": is_done,
                 "original_english": pre_export_english.get(key, original_english_map.get(key, "")) if is_synced else original_english_map.get(key, ""),
                 "is_synced": is_synced,
                 "is_untouched": is_untouched,
-                "synced_english": english if is_synced else "",
+                "synced_english": target_text if is_synced else "",
                 "source_file": loc_str.source_file,
                 "translated_by": translation_providers.get(key, ""),
                 "untranslatable_reason": loc_str.untranslatable_reason,
@@ -306,6 +319,7 @@ async def get_mod_detail(mod_id: str):
         "preview_image": f"/workshop/{mod_id}/{preview_img.name}" if preview_img else None,
         "strings": results,
         "source_language_override": lang_override,
+        "target_language_override": load_target_language_override(mod_id),
     }
 
 
@@ -406,17 +420,18 @@ async def clear_translations(mod_id: str):
         HTTPException: 404 if no mod with the given id is found.
     """
     mod_path = _find_mod_path(mod_id)
+    target_lang = load_target_language_override(mod_id) or "English"
 
     strings, _ = _adapter.extract_strings(mod_path)
 
     # Back up before clearing.
-    create_backup(mod_id, "Before clearing English translations")
+    create_backup(mod_id, "Before clearing translations")
 
-    # Write empty overrides for every key that has an English value in the CSV
-    # so the original CSV values don't show through.
+    # Write empty overrides for every key that has a target-language value
+    # in the CSV so the original CSV values don't show through.
     keys_to_clear: list[str] = []
     for key, loc_str in strings.items():
-        if loc_str.translations.get("English", ""):
+        if loc_str.translations.get(target_lang, ""):
             keys_to_clear.append(key)
 
     # Also clear any previously saved translations.
@@ -435,7 +450,7 @@ async def clear_translations(mod_id: str):
 
     # Re-run update so total_keys / hashes stay correct for the dashboard.
     tracker = ProgressTracker()
-    tracker.update(mod_id, strings, _adapter.source_languages)
+    tracker.update(mod_id, strings, _adapter.source_languages, target_lang=target_lang)
 
     # Mark untranslated everything EXCEPT keys with empty sources.
     lang_override = load_source_language_override(mod_id)
@@ -443,6 +458,9 @@ async def clear_translations(mod_id: str):
     for key, loc_str in strings.items():
         source_lang = resolve_source_language(loc_str, lang_override)
         source_text = loc_str.translations.get(source_lang, "") if source_lang else ""
+        target_text = loc_str.translations.get(target_lang, "")
+        if not source_text and target_text:
+            source_text = target_text
         if not source_text.strip():
             done_keys.append(key)
 
@@ -686,17 +704,19 @@ async def export_mod(mod_id: str, resync: bool = False):
     if not translations:
         raise HTTPException(status_code=400, detail="No translations found for this mod")
 
+    target_lang = load_target_language_override(mod_id) or "English"
+
     # Extract current strings from the mod.
     strings, _ = _adapter.extract_strings(mod_path)
 
-    # Capture pre-export English values so we can show a diff in the UI.
-    pre_export_english = {key: loc_str.translations.get("English", "") for key, loc_str in strings.items() if key in translations}
+    # Capture pre-export target-language values so we can show a diff in the UI.
+    pre_export_english = {key: loc_str.translations.get(target_lang, "") for key, loc_str in strings.items() if key in translations}
 
-    # Apply translations to the English column.
+    # Apply translations to the target language column.
     applied = 0
-    for key, english in translations.items():
+    for key, translated_text in translations.items():
         if key in strings:
-            strings[key].translations["English"] = english
+            strings[key].translations[target_lang] = translated_text
             applied += 1
 
     # Check if the Harmony injection mod is installed. When present,
@@ -718,9 +738,9 @@ async def export_mod(mod_id: str, resync: bool = False):
                 continue
             source = loc_str.source_file or _adapter.csv_for_key(loc_str.key)
             if source.lower().endswith(".json"):
-                english = loc_str.translations.get("English", "")
-                if english:
-                    gdata_translations[key] = english
+                target_text = loc_str.translations.get(target_lang, "")
+                if target_text:
+                    gdata_translations[key] = target_text
             else:
                 if source.lower().endswith(".dll"):
                     source = _adapter.csv_for_key(loc_str.key)
@@ -758,21 +778,18 @@ async def export_mod(mod_id: str, resync: bool = False):
         for key, loc_str in strings.items():
             if key not in translations:
                 continue
-            english = loc_str.translations.get("English", "")
-            if not english:
+            target_text = loc_str.translations.get(target_lang, "")
+            if not target_text:
                 continue
 
             if loc_str.source_file.lower().endswith(".dll"):
                 source = (
-                    loc_str.translations.get("Chinese", "")
-                    or loc_str.translations.get("Chinese-TW [zh-tw]", "")
-                    or loc_str.translations.get("Japanese", "")
-                    or loc_str.translations.get("Korean", "")
+                    loc_str.translations.get("Chinese", "") or loc_str.translations.get("Chinese-TW [zh-tw]", "") or loc_str.translations.get("Japanese", "") or loc_str.translations.get("Korean", "")
                 )
                 if source:
-                    text_overrides[source] = english
+                    text_overrides[source] = target_text
             else:
-                keyed_overrides[key] = english
+                keyed_overrides[key] = target_text
 
         if keyed_overrides:
             keyed_path = overrides_dir / "keyed_overrides.json"
@@ -948,6 +965,35 @@ async def set_source_language(mod_id: str, body: SourceLanguageOverride):
         A dict with `{"status": "saved"}`.
     """
     save_source_language_override(mod_id, body.source_language)
+    return {"status": "saved"}
+
+
+@router.get("/mods/{mod_id}/target-language")
+async def get_target_language(mod_id: str):
+    """Return the target language override for a mod.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        A dict with `target_language` set to the override language name,
+        or None if the default (English) is active.
+    """
+    return {"target_language": load_target_language_override(mod_id)}
+
+
+@router.post("/mods/{mod_id}/target-language")
+async def set_target_language(mod_id: str, body: TargetLanguageOverride):
+    """Save a target language override for a mod.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        body: The override payload with `target_language`.
+
+    Returns:
+        A dict with `{"status": "saved"}`.
+    """
+    save_target_language_override(mod_id, body.target_language)
     return {"status": "saved"}
 
 
