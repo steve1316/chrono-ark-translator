@@ -62,6 +62,7 @@ class LlamaCppProvider(TranslationProvider):
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
+        target_lang: str = "English",
     ) -> tuple[dict[str, str], list[dict]]:
         """Translate a batch of strings via llama-server.
 
@@ -89,6 +90,7 @@ class LlamaCppProvider(TranslationProvider):
             format_rules=format_rules,
             style_examples=style_examples,
             character_context=character_context,
+            target_lang=target_lang,
         )
 
         # Estimate output tokens needed: ~100 tokens per entry for translations + suggestions.
@@ -157,6 +159,7 @@ class LlamaCppProvider(TranslationProvider):
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
         cancel_event: Event | None = None,
+        target_lang: str = "English",
     ) -> Generator[dict, None, None]:
         """Stream translation via llama-server's /v1/chat/completions endpoint.
 
@@ -188,6 +191,7 @@ class LlamaCppProvider(TranslationProvider):
             format_rules=format_rules,
             style_examples=style_examples,
             character_context=character_context,
+            target_lang=target_lang,
         )
 
         estimated_output = max(8192, len(entries) * 100 + 2048)

@@ -16,6 +16,14 @@ _DEEPL_LANG_CODES = {
     "Chinese-TW [zh-tw]": "ZH",
     "Korean": "KO",
     "Japanese": "JA",
+    "English": "EN",
+}
+
+_DEEPL_TARGET_CODES = {
+    "English": "EN-US",
+    "Chinese": "ZH-HANS",
+    "Korean": "KO",
+    "Japanese": "JA",
 }
 
 
@@ -52,6 +60,8 @@ class DeepLProvider(TranslationProvider):
         game_context: str = "",
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
+        character_context: dict | None = None,
+        target_lang: str = "English",
     ) -> tuple[dict[str, str], list[dict]]:
         """Translate a batch of strings using DeepL.
 
@@ -82,8 +92,9 @@ class DeepLProvider(TranslationProvider):
 
         translator = deepl.Translator(self._api_key)
 
-        # Map source language to DeepL code.
+        # Map source/target language to DeepL codes.
         deepl_source = _DEEPL_LANG_CODES.get(source_lang, "ZH")
+        deepl_target = _DEEPL_TARGET_CODES.get(target_lang, "EN-US")
 
         results = {}
         texts = [text for _, text in entries]
@@ -94,7 +105,7 @@ class DeepLProvider(TranslationProvider):
             translations = translator.translate_text(
                 texts,
                 source_lang=deepl_source,
-                target_lang="EN-US",
+                target_lang=deepl_target,
                 preserve_formatting=True,
             )
 

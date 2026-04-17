@@ -60,8 +60,9 @@ class OpenAIProvider(TranslationProvider):
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
+        target_lang: str = "English",
     ) -> tuple[dict[str, str], list[dict]]:
-        """Translate a batch of strings to English using the OpenAI API.
+        """Translate a batch of strings using the OpenAI API.
 
         Sends the entries to the OpenAI chat completions endpoint and parses
         the JSON response. Retries automatically on rate-limit and transient
@@ -101,6 +102,7 @@ class OpenAIProvider(TranslationProvider):
             format_rules=format_rules,
             style_examples=style_examples,
             character_context=character_context,
+            target_lang=target_lang,
         )
 
         max_retries = 3
@@ -174,6 +176,7 @@ class OpenAIProvider(TranslationProvider):
         format_rules = kwargs.get("format_rules")
         style_examples = kwargs.get("style_examples")
         character_context = kwargs.get("character_context")
+        target_lang = kwargs.get("target_lang", "English")
 
         system_prompt, user_message = self.build_prompt(
             entries,
@@ -183,6 +186,7 @@ class OpenAIProvider(TranslationProvider):
             format_rules=format_rules,
             style_examples=style_examples,
             character_context=character_context,
+            target_lang=target_lang,
         )
         full_prompt = system_prompt + user_message
 

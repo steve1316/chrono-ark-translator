@@ -12,7 +12,7 @@ from threading import Event
 from typing import Generator
 
 
-_SYSTEM_PROMPT_TEMPLATE = """You are a professional game translator specializing in translating {source_lang} text into English for the game {game_context}.
+_SYSTEM_PROMPT_TEMPLATE = """You are a professional game translator specializing in translating {source_lang} text into {target_lang} for the game {game_context}.
 
 ## Translation Rules
 
@@ -159,9 +159,10 @@ class TranslationProvider(ABC):
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
+        target_lang: str = "English",
     ) -> tuple[dict[str, str], list[dict]]:
         """
-        Translate a batch of strings to English.
+        Translate a batch of strings.
 
         Args:
             entries: List of (key, source_text) tuples to translate.
@@ -172,9 +173,10 @@ class TranslationProvider(ABC):
             style_examples: Dict of category -> [(source, english)] pairs for few-shot.
             character_context: Character background info dict with keys like
                 `"character_name"`, `"source_game"`, and `"background"`.
+            target_lang: Name of the target language (e.g., `"English"`, `"Chinese"`).
 
         Returns:
-            A tuple of (translations dict mapping key to English text,
+            A tuple of (translations dict mapping key to target language text,
             suggested_terms list of dicts).
         """
         ...
@@ -188,6 +190,7 @@ class TranslationProvider(ABC):
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
+        target_lang: str = "English",
     ) -> tuple[str, str]:
         """Build the system and user prompts without sending to the API.
 
@@ -201,6 +204,7 @@ class TranslationProvider(ABC):
                 for few-shot style guidance.
             character_context: Character background info dict with keys like
                 `"character_name"`, `"source_game"`, and `"background"`.
+            target_lang: Name of the target language (e.g., `"English"`, `"Chinese"`).
 
         Returns:
             A tuple of (system_prompt, user_message).
@@ -213,6 +217,7 @@ class TranslationProvider(ABC):
 
         system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(
             source_lang=source_lang,
+            target_lang=target_lang,
             game_context=game_context or "a video game",
             format_rules_section=format_rules_section,
             style_examples_section=style_examples_section,
@@ -223,7 +228,7 @@ class TranslationProvider(ABC):
         while "\n\n\n" in system_prompt:
             system_prompt = system_prompt.replace("\n\n\n", "\n\n")
 
-        user_lines = [f"Translate the following {source_lang} strings to English:\n"]
+        user_lines = [f"Translate the following {source_lang} strings to {target_lang}:\n"]
         for key, source_text in entries:
             escaped = source_text.replace("\n", "\\n")
             user_lines.append(f"**{key}**: {escaped}")
@@ -247,6 +252,7 @@ class TranslationProvider(ABC):
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
         cancel_event: Event | None = None,
+        target_lang: str = "English",
     ) -> Generator[dict, None, None]:
         """Stream translation progress as a series of event dicts.
 
@@ -265,6 +271,7 @@ class TranslationProvider(ABC):
                 `"character_name"`, `"source_game"`, and `"background"`.
             cancel_event: When set, the provider should abort the in-progress
                 request and close any open HTTP connections (e.g. to Ollama).
+            target_lang: Name of the target language (e.g., `"English"`, `"Chinese"`).
 
         Yields:
             Dicts with a `"type"` key. Common types: `"started"`,
@@ -279,6 +286,7 @@ class TranslationProvider(ABC):
             format_rules=format_rules,
             style_examples=style_examples,
             character_context=character_context,
+            target_lang=target_lang,
         )
         yield {
             "type": "complete",

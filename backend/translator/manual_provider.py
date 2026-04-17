@@ -44,7 +44,10 @@ class ManualProvider(TranslationProvider):
         glossary_prompt: str,
         game_context: str = "",
         format_rules: list[str] | None = None,
-    ) -> dict[str, str]:
+        style_examples: dict[str, list[tuple[str, str]]] | None = None,
+        character_context: dict | None = None,
+        target_lang: str = "English",
+    ) -> tuple[dict[str, str], list[dict]]:
         """
         Export strings for manual translation and wait for user input.
 

@@ -57,8 +57,9 @@ class ClaudeProvider(TranslationProvider):
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
+        target_lang: str = "English",
     ) -> tuple[dict[str, str], list[dict]]:
-        """Translate a batch of strings to English using the Claude API.
+        """Translate a batch of strings using the Claude API.
 
         Sends the entries to Claude with the assembled prompt and parses the
         JSON response. Retries automatically on rate-limit and transient API
@@ -98,6 +99,7 @@ class ClaudeProvider(TranslationProvider):
             format_rules=format_rules,
             style_examples=style_examples,
             character_context=character_context,
+            target_lang=target_lang,
         )
 
         max_retries = 3
@@ -152,6 +154,7 @@ class ClaudeProvider(TranslationProvider):
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
+        target_lang: str = "English",
     ) -> dict:
         """Estimate the cost of translating the given entries with Claude.
 
@@ -193,6 +196,7 @@ class ClaudeProvider(TranslationProvider):
                 format_rules=format_rules,
                 style_examples=style_examples,
                 character_context=character_context,
+                target_lang=target_lang,
             )
             full_prompt = system_prompt + user_message
 

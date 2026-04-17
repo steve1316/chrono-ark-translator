@@ -64,6 +64,7 @@ class OllamaProvider(TranslationProvider):
         format_rules: list[str] | None = None,
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
+        target_lang: str = "English",
     ) -> tuple[dict[str, str], list[dict]]:
         """Translate a batch of strings via Ollama's /api/chat endpoint.
 
@@ -91,6 +92,7 @@ class OllamaProvider(TranslationProvider):
             format_rules=format_rules,
             style_examples=style_examples,
             character_context=character_context,
+            target_lang=target_lang,
         )
 
         # Estimate token count to set an adequate context window.
@@ -165,6 +167,7 @@ class OllamaProvider(TranslationProvider):
         style_examples: dict[str, list[tuple[str, str]]] | None = None,
         character_context: dict | None = None,
         cancel_event: Event | None = None,
+        target_lang: str = "English",
     ) -> Generator[dict, None, None]:
         """Stream translation via Ollama's `/api/chat` endpoint.
 
@@ -196,6 +199,7 @@ class OllamaProvider(TranslationProvider):
             format_rules=format_rules,
             style_examples=style_examples,
             character_context=character_context,
+            target_lang=target_lang,
         )
 
         prompt_chars = len(system_prompt) + len(user_message)
