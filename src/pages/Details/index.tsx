@@ -60,9 +60,7 @@ function CharacterContextPanel({ modId, onHasContextChange }: CharacterContextPa
             </p>
             <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem" }}>
                 <div style={{ flex: 1 }}>
-                    <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                        Source Game
-                    </label>
+                    <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Source Game</label>
                     <input
                         type="text"
                         placeholder="e.g. Library of Ruina"
@@ -101,9 +99,7 @@ function CharacterContextPanel({ modId, onHasContextChange }: CharacterContextPa
                 </div>
             </div>
             <div>
-                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                    Background
-                </label>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Background</label>
                 <textarea
                     placeholder="Describe the character's personality, role in their source game, and any lore that would help with translation..."
                     value={ctx.background}
@@ -124,11 +120,7 @@ function CharacterContextPanel({ modId, onHasContextChange }: CharacterContextPa
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem", alignItems: "center", gap: "0.75rem" }}>
                 {saved && <span style={{ color: "#34d399", fontSize: "0.85rem" }}>Saved!</span>}
-                <button
-                    className="btn btn-primary"
-                    onClick={handleSave}
-                    style={{ background: "rgba(129,230,217,0.15)", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)" }}
-                >
+                <button className="btn btn-primary" onClick={handleSave} style={{ background: "rgba(129,230,217,0.15)", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)" }}>
                     Save Context
                 </button>
             </div>
@@ -178,7 +170,6 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [hasExportChanges, setHasExportChanges] = useState(false)
     const [hasPreviousSync, setHasPreviousSync] = useState(false)
 
-
     const [suggestions, setSuggestions] = useState<TermSuggestion[]>([])
     const [showSuggestionModal, setShowSuggestionModal] = useState(false)
     const [showReviewModal, setShowReviewModal] = useState(false)
@@ -218,6 +209,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     }, [modId])
 
     const [sourceLangOverride, setSourceLangOverride] = useState<string | null>(null)
+    const [targetLangOverride, setTargetLangOverride] = useState<string | null>(null)
 
     const [exporting, setExporting] = useState(false)
     const [scanning, setScanning] = useState(false)
@@ -232,7 +224,9 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const [apiResponses, setApiResponses] = useState<any[]>([])
     const [activeResponseIdx, setActiveResponseIdx] = useState(0)
     const [showHistory, setShowHistory] = useState(false)
-    const [historyEntries, setHistoryEntries] = useState<{ id: string; reason: string; created_at: string; files: string[]; translated_count?: number; total_count?: number; glossary_count?: number }[]>([])
+    const [historyEntries, setHistoryEntries] = useState<
+        { id: string; reason: string; created_at: string; files: string[]; translated_count?: number; total_count?: number; glossary_count?: number }[]
+    >([])
     const [confirmModal, setConfirmModal] = useState<{
         type: "export" | "resync" | "reset" | "clear-translations" | "delete-all-glossary" | "restore-backup" | "delete-backup"
         message: string | React.ReactNode
@@ -391,6 +385,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             setModPreviewImage(data.preview_image ?? null)
             setModUrl(data.url ?? null)
             setSourceLangOverride(data.source_language_override ?? null)
+            setTargetLangOverride(data.target_language_override ?? null)
         } catch (err) {
             console.error("Failed to fetch mod detail:", err)
         } finally {
@@ -400,6 +395,15 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
 
     const saveSourceLanguage = async (lang: string | null) => {
         setSourceLangOverride(lang)
+        // When switching away from English source, clear target override
+        if (lang !== "English" && targetLangOverride) {
+            setTargetLangOverride(null)
+            fetch(`${API_BASE}/mods/${modId}/target-language`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ target_language: null }),
+            }).catch(() => {})
+        }
         try {
             await fetch(`${API_BASE}/mods/${modId}/source-language`, {
                 method: "POST",
@@ -409,6 +413,20 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
             fetchModDetail(true)
         } catch (err) {
             console.error("Failed to save source language:", err)
+        }
+    }
+
+    const saveTargetLanguage = async (lang: string | null) => {
+        setTargetLangOverride(lang)
+        try {
+            await fetch(`${API_BASE}/mods/${modId}/target-language`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ target_language: lang }),
+            })
+            fetchModDetail(true)
+        } catch (err) {
+            console.error("Failed to save target language:", err)
         }
     }
 
@@ -833,7 +851,30 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                     <option value="Korean">Korean</option>
                                     <option value="Japanese">Japanese</option>
                                     <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
+                                    <option value="English">English</option>
                                 </select>
+                                {sourceLangOverride === "English" && (
+                                    <>
+                                        <span style={{ margin: "0 0.3rem", color: "var(--text-dim)" }}>→</span>
+                                        <select
+                                            value={targetLangOverride || "Chinese"}
+                                            onChange={(e) => saveTargetLanguage(e.target.value)}
+                                            style={{
+                                                padding: "0.3rem 0.5rem",
+                                                borderRadius: "6px",
+                                                background: "rgba(0,0,0,0.2)",
+                                                border: "1px solid var(--glass-border)",
+                                                color: "var(--text-main)",
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
+                                            <option value="Chinese">Chinese</option>
+                                            <option value="Korean">Korean</option>
+                                            <option value="Japanese">Japanese</option>
+                                            <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
+                                        </select>
+                                    </>
+                                )}
                             </div>
                             <p>
                                 {strings.filter((s) => s.source.trim() && !s.untranslatable_reason && s.is_translated).length} /{" "}
@@ -1562,7 +1603,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 <div className="resizer" onPointerDown={(e) => onResizeStart(e, "source")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
                             </th>
                             <th className="sortable-th" onClick={() => handleSort("english")} style={{ width: columnWidths.english }}>
-                                English {getSortIcon("english")}
+                                {targetLangOverride || "English"} {getSortIcon("english")}
                                 <div className="resizer" onPointerDown={(e) => onResizeStart(e, "english")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
                             </th>
                         </tr>
