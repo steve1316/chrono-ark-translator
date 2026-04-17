@@ -66,6 +66,8 @@ interface TranslationConfirmModalProps {
     onConfirm: () => void
     /** Callback invoked when the user cancels or closes the modal */
     onCancel: () => void
+    /** Optional title override for the modal header */
+    title?: string
 }
 
 /**
@@ -86,7 +88,7 @@ interface TranslationConfirmModalProps {
  * @param onCancel - Fires when the user clicks Cancel or the backdrop
  * @returns The rendered confirmation modal
  */
-const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ preview, onConfirm, onCancel }) => {
+const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ preview, onConfirm, onCancel, title }) => {
     const languages = Object.keys(preview.previews)
     const [activeLang, setActiveLang] = useState(languages[0] || "")
     const [activeTab, setActiveTab] = useState<"system" | "user">("system")
@@ -114,7 +116,7 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
             <div className="glass-card" style={{ width: "900px", maxHeight: "85vh", display: "flex", flexDirection: "column", padding: "2rem" }}>
                 {/* Modal header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                    <h2 style={{ margin: 0 }}>Confirm Translation</h2>
+                    <h2 style={{ margin: 0 }}>{title || "Confirm Translation"}</h2>
                     <button
                         onClick={onCancel}
                         style={{ background: "none", border: "none", color: "var(--text-dim)", fontSize: "2rem", lineHeight: 1, cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px" }}
