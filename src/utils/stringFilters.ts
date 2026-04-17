@@ -1,8 +1,8 @@
 import type { LocString } from "../shared_types"
 
-export type RowStatus = "synced" | "pending" | "missing" | "untranslatable"
+export type RowStatus = "synced" | "untouched" | "pending" | "missing" | "untranslatable"
 
-export type FilterTab = "all" | "missing" | "pending" | "synced"
+export type FilterTab = "all" | "missing" | "untouched" | "pending" | "synced"
 
 export type SortField = "is_translated" | "translated_by" | "key" | "source_file" | "source" | "english"
 
@@ -18,6 +18,7 @@ export type SortConfig = { key: SortField; direction: SortDirection }
 export function getRowStatus(s: LocString): RowStatus {
     if (s.untranslatable_reason) return "untranslatable"
     if (s.is_synced) return "synced"
+    if (s.is_untouched) return "untouched"
     if (s.is_translated || !s.source.trim()) return "pending"
     return "missing"
 }
@@ -50,11 +51,13 @@ export function filterStrings(strings: LocString[], filter: FilterTab, search: s
 
         const isDone = s.is_translated
         const isPending = isDone && !s.is_synced
+        const isUntouched = !!s.is_untouched
         const isUntranslatable = !!s.untranslatable_reason
         const matchesFilter =
             filter === "all" ||
             (filter === "missing" && !isDone && !isUntranslatable) ||
-            (filter === "pending" && isPending) ||
+            (filter === "untouched" && isUntouched) ||
+            (filter === "pending" && isPending && !isUntouched) ||
             (filter === "synced" && s.is_synced)
 
         if (!matchesFilter) return false

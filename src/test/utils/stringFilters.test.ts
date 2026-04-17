@@ -12,6 +12,7 @@ function makeString(overrides: Partial<LocString> = {}): LocString {
         is_translated: false,
         original_english: "",
         is_synced: false,
+        is_untouched: false,
         synced_english: "",
         source_file: "LangDataDB.csv",
         translated_by: "",
@@ -36,6 +37,12 @@ describe("getRowStatus", () => {
     it("returns pending when source is empty (nothing to translate)", () => {
         expect(getRowStatus(makeString({ source: "  " }))).toBe("pending")
     })
+    it("returns untouched when is_untouched is true", () => {
+        expect(getRowStatus(makeString({ is_untouched: true, is_translated: true, english: "Test" }))).toBe("untouched")
+    })
+    it("prioritizes synced over untouched", () => {
+        expect(getRowStatus(makeString({ is_synced: true, is_untouched: true, is_translated: true, english: "Test" }))).toBe("synced")
+    })
     it("prioritizes untranslatable over synced", () => {
         expect(getRowStatus(makeString({ untranslatable_reason: "DLL", is_synced: true }))).toBe("untranslatable")
     })
@@ -51,6 +58,9 @@ describe("getRowStyle", () => {
     it("returns yellow for override", () => {
         expect(getRowStyle(makeString({ english: "New", original_english: "Old" }))).toEqual({ backgroundColor: "rgba(255, 220, 40, 0.15)" })
     })
+    it("returns undefined for untouched", () => {
+        expect(getRowStyle(makeString({ is_untouched: true }))).toBeUndefined()
+    })
     it("returns undefined for default rows", () => {
         expect(getRowStyle(makeString())).toBeUndefined()
     })
@@ -65,13 +75,14 @@ describe("filterStrings", () => {
     const synced = makeString({ key: "C", is_translated: true, is_synced: true, english: "Synced" })
     const emptySource = makeString({ key: "D", source: "" })
     const untranslatable = makeString({ key: "E", untranslatable_reason: "DLL", source: "中文" })
-    const all = [translated, missing, synced, emptySource, untranslatable]
+    const untouched = makeString({ key: "F", is_untouched: true, is_translated: true, english: "Original" })
+    const all = [translated, missing, synced, emptySource, untranslatable, untouched]
 
     it("hides rows with empty source text", () => {
         expect(filterStrings(all, "all", "").map((s) => s.key)).not.toContain("D")
     })
     it("all filter shows all non-empty rows", () => {
-        expect(filterStrings(all, "all", "")).toHaveLength(4)
+        expect(filterStrings(all, "all", "")).toHaveLength(5)
     })
     it("missing filter excludes translated and untranslatable", () => {
         expect(filterStrings(all, "missing", "").map((s) => s.key)).toEqual(["B"])
@@ -79,11 +90,14 @@ describe("filterStrings", () => {
     it("pending filter shows translated-but-not-synced", () => {
         expect(filterStrings(all, "pending", "").map((s) => s.key)).toEqual(["A"])
     })
+    it("untouched filter shows only untouched", () => {
+        expect(filterStrings(all, "untouched", "").map((s) => s.key)).toEqual(["F"])
+    })
     it("synced filter shows only synced", () => {
         expect(filterStrings(all, "synced", "").map((s) => s.key)).toEqual(["C"])
     })
     it("search matches across key", () => {
-        expect(filterStrings(all, "all", "LangDataDB")).toHaveLength(4)
+        expect(filterStrings(all, "all", "LangDataDB")).toHaveLength(5)
     })
     it("search matches source_file", () => {
         const s = makeString({ source_file: "CustomMod.csv" })
