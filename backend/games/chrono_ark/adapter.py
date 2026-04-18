@@ -26,6 +26,8 @@ _DESC_SUFFIX_PAIRS = [
 # All known field suffixes in localization keys (longest first so that
 # e.g. `_PassiveName` matches before `_Name`).
 _KNOWN_SUFFIXES = (
+    "_Text_MasterTarget",
+    "_CampSelectWord",
     "_PassiveName",
     "_PassiveDesc",
     "_PassiveDes",

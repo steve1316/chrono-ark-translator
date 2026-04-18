@@ -27,6 +27,8 @@ _FIELD_SUFFIXES: dict[str, str] = {
     "SkinName": "_SkinName",
     "SkinDesc": "_SkinDesc",
     "UnlockString": "_UnlockString",
+    "CampSelectWord": "_CampSelectWord",
+    "Text_MasterTarget": "_Text_MasterTarget",
 }
 
 # Schema names used as key prefixes (matches base-game CSV convention).
