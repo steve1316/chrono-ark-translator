@@ -123,7 +123,7 @@ const ModCard: React.FC<ModCardProps> = React.memo(({ mod, onClick, onSync, sear
 
                 {/* --- Action Buttons --- */}
                 <div className="mod-actions">
-                    <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => onClick(mod.id)}>
+                    <button className={`btn ${mod.untranslated > 0 ? "btn-warning" : "btn-primary"}`} style={{ flex: 1 }} onClick={() => onClick(mod.id)}>
                         View Strings
                     </button>
                     {/* Steam Workshop link -- only shown if the mod has a URL. */}
