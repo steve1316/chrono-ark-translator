@@ -8,7 +8,7 @@ import RegistryErrorBanner from "../../components/RegistryErrorBanner"
  * Search filters across `name` and `package_name`.
  *
  * @returns A page that renders a searchable table of TW3 supported mods, or a
- *     RegistryErrorBanner when the backend reports a configuration error.
+ *     `RegistryErrorBanner` when the backend reports a configuration error.
  */
 export default function SupportedModsPage() {
     const [mods, setMods] = useState<SupportedMod[] | null>(null)
