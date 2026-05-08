@@ -1,7 +1,7 @@
-"""Total War: Warhammer III adapter — sub-project 1 stub.
+"""Total War: Warhammer III adapter.
 
-Registers chassis metadata only. Pack-assembly capability and routes are
-added in sub-project 2.
+Composes the TW3 read-only registry routes under
+`/api/games/total_war_warhammer_3`. Runner routes will be added by Task 6.
 """
 
 from __future__ import annotations
@@ -34,8 +34,17 @@ class TotalWarWarhammer3Adapter(GameAdapter):
 
     @property
     def router(self) -> APIRouter:
+        """Return the composed adapter router for Total War: Warhammer III.
+
+        Cached at class level: the composed router has no instance dependencies.
+
+        Returns:
+            Cached composed `APIRouter` for the TW3 game.
+        """
         if TotalWarWarhammer3Adapter._ROUTER is None:
-            TotalWarWarhammer3Adapter._ROUTER = APIRouter(prefix="/api/games/total_war_warhammer_3")
+            from backend.games.total_war_warhammer_3.routes import build_total_war_warhammer_3_router
+
+            TotalWarWarhammer3Adapter._ROUTER = build_total_war_warhammer_3_router()
         return TotalWarWarhammer3Adapter._ROUTER
 
     @property
