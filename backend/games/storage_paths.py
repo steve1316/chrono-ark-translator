@@ -39,3 +39,8 @@ def mods_path(game_id: str) -> Path:
 def glossary_path(game_id: str) -> Path:
     """Return `<game_storage_path>/glossary.json` for `game_id`."""
     return game_storage_path(game_id) / "glossary.json"
+
+
+def translation_memory_path(game_id: str) -> Path:
+    """Return `<game_storage_path>/translation_memory.json` for `game_id`."""
+    return game_storage_path(game_id) / "translation_memory.json"

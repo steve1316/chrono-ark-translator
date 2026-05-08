@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-from backend import config
+from backend.games.storage_paths import translation_memory_path
 
 
 class TranslationMemory:
@@ -30,7 +30,7 @@ class TranslationMemory:
                 Defaults to storage/translation_memory.json.
         """
         if path is None:
-            path = config.STORAGE_PATH / "translation_memory.json"
+            path = translation_memory_path("chrono_ark")
         self._path = path
         self._entries: dict[str, dict] = {}
         self._hits = 0
