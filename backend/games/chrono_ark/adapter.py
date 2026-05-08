@@ -309,13 +309,20 @@ class ChronoArkAdapter(GameAdapter, TranslationCapability):
     def capabilities(self) -> list[str]:
         return ["translation"]
 
+    _ROUTER: APIRouter | None = None
+
     @property
     def router(self) -> APIRouter:
-        """Return the composed adapter router for Chrono Ark."""
-        if not hasattr(self, "_router"):
+        """Return the composed adapter router for Chrono Ark.
+
+        Cached at class level: the composed router has no instance
+        dependencies, so a single shared router is correct across all
+        instances and survives `set_active_game` rebinds.
+        """
+        if ChronoArkAdapter._ROUTER is None:
             from backend.games.chrono_ark.routes import build_chrono_ark_router
-            self._router = build_chrono_ark_router()
-        return self._router
+            ChronoArkAdapter._ROUTER = build_chrono_ark_router()
+        return ChronoArkAdapter._ROUTER
 
     @property
     def target_language(self) -> str:

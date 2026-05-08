@@ -7,6 +7,7 @@ into domain-specific modules under `backend.routes`.
 """
 
 import uvicorn
+from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,13 +19,17 @@ from backend.games.registry import list_games, get_adapter
 from backend.scripts.migrate_storage_v1_to_v2 import run_migration
 
 
-app = FastAPI(title="Chrono Ark Translator API")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """App lifespan hooks. Runs the v1->v2 storage migration once at startup.
 
-
-@app.on_event("startup")
-async def _run_storage_migration() -> None:
-    """Run the v1->v2 storage migration on startup. Idempotent."""
+    Idempotent: a marker file makes subsequent runs a no-op.
+    """
     run_migration()
+    yield
+
+
+app = FastAPI(title="Chrono Ark Translator API", lifespan=lifespan)
 
 
 # Enable CORS for Vite development server.

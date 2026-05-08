@@ -126,27 +126,14 @@ function CharacterContextPanel({ modId, onHasContextChange }: CharacterContextPa
 }
 
 /**
- * Legacy prop once owned by `App.tsx`.
- *
- * The page now navigates back via `useNavigate`, so this callback is
- * optional and ignored. Kept for backward compatibility until Task 11
- * removes the App-level prop-passing entirely.
- */
-interface ModDetailProps {
-    /** @deprecated Back-navigation is handled internally via `useNavigate`. */
-    onBack?: () => void
-}
-
-/**
  * Detail view for a specific mod, showing all translatable strings.
  *
  * Reads the active mod id from the URL via React Router's `useParams` and
- * uses `useNavigate` to return to the dashboard, so the page no longer
- * depends on an `onBack` callback supplied by `App.tsx`.
+ * uses `useNavigate` to return to the dashboard.
  *
  * @returns The rendered mod detail view.
  */
-const ModDetail: React.FC<ModDetailProps> = () => {
+const ModDetail: React.FC = () => {
     const { modId } = useParams<{ modId: string }>()
     const navigate = useNavigate()
     const onBack = useCallback(() => navigate("/dashboard"), [navigate])

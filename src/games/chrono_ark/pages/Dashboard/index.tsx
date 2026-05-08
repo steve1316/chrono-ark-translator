@@ -8,34 +8,14 @@ import { gameApi } from "../../../../api/games"
 import { filterMods } from "../../../../utils/modFilters"
 
 /**
- * Legacy props once owned by `App.tsx`.
- *
- * The page now fetches its own state, so every prop is optional and ignored.
- * The interface is kept for backward compatibility until Task 11 removes the
- * App-level prop-passing entirely.
- */
-interface DashboardPageProps {
-    /** @deprecated Self-fetched on mount; ignored. */
-    mods?: ModStatus[]
-    /** @deprecated Navigation handled internally via `useNavigate`. */
-    onModSelect?: (modId: string) => void
-    /** @deprecated Sync is handled internally via `gameApi`. */
-    onModSync?: (modId: string) => void
-    /** @deprecated Refresh updates local state directly. */
-    onRefresh?: (mods: ModStatus[]) => void
-}
-
-/**
  * The dashboard page displays a grid of all mods and their translation progress.
  *
  * Fetches its own mod list from the Chrono Ark game API on mount, re-fetches
- * after any per-mod sync, and navigates to the detail page on selection. State
- * that previously lived in `App.tsx` is now owned by this page; the legacy
- * props are accepted but ignored to keep `App.tsx` building until Task 11.
+ * after any per-mod sync, and navigates to the detail page on selection.
  *
  * @returns A React component that displays a grid of all mods and their translation progress.
  */
-const DashboardPage: React.FC<DashboardPageProps> = () => {
+const DashboardPage: React.FC = () => {
     const navigate = useNavigate()
     const [mods, setMods] = useState<ModStatus[]>([])
     const [search, setSearch] = useState("")
