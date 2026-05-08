@@ -789,7 +789,12 @@ async def export_mod(mod_id: str, resync: bool = False):
                 if source:
                     text_overrides[source] = target_text
             else:
-                keyed_overrides[key] = target_text
+                # The game expects Character names with lowercase "_name"
+                # but gdata extraction produces "_Name". Normalize here.
+                override_key = key
+                if key.startswith("Character/") and key.endswith("_Name"):
+                    override_key = key[:-5] + "_name"
+                keyed_overrides[override_key] = target_text
 
         if keyed_overrides:
             keyed_path = overrides_dir / "keyed_overrides.json"
