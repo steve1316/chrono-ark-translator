@@ -115,6 +115,14 @@ const SettingsPage: React.FC = () => {
     const [originalIgnoredMods, setOriginalIgnoredMods] = useState<string[]>([])
     const [newIgnoredMod, setNewIgnoredMod] = useState("")
 
+    // TW3 path state
+    const [tw3HelperPath, setTw3HelperPath] = useState("")
+    const [originalTw3HelperPath, setOriginalTw3HelperPath] = useState("")
+    const [tw3RpfmCliPath, setTw3RpfmCliPath] = useState("")
+    const [originalTw3RpfmCliPath, setOriginalTw3RpfmCliPath] = useState("")
+    const [tw3SteamLibraryDrive, setTw3SteamLibraryDrive] = useState("")
+    const [originalTw3SteamLibraryDrive, setOriginalTw3SteamLibraryDrive] = useState("")
+
     // Ollama-specific state
     const [ollamaStatus, setOllamaStatus] = useState<string>("unknown")
     const [ollamaModels, setOllamaModels] = useState<string[]>([])
@@ -181,7 +189,10 @@ const SettingsPage: React.FC = () => {
         llamacppGpuLayers !== originalLlamacppGpuLayers ||
         llamacppCtxSize !== originalLlamacppCtxSize ||
         llamacppVramTier !== originalLlamacppVramTier ||
-        JSON.stringify(ignoredMods) !== JSON.stringify(originalIgnoredMods)
+        JSON.stringify(ignoredMods) !== JSON.stringify(originalIgnoredMods) ||
+        tw3HelperPath !== originalTw3HelperPath ||
+        tw3RpfmCliPath !== originalTw3RpfmCliPath ||
+        tw3SteamLibraryDrive !== originalTw3SteamLibraryDrive
 
     // Fetch current settings from the backend on mount.
     // Uses AbortController so React StrictMode's double-mount doesn't
@@ -220,6 +231,12 @@ const SettingsPage: React.FC = () => {
                 setOriginalLlamacppCtxSize(data.llamacpp_ctx_size ?? 8192)
                 setIgnoredMods(data.ignored_mods ?? [])
                 setOriginalIgnoredMods(data.ignored_mods ?? [])
+                setTw3HelperPath(data.tw3_helper_path || "")
+                setOriginalTw3HelperPath(data.tw3_helper_path || "")
+                setTw3RpfmCliPath(data.tw3_rpfm_cli_path || "")
+                setOriginalTw3RpfmCliPath(data.tw3_rpfm_cli_path || "")
+                setTw3SteamLibraryDrive(data.tw3_steam_library_drive || "")
+                setOriginalTw3SteamLibraryDrive(data.tw3_steam_library_drive || "")
                 setClaudeModel(data.claude_model || "claude-sonnet-4-6")
                 setOriginalClaudeModel(data.claude_model || "claude-sonnet-4-6")
                 setOpenaiModel(data.openai_model || "gpt-4.1")
@@ -331,6 +348,9 @@ const SettingsPage: React.FC = () => {
         if (llamacppCtxSize !== originalLlamacppCtxSize) payload.llamacpp_ctx_size = llamacppCtxSize
         if (llamacppVramTier !== originalLlamacppVramTier) payload.llamacpp_vram_tier = llamacppVramTier
         if (JSON.stringify(ignoredMods) !== JSON.stringify(originalIgnoredMods)) payload.ignored_mods = ignoredMods
+        if (tw3HelperPath !== originalTw3HelperPath) payload.tw3_helper_path = tw3HelperPath
+        if (tw3RpfmCliPath !== originalTw3RpfmCliPath) payload.tw3_rpfm_cli_path = tw3RpfmCliPath
+        if (tw3SteamLibraryDrive !== originalTw3SteamLibraryDrive) payload.tw3_steam_library_drive = tw3SteamLibraryDrive
 
         try {
             const res = await fetch(`${API_BASE}/settings`, {
@@ -375,6 +395,12 @@ const SettingsPage: React.FC = () => {
             setOriginalLlamacppVramTier(data.llamacpp_vram_tier || "")
             setIgnoredMods(data.ignored_mods ?? [])
             setOriginalIgnoredMods(data.ignored_mods ?? [])
+            setTw3HelperPath(data.tw3_helper_path || "")
+            setOriginalTw3HelperPath(data.tw3_helper_path || "")
+            setTw3RpfmCliPath(data.tw3_rpfm_cli_path || "")
+            setOriginalTw3RpfmCliPath(data.tw3_rpfm_cli_path || "")
+            setTw3SteamLibraryDrive(data.tw3_steam_library_drive || "")
+            setOriginalTw3SteamLibraryDrive(data.tw3_steam_library_drive || "")
             setClaudeModel(data.claude_model || "claude-sonnet-4-6")
             setOriginalClaudeModel(data.claude_model || "claude-sonnet-4-6")
             setOpenaiModel(data.openai_model || "gpt-4.1")
@@ -1517,6 +1543,44 @@ const SettingsPage: React.FC = () => {
                         ))}
                     </div>
                 )}
+            </div>
+
+            {/* Total War: Warhammer III */}
+            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
+                <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-main)" }}>Total War: Warhammer III</h3>
+                <p style={{ color: "var(--text-dim)", marginBottom: "1rem" }}>
+                    Paths used by the helper_scripts script runner. Required before triggering rebuilds from the Runner page.
+                </p>
+
+                <label style={{ display: "block", marginBottom: "0.5rem", color: "var(--text-dim)" }}>helper_scripts directory</label>
+                <input
+                    type="text"
+                    className="btn-outline"
+                    placeholder="C:\path\to\totalwar-modding\helper_scripts"
+                    value={tw3HelperPath}
+                    onChange={(e) => setTw3HelperPath(e.target.value)}
+                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "0.75rem" }}
+                />
+
+                <label style={{ display: "block", marginBottom: "0.5rem", color: "var(--text-dim)" }}>rpfm_cli.exe path (optional, defaults to helper_scripts/rpfm_cli.exe)</label>
+                <input
+                    type="text"
+                    className="btn-outline"
+                    placeholder="leave blank to use default"
+                    value={tw3RpfmCliPath}
+                    onChange={(e) => setTw3RpfmCliPath(e.target.value)}
+                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "0.75rem" }}
+                />
+
+                <label style={{ display: "block", marginBottom: "0.5rem", color: "var(--text-dim)" }}>Steam library drive (e.g., F:)</label>
+                <input
+                    type="text"
+                    className="btn-outline"
+                    placeholder="F:"
+                    value={tw3SteamLibraryDrive}
+                    onChange={(e) => setTw3SteamLibraryDrive(e.target.value)}
+                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8 }}
+                />
             </div>
 
             {/* Save */}

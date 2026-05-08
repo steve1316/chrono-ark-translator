@@ -36,6 +36,7 @@ async def list_games():
         A list of `{game_id, display_name, icon, capabilities}` dicts.
     """
     from backend.games.registry import list_games_metadata
+
     return list_games_metadata()
 
 
@@ -69,6 +70,9 @@ async def get_settings():
         llamacpp_managed=is_managed("llamacpp"),
         ignored_mods=config.IGNORED_MODS,
         active_game=config.ACTIVE_GAME,
+        tw3_helper_path=config.TW3_HELPER_PATH,
+        tw3_rpfm_cli_path=config.TW3_RPFM_CLI_PATH,
+        tw3_steam_library_drive=config.TW3_STEAM_LIBRARY_DRIVE,
         games={game_id: {} for game_id in registry_list_games()},
     )
 
@@ -160,6 +164,18 @@ async def update_settings(payload: SettingsUpdate):
         except ValueError as exc:
             raise HTTPException(400, str(exc))
         env_updates["CATL_ACTIVE_GAME"] = payload.active_game
+
+    if payload.tw3_helper_path is not None:
+        config.TW3_HELPER_PATH = payload.tw3_helper_path
+        env_updates["CATL_TW3_HELPER_PATH"] = payload.tw3_helper_path
+
+    if payload.tw3_rpfm_cli_path is not None:
+        config.TW3_RPFM_CLI_PATH = payload.tw3_rpfm_cli_path
+        env_updates["CATL_TW3_RPFM_CLI_PATH"] = payload.tw3_rpfm_cli_path
+
+    if payload.tw3_steam_library_drive is not None:
+        config.TW3_STEAM_LIBRARY_DRIVE = payload.tw3_steam_library_drive
+        env_updates["CATL_TW3_STEAM_LIBRARY_DRIVE"] = payload.tw3_steam_library_drive
 
     if env_updates:
         _update_env_file(env_updates)
