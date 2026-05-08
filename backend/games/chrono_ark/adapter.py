@@ -9,8 +9,10 @@ import csv
 import os
 from pathlib import Path
 from typing import Optional
+from fastapi import APIRouter
 from backend.models import LocString
 from backend.games.base import GameAdapter, ModInfo
+from backend.games.capabilities.translation import TranslationCapability
 from backend import config
 from backend.games.chrono_ark import csv_extractor, dll_extractor, gdata_extractor, mod_scanner
 
@@ -100,7 +102,7 @@ def _drop_cross_source_duplicates(strings: dict[str, LocString]) -> None:
         strings.pop(key, None)
 
 
-class ChronoArkAdapter(GameAdapter):
+class ChronoArkAdapter(GameAdapter, TranslationCapability):
     """Game adapter for Chrono Ark.
 
     Handles extraction from Chrono Ark's CSV localization files,
@@ -294,6 +296,25 @@ class ChronoArkAdapter(GameAdapter):
     @property
     def game_name(self) -> str:
         return "Chrono Ark"
+
+    @property
+    def display_name(self) -> str:
+        return "Chrono Ark"
+
+    @property
+    def icon(self) -> str:
+        return "chrono_ark"
+
+    @property
+    def capabilities(self) -> list[str]:
+        return ["translation"]
+
+    @property
+    def router(self) -> APIRouter:
+        """Return the composed adapter router. Wired in Task 7."""
+        if not hasattr(self, "_router"):
+            self._router = APIRouter(prefix="/api/games/chrono_ark")
+        return self._router
 
     @property
     def target_language(self) -> str:
@@ -507,6 +528,17 @@ class ChronoArkAdapter(GameAdapter):
                 for lang in columns[3:]:
                     row.append(entry.translations.get(lang, ""))
                 writer.writerow(row)
+
+    def get_mod_url(self, mod_id: str) -> Optional[str]:
+        """Return the Steam Workshop URL for a mod.
+
+        Args:
+            mod_id: Steam Workshop item ID.
+
+        Returns:
+            Steam Workshop URL for the given mod.
+        """
+        return f"https://steamcommunity.com/sharedfiles/filedetails/?id={mod_id}"
 
     def export_gdata_strings(self, mod_path: Path, translations: dict[str, str]) -> list[str]:
         """Write translations back into a mod's gdata JSON files.
