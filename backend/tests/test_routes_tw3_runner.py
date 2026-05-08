@@ -86,3 +86,23 @@ def test_delete_run_cancels(settings):
     client.post("/api/games/total_war_warhammer_3/run/_test_sleep")
     res = client.delete("/api/games/total_war_warhammer_3/run")
     assert res.status_code == 204
+
+
+def test_run_stream_replays_buffered_lines_and_closes_on_done(settings):
+    client = TestClient(app)
+    # Start a quick run, wait for it to finish so the buffer is fully populated.
+    client.post("/api/games/total_war_warhammer_3/run/_test_echo")
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        if sr._proc is None or sr._proc.poll() is not None:
+            break
+        time.sleep(0.05)
+
+    # Now connect to the stream; it should replay all 5 buffered lines + done.
+    with client.stream("GET", "/api/games/total_war_warhammer_3/run/stream") as res:
+        assert res.status_code == 200
+        body = b"".join(res.iter_bytes(chunk_size=1024)).decode()
+
+    # Must contain 5 data events and a terminal done event.
+    assert body.count('"line"') >= 5
+    assert "event: done" in body

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 
 from backend import config
 from backend.games.total_war_warhammer_3 import script_runner as sr
@@ -85,3 +87,34 @@ def delete_run():
         raise HTTPException(status_code=404, detail="no active run")
     sr.cancel_run()
     return Response(status_code=204)
+
+
+@router.get("/run/stream")
+async def run_stream():
+    """Server-sent events: stream buffered + new log lines until the run ends.
+
+    Each `data:` event carries one line; a final `event: done` arrives when the
+    subprocess exits (or immediately if no run has ever started in this session).
+
+    Returns:
+        A `StreamingResponse` with `text/event-stream` content type.
+    """
+
+    async def event_source():
+        async for event in sr.stream_lines():
+            kind = event["event"]
+            if kind == "data":
+                payload = {"line": event["line"], "ts": event["ts"]}
+                yield f"data: {json.dumps(payload)}\n\n"
+            elif kind == "done":
+                payload = {
+                    "exit_code": event.get("exit_code"),
+                    "duration_seconds": event.get("duration_seconds"),
+                }
+                yield f"event: done\ndata: {json.dumps(payload)}\n\n"
+                break
+            elif kind == "error":
+                yield f"event: error\ndata: {json.dumps({'detail': event.get('detail', '')})}\n\n"
+                break
+
+    return StreamingResponse(event_source(), media_type="text/event-stream")
