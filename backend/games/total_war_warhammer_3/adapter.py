@@ -1,7 +1,7 @@
 """Total War: Warhammer III adapter.
 
-Composes the TW3 read-only registry routes under
-`/api/games/total_war_warhammer_3`. Runner routes will be added by Task 6.
+Composes the read-only registry routes and the script runner under
+`/api/games/total_war_warhammer_3`.
 """
 
 from __future__ import annotations
@@ -12,7 +12,11 @@ from backend.games.base import GameAdapter
 
 
 class TotalWarWarhammer3Adapter(GameAdapter):
-    """Total War: Warhammer III game adapter. Registry routes are live; runner routes will be added in Task 6."""
+    """Total War: Warhammer III game adapter.
+
+    Exposes the read-only registries (`SUPPORTED_MODS`, `SUPPORTED_EFFECTS`) and
+    the helper_scripts script runner (subprocess + SSE log streaming).
+    """
 
     _ROUTER: APIRouter | None = None
 
@@ -52,5 +56,5 @@ class TotalWarWarhammer3Adapter(GameAdapter):
         return {
             "helper_scripts_path": {"type": "str", "default": ""},
             "rpfm_cli_path": {"type": "str", "default": ""},
-            "steam_library_drive": {"type": "str", "default": "F:"},
+            "steam_library_drive": {"type": "str", "default": ""},
         }

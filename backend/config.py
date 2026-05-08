@@ -86,7 +86,7 @@ ACTIVE_GAME = os.environ.get("CATL_ACTIVE_GAME", "chrono_ark")
 TW3_HELPER_PATH = os.environ.get("CATL_TW3_HELPER_PATH", "")
 """Filesystem path to the totalwar-modding helper_scripts/ directory.
 
-Used by sub-project 2+ to subprocess Total War: Warhammer III pipelines.
+Used by the script runner to subprocess Total War: Warhammer III pipelines.
 Empty string = not yet configured.
 """
 
@@ -97,9 +97,10 @@ Defaults to `<TW3_HELPER_PATH>/rpfm_cli.exe` if blank, resolved at runtime by
 the script runner preflight.
 """
 
-TW3_STEAM_LIBRARY_DRIVE = os.environ.get("CATL_TW3_STEAM_LIBRARY_DRIVE", "F:")
+TW3_STEAM_LIBRARY_DRIVE = os.environ.get("CATL_TW3_STEAM_LIBRARY_DRIVE", "")
 """Drive letter where the user's Steam library lives, e.g. 'F:'.
 
-Exposed to the helper_scripts subprocess as the STEAM_LIBRARY_DRIVE
-environment variable so the scripts can resolve workshop and vanilla pack paths.
+Empty default means preflight will fail until the user configures it via
+the env var or settings UI. Exposed to helper_scripts subprocess as the
+STEAM_LIBRARY_DRIVE environment variable.
 """

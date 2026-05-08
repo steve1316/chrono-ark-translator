@@ -1,9 +1,9 @@
 """Subprocess-based runner for the helper_scripts/update_*.py family.
 
-Single-run lock, bounded stdout deque, daemon-thread reader. The skeleton
-declares constants, dataclasses, exceptions, and module-level state. Lifecycle
-methods (`start_run`, `current_run`, `cancel_run`, `stream_lines`) are added
-by Tasks 4 and 5.
+Provides single-flight execution (one run at a time), a bounded stdout deque
+for log buffering, a daemon-thread reader, and an async generator (`stream_lines`)
+that drives the SSE route. Public surface: `start_run`, `current_run`, `is_idle`,
+`cancel_run`, `stream_lines`.
 """
 
 from __future__ import annotations
