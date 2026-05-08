@@ -36,3 +36,14 @@ def test_api_games_endpoint_lists_chrono_ark():
     data = res.json()
     chrono = next((g for g in data if g["game_id"] == "chrono_ark"), None)
     assert chrono is not None
+
+
+def test_tw3_stub_adapter_registered():
+    from backend.games.registry import list_games_metadata, get_adapter
+    metadata = list_games_metadata()
+    tw3 = next((m for m in metadata if m["game_id"] == "total_war_warhammer_3"), None)
+    assert tw3 is not None
+    assert tw3["display_name"] == "Warhammer III"
+    assert tw3["capabilities"] == []
+    adapter = get_adapter("total_war_warhammer_3")
+    assert adapter.game_id == "total_war_warhammer_3"

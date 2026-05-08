@@ -6,9 +6,11 @@ Provides registration and lookup of game adapters by ID.
 
 from backend.games.base import GameAdapter
 from backend.games.chrono_ark.adapter import ChronoArkAdapter
+from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
 
 _ADAPTERS: dict[str, type[GameAdapter]] = {
     "chrono_ark": ChronoArkAdapter,
+    "total_war_warhammer_3": TotalWarWarhammer3Adapter,
 }
 
 
