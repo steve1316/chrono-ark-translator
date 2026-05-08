@@ -112,3 +112,43 @@ _current: RunHandle | None = None
 _proc: subprocess.Popen | None = None
 _log: "deque[_LogLine]" = deque(maxlen=5000)
 _event_new_line = threading.Event()
+
+
+def _preflight(settings: dict) -> Path:
+    """Validate runner settings and resolve the helper_scripts directory.
+
+    Args:
+        settings: Per-game settings dict with `helper_scripts_path`, `rpfm_cli_path`,
+            and `steam_library_drive` keys. Empty strings are treated as unset.
+
+    Raises:
+        PreflightError: When one or more required paths/settings are missing.
+            The exception's `missing` attribute lists each failed check.
+
+    Returns:
+        Resolved `Path` to the helper_scripts directory (verified to exist).
+    """
+    missing: list[str] = []
+
+    raw_helper = settings.get("helper_scripts_path", "") or ""
+    helper = Path(raw_helper) if raw_helper else None
+    if not helper or not helper.is_dir():
+        missing.append("helper_scripts_path")
+
+    raw_rpfm = settings.get("rpfm_cli_path", "") or ""
+    rpfm = Path(raw_rpfm) if raw_rpfm else (helper / "rpfm_cli.exe" if helper else None)
+    if not rpfm or not rpfm.is_file():
+        missing.append(f"rpfm_cli at {rpfm}" if rpfm else "rpfm_cli_path")
+
+    if helper and helper.is_dir():
+        if not (helper / "schemas" / "schema_wh3.ron").is_file():
+            missing.append("schemas/schema_wh3.ron")
+        if not (helper / "schemas" / "schema_wh3.json").is_file():
+            missing.append("schemas/schema_wh3.json")
+
+    if not (settings.get("steam_library_drive") or ""):
+        missing.append("steam_library_drive")
+
+    if missing:
+        raise PreflightError(missing)
+    return helper  # type: ignore[return-value]
