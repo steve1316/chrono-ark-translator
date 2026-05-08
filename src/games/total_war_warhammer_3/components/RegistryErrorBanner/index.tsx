@@ -29,7 +29,7 @@ export default function RegistryErrorBanner({ detail, missing }: Props) {
                     ))}
                 </ul>
             )}
-            <Link to="/settings">Configure in Settings</Link>
+            <Link to="/settings" style={{ color: "var(--accent-primary)" }}>Configure in Settings</Link>
         </div>
     )
 }

@@ -48,13 +48,13 @@ export default function DashboardPage() {
                         <ScriptRunButton scriptId={pack.scriptId} label="Rebuild" />
                     </div>
                 ))}
-                <Link to="/supported-mods" className="glass-card" style={{ padding: "1.25rem", textDecoration: "none" }}>
-                    <h3>Supported Mods</h3>
-                    <p>Browse the mod registry.</p>
+                <Link to="/supported-mods" className="glass-card" style={{ padding: "1.25rem", textDecoration: "none", color: "var(--text-main)" }}>
+                    <h3 style={{ marginTop: 0 }}>Supported Mods</h3>
+                    <p style={{ color: "var(--text-dim)" }}>Browse the mod registry.</p>
                 </Link>
-                <Link to="/effects" className="glass-card" style={{ padding: "1.25rem", textDecoration: "none" }}>
-                    <h3>Effects</h3>
-                    <p>Browse the effects catalog.</p>
+                <Link to="/effects" className="glass-card" style={{ padding: "1.25rem", textDecoration: "none", color: "var(--text-main)" }}>
+                    <h3 style={{ marginTop: 0 }}>Effects</h3>
+                    <p style={{ color: "var(--text-dim)" }}>Browse the effects catalog.</p>
                 </Link>
             </div>
         </>
