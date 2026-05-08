@@ -41,11 +41,18 @@ export default function RunnerPage() {
     const [lines, setLines] = useState<LogLine[]>([])
     const [doneInfo, setDoneInfo] = useState<{ scriptId: string; info: DoneEvent } | null>(null)
     const sourceRef = useRef<EventSource | null>(null)
+    // Tracks whether polledRun has been updated at least once since localRun was set.
+    const polledAfterLocalSet = useRef(false)
+
+    // Mark that a fresh poll response has arrived whenever polledRun changes.
+    useEffect(() => {
+        polledAfterLocalSet.current = true
+    }, [polledRun])
 
     // Keep localRun in sync: once the poll catches up, clear the override.
     useEffect(() => {
-        if (localRun && polledRun.status === localRun.status) setLocalRun(null)
-    }, [polledRun.status, localRun])
+        if (localRun && polledAfterLocalSet.current) setLocalRun(null)
+    }, [polledRun, localRun])
 
     useEffect(() => {
         if (run.status !== "running") {
@@ -90,6 +97,7 @@ export default function RunnerPage() {
             await startRun(scriptId)
             // Immediately refresh state so the UI switches to log view without waiting for the next poll.
             const next = await getCurrentRun()
+            polledAfterLocalSet.current = false
             setLocalRun(next)
         } catch (err) {
             console.error("Failed to start run", err)
