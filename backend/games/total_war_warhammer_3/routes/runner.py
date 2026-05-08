@@ -33,7 +33,7 @@ def get_run():
         `status`, `run_id`, `script_id`, `started_at`, and `lines_emitted`.
     """
     handle = sr.current_run()
-    if handle is None or (sr._proc is not None and sr._proc.poll() is not None):
+    if sr.is_idle() or handle is None:
         return {"status": "idle"}
     return {
         "status": "running",
@@ -80,12 +80,8 @@ def delete_run():
 
     Raises:
         HTTPException(404): When no run is active.
-
-    Returns:
-        Empty 204 response on success.
     """
-    handle = sr.current_run()
-    if handle is None or (sr._proc is not None and sr._proc.poll() is not None):
+    if sr.is_idle():
         raise HTTPException(status_code=404, detail="no active run")
     sr.cancel_run()
     return Response(status_code=204)

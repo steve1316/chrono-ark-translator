@@ -169,6 +169,24 @@ def current_run() -> RunHandle | None:
     return _current
 
 
+def is_idle() -> bool:
+    """Return True when no run is active.
+
+    Acquires `_lock` so the check is consistent with `start_run` writes.
+
+    Returns:
+        True when there is no current run, or the current run's subprocess has exited.
+    """
+    with _lock:
+        proc = _proc
+        handle = _current
+    if handle is None:
+        return True
+    if proc is None:
+        return True
+    return proc.poll() is not None
+
+
 def start_run(
     script_id: str,
     settings: dict,
