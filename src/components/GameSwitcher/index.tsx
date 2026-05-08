@@ -52,11 +52,11 @@ const GameSwitcher = ({ activeGameId, onChange }: GameSwitcherProps) => {
     if (games.length === 0) return null
 
     return (
-        <div style={{ padding: "0.5rem", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ padding: "0.5rem", borderBottom: "1px solid var(--glass-border)" }}>
             <select
                 value={activeGameId}
                 onChange={(e) => handleSelect(e.target.value)}
-                style={{ width: "100%", padding: "0.5rem", background: "var(--bg-elevated)", color: "var(--text)" }}
+                style={{ width: "100%", padding: "0.5rem", background: "var(--glass-bg)", color: "var(--text-main)" }}
             >
                 {games.map((g) => (
                     <option key={g.game_id} value={g.game_id}>
