@@ -1,51 +1,51 @@
 import React from "react"
 import { NavLink } from "react-router-dom"
-import { MdDashboard } from "react-icons/md"
-import { FaBook, FaChartLine, FaCog } from "react-icons/fa"
+import { FaCog } from "react-icons/fa"
+import GameSwitcher from "../GameSwitcher"
+import { getGame } from "../../games/registry"
+
+interface SidebarProps {
+    activeGameId: string
+    onGameChange: (gameId: string) => void
+}
 
 /**
  * Persistent sidebar navigation component displayed on every page.
  *
- * Renders a vertical list of icon-labeled links to the application's
- * top-level routes. Each link uses React Router's `NavLink` so that the
- * currently active route is automatically highlighted via the "active"
- * CSS class.
+ * Renders the `GameSwitcher` followed by the active game's nav entries (pulled
+ * from the registry manifest) and the cross-game Settings link. Each link
+ * uses React Router's `NavLink` so the currently active route is highlighted
+ * via the "active" CSS class.
  *
- * @returns The rendered sidebar JSX containing navigation links
+ * Args:
+ *     activeGameId: The currently active game's id, used to look up the manifest.
+ *     onGameChange: Forwarded to the `GameSwitcher` so the App can update state.
+ *
+ * Returns:
+ *     The rendered sidebar JSX containing the game switcher and navigation links.
  */
-const Sidebar: React.FC = () => {
+const Sidebar: React.FC<SidebarProps> = ({ activeGameId, onGameChange }) => {
+    const game = getGame(activeGameId)
     return (
         <div className="sidebar">
+            {/* --- Game switcher --- selects which game's subtree is active. */}
+            <GameSwitcher activeGameId={activeGameId} onChange={onGameChange} />
+
             {/* --- Navigation Links ---
-                Each NavLink conditionally applies the "active" class based
-                on the current route, providing visual feedback for the
-                selected page. Inline styles ensure consistent layout
-                regardless of global button/anchor styles. */}
-            <nav style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {/* Dashboard -- mod overview and translation progress */}
-                <NavLink
-                    to="/dashboard"
-                    className={({ isActive }) => `nav-link btn-outline ${isActive ? "active" : ""}`}
-                    style={{ border: "none", textAlign: "left", width: "100%", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.75rem" }}
-                >
-                    <MdDashboard /> Dashboard
-                </NavLink>
-                {/* Glossary -- global and per-mod terminology management */}
-                <NavLink
-                    to="/glossary"
-                    className={({ isActive }) => `nav-link btn-outline ${isActive ? "active" : ""}`}
-                    style={{ border: "none", textAlign: "left", width: "100%", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.75rem" }}
-                >
-                    <FaBook /> Glossary
-                </NavLink>
-                {/* Statistics -- translation memory and progress metrics */}
-                <NavLink
-                    to="/statistics"
-                    className={({ isActive }) => `nav-link btn-outline ${isActive ? "active" : ""}`}
-                    style={{ border: "none", textAlign: "left", width: "100%", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.75rem" }}
-                >
-                    <FaChartLine /> Statistics
-                </NavLink>
+                The active game's manifest contributes per-game entries; the
+                cross-game Settings link is always rendered last. Inline styles
+                ensure consistent layout regardless of global button styles. */}
+            <nav style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "0.5rem" }}>
+                {game?.nav.map((entry) => (
+                    <NavLink
+                        key={entry.to}
+                        to={entry.to}
+                        className={({ isActive }) => `nav-link btn-outline ${isActive ? "active" : ""}`}
+                        style={{ border: "none", textAlign: "left", width: "100%", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.75rem" }}
+                    >
+                        {entry.icon} {entry.label}
+                    </NavLink>
+                ))}
                 {/* Settings -- API keys, provider configuration, game path */}
                 <NavLink
                     to="/settings"

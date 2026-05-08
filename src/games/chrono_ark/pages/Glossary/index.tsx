@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { FaSearch } from "react-icons/fa"
-import { API_BASE } from "../../config"
-import type { Glossary } from "../../shared_types"
-import { extractCategories, filterGlossaryTerms } from "../../utils/glossaryFilters"
+import { gameApi } from "../../../../api/games"
+import type { Glossary } from "../../../../shared_types"
+import { extractCategories, filterGlossaryTerms } from "../../../../utils/glossaryFilters"
 
 /**
  * Displays the base-game terminology glossary in a searchable, filterable table.
@@ -24,7 +24,7 @@ const GlossaryPage: React.FC = () => {
     useEffect(() => {
         const fetchGlossary = async () => {
             try {
-                const res = await fetch(`${API_BASE}/glossary`)
+                const res = await gameApi("chrono_ark").get("/glossary")
                 const data = await res.json()
                 setGlossary(data)
             } catch (err) {
@@ -135,7 +135,7 @@ const GlossaryPage: React.FC = () => {
                                             onClick={(e) => {
                                                 e.preventDefault()
                                                 e.stopPropagation()
-                                                fetch(`${API_BASE}/open-base-game-file/${encodeURIComponent(info.source_file!)}`, { method: "POST" })
+                                                gameApi("chrono_ark").post(`/open-base-game-file/${encodeURIComponent(info.source_file!)}`)
                                             }}
                                         >
                                             {info.source_file}

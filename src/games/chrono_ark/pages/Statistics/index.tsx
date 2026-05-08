@@ -1,17 +1,44 @@
-import React from "react"
-import type { Stats } from "../../shared_types"
+import React, { useEffect, useState } from "react"
+import type { Stats } from "../../../../shared_types"
+import { API_BASE } from "../../../../config"
 
+/**
+ * Legacy prop once owned by `App.tsx`.
+ *
+ * The page fetches its own stats now, so the prop is optional and ignored.
+ * Kept for backward compatibility until Task 11 removes the App-level
+ * prop-passing entirely.
+ */
 interface StatisticsPageProps {
-    /** The statistics to display. */
-    stats: Stats | null
+    /** @deprecated Self-fetched on mount; ignored. */
+    stats?: Stats | null
 }
 
 /**
  * The statistics page displays the translation memory and global progress.
- * @param stats - The statistics to display.
+ *
+ * Fetches its own stats from `GET /api/stats` (a cross-game endpoint exposed
+ * by the settings router) on mount so it no longer relies on App-level props.
+ * Renders a placeholder while the fetch is in flight or if it fails.
+ *
  * @returns A React component that displays the translation memory and global progress.
  */
-const StatisticsPage: React.FC<StatisticsPageProps> = ({ stats }) => {
+const StatisticsPage: React.FC<StatisticsPageProps> = () => {
+    const [stats, setStats] = useState<Stats | null>(null)
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/stats`)
+                const data = await res.json()
+                setStats(data)
+            } catch (err) {
+                console.error("Failed to fetch stats:", err)
+            }
+        }
+        fetchStats()
+    }, [])
+
     if (!stats) {
         return <div>No statistics available.</div>
     }

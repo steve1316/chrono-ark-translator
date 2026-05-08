@@ -4,10 +4,11 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from backend import config
+from backend.games.registry import list_games as registry_list_games
 from backend.process_manager import is_managed
 from backend.data.translation_memory import TranslationMemory
 from backend.data.progress_tracker import ProgressTracker
-from backend.routes.helpers import _adapter, _mask_key, _update_env_file
+from backend.routes.helpers import current_adapter, _mask_key, _update_env_file, set_active_game
 from backend.routes.models import SettingsResponse, SettingsUpdate
 
 router = APIRouter(prefix="/api")
@@ -22,9 +23,20 @@ async def get_game_info():
         configured game.
     """
     return {
-        "game_id": _adapter.game_id,
-        "game_name": _adapter.game_name,
+        "game_id": current_adapter().game_id,
+        "game_name": current_adapter().game_name,
     }
+
+
+@router.get("/games")
+async def list_games():
+    """Return chassis metadata for all registered game adapters.
+
+    Returns:
+        A list of `{game_id, display_name, icon, capabilities}` dicts.
+    """
+    from backend.games.registry import list_games_metadata
+    return list_games_metadata()
 
 
 @router.get("/settings")
@@ -56,6 +68,8 @@ async def get_settings():
         ollama_managed=is_managed("ollama"),
         llamacpp_managed=is_managed("llamacpp"),
         ignored_mods=config.IGNORED_MODS,
+        active_game=config.ACTIVE_GAME,
+        games={game_id: {} for game_id in registry_list_games()},
     )
 
 
@@ -140,6 +154,13 @@ async def update_settings(payload: SettingsUpdate):
         config.IGNORED_MODS = payload.ignored_mods
         env_updates["CATL_IGNORED_MODS"] = ",".join(payload.ignored_mods)
 
+    if payload.active_game is not None:
+        try:
+            set_active_game(payload.active_game)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        env_updates["CATL_ACTIVE_GAME"] = payload.active_game
+
     if env_updates:
         _update_env_file(env_updates)
 
@@ -185,7 +206,7 @@ async def get_stats():
 
     # Also count total mods and translation progress
     tracker = ProgressTracker()
-    mods = _adapter.scan_mods()
+    mods = current_adapter().scan_mods()
 
     total_strings = 0
     total_translated = 0

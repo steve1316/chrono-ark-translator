@@ -1,27 +1,43 @@
 import React, { useState, useMemo, useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 import { FaSearch } from "react-icons/fa"
-import ModGrid from "../../components/ModGrid"
-import EstimateTotalCostModal from "../../components/EstimateTotalCostModal"
-import type { ModStatus } from "../../shared_types"
-import { API_BASE } from "../../config"
-import { filterMods } from "../../utils/modFilters"
+import ModGrid from "../../../../components/ModGrid"
+import EstimateTotalCostModal from "../../../../components/EstimateTotalCostModal"
+import type { ModStatus } from "../../../../shared_types"
+import { gameApi } from "../../../../api/games"
+import { filterMods } from "../../../../utils/modFilters"
 
+/**
+ * Legacy props once owned by `App.tsx`.
+ *
+ * The page now fetches its own state, so every prop is optional and ignored.
+ * The interface is kept for backward compatibility until Task 11 removes the
+ * App-level prop-passing entirely.
+ */
 interface DashboardPageProps {
-    mods: ModStatus[]
-    onModSelect: (modId: string) => void
-    onModSync: (modId: string) => void
-    onRefresh: (mods: ModStatus[]) => void
+    /** @deprecated Self-fetched on mount; ignored. */
+    mods?: ModStatus[]
+    /** @deprecated Navigation handled internally via `useNavigate`. */
+    onModSelect?: (modId: string) => void
+    /** @deprecated Sync is handled internally via `gameApi`. */
+    onModSync?: (modId: string) => void
+    /** @deprecated Refresh updates local state directly. */
+    onRefresh?: (mods: ModStatus[]) => void
 }
 
 /**
  * The dashboard page displays a grid of all mods and their translation progress.
- * @param mods - The list of mods to display.
- * @param onModSelect - The callback function to handle mod selection.
- * @param onModSync - The callback function to handle mod sync.
- * @param onRefresh - Callback to update the parent mods state with fresh data.
+ *
+ * Fetches its own mod list from the Chrono Ark game API on mount, re-fetches
+ * after any per-mod sync, and navigates to the detail page on selection. State
+ * that previously lived in `App.tsx` is now owned by this page; the legacy
+ * props are accepted but ignored to keep `App.tsx` building until Task 11.
+ *
  * @returns A React component that displays a grid of all mods and their translation progress.
  */
-const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModSync, onRefresh }) => {
+const DashboardPage: React.FC<DashboardPageProps> = () => {
+    const navigate = useNavigate()
+    const [mods, setMods] = useState<ModStatus[]>([])
     const [search, setSearch] = useState("")
     const [cardWidth, setCardWidth] = useState<number | undefined>(undefined)
     const [refreshing, setRefreshing] = useState(false)
@@ -42,6 +58,47 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
     const [showEstimateModal, setShowEstimateModal] = useState(false)
     const estimateAbortRef = useRef<AbortController | null>(null)
 
+    /**
+     * Fetches the list of all mods from the Chrono Ark game API.
+     *
+     * Hits `GET /api/games/chrono_ark/mods` and replaces local state with the
+     * returned array of `ModStatus` objects. Errors are logged but do not
+     * surface to the UI; the existing list is preserved on failure.
+     */
+    const fetchMods = async () => {
+        try {
+            const res = await gameApi("chrono_ark").get("/mods")
+            const data = await res.json()
+            setMods(data)
+        } catch (err) {
+            console.error("Failed to fetch mods:", err)
+        }
+    }
+
+    // Fetch mods on first mount.
+    useEffect(() => {
+        fetchMods()
+    }, [])
+
+    /**
+     * Rescans a mod's workshop folder on disk and updates the backend database.
+     *
+     * Hits `POST /api/games/chrono_ark/mods/{modId}/sync`. After a successful
+     * sync the mod list is re-fetched so the dashboard reflects any newly
+     * discovered or removed localization strings.
+     *
+     * Args:
+     *     modId: The unique identifier of the mod to sync.
+     */
+    const handleModSync = async (modId: string) => {
+        try {
+            await gameApi("chrono_ark").post(`/mods/${modId}/sync`)
+            fetchMods()
+        } catch (err) {
+            console.error("Failed to sync mod:", err)
+        }
+    }
+
     // Abort any in-flight refresh when the component unmounts (page refresh / navigation).
     useEffect(() => {
         return () => {
@@ -51,12 +108,12 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
     }, [])
 
     /**
-     * Deep-refreshes every mod by streaming progress from POST /api/mods/refresh.
+     * Deep-refreshes every mod by streaming progress from POST `/api/games/chrono_ark/mods/refresh`.
      *
      * The endpoint re-extracts each mod's localization strings and recomputes
      * translated/total counts from scratch, emitting an SSE progress event per
      * mod (used to update the button label) and a final event with the complete
-     * results list (forwarded to onRefresh to update App-level state).
+     * results list (which replaces local mod state).
      *
      * An AbortController is attached so the request is cancelled automatically
      * when the component unmounts (navigation / page refresh) or when the user
@@ -73,10 +130,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
         setRefreshProgress(null)
 
         try {
-            const res = await fetch(`${API_BASE}/mods/refresh`, {
-                method: "POST",
-                signal: controller.signal,
-            })
+            const res = await gameApi("chrono_ark").post("/mods/refresh", undefined, { signal: controller.signal })
             const reader = res.body?.getReader()
             const decoder = new TextDecoder()
             if (!reader) return
@@ -90,7 +144,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
                     try {
                         const event = JSON.parse(line.slice(6))
                         if (event.done) {
-                            onRefresh(event.results)
+                            setMods(event.results)
                         } else {
                             setRefreshProgress(event)
                         }
@@ -111,7 +165,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
     }
 
     /**
-     * Estimates translation costs for all mods by streaming progress from POST /api/translate/estimate-all.
+     * Estimates translation costs for all mods by streaming progress from POST `/api/games/chrono_ark/translate/estimate-all`.
      *
      * The endpoint computes token and cost estimates per mod for each configured
      * provider, emitting an SSE progress event per mod and a final done event.
@@ -132,10 +186,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
         setEstimateResults([])
 
         try {
-            const res = await fetch(`${API_BASE}/translate/estimate-all`, {
-                method: "POST",
-                signal: controller.signal,
-            })
+            const res = await gameApi("chrono_ark").post("/translate/estimate-all", undefined, { signal: controller.signal })
             const reader = res.body?.getReader()
             const decoder = new TextDecoder()
             if (!reader) return
@@ -208,6 +259,18 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
         return () => observer.disconnect()
     }, [filteredMods.length])
 
+    /**
+     * Remembers the selected mod for the dashboard scroll-restore effect, then
+     * routes to the mod detail page.
+     *
+     * Args:
+     *     modId: The unique identifier of the mod the user clicked.
+     */
+    const handleModSelect = (modId: string) => {
+        sessionStorage.setItem("lastViewedMod", modId)
+        navigate(`/mods/${modId}`)
+    }
+
     return (
         <>
             <div className="dashboard-header">
@@ -238,7 +301,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ mods, onModSelect, onModS
             </div>
 
             <div ref={gridWrapperRef}>
-                <ModGrid mods={filteredMods} onModSelect={onModSelect} onModSync={onModSync} searchQuery={search.trim()} />
+                <ModGrid mods={filteredMods} onModSelect={handleModSelect} onModSync={handleModSync} searchQuery={search.trim()} />
             </div>
             {showEstimateModal && <EstimateTotalCostModal results={estimateResults} onClose={() => setShowEstimateModal(false)} />}
         </>

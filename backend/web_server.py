@@ -13,10 +13,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from backend import config
 from backend.routes.helpers import _adapter
-from backend.routes import mods, translation, glossary, ollama, llamacpp, settings
+from backend.routes import ollama, llamacpp, settings
+from backend.games.registry import list_games, get_adapter
+from backend.scripts.migrate_storage_v1_to_v2 import run_migration
 
 
 app = FastAPI(title="Chrono Ark Translator API")
+
+
+@app.on_event("startup")
+async def _run_storage_migration() -> None:
+    """Run the v1->v2 storage migration on startup. Idempotent."""
+    run_migration()
+
 
 # Enable CORS for Vite development server.
 app.add_middleware(
@@ -27,13 +36,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register domain routers.
-app.include_router(mods.router)
-app.include_router(translation.router)
-app.include_router(glossary.router)
+# Register game-agnostic routers (kept flat under /api/...).
 app.include_router(ollama.router)
 app.include_router(llamacpp.router)
 app.include_router(settings.router)
+
+# Mount each registered adapter's router under /api/games/<id>/...
+for _game_id in list_games():
+    _adapter_instance = get_adapter(_game_id)
+    app.include_router(_adapter_instance.router)
 
 # Mount the workshop directory as static files so preview images are served
 # directly without going through a Python endpoint for each request.

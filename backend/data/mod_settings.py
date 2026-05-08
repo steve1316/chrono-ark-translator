@@ -3,7 +3,7 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from backend import config
+from backend.games.storage_paths import mods_path
 
 
 def load_source_language_override(mod_id: str, *, storage_path: Path | None = None) -> str | None:
@@ -16,8 +16,8 @@ def load_source_language_override(mod_id: str, *, storage_path: Path | None = No
     Returns:
         The override language name (e.g. `"Korean"`), or None if not set.
     """
-    base = storage_path or config.STORAGE_PATH
-    path = base / "mods" / mod_id / "mod_settings.json"
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    path = mods_dir / mod_id / "mod_settings.json"
     if not path.exists():
         return None
     try:
@@ -41,8 +41,8 @@ def save_source_language_override(
         language: Language name to use as override, or None for auto-detect.
         storage_path: Base storage path override. Defaults to `config.STORAGE_PATH`.
     """
-    base = storage_path or config.STORAGE_PATH
-    mod_dir = base / "mods" / mod_id
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    mod_dir = mods_dir / mod_id
     mod_dir.mkdir(parents=True, exist_ok=True)
     path = mod_dir / "mod_settings.json"
 
@@ -72,8 +72,8 @@ def load_target_language_override(mod_id: str, *, storage_path: Path | None = No
     Returns:
         The override language name (e.g. `"Chinese"`), or None if not set.
     """
-    base = storage_path or config.STORAGE_PATH
-    path = base / "mods" / mod_id / "mod_settings.json"
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    path = mods_dir / mod_id / "mod_settings.json"
     if not path.exists():
         return None
     try:
@@ -97,8 +97,8 @@ def save_target_language_override(
         language: Language name to use as target, or None for default (English).
         storage_path: Base storage path override. Defaults to `config.STORAGE_PATH`.
     """
-    base = storage_path or config.STORAGE_PATH
-    mod_dir = base / "mods" / mod_id
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    mod_dir = mods_dir / mod_id
     mod_dir.mkdir(parents=True, exist_ok=True)
     path = mod_dir / "mod_settings.json"
 

@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, useNavigate } from "react-router-dom"
 import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook, FaFolderOpen, FaExclamationCircle } from "react-icons/fa"
-import type { GlossaryTerm, LocString, TermSuggestion } from "../../shared_types"
-import { getRowStatus, getRowStyle, filterStrings, sortStrings } from "../../utils/stringFilters"
-import type { SortField, SortDirection } from "../../utils/stringFilters"
-import { API_BASE } from "../../config"
-import GlossarySuggestionModal from "../../components/GlossarySuggestionModal"
-import TranslationConfirmModal from "../../components/TranslationConfirmModal"
-import ConfirmModal from "../../components/ConfirmModal"
-import EditableCell from "../../components/EditableCell"
-import { useIterativeTranslation } from "../../hooks/useIterativeTranslation"
-import type { BatchDescriptor } from "../../hooks/useIterativeTranslation"
+import type { GlossaryTerm, LocString, TermSuggestion } from "../../../../shared_types"
+import { getRowStatus, getRowStyle, filterStrings, sortStrings } from "../../../../utils/stringFilters"
+import type { SortField, SortDirection } from "../../../../utils/stringFilters"
+import { gameApi } from "../../../../api/games"
+import { API_BASE } from "../../../../config"
+import GlossarySuggestionModal from "../../../../components/GlossarySuggestionModal"
+import TranslationConfirmModal from "../../../../components/TranslationConfirmModal"
+import ConfirmModal from "../../../../components/ConfirmModal"
+import EditableCell from "../../../../components/EditableCell"
+import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
+import type { BatchDescriptor } from "../../../../hooks/useIterativeTranslation"
 
 interface CharacterContextPanelProps {
     modId: string
@@ -24,7 +25,7 @@ function CharacterContextPanel({ modId, onHasContextChange }: CharacterContextPa
     useEffect(() => {
         const fetchCtx = async () => {
             try {
-                const res = await fetch(`${API_BASE}/mods/${modId}/character-context`)
+                const res = await gameApi("chrono_ark").get(`/mods/${modId}/character-context`)
                 if (res.ok) {
                     const data = await res.json()
                     setCtx(data)
@@ -37,11 +38,7 @@ function CharacterContextPanel({ modId, onHasContextChange }: CharacterContextPa
 
     const handleSave = async () => {
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/character-context`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(ctx),
-            })
+            const res = await gameApi("chrono_ark").post(`/mods/${modId}/character-context`, ctx)
             if (res.ok) {
                 onHasContextChange(!!(ctx.source_game || ctx.character_name || ctx.background))
                 setSaved(true)
@@ -129,20 +126,30 @@ function CharacterContextPanel({ modId, onHasContextChange }: CharacterContextPa
 }
 
 /**
- * Props for the ModDetail component.
+ * Legacy prop once owned by `App.tsx`.
+ *
+ * The page now navigates back via `useNavigate`, so this callback is
+ * optional and ignored. Kept for backward compatibility until Task 11
+ * removes the App-level prop-passing entirely.
  */
 interface ModDetailProps {
-    /** Callback to navigate back to the dashboard/mod list. */
-    onBack: () => void
+    /** @deprecated Back-navigation is handled internally via `useNavigate`. */
+    onBack?: () => void
 }
 
 /**
  * Detail view for a specific mod, showing all translatable strings.
- * @param onBack - Callback to return to the dashboard.
+ *
+ * Reads the active mod id from the URL via React Router's `useParams` and
+ * uses `useNavigate` to return to the dashboard, so the page no longer
+ * depends on an `onBack` callback supplied by `App.tsx`.
+ *
  * @returns The rendered mod detail view.
  */
-const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
+const ModDetail: React.FC<ModDetailProps> = () => {
     const { modId } = useParams<{ modId: string }>()
+    const navigate = useNavigate()
+    const onBack = useCallback(() => navigate("/dashboard"), [navigate])
     const [strings, setStrings] = useState<LocString[]>([])
     const [modName, setModName] = useState<string>("")
     const [modAuthor, setModAuthor] = useState<string>("")
@@ -200,7 +207,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     // Preflight: check whether character context exists so the dot indicator shows on mount.
     useEffect(() => {
         if (!modId) return
-        fetch(`${API_BASE}/mods/${modId}/character-context`)
+        gameApi("chrono_ark")
+            .get(`/mods/${modId}/character-context`)
             .then((res) => (res.ok ? res.json() : null))
             .then((data) => {
                 if (data) setHasCharacterContext(!!(data.source_game || data.character_name || data.background))
@@ -288,12 +296,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
         if (!modId) return
         setTranslateBanner(null)
         try {
-            // POST /api/translate/preview — returns { total_strings, total_batches, batch_size, provider, previews, estimates }
-            const res = await fetch(`${API_BASE}/translate/preview`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ mod_id: modId, provider, retranslate }),
-            })
+            // POST /api/games/chrono_ark/translate/preview — returns { total_strings, total_batches, batch_size, provider, previews, estimates }
+            const res = await gameApi("chrono_ark").post("/translate/preview", { mod_id: modId, provider, retranslate })
             const data = await res.json()
             if (!res.ok) {
                 setTranslateBanner({ type: "error", message: data.detail || "Failed to fetch translation preview." })
@@ -328,7 +332,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const fetchExportStatus = async () => {
         if (!modId) return
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/export-status`)
+            const res = await gameApi("chrono_ark").get(`/mods/${modId}/export-status`)
             if (res.ok) {
                 const data = await res.json()
                 setHasExportChanges(data.has_changes)
@@ -345,7 +349,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const fetchSuggestions = async () => {
         if (!modId) return
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/glossary/suggestions`)
+            const res = await gameApi("chrono_ark").get(`/mods/${modId}/glossary/suggestions`)
             if (res.ok) {
                 const data = await res.json()
                 setSuggestions(data)
@@ -361,7 +365,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const fetchModGlossary = async () => {
         if (!modId) return
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/glossary`)
+            const res = await gameApi("chrono_ark").get(`/mods/${modId}/glossary`)
             if (res.ok) {
                 const data = await res.json()
                 setModGlossary(data.terms || {})
@@ -377,7 +381,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
         if (!modId) return
         if (!silent) setLoading(true)
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}`)
+            const res = await gameApi("chrono_ark").get(`/mods/${modId}`)
             const data = await res.json()
             setStrings(data.strings)
             setModName(data.name ?? "")
@@ -398,18 +402,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
         // When switching away from English source, clear target override
         if (lang !== "English" && targetLangOverride) {
             setTargetLangOverride(null)
-            fetch(`${API_BASE}/mods/${modId}/target-language`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ target_language: null }),
-            }).catch(() => {})
+            gameApi("chrono_ark").post(`/mods/${modId}/target-language`, { target_language: null }).catch(() => {})
         }
         try {
-            await fetch(`${API_BASE}/mods/${modId}/source-language`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ source_language: lang }),
-            })
+            await gameApi("chrono_ark").post(`/mods/${modId}/source-language`, { source_language: lang })
             fetchModDetail(true)
         } catch (err) {
             console.error("Failed to save source language:", err)
@@ -419,11 +415,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const saveTargetLanguage = async (lang: string | null) => {
         setTargetLangOverride(lang)
         try {
-            await fetch(`${API_BASE}/mods/${modId}/target-language`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ target_language: lang }),
-            })
+            await gameApi("chrono_ark").post(`/mods/${modId}/target-language`, { target_language: lang })
             fetchModDetail(true)
         } catch (err) {
             console.error("Failed to save target language:", err)
@@ -472,11 +464,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const handleSaveString = async (key: string, newValue: string) => {
         if (!modId) return
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/strings`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ key, english: newValue }),
-            })
+            const res = await gameApi("chrono_ark").post(`/mods/${modId}/strings`, { key, english: newValue })
             if (res.ok) {
                 // Optimistic update: mark translated if English is non-empty or source is blank.
                 setStrings((prev) =>
@@ -580,8 +568,8 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
         if (!modId) return
         setExporting(true)
         try {
-            const url = resync ? `${API_BASE}/mods/${modId}/export?resync=true` : `${API_BASE}/mods/${modId}/export`
-            const res = await fetch(url, { method: "POST" })
+            const path = resync ? `/mods/${modId}/export?resync=true` : `/mods/${modId}/export`
+            const res = await gameApi("chrono_ark").post(path)
             if (res.ok) {
                 const data = await res.json()
                 const parts: string[] = []
@@ -639,9 +627,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const handleReset = async () => {
         if (!modId) return
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/reset`, {
-                method: "POST",
-            })
+            const res = await gameApi("chrono_ark").post(`/mods/${modId}/reset`)
             if (res.ok) {
                 const data = await res.json()
                 const csvMsg = data.csv_restored ? " Original CSV files restored." : ""
@@ -680,9 +666,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const handleClearTranslations = async () => {
         if (!modId) return
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/clear-translations`, {
-                method: "POST",
-            })
+            const res = await gameApi("chrono_ark").post(`/mods/${modId}/clear-translations`)
             if (res.ok) {
                 setStrings((prev) => prev.map((s) => ({ ...s, english: "", is_translated: false, is_synced: false })))
                 fetchExportStatus()
@@ -706,7 +690,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const handleOpenFolder = async () => {
         if (!modId) return
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/open`, { method: "POST" })
+            const res = await gameApi("chrono_ark").post(`/mods/${modId}/open`)
             if (!res.ok) {
                 const error = await res.json()
                 setTranslateBanner({ type: "error", message: `Failed to open folder: ${error.detail || "Unknown error"}` })
@@ -719,7 +703,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const fetchHistory = async () => {
         if (!modId) return
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/history`)
+            const res = await gameApi("chrono_ark").get(`/mods/${modId}/history`)
             if (res.ok) {
                 const data = await res.json()
                 setHistoryEntries(data)
@@ -733,7 +717,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
     const fetchApiResponses = async () => {
         if (!modId) return
         try {
-            const res = await fetch(`${API_BASE}/mods/${modId}/api-responses`)
+            const res = await gameApi("chrono_ark").get(`/mods/${modId}/api-responses`)
             if (res.ok) {
                 const data = await res.json()
                 setApiResponses(data)
@@ -932,7 +916,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             onClick={async () => {
                                 setScanning(true)
                                 try {
-                                    const res = await fetch(`${API_BASE}/mods/${modId}/glossary/suggestions/scan`, { method: "POST" })
+                                    const res = await gameApi("chrono_ark").post(`/mods/${modId}/glossary/suggestions/scan`)
                                     if (res.ok) {
                                         const data = await res.json()
                                         if (data.new > 0) {
@@ -1194,7 +1178,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                     style={{ padding: "0.2rem 0.6rem", fontSize: "0.75rem" }}
                                     onClick={async () => {
                                         try {
-                                            const res = await fetch(`${API_BASE}/mods/${modId}/glossary/suggest-edits`, { method: "POST" })
+                                            const res = await gameApi("chrono_ark").post(`/mods/${modId}/glossary/suggest-edits`)
                                             if (res.ok) {
                                                 const data = await res.json()
                                                 if (data.new > 0) {
@@ -1306,10 +1290,10 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                             className="btn btn-primary"
                             disabled={!newTermEnglish.trim()}
                             onClick={async () => {
-                                await fetch(`${API_BASE}/mods/${modId}/glossary`, {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ english: newTermEnglish, source_mappings: { [newTermLang]: newTermSource }, category: newTermCategory }),
+                                await gameApi("chrono_ark").post(`/mods/${modId}/glossary`, {
+                                    english: newTermEnglish,
+                                    source_mappings: { [newTermLang]: newTermSource },
+                                    category: newTermCategory,
                                 })
                                 setNewTermEnglish("")
                                 setNewTermSource("")
@@ -1398,15 +1382,11 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                         style={{ padding: "0.25rem 0.6rem", fontSize: "0.8rem" }}
                                                         onClick={async () => {
                                                             // Delete old term when editing
-                                                            await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
-                                                                method: "POST",
-                                                                headers: { "Content-Type": "application/json" },
-                                                                body: JSON.stringify({ terms: [termKey] }),
-                                                            })
-                                                            await fetch(`${API_BASE}/mods/${modId}/glossary`, {
-                                                                method: "POST",
-                                                                headers: { "Content-Type": "application/json" },
-                                                                body: JSON.stringify({ english: editTermEnglish, source_mappings: { [editTermLang]: editTermSource }, category: editTermCategory }),
+                                                            await gameApi("chrono_ark").post(`/mods/${modId}/glossary/delete`, { terms: [termKey] })
+                                                            await gameApi("chrono_ark").post(`/mods/${modId}/glossary`, {
+                                                                english: editTermEnglish,
+                                                                source_mappings: { [editTermLang]: editTermSource },
+                                                                category: editTermCategory,
                                                             })
                                                             if (editTermEnglish !== english) {
                                                                 setRenamedTerm({ oldName: english, newName: editTermEnglish })
@@ -1486,11 +1466,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                                             className="btn btn-outline"
                                                             style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
                                                             onClick={async () => {
-                                                                await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
-                                                                    method: "POST",
-                                                                    headers: { "Content-Type": "application/json" },
-                                                                    body: JSON.stringify({ terms: [termKey] }),
-                                                                })
+                                                                await gameApi("chrono_ark").post(`/mods/${modId}/glossary/delete`, { terms: [termKey] })
                                                                 fetchModGlossary()
                                                             }}
                                                         >
@@ -1637,7 +1613,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                             onClick={(e) => {
                                                 e.preventDefault()
                                                 e.stopPropagation()
-                                                fetch(`${API_BASE}/mods/${modId}/open-source-file/${encodeURIComponent(s.source_file)}`, { method: "POST" })
+                                                gameApi("chrono_ark").post(`/mods/${modId}/open-source-file/${encodeURIComponent(s.source_file)}`)
                                             }}
                                         >
                                             {s.source_file}
@@ -1957,11 +1933,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                             onClick={async () => {
                                                 try {
                                                     for (const item of replacePreview.affected) {
-                                                        await fetch(`${API_BASE}/mods/${modId}/strings`, {
-                                                            method: "POST",
-                                                            headers: { "Content-Type": "application/json" },
-                                                            body: JSON.stringify({ key: item.key, english: item.new_text }),
-                                                        })
+                                                        await gameApi("chrono_ark").post(`/mods/${modId}/strings`, { key: item.key, english: item.new_text })
                                                     }
                                                     setReplacePreview(null)
                                                     setRenamedTerm(null)
@@ -2193,16 +2165,12 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 handleClearTranslations()
                                 break
                             case "delete-all-glossary":
-                                await fetch(`${API_BASE}/mods/${modId}/glossary/delete`, {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ all: true }),
-                                })
+                                await gameApi("chrono_ark").post(`/mods/${modId}/glossary/delete`, { all: true })
                                 fetchModGlossary()
                                 break
                             case "restore-backup":
                                 try {
-                                    const res = await fetch(`${API_BASE}/mods/${modId}/history/${entryId}/restore`, { method: "POST" })
+                                    const res = await gameApi("chrono_ark").post(`/mods/${modId}/history/${entryId}/restore`)
                                     if (res.ok) {
                                         setShowHistory(false)
                                         setTranslateBanner({ type: "success", message: "Restored from backup successfully." })
@@ -2217,7 +2185,7 @@ const ModDetail: React.FC<ModDetailProps> = ({ onBack }) => {
                                 break
                             case "delete-backup":
                                 try {
-                                    await fetch(`${API_BASE}/mods/${modId}/history/${entryId}`, { method: "DELETE" })
+                                    await fetch(gameApi("chrono_ark").url(`/mods/${modId}/history/${entryId}`), { method: "DELETE" })
                                     setHistoryEntries((prev) => prev.filter((e) => e.id !== entryId))
                                 } catch (err) {
                                     console.error("Failed to delete backup:", err)

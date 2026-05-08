@@ -82,3 +82,10 @@ IGNORED_MODS: list[str] = [m.strip() for m in os.environ.get("CATL_IGNORED_MODS"
 
 # Active game adapter ID. See games/ directory for available adapters.
 ACTIVE_GAME = os.environ.get("CATL_ACTIVE_GAME", "chrono_ark")
+
+TW3_HELPER_PATH = os.environ.get("CATL_TW3_HELPER_PATH", "")
+"""Filesystem path to the totalwar-modding helper_scripts/ directory.
+
+Used by sub-project 2+ to subprocess Total War: Warhammer III pipelines.
+Empty string = not yet configured.
+"""

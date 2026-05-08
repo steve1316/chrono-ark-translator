@@ -1,15 +1,18 @@
 """
 Abstract base class for game adapters.
 
-Defines the interface that all game-specific adapters must implement
-to support extraction, translation, and export workflows.
+Defines the chassis interface that all game-specific adapters must implement.
+Translation, pack assembly, and other domain operations are added via
+capability mixins from `backend.games.capabilities`.
 """
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
-from backend.models import LocString
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fastapi import APIRouter
 
 
 @dataclass
@@ -42,160 +45,52 @@ class ModInfo:
 
 
 class GameAdapter(ABC):
-    """
-    Abstract interface for game-specific extraction, export, and context.
+    """Base interface for game adapters in the workbench chassis.
 
-    Each supported game implements this to define how to find mods,
-    extract strings, export translations, build glossaries, and provide
-    translation context for LLM providers.
+    Concrete adapters declare identity, icon, capabilities, an `APIRouter`
+    that owns the adapter's HTTP routes, and a settings schema. Translation,
+    pack assembly, and other domain operations are added via capability
+    mixins from `backend.games.capabilities` (e.g. `TranslationCapability`).
     """
 
     @property
     @abstractmethod
     def game_id(self) -> str:
-        """Unique identifier for this game (e.g. 'chrono_ark')."""
-        ...
+        """Return the unique adapter id (e.g. `"chrono_ark"`)."""
 
     @property
     @abstractmethod
+    def display_name(self) -> str:
+        """Return the human-readable game name shown in the UI."""
+
+    @property
+    @abstractmethod
+    def icon(self) -> str:
+        """Return the icon key or asset path for the game."""
+
+    @property
+    @abstractmethod
+    def capabilities(self) -> list[str]:
+        """Return capability tags (e.g. `["translation", "pack_assembly"]`)."""
+
+    @property
+    @abstractmethod
+    def router(self) -> "APIRouter":
+        """Return the FastAPI router mounted at `/api/games/<game_id>/...`."""
+
+    @property
+    def settings_schema(self) -> dict[str, dict]:
+        """Return per-game settings schema. Override in adapters that need it.
+
+        Returns:
+            Mapping of setting key to `{"type": <python type name>, "default": <value>}`.
+        """
+        return {}
+
+    def on_register(self) -> None:
+        """Hook called once when the adapter is registered. Default: no-op."""
+
+    @property
     def game_name(self) -> str:
-        """Human-readable game name."""
-        ...
-
-    @property
-    @abstractmethod
-    def target_language(self) -> str:
-        """The language being translated INTO (e.g. 'English')."""
-        ...
-
-    @property
-    @abstractmethod
-    def source_languages(self) -> list[str]:
-        """Source languages to check, in priority order."""
-        ...
-
-    @abstractmethod
-    def get_translation_context(self) -> str:
-        """Return a game-description string for LLM system prompts."""
-        ...
-
-    @abstractmethod
-    def get_format_preservation_rules(self) -> list[str]:
-        """Return game-specific formatting rules for LLM prompts."""
-        ...
-
-    @abstractmethod
-    def get_style_examples(self, source_lang: str = "Korean") -> dict[str, list[tuple[str, str]]]:
-        """
-        Return curated source->English translation examples for few-shot prompting.
-
-        Args:
-            source_lang: The source language to use for example text.
-
-        Returns:
-            Dict mapping category name to list of (source_text, english_text) pairs.
-        """
-        ...
-
-    @abstractmethod
-    def scan_mods(self, search_path: Optional[Path] = None) -> list[ModInfo]:
-        """Discover all installed mods/projects for this game.
-
-        Args:
-            search_path: Optional override for the default mod search directory.
-                If None, uses the game's default workshop/mod path.
-
-        Returns:
-            List of ModInfo objects describing each discovered mod.
-        """
-        ...
-
-    @abstractmethod
-    def extract_strings(self, mod_path: Path) -> tuple[dict[str, LocString], list[str]]:
-        """Extract all localization strings from a mod/project directory.
-
-        Args:
-            mod_path: Path to the mod's root directory.
-
-        Returns:
-            Tuple of (strings dict mapping localization key to LocString,
-            list of variant/duplicate file relative paths).
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def base_game_path(self) -> Optional[Path]:
-        """Filesystem path to the base game's data directory, or None if unknown."""
-        ...
-
-    @abstractmethod
-    def extract_base_game_strings(self, game_path: Optional[Path] = None) -> dict[str, LocString]:
-        """Extract strings from the base game (for glossary building).
-
-        Args:
-            game_path: Optional override for the base game data directory.
-                If None, uses the game's default path.
-
-        Returns:
-            Dictionary mapping localization key to LocString.
-        """
-        ...
-
-    @abstractmethod
-    def detect_source_language(self, loc_string: LocString) -> Optional[str]:
-        """Determine which source language column has content.
-
-        Args:
-            loc_string: The localization string to inspect.
-
-        Returns:
-            Name of the first source language with non-empty text, or None
-            if no source text is found.
-        """
-        ...
-
-    @abstractmethod
-    def get_untranslated(self, strings: dict[str, LocString]) -> dict[str, LocString]:
-        """Filter strings needing translation.
-
-        Args:
-            strings: Dictionary of all localization strings to filter.
-
-        Returns:
-            Dictionary containing only the strings that still need
-            target language translation.
-        """
-        ...
-
-    @abstractmethod
-    def get_glossary_categories(self) -> dict[str, str | list[str]]:
-        """Return category_name -> key_prefix mappings for auto-glossary.
-
-        Returns:
-            Dictionary mapping category name (e.g. `"characters"`) to
-            a single key prefix string or a list of prefix strings used
-            to identify entries of that category.
-        """
-        ...
-
-    @abstractmethod
-    def export_strings(self, output_path: Path, entries: list[LocString]) -> None:
-        """Write localization entries back to the game's native format.
-
-        Args:
-            output_path: Destination file path for the exported data.
-            entries: List of LocString objects to write.
-        """
-        ...
-
-    def get_mod_url(self, mod_id: str) -> Optional[str]:
-        """Return the Steam Workshop URL for a mod.
-
-        Args:
-            mod_id: Steam Workshop item ID.
-
-        Returns:
-            Steam Workshop URL for the given mod.
-        """
-        return f"https://steamcommunity.com/sharedfiles/filedetails/?id={mod_id}"
+        """Back-compat alias for `display_name`."""
+        return self.display_name
