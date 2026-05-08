@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { FaEye, FaEyeSlash, FaCheck, FaExclamationTriangle, FaChevronDown, FaChevronRight, FaDownload, FaPlay, FaStop, FaTimes } from "react-icons/fa"
 import { API_BASE } from "../../config"
+import { gameApi } from "../../api/games"
 
 /** Tracks user-entered API key values (empty string = no pending change). */
 interface KeyState {
@@ -707,7 +708,7 @@ const SettingsPage: React.FC = () => {
                         onClick={async () => {
                             setPromptLoading(true)
                             try {
-                                const res = await fetch(`${API_BASE}/translate/system-prompt?source_lang=${encodeURIComponent(promptSourceLang)}`)
+                                const res = await gameApi("chrono_ark").get(`/translate/system-prompt?source_lang=${encodeURIComponent(promptSourceLang)}`)
                                 const data = await res.json()
                                 setSystemPrompt(data.system_prompt || "")
                             } catch (err) {
