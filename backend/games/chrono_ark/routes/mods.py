@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from backend import config
 from backend.routes.helpers import (
-    _adapter,
+    current_adapter,
     _find_mod,
     _find_mod_path,
     _find_mod_preview_image,
@@ -51,7 +51,7 @@ async def get_mods():
         author, CSV/DLL flags, translation progress counters, workshop URL,
         and preview image path.
     """
-    mods = _adapter.scan_mods()
+    mods = current_adapter().scan_mods()
     tracker = ProgressTracker()
 
     results = []
@@ -85,7 +85,7 @@ async def get_mods():
                 "untouched": untouched,
                 "percentage": status["percentage"],
                 "last_updated": status["last_updated"],
-                "url": _adapter.get_mod_url(mod.mod_id),
+                "url": current_adapter().get_mod_url(mod.mod_id),
                 "preview_image": f"/workshop/{mod.mod_id}/{preview_img.name}" if preview_img else None,
                 "has_changes": has_changes,
             }
@@ -107,7 +107,7 @@ async def refresh_mods(request: Request):
     Returns:
         A `StreamingResponse` of `text/event-stream` SSE events.
     """
-    mods = _adapter.scan_mods()
+    mods = current_adapter().scan_mods()
 
     async def event_stream():
         tracker = ProgressTracker()
@@ -148,7 +148,7 @@ async def refresh_mods(request: Request):
                 "untouched": untouched,
                 "percentage": status["percentage"],
                 "last_updated": status["last_updated"],
-                "url": _adapter.get_mod_url(mod.mod_id),
+                "url": current_adapter().get_mod_url(mod.mod_id),
                 "preview_image": f"/workshop/{mod.mod_id}/{preview_img.name}" if preview_img else None,
                 "has_changes": has_changes,
             }
@@ -181,7 +181,7 @@ async def get_mod_detail(mod_id: str):
     mod_path = mod.path
 
     # Extract current strings
-    strings, _ = _adapter.extract_strings(mod_path)
+    strings, _ = current_adapter().extract_strings(mod_path)
 
     # For gdata-sourced mods whose JSONs have already been exported,
     # restore the original source text from backup.
@@ -256,7 +256,7 @@ async def get_mod_detail(mod_id: str):
     # When the Harmony injection mod is installed, DLL strings become
     # translatable — clear their untranslatable_reason so the progress
     # tracker includes them in total_keys.
-    has_harmony_mod = _adapter.get_translation_overrides_dir() is not None
+    has_harmony_mod = current_adapter().get_translation_overrides_dir() is not None
     if has_harmony_mod:
         for key, loc_str in strings.items():
             if key.startswith("DLL/") and loc_str.untranslatable_reason:
@@ -264,7 +264,7 @@ async def get_mod_detail(mod_id: str):
 
     # Update progress tracker so dashboard stats reflect this mod's strings.
     tracker = ProgressTracker()
-    tracker.update(mod_id, strings, _adapter.source_languages, target_lang=target_lang)
+    tracker.update(mod_id, strings, current_adapter().source_languages, target_lang=target_lang)
     lang_override = load_source_language_override(mod_id)
     translated_keys = []
     results = []
@@ -315,7 +315,7 @@ async def get_mod_detail(mod_id: str):
         "id": mod_id,
         "name": mod.name,
         "author": mod.author,
-        "url": _adapter.get_mod_url(mod_id),
+        "url": current_adapter().get_mod_url(mod_id),
         "preview_image": f"/workshop/{mod_id}/{preview_img.name}" if preview_img else None,
         "strings": results,
         "source_language_override": lang_override,
@@ -355,10 +355,10 @@ async def update_string(mod_id: str, update: TranslationUpdate):
     tracker = ProgressTracker()
 
     # We need to know if the source is empty to decide if it stays "translated"
-    mods = _adapter.scan_mods()
+    mods = current_adapter().scan_mods()
     matching = [m for m in mods if m.mod_id == mod_id]
     if matching:
-        strings, _ = _adapter.extract_strings(matching[0].path)
+        strings, _ = current_adapter().extract_strings(matching[0].path)
         if update.key in strings:
             loc_str = strings[update.key]
             lang_override = load_source_language_override(mod_id)
@@ -392,13 +392,13 @@ async def sync_mod(mod_id: str):
 
     create_backup(mod_id, "Before sync")
 
-    strings, _ = _adapter.extract_strings(mod_path)
+    strings, _ = current_adapter().extract_strings(mod_path)
     _merge_gdata_originals(mod_id, strings)
     output_path = config.STORAGE_PATH / "mods" / mod_id / "source.json"
     save_extracted_strings(strings, output_path)
 
     tracker = ProgressTracker()
-    diff = tracker.update(mod_id, strings, _adapter.source_languages)
+    diff = tracker.update(mod_id, strings, current_adapter().source_languages)
 
     return {"status": "success", "new": len(diff.new_keys), "modified": len(diff.modified_keys), "removed": len(diff.removed_keys), "unchanged": len(diff.unchanged_keys)}
 
@@ -422,7 +422,7 @@ async def clear_translations(mod_id: str):
     mod_path = _find_mod_path(mod_id)
     target_lang = load_target_language_override(mod_id) or "English"
 
-    strings, _ = _adapter.extract_strings(mod_path)
+    strings, _ = current_adapter().extract_strings(mod_path)
 
     # Back up before clearing.
     create_backup(mod_id, "Before clearing translations")
@@ -450,7 +450,7 @@ async def clear_translations(mod_id: str):
 
     # Re-run update so total_keys / hashes stay correct for the dashboard.
     tracker = ProgressTracker()
-    tracker.update(mod_id, strings, _adapter.source_languages, target_lang=target_lang)
+    tracker.update(mod_id, strings, current_adapter().source_languages, target_lang=target_lang)
 
     # Mark untranslated everything EXCEPT keys with empty sources.
     lang_override = load_source_language_override(mod_id)
@@ -521,7 +521,7 @@ async def reset_mod(mod_id: str):
 
     # Remove this mod's entries from the Harmony injector override JSONs.
     overrides_cleared = False
-    overrides_dir = _adapter.get_translation_overrides_dir()
+    overrides_dir = current_adapter().get_translation_overrides_dir()
     if overrides_dir:
         mod_info = _find_mod(mod_id)
         mod_name = mod_info.name
@@ -707,7 +707,7 @@ async def export_mod(mod_id: str, resync: bool = False):
     target_lang = load_target_language_override(mod_id) or "English"
 
     # Extract current strings from the mod.
-    strings, _ = _adapter.extract_strings(mod_path)
+    strings, _ = current_adapter().extract_strings(mod_path)
 
     # Capture pre-export target-language values so we can show a diff in the UI.
     pre_export_english = {key: loc_str.translations.get(target_lang, "") for key, loc_str in strings.items() if key in translations}
@@ -722,7 +722,7 @@ async def export_mod(mod_id: str, resync: bool = False):
     # Check if the Harmony injection mod is installed. When present,
     # translations are written to override JSONs instead of modifying the
     # original mod CSV/gdata files.
-    overrides_dir = _adapter.get_translation_overrides_dir()
+    overrides_dir = current_adapter().get_translation_overrides_dir()
 
     files_written = []
     gdata_files_written = []
@@ -736,20 +736,20 @@ async def export_mod(mod_id: str, resync: bool = False):
                 continue
             if key not in translations:
                 continue
-            source = loc_str.source_file or _adapter.csv_for_key(loc_str.key)
+            source = loc_str.source_file or current_adapter().csv_for_key(loc_str.key)
             if source.lower().endswith(".json"):
                 target_text = loc_str.translations.get(target_lang, "")
                 if target_text:
                     gdata_translations[key] = target_text
             else:
                 if source.lower().endswith(".dll"):
-                    source = _adapter.csv_for_key(loc_str.key)
+                    source = current_adapter().csv_for_key(loc_str.key)
                 if source not in by_source:
                     by_source[source] = []
                 by_source[source].append(loc_str)
 
         if gdata_translations:
-            gdata_files_written = _adapter.export_gdata_strings(mod_path, gdata_translations)
+            gdata_files_written = current_adapter().export_gdata_strings(mod_path, gdata_translations)
 
         for csv_filename, entries in by_source.items():
             loc_path = mod_path / "Localization" / csv_filename
@@ -762,7 +762,7 @@ async def export_mod(mod_id: str, resync: bool = False):
                 (mod_path / "Localization").mkdir(parents=True, exist_ok=True)
                 output_path = loc_path
 
-            _adapter.export_strings(output_path, entries)
+            current_adapter().export_strings(output_path, entries)
             files_written.append(csv_filename)
 
     # Write translation overrides for the Harmony injection mod.
@@ -902,7 +902,7 @@ async def open_base_game_file(filename: str):
         HTTPException: 400 if base game path is not configured, 404 if
             the file is not found.
     """
-    base_path = _adapter.base_game_path
+    base_path = current_adapter().base_game_path
     if base_path is None:
         raise HTTPException(status_code=400, detail="Base game path not configured")
 

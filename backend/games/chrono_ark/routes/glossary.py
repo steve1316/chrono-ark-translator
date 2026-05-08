@@ -21,7 +21,7 @@ from backend.data.suggestion_manager import (
     save_suggestions,
 )
 from backend.data.translation_store import load_translations, replace_in_translations
-from backend.routes.helpers import _adapter, _find_mod_path, _merge_gdata_originals, resolve_source_language
+from backend.routes.helpers import current_adapter, _find_mod_path, _merge_gdata_originals, resolve_source_language
 from backend.routes.models import (
     GlossaryReplacePreview,
     GlossaryTerm,
@@ -317,7 +317,7 @@ async def scan_for_suggestions(mod_id: str):
         A dict with `status` and the count of `new` suggestions found.
     """
     mod_path = _find_mod_path(mod_id)
-    strings, _ = _adapter.extract_strings(mod_path)
+    strings, _ = current_adapter().extract_strings(mod_path)
     _merge_gdata_originals(mod_id, strings)
 
     saved = load_translations(mod_id)
@@ -352,7 +352,7 @@ async def scan_for_suggestions(mod_id: str):
             source_lang=lang,
             existing_suggestions=combined_existing,
             mod_glossary=mod_glossary,
-            term_categories=_adapter.get_glossary_categories(),
+            term_categories=current_adapter().get_glossary_categories(),
         )
         new_suggestions.extend(found)
         combined_existing.extend(found)

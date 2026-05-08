@@ -24,7 +24,7 @@ from backend.data.translation_store import load_translations, save_translations_
 from backend.main import get_provider
 from backend.data.mod_settings import load_source_language_override, load_target_language_override
 from backend.routes.helpers import (
-    _adapter,
+    current_adapter,
     _active_translations,
     _fill_duplicate_translations,
     _filter_suggestions,
@@ -57,8 +57,8 @@ async def estimate_translation(req: TranslationRequest):
     """
     mod_path = _find_mod_path(req.mod_id)
 
-    strings, _ = _adapter.extract_strings(mod_path)
-    untranslated = _adapter.get_untranslated(strings)
+    strings, _ = current_adapter().extract_strings(mod_path)
+    untranslated = current_adapter().get_untranslated(strings)
 
     if not untranslated:
         return {"total": 0, "estimates": {}}
@@ -79,10 +79,10 @@ async def estimate_translation(req: TranslationRequest):
     # Load glossary and context for accurate cost estimation.
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
-    game_context = _adapter.get_translation_context()
+    game_context = current_adapter().get_translation_context()
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
-    format_rules = _adapter.get_format_preservation_rules()
+    format_rules = current_adapter().get_format_preservation_rules()
 
     estimates = {}
     for lang, entries in by_lang.items():
@@ -93,7 +93,7 @@ async def estimate_translation(req: TranslationRequest):
             glossary_prompt=glossary_prompt,
             game_context=game_context,
             format_rules=format_rules,
-            style_examples=_adapter.get_style_examples(lang),
+            style_examples=current_adapter().get_style_examples(lang),
             character_context=character_context,
             target_lang=target_lang,
         )
@@ -118,21 +118,21 @@ async def estimate_all_translation_costs(request: Request):
     Returns:
         A `StreamingResponse` of `text/event-stream` SSE events.
     """
-    mods = _adapter.scan_mods()
+    mods = current_adapter().scan_mods()
     provider_name = config.TRANSLATION_PROVIDER
     provider = get_provider(provider_name)
 
     async def event_stream():
         total = len(mods)
         base_glossary = load_glossary()
-        game_context = _adapter.get_translation_context()
-        format_rules = _adapter.get_format_preservation_rules()
+        game_context = current_adapter().get_translation_context()
+        format_rules = current_adapter().get_format_preservation_rules()
 
         for i, mod in enumerate(mods):
             if await request.is_disconnected():
                 return
 
-            strings, _ = _adapter.extract_strings(mod.path)
+            strings, _ = current_adapter().extract_strings(mod.path)
 
             # Treat ALL strings as needing translation (ignore existing English).
             # Detect source language once per string to avoid redundant calls.
@@ -168,7 +168,7 @@ async def estimate_all_translation_costs(request: Request):
                         glossary_prompt=glossary_prompt,
                         game_context=game_context,
                         format_rules=format_rules,
-                        style_examples=_adapter.get_style_examples(lang),
+                        style_examples=current_adapter().get_style_examples(lang),
                         character_context=character_context,
                         target_lang=mod_target_lang,
                     )
@@ -215,7 +215,7 @@ async def preview_translation(req: TranslationRequest):
     """
     mod_path = _find_mod_path(req.mod_id)
 
-    strings, _ = _adapter.extract_strings(mod_path)
+    strings, _ = current_adapter().extract_strings(mod_path)
     _merge_gdata_originals(req.mod_id, strings)
 
     # Apply saved translations so user edits (including clears) are respected.
@@ -227,9 +227,9 @@ async def preview_translation(req: TranslationRequest):
     if req.retranslate:
         # Re-translate: include all strings that have source text, even if
         # they already have an English translation.
-        target = {key: loc_str for key, loc_str in strings.items() if not loc_str.untranslatable_reason or key.startswith("DLL/") if _adapter.detect_source_language(loc_str) is not None}
+        target = {key: loc_str for key, loc_str in strings.items() if not loc_str.untranslatable_reason or key.startswith("DLL/") if current_adapter().detect_source_language(loc_str) is not None}
     else:
-        target = _adapter.get_untranslated(strings)
+        target = current_adapter().get_untranslated(strings)
 
     if not target:
         return {"total_strings": 0, "message": "All strings already translated" if not req.retranslate else "No translatable strings found", "previews": {}}
@@ -239,10 +239,10 @@ async def preview_translation(req: TranslationRequest):
 
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
-    game_context = _adapter.get_translation_context()
+    game_context = current_adapter().get_translation_context()
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
-    format_rules = _adapter.get_format_preservation_rules()
+    format_rules = current_adapter().get_format_preservation_rules()
 
     lang_override = load_source_language_override(req.mod_id)
     target_lang = load_target_language_override(req.mod_id) or "English"
@@ -260,7 +260,7 @@ async def preview_translation(req: TranslationRequest):
     total_batches = 0
     for lang, entries in by_lang.items():
         glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang, target_lang=target_lang)
-        style_examples = _adapter.get_style_examples(lang)
+        style_examples = current_adapter().get_style_examples(lang)
         num_batches = (len(entries) + batch_size - 1) // batch_size
         total_batches += num_batches
         user_messages: list[str] = []
@@ -344,8 +344,8 @@ async def get_system_prompt(source_lang: str = "Korean", target_lang: str = "Eng
         source_lang=source_lang,
         target_lang=target_lang,
     )
-    game_context = _adapter.get_translation_context()
-    format_rules = _adapter.get_format_preservation_rules()
+    game_context = current_adapter().get_translation_context()
+    format_rules = current_adapter().get_format_preservation_rules()
 
     system_prompt, _ = provider.build_prompt(
         entries=[("Example/Key_Name", "예시 텍스트")],
@@ -353,7 +353,7 @@ async def get_system_prompt(source_lang: str = "Korean", target_lang: str = "Eng
         glossary_prompt=glossary_prompt,
         game_context=game_context,
         format_rules=format_rules,
-        style_examples=_adapter.get_style_examples(source_lang),
+        style_examples=current_adapter().get_style_examples(source_lang),
         target_lang=target_lang,
     )
 
@@ -387,7 +387,7 @@ async def translate_mod(req: TranslationRequest):
     """
     mod_path = _find_mod_path(req.mod_id)
 
-    strings, _ = _adapter.extract_strings(mod_path)
+    strings, _ = current_adapter().extract_strings(mod_path)
     target_lang = load_target_language_override(req.mod_id) or "English"
 
     # Apply saved translations so user edits (including clears) are respected.
@@ -396,7 +396,7 @@ async def translate_mod(req: TranslationRequest):
         if key in strings:
             strings[key].translations[target_lang] = english
 
-    untranslated = _adapter.get_untranslated(strings)
+    untranslated = current_adapter().get_untranslated(strings)
 
     provider_name = req.provider or config.TRANSLATION_PROVIDER
     provider = get_provider(provider_name)
@@ -407,10 +407,10 @@ async def translate_mod(req: TranslationRequest):
     # Load glossaries.
     base_glossary = load_glossary()
     mod_glossary = load_mod_glossary(req.mod_id)
-    game_context = _adapter.get_translation_context()
+    game_context = current_adapter().get_translation_context()
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
-    format_rules = _adapter.get_format_preservation_rules()
+    format_rules = current_adapter().get_format_preservation_rules()
 
     # Translate.
     tm = TranslationMemory()
@@ -438,7 +438,7 @@ async def translate_mod(req: TranslationRequest):
     try:
         for lang, entries in by_lang.items():
             glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang, target_lang=target_lang)
-            style_examples = _adapter.get_style_examples(lang)
+            style_examples = current_adapter().get_style_examples(lang)
             for i in range(0, len(entries), batch_size):
                 batch = entries[i : i + batch_size]
                 translations, suggestions = await loop.run_in_executor(
@@ -498,7 +498,7 @@ async def translate_mod(req: TranslationRequest):
             source_lang=lang,
             existing_suggestions=combined_existing,
             mod_glossary=mod_glossary,
-            term_categories=_adapter.get_glossary_categories(),
+            term_categories=current_adapter().get_glossary_categories(),
         )
         filtered_suggestions.extend(name_key_suggestions)
         combined_existing.extend(name_key_suggestions)
@@ -542,7 +542,7 @@ async def translate_batch(req: BatchTranslationRequest):
     """
     mod_path = _find_mod_path(req.mod_id)
 
-    strings, _ = _adapter.extract_strings(mod_path)
+    strings, _ = current_adapter().extract_strings(mod_path)
     _merge_gdata_originals(req.mod_id, strings)
     target_lang = load_target_language_override(req.mod_id) or "English"
 
@@ -581,11 +581,11 @@ async def translate_batch(req: BatchTranslationRequest):
     mod_glossary = load_mod_glossary(req.mod_id)
     glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=req.source_lang, target_lang=target_lang)
 
-    game_context = _adapter.get_translation_context()
+    game_context = current_adapter().get_translation_context()
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
-    format_rules = _adapter.get_format_preservation_rules()
-    style_examples = _adapter.get_style_examples(req.source_lang)
+    format_rules = current_adapter().get_format_preservation_rules()
+    style_examples = current_adapter().get_style_examples(req.source_lang)
 
     tm = TranslationMemory()
 
@@ -669,7 +669,7 @@ async def translate_batch(req: BatchTranslationRequest):
         source_lang=req.source_lang,
         existing_suggestions=existing_suggestions + filtered_suggestions,
         mod_glossary=mod_glossary,
-        term_categories=_adapter.get_glossary_categories(),
+        term_categories=current_adapter().get_glossary_categories(),
     )
     filtered_suggestions.extend(name_key_suggestions)
 
@@ -713,7 +713,7 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
     """
     mod_path = _find_mod_path(req.mod_id)
 
-    strings, _ = _adapter.extract_strings(mod_path)
+    strings, _ = current_adapter().extract_strings(mod_path)
     _merge_gdata_originals(req.mod_id, strings)
     target_lang = load_target_language_override(req.mod_id) or "English"
 
@@ -748,11 +748,11 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
     mod_glossary = load_mod_glossary(req.mod_id)
     glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=req.source_lang, target_lang=target_lang)
 
-    game_context = _adapter.get_translation_context()
+    game_context = current_adapter().get_translation_context()
     char_ctx = load_character_context(req.mod_id)
     character_context = char_ctx if any(char_ctx.values()) else None
-    format_rules = _adapter.get_format_preservation_rules()
-    style_examples = _adapter.get_style_examples(req.source_lang)
+    format_rules = current_adapter().get_format_preservation_rules()
+    style_examples = current_adapter().get_style_examples(req.source_lang)
 
     tm = TranslationMemory()
 
@@ -846,7 +846,7 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
                     source_lang=req.source_lang,
                     existing_suggestions=existing_suggestions + filtered_suggestions,
                     mod_glossary=mod_glossary,
-                    term_categories=_adapter.get_glossary_categories(),
+                    term_categories=current_adapter().get_glossary_categories(),
                 )
                 filtered_suggestions.extend(name_key_suggestions)
 
