@@ -176,6 +176,8 @@ class SettingsResponse(BaseModel):
     ollama_managed: bool
     llamacpp_managed: bool
     ignored_mods: list[str]
+    active_game: str
+    games: dict[str, dict] = {}
 
 
 class SettingsUpdate(BaseModel):
@@ -222,6 +224,7 @@ class SettingsUpdate(BaseModel):
     llamacpp_ctx_size: Optional[int] = None
     llamacpp_vram_tier: Optional[str] = None
     ignored_mods: Optional[list[str]] = None
+    active_game: Optional[str] = None
 
 
 class GlossaryReplacePreview(BaseModel):

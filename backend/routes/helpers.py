@@ -32,7 +32,34 @@ from backend.data.translation_store import load_translations
 # ---------------------------------------------------------------------------
 
 _adapter: GameAdapter = get_adapter(config.ACTIVE_GAME)
-"""The active game adapter singleton."""
+"""Cached active game adapter. Use `current_adapter()` to read."""
+
+
+def current_adapter() -> GameAdapter:
+    """Return the currently-active game adapter.
+
+    Always reflects `config.ACTIVE_GAME`; rotates lazily after
+    `set_active_game` flips the config value.
+    """
+    global _adapter
+    if _adapter.game_id != config.ACTIVE_GAME:
+        _adapter = get_adapter(config.ACTIVE_GAME)
+    return _adapter
+
+
+def set_active_game(game_id: str) -> None:
+    """Update active game in config and rotate the cached adapter.
+
+    Args:
+        game_id: Adapter id to switch to.
+
+    Raises:
+        ValueError: If `game_id` is not a registered adapter.
+    """
+    global _adapter
+    new_adapter = get_adapter(game_id)
+    config.ACTIVE_GAME = game_id
+    _adapter = new_adapter
 
 _active_translations: dict[str, threading.Event] = {}
 """Active translation cancel events, keyed by mod_id."""

@@ -95,3 +95,20 @@ def test_chrono_ark_mods_endpoint_under_game_prefix():
     client = TestClient(app)
     res = client.get("/api/games/chrono_ark/mods")
     assert res.status_code == 200
+
+
+def test_post_settings_active_game_rotates_adapter():
+    from fastapi.testclient import TestClient
+    from backend.web_server import app
+    from backend.routes import helpers
+
+    client = TestClient(app)
+
+    res = client.post("/api/settings", json={"active_game": "total_war_warhammer_3"})
+    assert res.status_code == 200
+    assert helpers.current_adapter().game_id == "total_war_warhammer_3"
+
+    # Restore so subsequent tests are not polluted.
+    res = client.post("/api/settings", json={"active_game": "chrono_ark"})
+    assert res.status_code == 200
+    assert helpers.current_adapter().game_id == "chrono_ark"
