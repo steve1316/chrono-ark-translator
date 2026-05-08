@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react"
 import { API_BASE } from "../config"
+import { gameApi } from "../api/games"
 import type { TermSuggestion } from "../shared_types"
 
 /** Descriptor for a single batch, provided by the preview endpoint's `batch_plan`. */
@@ -109,18 +110,17 @@ export function useIterativeTranslation(
                 const controller = new AbortController()
                 abortControllerRef.current = controller
 
-                const res = await fetch(`${API_BASE}/translate/batch/stream`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
+                const res = await gameApi("chrono_ark").post(
+                    "/translate/batch/stream",
+                    {
                         mod_id: modId,
                         provider: providerRef.current,
                         keys: batch.keys,
                         source_lang: batch.source_lang,
                         is_first_batch: batchIndex === 0,
-                    }),
-                    signal: controller.signal,
-                })
+                    },
+                    { signal: controller.signal },
+                )
 
                 if (cancelledRef.current) return
 
@@ -204,16 +204,12 @@ export function useIterativeTranslation(
             }
 
             try {
-                const res = await fetch(`${API_BASE}/translate/batch`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        mod_id: modId,
-                        provider: providerRef.current,
-                        keys: batch.keys,
-                        source_lang: batch.source_lang,
-                        is_first_batch: batchIndex === 0,
-                    }),
+                const res = await gameApi("chrono_ark").post("/translate/batch", {
+                    mod_id: modId,
+                    provider: providerRef.current,
+                    keys: batch.keys,
+                    source_lang: batch.source_lang,
+                    is_first_batch: batchIndex === 0,
                 })
 
                 if (cancelledRef.current) return
@@ -279,9 +275,7 @@ export function useIterativeTranslation(
         abortControllerRef.current?.abort()
         abortControllerRef.current = null
         // Tell the backend to cancel so it closes the active connection.
-        fetch(`${API_BASE}/translate/cancel?mod_id=${encodeURIComponent(modId)}`, {
-            method: "POST",
-        }).catch(() => {})
+        gameApi("chrono_ark").post(`/translate/cancel?mod_id=${encodeURIComponent(modId)}`).catch(() => {})
         stopProviderIfNeeded()
         setState({ phase: "idle" })
     }, [modId, stopProviderIfNeeded])

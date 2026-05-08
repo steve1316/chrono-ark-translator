@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { FaCheck, FaTimes, FaCheckDouble, FaTimesCircle } from "react-icons/fa"
 import type { TermSuggestion } from "../../shared_types"
-import { API_BASE } from "../../config"
+import { gameApi } from "../../api/games"
 
 /**
  * Props for the {@link GlossarySuggestionModal} component.
@@ -60,11 +60,7 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId
     const handleAccept = async (terms: string[]) => {
         setProcessing(true)
         try {
-            await fetch(`${API_BASE}/mods/${modId}/glossary/suggestions/accept`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ terms }),
-            })
+            await gameApi("chrono_ark").post(`/mods/${modId}/glossary/suggestions/accept`, { terms })
             // Optimistically remove accepted terms from the local list.
             setPending((prev) => prev.filter((s) => !terms.includes(s.english)))
             onUpdated()
@@ -92,12 +88,8 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId
     const handleDismiss = async (terms: string[], all: boolean = false) => {
         setProcessing(true)
         try {
-            await fetch(`${API_BASE}/mods/${modId}/glossary/suggestions/dismiss`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                // When dismissing all, send { all: true } so the backend clears everything.
-                body: JSON.stringify(all ? { all: true } : { terms }),
-            })
+            // When dismissing all, send { all: true } so the backend clears everything.
+            await gameApi("chrono_ark").post(`/mods/${modId}/glossary/suggestions/dismiss`, all ? { all: true } : { terms })
             if (all) {
                 setPending([])
             } else {
