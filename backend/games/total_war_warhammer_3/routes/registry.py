@@ -41,7 +41,7 @@ def get_supported_mods():
     try:
         mods = load_supported_mods(_helper_scripts_path())
     except (HelperScriptsNotConfiguredError, RegistryFileMissingError) as exc:
-        raise HTTPException(status_code=503, detail=f"helper_scripts_path not configured: {exc}")
+        raise HTTPException(status_code=503, detail=f"Registry unavailable: {exc}")
     except HelperScriptsLoaderError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     return {"mods": mods}
@@ -61,7 +61,7 @@ def get_effects():
     try:
         effects = load_supported_effects(_helper_scripts_path())
     except (HelperScriptsNotConfiguredError, RegistryFileMissingError) as exc:
-        raise HTTPException(status_code=503, detail=f"helper_scripts_path not configured: {exc}")
+        raise HTTPException(status_code=503, detail=f"Registry unavailable: {exc}")
     except HelperScriptsLoaderError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     return {"effects": effects}

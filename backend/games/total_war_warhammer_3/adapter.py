@@ -12,7 +12,7 @@ from backend.games.base import GameAdapter
 
 
 class TotalWarWarhammer3Adapter(GameAdapter):
-    """Empty-capability stub used to verify chassis registration end-to-end."""
+    """Total War: Warhammer III game adapter. Registry routes are live; runner routes will be added in Task 6."""
 
     _ROUTER: APIRouter | None = None
 

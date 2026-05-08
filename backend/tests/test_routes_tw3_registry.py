@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from backend.games.total_war_warhammer_3.helper_scripts_loader import (
     HelperScriptsNotConfiguredError,
+    RegistryFileMissingError,
     RegistryFileSyntaxError,
 )
 from backend.web_server import app
@@ -32,7 +33,18 @@ def test_get_supported_mods_returns_503_when_path_unset():
     ):
         res = client.get("/api/games/total_war_warhammer_3/supported-mods")
     assert res.status_code == 503
-    assert "helper_scripts_path" in res.json()["detail"]
+    assert "Registry unavailable" in res.json()["detail"]
+
+
+def test_get_supported_mods_returns_503_when_file_missing():
+    client = TestClient(app)
+    with patch(
+        "backend.games.total_war_warhammer_3.routes.registry.load_supported_mods",
+        side_effect=RegistryFileMissingError("supported_mods.py not found"),
+    ):
+        res = client.get("/api/games/total_war_warhammer_3/supported-mods")
+    assert res.status_code == 503
+    assert "Registry unavailable" in res.json()["detail"]
 
 
 def test_get_effects_returns_data(monkeypatch):
