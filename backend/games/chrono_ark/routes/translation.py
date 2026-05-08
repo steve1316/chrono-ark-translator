@@ -36,7 +36,7 @@ from backend.routes.helpers import (
 from backend.routes.llamacpp import _ensure_llamacpp_running
 from backend.routes.models import BatchTranslationRequest, TranslationRequest
 
-router = APIRouter(prefix="/api/translate")
+router = APIRouter(prefix="/translate")
 
 
 @router.post("/estimate")
@@ -702,7 +702,7 @@ async def translate_cancel(mod_id: str = ""):
 async def translate_batch_stream(req: BatchTranslationRequest, request: Request):
     """Translate a single batch with real-time SSE progress events.
 
-    Same logic as `/api/translate/batch` but streams progress events for
+    Same logic as `/api/games/chrono_ark/translate/batch` but streams progress events for
     providers that support it (currently Ollama).  Non-streaming providers
     fall back to a single `complete` event.
 

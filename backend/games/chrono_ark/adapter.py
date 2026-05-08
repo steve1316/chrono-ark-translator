@@ -311,9 +311,10 @@ class ChronoArkAdapter(GameAdapter, TranslationCapability):
 
     @property
     def router(self) -> APIRouter:
-        """Return the composed adapter router. Wired in Task 7."""
+        """Return the composed adapter router for Chrono Ark."""
         if not hasattr(self, "_router"):
-            self._router = APIRouter(prefix="/api/games/chrono_ark")
+            from backend.games.chrono_ark.routes import build_chrono_ark_router
+            self._router = build_chrono_ark_router()
         return self._router
 
     @property

@@ -87,3 +87,11 @@ def test_migration_idempotent(tmp_path, monkeypatch):
 
     moved = run_migration()
     assert moved is False
+
+
+def test_chrono_ark_mods_endpoint_under_game_prefix():
+    from fastapi.testclient import TestClient
+    from backend.web_server import app
+    client = TestClient(app)
+    res = client.get("/api/games/chrono_ark/mods")
+    assert res.status_code == 200

@@ -29,7 +29,7 @@ from backend.routes.models import (
     SuggestionAction,
 )
 
-router = APIRouter(prefix="/api")
+router = APIRouter()
 
 
 @router.get("/glossary")

@@ -39,7 +39,7 @@ from backend.data.character_context import load_character_context, save_characte
 from backend.data.history_manager import create_backup, list_backups, restore_backup, delete_backup
 from backend.main import save_extracted_strings
 
-router = APIRouter(prefix="/api")
+router = APIRouter()
 
 
 @router.get("/mods")
