@@ -47,3 +47,23 @@ def list_games() -> list[str]:
         List of game identifier strings for all registered adapters.
     """
     return list(_ADAPTERS.keys())
+
+
+def list_games_metadata() -> list[dict]:
+    """Return chassis metadata for every registered adapter.
+
+    Returns:
+        List of dicts, each with keys `game_id`, `display_name`, `icon`,
+        `capabilities`. Used by the frontend `<GameSwitcher>` and any
+        chassis code that needs to enumerate games.
+    """
+    result = []
+    for game_id, adapter_class in _ADAPTERS.items():
+        instance = adapter_class()
+        result.append({
+            "game_id": instance.game_id,
+            "display_name": instance.display_name,
+            "icon": instance.icon,
+            "capabilities": instance.capabilities,
+        })
+    return result

@@ -27,6 +27,17 @@ async def get_game_info():
     }
 
 
+@router.get("/games")
+async def list_games():
+    """Return chassis metadata for all registered game adapters.
+
+    Returns:
+        A list of `{game_id, display_name, icon, capabilities}` dicts.
+    """
+    from backend.games.registry import list_games_metadata
+    return list_games_metadata()
+
+
 @router.get("/settings")
 async def get_settings():
     """Return current provider, batch size, masked API key status, and Ollama settings.
