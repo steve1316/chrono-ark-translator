@@ -72,10 +72,36 @@ def _load_constant(helper_scripts_path: Path, filename: str, constant: str) -> A
 
 
 def load_supported_mods(helper_scripts_path: Path) -> list[dict]:
-    """Live-import `SUPPORTED_MODS` from `helper_scripts_path/supported_mods.py`."""
+    """Live-import `SUPPORTED_MODS` from `supported_mods.py` in the given directory.
+
+    Args:
+        helper_scripts_path: Configured `helper_scripts/` directory.
+
+    Raises:
+        HelperScriptsNotConfiguredError: When `helper_scripts_path` is missing or not a directory.
+        RegistryFileMissingError: When `supported_mods.py` is absent.
+        RegistryFileSyntaxError: When the file fails to compile.
+        RegistryConstantNotFoundError: When `SUPPORTED_MODS` is not declared.
+
+    Returns:
+        The `SUPPORTED_MODS` list of dicts.
+    """
     return _load_constant(helper_scripts_path, "supported_mods.py", "SUPPORTED_MODS")
 
 
 def load_supported_effects(helper_scripts_path: Path) -> dict:
-    """Live-import `SUPPORTED_EFFECTS` from `helper_scripts_path/dynamic_rors_effects.py`."""
+    """Live-import `SUPPORTED_EFFECTS` from `dynamic_rors_effects.py` in the given directory.
+
+    Args:
+        helper_scripts_path: Configured `helper_scripts/` directory.
+
+    Raises:
+        HelperScriptsNotConfiguredError: When `helper_scripts_path` is missing or not a directory.
+        RegistryFileMissingError: When `dynamic_rors_effects.py` is absent.
+        RegistryFileSyntaxError: When the file fails to compile.
+        RegistryConstantNotFoundError: When `SUPPORTED_EFFECTS` is not declared.
+
+    Returns:
+        The `SUPPORTED_EFFECTS` dict.
+    """
     return _load_constant(helper_scripts_path, "dynamic_rors_effects.py", "SUPPORTED_EFFECTS")
