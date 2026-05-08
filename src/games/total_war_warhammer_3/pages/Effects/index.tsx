@@ -30,15 +30,15 @@ export default function EffectsPage() {
 
     if (error) {
         return (
-            <div className="page-content">
+            <>
                 <h1>Effects</h1>
                 <RegistryErrorBanner detail={error.detail} missing={error.missing} />
-            </div>
+            </>
         )
     }
 
     return (
-        <div className="page-content">
+        <>
             <div className="dashboard-header">
                 <div className="title-group">
                     <h1>Effects</h1>
@@ -52,6 +52,6 @@ export default function EffectsPage() {
                         <pre style={{ overflowX: "auto", fontFamily: "monospace" }}>{JSON.stringify(value, null, 2)}</pre>
                     </details>
                 ))}
-        </div>
+        </>
     )
 }

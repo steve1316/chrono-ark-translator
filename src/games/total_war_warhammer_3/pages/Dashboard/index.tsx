@@ -31,7 +31,7 @@ const PACKS: PackCard[] = [
  */
 export default function DashboardPage() {
     return (
-        <div className="page-content">
+        <>
             <div className="dashboard-header">
                 <div className="title-group">
                     <h1>Warhammer III Workshop</h1>
@@ -57,6 +57,6 @@ export default function DashboardPage() {
                     <p>Browse the effects catalog.</p>
                 </Link>
             </div>
-        </div>
+        </>
     )
 }

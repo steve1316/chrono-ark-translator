@@ -38,15 +38,15 @@ export default function SupportedModsPage() {
 
     if (error) {
         return (
-            <div className="page-content">
+            <>
                 <h1>Supported Mods</h1>
                 <RegistryErrorBanner detail={error.detail} missing={error.missing} />
-            </div>
+            </>
         )
     }
 
     return (
-        <div className="page-content">
+        <>
             <div className="dashboard-header">
                 <div className="title-group">
                     <h1>Supported Mods</h1>
@@ -81,6 +81,6 @@ export default function SupportedModsPage() {
                     ))}
                 </tbody>
             </table>
-        </div>
+        </>
     )
 }
