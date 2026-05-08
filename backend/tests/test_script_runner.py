@@ -1,5 +1,6 @@
 """Tests for the TW3 script runner."""
 
+import time
 from pathlib import Path
 
 import pytest
@@ -7,9 +8,14 @@ import pytest
 from backend.games.total_war_warhammer_3.script_runner import (
     SCRIPT_REGISTRY,
     PreflightError,
+    RunInProgressError,
     ScriptDef,
-    UnknownScriptError,  # noqa: F401 -- used by Task 5 tests
+    UnknownScriptError,
+    _TEST_SCRIPT_REGISTRY,
     _preflight,
+    cancel_run,
+    current_run,
+    start_run,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "helper_scripts"
@@ -65,3 +71,82 @@ def test_preflight_fails_when_steam_drive_unset():
     with pytest.raises(PreflightError) as exc:
         _preflight(_settings(drive=""))
     assert "steam_library_drive" in exc.value.missing
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# Lifecycle tests
+
+
+@pytest.fixture(autouse=True)
+def _reset_runner_state():
+    """Clear runner state between tests so they cannot bleed into each other."""
+    from backend.games.total_war_warhammer_3 import script_runner as sr
+
+    if sr._proc is not None and sr._proc.poll() is None:
+        try:
+            sr._proc.terminate()
+            sr._proc.wait(timeout=5)
+        except Exception:
+            pass
+    sr._current = None
+    sr._proc = None
+    sr._log.clear()
+    yield
+
+
+def test_start_run_executes_fixture_and_streams_lines():
+    handle = start_run("_test_echo", _settings(), registry=_TEST_SCRIPT_REGISTRY)
+    assert handle.script_id == "_test_echo"
+    # Wait for completion (echo exits in <1s).
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        h = current_run()
+        if h and h.exit_code is not None:
+            break
+        time.sleep(0.05)
+    h = current_run()
+    assert h is not None
+    assert h.exit_code == 0
+    # Buffer captured all 5 lines.
+    from backend.games.total_war_warhammer_3.script_runner import _log
+
+    lines = [line.line for line in list(_log)]
+    assert any("line 0" in l for l in lines)
+    assert any("line 4" in l for l in lines)
+
+
+def test_start_run_raises_when_already_running():
+    start_run("_test_sleep", _settings(), registry=_TEST_SCRIPT_REGISTRY)
+    try:
+        with pytest.raises(RunInProgressError):
+            start_run("_test_echo", _settings(), registry=_TEST_SCRIPT_REGISTRY)
+    finally:
+        cancel_run()
+
+
+def test_cancel_run_terminates_long_running_subprocess():
+    start_run("_test_sleep", _settings(), registry=_TEST_SCRIPT_REGISTRY)
+    # Wait briefly to confirm it's running.
+    time.sleep(0.5)
+    assert current_run() is not None
+    cancel_run()
+    # Within 12s (terminate timeout 10 + 2 grace), the process should be gone.
+    deadline = time.monotonic() + 12
+    while time.monotonic() < deadline:
+        h = current_run()
+        if h and h.exit_code is not None:
+            break
+        time.sleep(0.1)
+    h = current_run()
+    assert h is not None
+    assert h.exit_code is not None  # whatever code, just must be set
+
+
+def test_cancel_run_idempotent_when_idle():
+    cancel_run()  # does not raise
+
+
+def test_unknown_script_id_raises():
+    with pytest.raises(UnknownScriptError):
+        start_run("does_not_exist", _settings(), registry=_TEST_SCRIPT_REGISTRY)

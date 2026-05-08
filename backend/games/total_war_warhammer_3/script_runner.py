@@ -114,6 +114,12 @@ _log: "deque[_LogLine]" = deque(maxlen=5000)
 _event_new_line = threading.Event()
 
 
+_TEST_SCRIPT_REGISTRY: dict[str, ScriptDef] = {
+    "_test_echo": ScriptDef("_test_echo.py", []),
+    "_test_sleep": ScriptDef("_test_sleep.py", []),
+}
+
+
 def _preflight(settings: dict) -> Path:
     """Validate runner settings and resolve the helper_scripts directory.
 
@@ -152,3 +158,152 @@ def _preflight(settings: dict) -> Path:
     if missing:
         raise PreflightError(missing)
     return helper  # type: ignore[return-value]
+
+
+def current_run() -> RunHandle | None:
+    """Return the current or most-recent run handle.
+
+    Returns:
+        The active or last `RunHandle`, or `None` if no run has started this session.
+    """
+    return _current
+
+
+def start_run(
+    script_id: str,
+    settings: dict,
+    *,
+    registry: dict[str, ScriptDef] | None = None,
+) -> RunHandle:
+    """Start a script run. Single-flight: raises `RunInProgressError` if active.
+
+    Args:
+        script_id: Key into `SCRIPT_REGISTRY` (or `registry` if overridden).
+        settings: Per-game settings dict (`helper_scripts_path`, `rpfm_cli_path`,
+            `steam_library_drive`).
+        registry: Optional override registry; tests pass `_TEST_SCRIPT_REGISTRY`
+            to point at fixture scripts.
+
+    Raises:
+        UnknownScriptError: When `script_id` is not in the registry.
+        PreflightError: When required paths/settings are missing.
+        RunInProgressError: When another run is already active.
+
+    Returns:
+        The created `RunHandle` for the new subprocess.
+    """
+    global _current, _proc
+    reg = registry if registry is not None else SCRIPT_REGISTRY
+    if script_id not in reg:
+        raise UnknownScriptError(script_id)
+    helper_path = _preflight(settings)
+    script_def = reg[script_id]
+
+    with _lock:
+        if _proc is not None and _proc.poll() is None:
+            raise RunInProgressError(script_id)
+
+        run_id = uuid.uuid4().hex
+        env = {**os.environ, "STEAM_LIBRARY_DRIVE": settings.get("steam_library_drive", "")}
+        creationflags = 0
+        if sys.platform == "win32":
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+
+        proc = subprocess.Popen(
+            [sys.executable, script_def.filename, *script_def.args],
+            cwd=str(helper_path),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=1,
+            text=True,
+            env=env,
+            creationflags=creationflags,
+        )
+
+        handle = RunHandle(
+            run_id=run_id,
+            script_id=script_id,
+            started_at=datetime.now(timezone.utc),
+        )
+        _current = handle
+        _proc = proc
+        _log.clear()
+        _event_new_line.clear()
+
+    threading.Thread(target=_reader_thread, args=(proc, handle), daemon=True).start()
+    return handle
+
+
+def _reader_thread(proc: subprocess.Popen, handle: RunHandle) -> None:
+    """Daemon thread: read stdout into `_log` and notify SSE consumers.
+
+    Args:
+        proc: The Popen object whose stdout to drain.
+        handle: The `RunHandle` to update on exit.
+    """
+    assert proc.stdout is not None
+    for raw in proc.stdout:
+        line = raw.rstrip("\n")
+        _log.append(_LogLine(line=line, ts=datetime.now(timezone.utc)))
+        _event_new_line.set()
+    proc.wait()
+    handle.exit_code = proc.returncode
+    handle.ended_at = datetime.now(timezone.utc)
+    _event_new_line.set()
+
+
+def cancel_run() -> None:
+    """Terminate the active run, if any. Idempotent when idle.
+
+    On Windows the runner sends `CTRL_BREAK_EVENT` to the process group so child
+    rpfm_cli processes also die. On non-Windows it falls back to `terminate()`.
+    Forces a kill after a 10-second grace period.
+    """
+    global _proc
+    with _lock:
+        proc = _proc
+    if proc is None or proc.poll() is not None:
+        return
+    if sys.platform == "win32":
+        try:
+            os.kill(proc.pid, signal.CTRL_BREAK_EVENT)
+        except (OSError, ValueError):
+            pass
+    else:
+        proc.terminate()
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=2)
+
+
+async def stream_lines() -> AsyncIterator[dict]:
+    """Async generator: yield buffered lines, then tail new ones until run ends.
+
+    Yields:
+        For each captured line: `{"event": "data", "line": str, "ts": iso8601}`.
+        On exit: a single `{"event": "done", "exit_code": int, "duration_seconds": float}`.
+        If no run has ever started: a single `{"event": "done", "exit_code": None}`.
+    """
+    handle = _current
+    if handle is None:
+        yield {"event": "done", "exit_code": None}
+        return
+
+    seen = 0
+    started = handle.started_at
+    while True:
+        snapshot = list(_log)
+        for entry in snapshot[seen:]:
+            yield {"event": "data", "line": entry.line, "ts": entry.ts.isoformat()}
+        seen = len(snapshot)
+
+        if handle.exit_code is not None and seen >= len(_log):
+            duration = (handle.ended_at - started).total_seconds() if handle.ended_at else 0.0
+            yield {"event": "done", "exit_code": handle.exit_code, "duration_seconds": duration}
+            return
+
+        # Wait briefly for new lines.
+        await asyncio.get_event_loop().run_in_executor(None, _event_new_line.wait, 0.5)
+        _event_new_line.clear()
