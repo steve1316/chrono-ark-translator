@@ -35,7 +35,7 @@ interface DoneEvent {
  * @returns A button grid in idle state, or a live log + cancel button when a run is in flight.
  */
 export default function RunnerPage() {
-    const polledRun = useCurrentRun(2000)
+    const polledRun = useCurrentRun()
     const [localRun, setLocalRun] = useState<RunState | null>(null)
     const run = localRun ?? polledRun
     const [lines, setLines] = useState<LogLine[]>([])
@@ -106,7 +106,7 @@ export default function RunnerPage() {
 
     if (run.status === "running") {
         return (
-            <div className="page-content">
+            <>
                 <div className="dashboard-header">
                     <div className="title-group">
                         <h1>Running: {run.script_id}</h1>
@@ -121,12 +121,12 @@ export default function RunnerPage() {
                         <div key={i}>{l.line}</div>
                     ))}
                 </pre>
-            </div>
+            </>
         )
     }
 
     return (
-        <div className="page-content">
+        <>
             <div className="dashboard-header">
                 <div className="title-group">
                     <h1>Runner</h1>
@@ -140,11 +140,11 @@ export default function RunnerPage() {
             )}
             <div className="mod-grid">
                 {SCRIPTS.map((s) => (
-                    <button key={s.id} className="btn btn-primary" onClick={() => handleStart(s.id)} style={{ padding: "1rem" }}>
+                    <button key={s.id} className="btn btn-primary" onClick={() => handleStart(s.id)}>
                         {s.label}
                     </button>
                 ))}
             </div>
-        </div>
+        </>
     )
 }
