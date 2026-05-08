@@ -47,3 +47,11 @@ def test_tw3_stub_adapter_registered():
     assert tw3["capabilities"] == []
     adapter = get_adapter("total_war_warhammer_3")
     assert adapter.game_id == "total_war_warhammer_3"
+
+
+def test_game_storage_path_legacy_compat(tmp_path, monkeypatch):
+    from backend import config
+    from backend.games.storage_paths import game_storage_path
+    monkeypatch.setattr(config, "STORAGE_PATH", tmp_path)
+    # Phase B Task 4: helper still resolves to legacy paths.
+    assert game_storage_path("chrono_ark") == tmp_path

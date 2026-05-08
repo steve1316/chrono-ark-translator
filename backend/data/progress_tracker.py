@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-from .. import config
+from ..games.storage_paths import mods_path
 from ..models import LocString
 
 
@@ -48,8 +48,6 @@ class ProgressTracker:
             storage_path: Root storage directory.
                 Defaults to config.STORAGE_PATH.
         """
-        if storage_path is None:
-            storage_path = config.STORAGE_PATH
         self._storage_path = storage_path
 
     def _mod_progress_path(self, mod_id: str) -> Path:
@@ -61,7 +59,8 @@ class ProgressTracker:
         Returns:
             Path to the mod's progress JSON file.
         """
-        return self._storage_path / "mods" / mod_id / "progress.json"
+        mods_dir = (self._storage_path / "mods") if self._storage_path else mods_path("chrono_ark")
+        return mods_dir / mod_id / "progress.json"
 
     def _load_snapshot(self, mod_id: str) -> dict:
         """

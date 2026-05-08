@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from backend import config
+from backend.games.storage_paths import mods_path
 
 
 def _translations_path(mod_id: str, storage_path: Optional[Path] = None) -> Path:
@@ -24,8 +24,8 @@ def _translations_path(mod_id: str, storage_path: Optional[Path] = None) -> Path
     Returns:
         Path to the mod's translations JSON file.
     """
-    base = storage_path or config.STORAGE_PATH
-    return base / "mods" / mod_id / "translations.json"
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    return mods_dir / mod_id / "translations.json"
 
 
 def _normalize_entry(value: str | dict) -> dict:

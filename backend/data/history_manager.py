@@ -11,7 +11,7 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-from backend import config
+from backend.games.storage_paths import mods_path
 
 
 def _history_dir(mod_id: str, storage_path: Optional[Path] = None) -> Path:
@@ -24,8 +24,8 @@ def _history_dir(mod_id: str, storage_path: Optional[Path] = None) -> Path:
     Returns:
         Path to the mod's `history/` directory.
     """
-    base = storage_path or config.STORAGE_PATH
-    path = base / "mods" / mod_id / "history"
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    path = mods_dir / mod_id / "history"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -42,8 +42,8 @@ def create_backup(mod_id: str, reason: str, storage_path: Optional[Path] = None)
     Returns:
         The backup ID (timestamp string), or None if there was nothing to back up.
     """
-    base = storage_path or config.STORAGE_PATH
-    mod_dir = base / "mods" / mod_id
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    mod_dir = mods_dir / mod_id
 
     # Only back up if there's meaningful data.
     files_to_backup = [
@@ -164,7 +164,7 @@ def restore_backup(mod_id: str, backup_id: str, storage_path: Optional[Path] = N
     Returns:
         True if the restore was successful, False if the backup was not found.
     """
-    base = storage_path or config.STORAGE_PATH
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
     backup_dir = _history_dir(mod_id, storage_path) / backup_id
 
     if not backup_dir.exists():
@@ -173,7 +173,7 @@ def restore_backup(mod_id: str, backup_id: str, storage_path: Optional[Path] = N
     # Create a backup of current state before restoring
     create_backup(mod_id, f"Before restore to {backup_id}", storage_path)
 
-    mod_dir = base / "mods" / mod_id
+    mod_dir = mods_dir / mod_id
     meta_path = backup_dir / "meta.json"
     if meta_path.exists():
         with open(meta_path, "r", encoding="utf-8") as f:

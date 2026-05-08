@@ -8,7 +8,7 @@ import json
 import re
 from pathlib import Path
 from typing import Optional
-from backend import config
+from backend.games.storage_paths import mods_path
 
 _TAG_RE = re.compile(r"<[^>]+>")
 
@@ -23,9 +23,8 @@ def load_suggestions(mod_id: str, storage_path: Optional[Path] = None) -> list[d
     Returns:
         List of suggestion dictionaries, or an empty list if none exist.
     """
-    if storage_path is None:
-        storage_path = config.STORAGE_PATH
-    path = storage_path / "mods" / mod_id / "pending_suggestions.json"
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    path = mods_dir / mod_id / "pending_suggestions.json"
     if not path.exists():
         return []
     with open(path, "r", encoding="utf-8") as f:
@@ -40,9 +39,8 @@ def save_suggestions(mod_id: str, suggestions: list[dict], storage_path: Optiona
         suggestions: List of suggestion dictionaries to persist.
         storage_path: Base storage path override. Defaults to config.STORAGE_PATH.
     """
-    if storage_path is None:
-        storage_path = config.STORAGE_PATH
-    path = storage_path / "mods" / mod_id / "pending_suggestions.json"
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    path = mods_dir / mod_id / "pending_suggestions.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(suggestions, f, indent=2, ensure_ascii=False)

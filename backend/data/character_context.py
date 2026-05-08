@@ -3,7 +3,7 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from backend import config
+from backend.games.storage_paths import mods_path
 
 _DEFAULTS = {"source_game": "", "character_name": "", "background": "", "created_at": "", "updated_at": ""}
 
@@ -19,8 +19,8 @@ def load_character_context(mod_id: str, *, storage_path: Path | None = None) -> 
         Dictionary with keys `source_game`, `character_name`, and
         `background`, each defaulting to an empty string if absent.
     """
-    base = storage_path or config.STORAGE_PATH
-    path = base / "mods" / mod_id / "character_context.json"
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    path = mods_dir / mod_id / "character_context.json"
     if not path.exists():
         return dict(_DEFAULTS)
     try:
@@ -43,8 +43,8 @@ def save_character_context(mod_id: str, ctx: dict, *, storage_path: Path | None 
         ctx: Character context dictionary to save.
         storage_path: Base storage path override. Defaults to config.STORAGE_PATH.
     """
-    base = storage_path or config.STORAGE_PATH
-    mod_dir = base / "mods" / mod_id
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    mod_dir = mods_dir / mod_id
     mod_dir.mkdir(parents=True, exist_ok=True)
     path = mod_dir / "character_context.json"
 

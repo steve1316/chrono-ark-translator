@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from backend import config
+from backend.games.storage_paths import glossary_path, mods_path
 from backend.models import LocString
 
 
@@ -405,7 +406,7 @@ def load_glossary(path: Optional[Path] = None) -> dict:
         Glossary dictionary, or empty structure if file doesn't exist.
     """
     if path is None:
-        path = config.STORAGE_PATH / "glossary.json"
+        path = glossary_path("chrono_ark")
 
     if not path.exists():
         return {"terms": {}}
@@ -423,7 +424,7 @@ def save_glossary(glossary: dict, path: Optional[Path] = None) -> None:
         path: Path to save to. Defaults to storage/glossary.json.
     """
     if path is None:
-        path = config.STORAGE_PATH / "glossary.json"
+        path = glossary_path("chrono_ark")
 
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -625,9 +626,8 @@ def load_mod_glossary(mod_id: str, storage_path: Optional[Path] = None) -> dict:
     Returns:
         Glossary dictionary, or empty structure if none exists.
     """
-    if storage_path is None:
-        storage_path = config.STORAGE_PATH
-    path = storage_path / "mods" / mod_id / "glossary.json"
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    path = mods_dir / mod_id / "glossary.json"
     if not path.exists():
         return {"terms": {}}
     with open(path, "r", encoding="utf-8") as f:
@@ -643,9 +643,8 @@ def save_mod_glossary(mod_id: str, glossary: dict, storage_path: Optional[Path] 
         glossary: The glossary dictionary to save.
         storage_path: Base storage path. Defaults to config.STORAGE_PATH.
     """
-    if storage_path is None:
-        storage_path = config.STORAGE_PATH
-    path = storage_path / "mods" / mod_id / "glossary.json"
+    mods_dir = (storage_path / "mods") if storage_path else mods_path("chrono_ark")
+    path = mods_dir / mod_id / "glossary.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(glossary, f, indent=2, ensure_ascii=False)
