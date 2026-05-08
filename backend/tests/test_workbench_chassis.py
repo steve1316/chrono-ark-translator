@@ -49,9 +49,41 @@ def test_tw3_stub_adapter_registered():
     assert adapter.game_id == "total_war_warhammer_3"
 
 
-def test_game_storage_path_legacy_compat(tmp_path, monkeypatch):
+def test_game_storage_path_resolves_to_per_game_namespace(tmp_path, monkeypatch):
     from backend import config
     from backend.games.storage_paths import game_storage_path
     monkeypatch.setattr(config, "STORAGE_PATH", tmp_path)
-    # Phase B Task 4: helper still resolves to legacy paths.
-    assert game_storage_path("chrono_ark") == tmp_path
+    assert game_storage_path("chrono_ark") == tmp_path / "games" / "chrono_ark"
+
+
+def test_migration_moves_legacy_storage(tmp_path, monkeypatch):
+    from backend import config
+    from backend.scripts.migrate_storage_v1_to_v2 import run_migration
+
+    legacy_root = tmp_path
+    (legacy_root / "mods" / "1234").mkdir(parents=True)
+    (legacy_root / "mods" / "1234" / "translations.json").write_text("{}", encoding="utf-8")
+    (legacy_root / "glossary.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(config, "STORAGE_PATH", legacy_root)
+
+    moved = run_migration()
+    assert moved is True
+
+    new_root = legacy_root / "games" / "chrono_ark"
+    assert (new_root / "mods" / "1234" / "translations.json").exists()
+    assert (new_root / "glossary.json").exists()
+    assert not (legacy_root / "mods").exists()
+    assert (legacy_root / "_migrations" / "v1_complete.marker").exists()
+
+
+def test_migration_idempotent(tmp_path, monkeypatch):
+    from backend import config
+    from backend.scripts.migrate_storage_v1_to_v2 import run_migration
+
+    monkeypatch.setattr(config, "STORAGE_PATH", tmp_path)
+    (tmp_path / "_migrations").mkdir(parents=True)
+    (tmp_path / "_migrations" / "v1_complete.marker").write_text("done", encoding="utf-8")
+
+    moved = run_migration()
+    assert moved is False

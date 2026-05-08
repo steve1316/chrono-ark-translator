@@ -14,9 +14,17 @@ from fastapi.staticfiles import StaticFiles
 from backend import config
 from backend.routes.helpers import _adapter
 from backend.routes import mods, translation, glossary, ollama, llamacpp, settings
+from backend.scripts.migrate_storage_v1_to_v2 import run_migration
 
 
 app = FastAPI(title="Chrono Ark Translator API")
+
+
+@app.on_event("startup")
+async def _run_storage_migration() -> None:
+    """Run the v1->v2 storage migration on startup. Idempotent."""
+    run_migration()
+
 
 # Enable CORS for Vite development server.
 app.add_middleware(
