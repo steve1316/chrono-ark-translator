@@ -21,6 +21,7 @@ export function ChronoArkRoutes() {
             <Route path="/mods/:modId" element={<ModDetail />} />
             <Route path="/glossary" element={<GlossaryPage />} />
             <Route path="/statistics" element={<StatisticsPage />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
     )
 }

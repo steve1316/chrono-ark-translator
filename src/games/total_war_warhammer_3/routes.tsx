@@ -6,6 +6,7 @@ export function TotalWarWarhammer3Routes() {
         <Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Placeholder />} />
+            <Route path="*" element={<Navigate to="/overview" replace />} />
         </Routes>
     )
 }
