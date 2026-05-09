@@ -61,6 +61,7 @@ def set_active_game(game_id: str) -> None:
     config.ACTIVE_GAME = game_id
     _adapter = new_adapter
 
+
 _active_translations: dict[str, threading.Event] = {}
 """Active translation cancel events, keyed by mod_id."""
 

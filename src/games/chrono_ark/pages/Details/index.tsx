@@ -389,7 +389,9 @@ const ModDetail: React.FC = () => {
         // When switching away from English source, clear target override
         if (lang !== "English" && targetLangOverride) {
             setTargetLangOverride(null)
-            gameApi("chrono_ark").post(`/mods/${modId}/target-language`, { target_language: null }).catch(() => {})
+            gameApi("chrono_ark")
+                .post(`/mods/${modId}/target-language`, { target_language: null })
+                .catch(() => {})
         }
         try {
             await gameApi("chrono_ark").post(`/mods/${modId}/source-language`, { source_language: lang })

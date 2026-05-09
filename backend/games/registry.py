@@ -62,10 +62,12 @@ def list_games_metadata() -> list[dict]:
     result = []
     for game_id, adapter_class in _ADAPTERS.items():
         instance = adapter_class()
-        result.append({
-            "game_id": instance.game_id,
-            "display_name": instance.display_name,
-            "icon": instance.icon,
-            "capabilities": instance.capabilities,
-        })
+        result.append(
+            {
+                "game_id": instance.game_id,
+                "display_name": instance.display_name,
+                "icon": instance.icon,
+                "capabilities": instance.capabilities,
+            }
+        )
     return result

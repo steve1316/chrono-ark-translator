@@ -4,8 +4,8 @@ import Sidebar from "./components/Sidebar"
 import SettingsPage from "./pages/Settings"
 import { API_BASE } from "./config"
 import { getGame } from "./games/registry"
-import "./games/chrono_ark"  // side-effect: registers manifest
-import "./games/total_war_warhammer_3"  // side-effect: registers manifest
+import "./games/chrono_ark" // side-effect: registers manifest
+import "./games/total_war_warhammer_3" // side-effect: registers manifest
 import "./index.css"
 
 function App() {

@@ -1548,9 +1548,7 @@ const SettingsPage: React.FC = () => {
             {/* Total War: Warhammer III */}
             <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
                 <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-main)" }}>Total War: Warhammer III</h3>
-                <p style={{ color: "var(--text-dim)", marginBottom: "1rem" }}>
-                    Paths used by the helper_scripts script runner. Required before triggering rebuilds from the Runner page.
-                </p>
+                <p style={{ color: "var(--text-dim)", marginBottom: "1rem" }}>Paths used by the helper_scripts script runner. Required before triggering rebuilds from the Runner page.</p>
 
                 <label style={{ display: "block", marginBottom: "0.5rem", color: "var(--text-dim)" }}>helper_scripts directory</label>
                 <input

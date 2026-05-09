@@ -19,6 +19,7 @@ def test_chrono_ark_adapter_has_chassis_metadata():
 
 def test_list_games_metadata_returns_chrono_ark():
     from backend.games.registry import list_games_metadata
+
     metadata = list_games_metadata()
     chrono = next((m for m in metadata if m["game_id"] == "chrono_ark"), None)
     assert chrono is not None
@@ -30,6 +31,7 @@ def test_list_games_metadata_returns_chrono_ark():
 def test_api_games_endpoint_lists_chrono_ark():
     from fastapi.testclient import TestClient
     from backend.web_server import app
+
     client = TestClient(app)
     res = client.get("/api/games")
     assert res.status_code == 200
@@ -40,6 +42,7 @@ def test_api_games_endpoint_lists_chrono_ark():
 
 def test_tw3_stub_adapter_registered():
     from backend.games.registry import list_games_metadata, get_adapter
+
     metadata = list_games_metadata()
     tw3 = next((m for m in metadata if m["game_id"] == "total_war_warhammer_3"), None)
     assert tw3 is not None
@@ -52,6 +55,7 @@ def test_tw3_stub_adapter_registered():
 def test_game_storage_path_resolves_to_per_game_namespace(tmp_path, monkeypatch):
     from backend import config
     from backend.games.storage_paths import game_storage_path
+
     monkeypatch.setattr(config, "STORAGE_PATH", tmp_path)
     assert game_storage_path("chrono_ark") == tmp_path / "games" / "chrono_ark"
 
@@ -92,6 +96,7 @@ def test_migration_idempotent(tmp_path, monkeypatch):
 def test_chrono_ark_mods_endpoint_under_game_prefix():
     from fastapi.testclient import TestClient
     from backend.web_server import app
+
     client = TestClient(app)
     res = client.get("/api/games/chrono_ark/mods")
     assert res.status_code == 200
