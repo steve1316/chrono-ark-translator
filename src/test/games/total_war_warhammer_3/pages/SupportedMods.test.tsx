@@ -7,13 +7,13 @@ import type { ValidationIssue } from "../../../../games/total_war_warhammer_3/ap
 
 vi.mock("../../../../games/total_war_warhammer_3/hooks/useValidation", () => ({
     useValidation: vi.fn(),
-    _resetUseValidationForTests: vi.fn(),
 }))
 
 import { useValidation } from "../../../../games/total_war_warhammer_3/hooks/useValidation"
 
 afterEach(() => {
     vi.restoreAllMocks()
+    vi.resetAllMocks()
 })
 
 function defaultHook(overrides: Partial<{ issues: ValidationIssue[] | null; loading: boolean; error: unknown }> = {}) {

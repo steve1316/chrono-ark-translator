@@ -77,7 +77,7 @@ export default function SupportedModsPage() {
             <table className="data-table">
                 <thead>
                     <tr>
-                        <th>Status</th>
+                        <th style={{ width: "2.5rem", textAlign: "center" }}>Status</th>
                         <th>Name</th>
                         <th>Package</th>
                         <th>Modified Attributes</th>
@@ -87,7 +87,7 @@ export default function SupportedModsPage() {
                 <tbody>
                     {filtered.map((m) => (
                         <tr key={m.package_name}>
-                            <td>
+                            <td style={{ width: "2.5rem", textAlign: "center" }}>
                                 <ValidationBadge issues={issuesByMod.get(m.package_name) ?? []} />
                             </td>
                             <td>{m.name}</td>
