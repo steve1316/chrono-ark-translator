@@ -1,0 +1,97 @@
+"""Tests for the TW3 validation route."""
+
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+from fastapi.testclient import TestClient
+
+import backend.config as config
+from backend.games.total_war_warhammer_3.helper_scripts_loader import (
+    HelperScriptsNotConfiguredError,
+    RegistryFileMissingError,
+)
+from backend.web_server import app
+
+FIXTURES = Path(__file__).parent / "fixtures" / "helper_scripts"
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _reset_tw3_router_cache():
+    """The TW3 adapter caches its composed router class-level. Reset so the new
+    validation sub-router is included for the test session."""
+    from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
+
+    TotalWarWarhammer3Adapter._ROUTER = None
+    yield
+
+
+def test_get_validation_returns_issues_from_fixture(monkeypatch):
+    """Pointing TW3_HELPER_PATH at the test fixtures yields known issues from the fixture mods.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture.
+    """
+    monkeypatch.setattr(config, "TW3_HELPER_PATH", str(FIXTURES))
+    client = TestClient(app)
+    res = client.get("/api/games/total_war_warhammer_3/validation")
+    assert res.status_code == 200
+    issues = res.json()["issues"]
+    assert any(i["kind"] == "missing_effect_category" and i["target"] == "melee" for i in issues)
+    assert any(i["kind"] == "missing_mod_path" for i in issues)
+
+
+def test_get_validation_returns_503_when_helper_path_unset(monkeypatch):
+    """Returns 503 when `TW3_HELPER_PATH` is not configured.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture.
+    """
+    monkeypatch.setattr(config, "TW3_HELPER_PATH", "")
+    client = TestClient(app)
+    res = client.get("/api/games/total_war_warhammer_3/validation")
+    assert res.status_code == 503
+
+
+def test_get_validation_returns_503_when_supported_mods_missing():
+    """Returns 503 when `load_supported_mods` raises `RegistryFileMissingError`."""
+    client = TestClient(app)
+    with patch(
+        "backend.games.total_war_warhammer_3.routes.validation.load_supported_mods",
+        side_effect=RegistryFileMissingError("supported_mods.py not found"),
+    ):
+        res = client.get("/api/games/total_war_warhammer_3/validation")
+    assert res.status_code == 503
+    assert "Registry unavailable" in res.json()["detail"]
+
+
+def test_get_validation_returns_503_when_effects_missing():
+    """Returns 503 when `load_supported_effects` raises `RegistryFileMissingError`."""
+    client = TestClient(app)
+    with patch(
+        "backend.games.total_war_warhammer_3.routes.validation.load_supported_effects",
+        side_effect=RegistryFileMissingError("dynamic_rors_effects.py not found"),
+    ):
+        res = client.get("/api/games/total_war_warhammer_3/validation")
+    assert res.status_code == 503
+    assert "Registry unavailable" in res.json()["detail"]
+
+
+def test_get_validation_returns_empty_when_no_issues(monkeypatch, tmp_path):
+    """Returns an empty issues list when all mod paths exist and all categories are valid.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture.
+        tmp_path: pytest tmp_path fixture.
+    """
+    helper = tmp_path / "helper_scripts"
+    helper.mkdir()
+    real_pack = tmp_path / "real_a.pack"
+    real_pack.write_bytes(b"x")
+    (helper / "supported_mods.py").write_text(f'SUPPORTED_MODS = [{{"name": "OK Mod", "package_name": "ok_mod", "path": "{real_pack.as_posix()}", "modified_attributes": ["infantry"]}}]')
+    (helper / "dynamic_rors_effects.py").write_text('SUPPORTED_EFFECTS = {"infantry": {}}')
+    monkeypatch.setattr(config, "TW3_HELPER_PATH", str(helper))
+    client = TestClient(app)
+    res = client.get("/api/games/total_war_warhammer_3/validation")
+    assert res.status_code == 200
+    assert res.json() == {"issues": []}
