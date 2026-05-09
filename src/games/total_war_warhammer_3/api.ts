@@ -1,0 +1,138 @@
+import { gameApi } from "../../api/games"
+
+const api = gameApi("total_war_warhammer_3")
+
+export interface SupportedMod {
+    /** Display name of the mod. */
+    name: string
+    /** Package name used to identify the mod file. */
+    package_name: string
+    /** Filesystem path to the mod. */
+    path: string
+    /** Optional list of attributes this mod modifies. */
+    modified_attributes?: string[]
+    [key: string]: unknown
+}
+
+/** Represents a run that is currently active. */
+export interface RunStateRunning {
+    /** Discriminant. */
+    status: "running"
+    /** Unique ID for this run. */
+    run_id: string
+    /** Script that was invoked. */
+    script_id: string
+    /** ISO timestamp of when the run started. */
+    started_at: string
+    /** Number of log lines emitted so far. */
+    lines_emitted: number
+}
+
+/** Represents the state when no run is active. */
+export interface RunStateIdle {
+    /** Discriminant. */
+    status: "idle"
+}
+
+export type RunState = RunStateRunning | RunStateIdle
+
+/**
+ * Fetch the read-only `SUPPORTED_MODS` registry from the TW3 backend.
+ *
+ * @returns Array of mod entries (whatever shape the source `supported_mods.py` declares).
+ * @throws `RegistryError` When the backend returns 5xx (typically because `helper_scripts_path`
+ *     is unset or the source file is missing).
+ */
+export async function fetchSupportedMods(): Promise<SupportedMod[]> {
+    const res = await api.get("/supported-mods")
+    if (!res.ok) throw await registryError(res)
+    const body = await res.json()
+    return body.mods as SupportedMod[]
+}
+
+/**
+ * Fetch the read-only `SUPPORTED_EFFECTS` registry from the TW3 backend.
+ *
+ * @returns Nested category dict from the source `dynamic_rors_effects.py`.
+ * @throws `RegistryError` On backend 5xx.
+ */
+export async function fetchEffects(): Promise<Record<string, unknown>> {
+    const res = await api.get("/effects")
+    if (!res.ok) throw await registryError(res)
+    const body = await res.json()
+    return body.effects
+}
+
+/**
+ * Start a script run on the backend.
+ *
+ * @param scriptId Key into the backend `SCRIPT_REGISTRY`.
+ * @returns Run handle metadata: `run_id`, `script_id`, `started_at`.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function startRun(scriptId: string): Promise<{ run_id: string; script_id: string; started_at: string }> {
+    const res = await api.post(`/run/${scriptId}`)
+    if (!res.ok) throw await registryError(res)
+    return res.json()
+}
+
+/**
+ * Poll the backend for the current run state.
+ *
+ * @returns `{status: "idle"}` or full running-state payload.
+ * @throws `Error` When the request fails for an unexpected reason.
+ */
+export async function getCurrentRun(): Promise<RunState> {
+    const res = await api.get("/run")
+    if (!res.ok) throw new Error(`getCurrentRun failed: ${res.status}`)
+    return res.json()
+}
+
+/**
+ * Cancel the active run, if any. Idempotent at the API surface (404 swallowed).
+ */
+export async function cancelRun(): Promise<void> {
+    const res = await fetch(api.url("/run"), { method: "DELETE" })
+    if (!res.ok && res.status !== 404) {
+        throw new Error(`cancelRun failed: ${res.status}`)
+    }
+}
+
+/**
+ * Build the SSE stream URL for the runner log.
+ *
+ * @returns Absolute URL the frontend can pass to `new EventSource(...)`.
+ */
+export function runStreamUrl(): string {
+    return api.url("/run/stream")
+}
+
+/** Surfaces backend registry/runner errors with status, detail, and optional missing-list. */
+export class RegistryError extends Error {
+    /** HTTP status code returned by the backend. */
+    status: number
+    /** Human-readable error detail from the response body. */
+    detail: string
+    /** List of missing items reported by the backend, if any. */
+    missing: string[] | null
+
+    constructor(status: number, detail: string, missing: string[] | null) {
+        super(detail)
+        this.status = status
+        this.detail = detail
+        this.missing = missing
+    }
+}
+
+async function registryError(res: Response): Promise<RegistryError> {
+    let detail = res.statusText
+    let missing: string[] | null = null
+    try {
+        const body = await res.json()
+        if (typeof body.detail === "string") detail = body.detail
+        else if (body.detail && Array.isArray(body.detail.missing)) missing = body.detail.missing
+    } catch {
+        /* ignore */
+    }
+    return new RegistryError(res.status, detail, missing)
+}

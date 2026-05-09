@@ -1,7 +1,7 @@
-"""Total War: Warhammer III adapter — sub-project 1 stub.
+"""Total War: Warhammer III adapter.
 
-Registers chassis metadata only. Pack-assembly capability and routes are
-added in sub-project 2.
+Composes the read-only registry routes and the script runner under
+`/api/games/total_war_warhammer_3`.
 """
 
 from __future__ import annotations
@@ -12,7 +12,11 @@ from backend.games.base import GameAdapter
 
 
 class TotalWarWarhammer3Adapter(GameAdapter):
-    """Empty-capability stub used to verify chassis registration end-to-end."""
+    """Total War: Warhammer III game adapter.
+
+    Exposes the read-only registries (`SUPPORTED_MODS`, `SUPPORTED_EFFECTS`) and
+    the helper_scripts script runner (subprocess + SSE log streaming).
+    """
 
     _ROUTER: APIRouter | None = None
 
@@ -34,8 +38,17 @@ class TotalWarWarhammer3Adapter(GameAdapter):
 
     @property
     def router(self) -> APIRouter:
+        """Return the composed adapter router for Total War: Warhammer III.
+
+        Cached at class level: the composed router has no instance dependencies.
+
+        Returns:
+            Cached composed `APIRouter` for the TW3 game.
+        """
         if TotalWarWarhammer3Adapter._ROUTER is None:
-            TotalWarWarhammer3Adapter._ROUTER = APIRouter(prefix="/api/games/total_war_warhammer_3")
+            from backend.games.total_war_warhammer_3.routes import build_total_war_warhammer_3_router
+
+            TotalWarWarhammer3Adapter._ROUTER = build_total_war_warhammer_3_router()
         return TotalWarWarhammer3Adapter._ROUTER
 
     @property
@@ -43,5 +56,5 @@ class TotalWarWarhammer3Adapter(GameAdapter):
         return {
             "helper_scripts_path": {"type": "str", "default": ""},
             "rpfm_cli_path": {"type": "str", "default": ""},
-            "steam_library_drive": {"type": "str", "default": "F:"},
+            "steam_library_drive": {"type": "str", "default": ""},
         }

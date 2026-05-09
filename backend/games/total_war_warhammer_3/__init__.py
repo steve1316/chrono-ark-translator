@@ -1,1 +1,5 @@
-"""Total War: Warhammer III adapter package (stub for sub-project 1)."""
+"""Total War: Warhammer III adapter package.
+
+Provides the read-only registry routes (`SUPPORTED_MODS`, `SUPPORTED_EFFECTS`)
+and the script runner that subprocesses helper_scripts/update_*.py.
+"""

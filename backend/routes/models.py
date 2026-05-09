@@ -153,6 +153,9 @@ class SettingsResponse(BaseModel):
         ollama_managed: Whether this app spawned the running Ollama process.
         llamacpp_managed: Whether this app spawned the running llama-server process.
         ignored_mods: List of workshop mod IDs hidden from the dashboard.
+        tw3_helper_path: Path to the TW3 helper_scripts directory.
+        tw3_rpfm_cli_path: Path to rpfm_cli.exe (blank = use default inside helper_scripts).
+        tw3_steam_library_drive: Drive letter for the Steam library (e.g. `"F:"`).
     """
 
     provider: str
@@ -177,6 +180,9 @@ class SettingsResponse(BaseModel):
     llamacpp_managed: bool
     ignored_mods: list[str]
     active_game: str
+    tw3_helper_path: str = ""
+    tw3_rpfm_cli_path: str = ""
+    tw3_steam_library_drive: str = ""
     games: dict[str, dict] = {}
 
 
@@ -204,6 +210,9 @@ class SettingsUpdate(BaseModel):
         llamacpp_gpu_layers: New GPU layer count (-1 = all).
         llamacpp_ctx_size: New context window size.
         ignored_mods: New list of workshop mod IDs to hide from the dashboard.
+        tw3_helper_path: New path to the TW3 helper_scripts directory.
+        tw3_rpfm_cli_path: New path to rpfm_cli.exe.
+        tw3_steam_library_drive: New Steam library drive letter.
     """
 
     provider: Optional[str] = None
@@ -225,6 +234,9 @@ class SettingsUpdate(BaseModel):
     llamacpp_vram_tier: Optional[str] = None
     ignored_mods: Optional[list[str]] = None
     active_game: Optional[str] = None
+    tw3_helper_path: Optional[str] = None
+    tw3_rpfm_cli_path: Optional[str] = None
+    tw3_steam_library_drive: Optional[str] = None
 
 
 class GlossaryReplacePreview(BaseModel):

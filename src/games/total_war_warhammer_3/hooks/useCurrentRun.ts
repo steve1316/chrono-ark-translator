@@ -1,0 +1,60 @@
+import { useEffect, useState } from "react"
+import { getCurrentRun, type RunState } from "../api"
+
+const INTERVAL_MS = 2000
+
+let currentState: RunState = { status: "idle" }
+const subscribers = new Set<(s: RunState) => void>()
+let intervalId: number | null = null
+
+const tick = async () => {
+    try {
+        currentState = await getCurrentRun()
+    } catch {
+        currentState = { status: "idle" }
+    }
+    subscribers.forEach((cb) => cb(currentState))
+}
+
+const startPolling = () => {
+    if (intervalId !== null) return
+    tick()
+    intervalId = window.setInterval(tick, INTERVAL_MS)
+}
+
+const stopPolling = () => {
+    if (intervalId === null) return
+    window.clearInterval(intervalId)
+    intervalId = null
+}
+
+/**
+ * Returns the latest known TW3 run state. The poll is shared across all callers via a module-level
+ * subscriber set, so 10 mounted hooks still produce only one `GET /run` request per `INTERVAL_MS`.
+ *
+ * @returns The latest known `RunState`. Defaults to `{status: "idle"}` until the first poll completes.
+ */
+export function useCurrentRun(): RunState {
+    const [state, setState] = useState<RunState>(currentState)
+
+    useEffect(() => {
+        subscribers.add(setState)
+        if (subscribers.size === 1) startPolling()
+        // Push the latest known state into this subscriber on subscribe so it does not have to wait
+        // up to INTERVAL_MS for the first update.
+        setState(currentState)
+        return () => {
+            subscribers.delete(setState)
+            if (subscribers.size === 0) stopPolling()
+        }
+    }, [])
+
+    return state
+}
+
+/** Test-only: reset the module singleton between tests. */
+export function _resetUseCurrentRunForTests() {
+    stopPolling()
+    subscribers.clear()
+    currentState = { status: "idle" }
+}
