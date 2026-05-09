@@ -1,15 +1,38 @@
 """Live importlib-based loader for the helper_scripts registry constants.
 
 Reads `SUPPORTED_MODS` from `supported_mods.py` and `SUPPORTED_EFFECTS` from
-`dynamic_rors_effects.py` without mutating `sys.path`. Errors surface as typed
-exceptions for the route layer to translate into HTTP responses.
+`dynamic_rors_effects.py`. The registry files may import sibling modules in
+the same directory (e.g. `from utilities import STEAM_LIBRARY_DRIVE`), so the
+loader prepends the helper_scripts directory to `sys.path` for the duration
+of the import and restores it afterwards. Errors surface as typed exceptions
+for the route layer to translate into HTTP responses.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import sys
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
+
+
+@contextmanager
+def _sys_path_prepended(directory: Path) -> Iterator[None]:
+    """Prepend `directory` to `sys.path` for the duration of the context.
+
+    Args:
+        directory: Path to insert at index 0 of `sys.path`.
+    """
+    entry = str(directory)
+    sys.path.insert(0, entry)
+    try:
+        yield
+    finally:
+        try:
+            sys.path.remove(entry)
+        except ValueError:
+            pass
 
 
 class HelperScriptsLoaderError(Exception):
@@ -62,7 +85,8 @@ def _load_constant(helper_scripts_path: Path, filename: str, constant: str) -> A
 
     module = importlib.util.module_from_spec(spec)
     try:
-        spec.loader.exec_module(module)
+        with _sys_path_prepended(helper_scripts_path):
+            spec.loader.exec_module(module)
     except SyntaxError as exc:
         raise RegistryFileSyntaxError(str(exc)) from exc
 

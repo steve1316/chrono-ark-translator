@@ -56,3 +56,20 @@ def test_load_raises_when_constant_missing():
 
     with pytest.raises(RegistryConstantNotFoundError):
         _load_constant(FIXTURES, "missing_constant.py", "SUPPORTED_MODS")
+
+
+def test_load_resolves_sibling_imports():
+    """The real `supported_mods.py` imports `from utilities import STEAM_LIBRARY_DRIVE`,
+    so the loader must put `helper_scripts_path` on `sys.path` for the duration of
+    the import. This test exercises that contract via fixture files."""
+    import sys
+
+    from backend.games.total_war_warhammer_3.helper_scripts_loader import _load_constant
+
+    before = list(sys.path)
+    result = _load_constant(FIXTURES, "with_sibling_constant.py", "WITH_SIBLING")
+    after = list(sys.path)
+
+    assert result == [{"name": "uses sibling", "value": "loaded-from-sibling"}]
+    # `sys.path` must be restored to its pre-call state.
+    assert before == after
