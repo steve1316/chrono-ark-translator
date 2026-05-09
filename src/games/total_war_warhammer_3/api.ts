@@ -107,6 +107,94 @@ export function runStreamUrl(): string {
     return api.url("/run/stream")
 }
 
+/** Shape of a single crash snapshot manifest returned by the backend. */
+export interface CrashSnapshot {
+    /** Unique folder name used as the snapshot id. */
+    id: string
+    /** ISO timestamp of when the snapshot was captured. */
+    captured_at: string
+    /** How the snapshot was triggered. */
+    trigger: "watcher" | "manual"
+    /** Source description (e.g. watcher path or "manual"). */
+    source: string
+    /** Per-artifact file presence and size metadata. */
+    files: {
+        /** Crash report artifact summary. */
+        crash_report: { present: boolean; file_count: number; total_bytes: number }
+        /** Log artifact summary. */
+        logs: { present: boolean; file_count: number; total_bytes: number }
+        /** Script preferences artifact summary. */
+        "preferences.script.txt": { present: boolean; total_bytes: number }
+    }
+    /** User-supplied notes attached to the snapshot. */
+    notes: string
+}
+
+/**
+ * List all crash snapshots, newest first.
+ *
+ * @returns Array of `CrashSnapshot` manifests.
+ * @throws `RegistryError` On 5xx responses.
+ */
+export async function fetchCrashes(): Promise<CrashSnapshot[]> {
+    const res = await api.get("/crashes")
+    if (!res.ok) throw await registryError(res)
+    const body = await res.json()
+    return body.snapshots as CrashSnapshot[]
+}
+
+/**
+ * Trigger a manual capture.
+ *
+ * @returns The new snapshot manifest.
+ * @throws `RegistryError` On 5xx responses.
+ */
+export async function captureCrash(): Promise<CrashSnapshot> {
+    const res = await api.post("/crashes/capture")
+    if (!res.ok) throw await registryError(res)
+    return res.json()
+}
+
+/**
+ * Update the notes field of a snapshot.
+ *
+ * @param id Snapshot id (folder name).
+ * @param notes New notes text.
+ * @returns Updated manifest.
+ * @throws `RegistryError` On non-2xx responses.
+ */
+export async function updateCrashNotes(id: string, notes: string): Promise<CrashSnapshot> {
+    const res = await fetch(api.url(`/crashes/${id}/notes`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes }),
+    })
+    if (!res.ok) throw await registryError(res)
+    return res.json()
+}
+
+/**
+ * Delete a snapshot.
+ *
+ * @param id Snapshot id (folder name).
+ * @throws `RegistryError` On non-2xx responses other than 404.
+ */
+export async function deleteCrash(id: string): Promise<void> {
+    const res = await fetch(api.url(`/crashes/${id}`), { method: "DELETE" })
+    if (!res.ok && res.status !== 404) throw await registryError(res)
+}
+
+/**
+ * Open the snapshot folder in Windows Explorer.
+ *
+ * @param id Snapshot id (folder name).
+ * @throws `RegistryError` On 4xx/5xx responses.
+ */
+export async function revealCrashFolder(id: string): Promise<void> {
+    const res = await api.post(`/crashes/${id}/reveal`)
+    if (!res.ok) throw await registryError(res)
+}
+
 /** Surfaces backend registry/runner errors with status, detail, and optional missing-list. */
 export class RegistryError extends Error {
     /** HTTP status code returned by the backend. */
