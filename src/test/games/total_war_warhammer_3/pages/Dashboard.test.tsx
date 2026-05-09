@@ -2,19 +2,49 @@ import { render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import DashboardPage from "../../../../games/total_war_warhammer_3/pages/Dashboard"
+import { RegistryError, type UpdateReport } from "../../../../games/total_war_warhammer_3/api"
 
-afterEach(() => vi.restoreAllMocks())
+vi.mock("../../../../games/total_war_warhammer_3/hooks/useUpdates", () => ({
+    useUpdates: vi.fn(),
+    _resetUseUpdatesForTests: vi.fn(),
+}))
+
+import { useUpdates } from "../../../../games/total_war_warhammer_3/hooks/useUpdates"
+
+afterEach(() => {
+    vi.restoreAllMocks()
+    vi.resetAllMocks()
+})
 
 const wrap = (ui: React.ReactNode) => <MemoryRouter>{ui}</MemoryRouter>
 
+function defaultHook(
+    overrides: Partial<{
+        report: UpdateReport | null
+        loading: boolean
+        error: RegistryError | null
+        sync: () => Promise<void>
+    }> = {}
+) {
+    vi.mocked(useUpdates).mockReturnValue({
+        report: overrides.report ?? null,
+        loading: overrides.loading ?? false,
+        error: (overrides.error ?? null) as never,
+        refresh: vi.fn(),
+        sync: overrides.sync ?? vi.fn(),
+    })
+}
+
 describe("Dashboard page", () => {
     it("renders 6 pack cards", async () => {
+        defaultHook()
         vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ status: "idle" }), { status: 200 }))
         render(wrap(<DashboardPage />))
         await waitFor(() => expect(screen.getAllByRole("button", { name: /rebuild/i }).length).toBeGreaterThanOrEqual(6))
     })
 
     it("disables rebuild buttons when a run is already in progress", async () => {
+        defaultHook()
         vi.spyOn(globalThis, "fetch").mockResolvedValue(
             new Response(
                 JSON.stringify({

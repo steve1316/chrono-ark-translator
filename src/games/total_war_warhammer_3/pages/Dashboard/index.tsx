@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import ScriptRunButton from "../../components/ScriptRunButton"
+import UpdateWidget from "../../components/UpdateWidget"
 
 /** A single compat pack card shown on the Dashboard. */
 interface PackCard {
@@ -38,6 +39,9 @@ export default function DashboardPage() {
                     <p>Manage and rebuild your compat packs.</p>
                 </div>
                 <ScriptRunButton scriptId="update" label="Rebuild All" />
+            </div>
+            <div style={{ marginBottom: "1.5rem" }}>
+                <UpdateWidget />
             </div>
             <div className="mod-grid">
                 {PACKS.map((pack) => (
