@@ -48,7 +48,7 @@ def test_current_older_than_baseline_yields_no_stale(tmp_path):
 
 
 def test_current_newer_than_baseline_yields_stale(tmp_path):
-    """A real file with mtime newer than the baseline produces one stale entry."""
+    """A real file with mtime newer than the baseline produces one stale entry with all fields set."""
     pack = tmp_path / "real.pack"
     pack.write_bytes(b"x")
     baseline_mtime = 1000.0
@@ -59,8 +59,13 @@ def test_current_newer_than_baseline_yields_stale(tmp_path):
     issues = detect_updates(mods, {"m": baseline_mtime})
 
     assert len(issues) == 1
-    assert issues[0]["package_name"] == "m"
-    assert issues[0]["delta_seconds"] == pytest.approx(1000.0)
+    stale = issues[0]
+    assert stale["package_name"] == "m"
+    assert stale["mod_name"] == "M"
+    assert stale["path"] == str(pack)
+    assert stale["current_mtime"] == pytest.approx(current_mtime)
+    assert stale["baseline_mtime"] == pytest.approx(baseline_mtime)
+    assert stale["delta_seconds"] == pytest.approx(1000.0)
 
 
 def test_unreadable_path_yields_no_stale():
@@ -115,3 +120,27 @@ def test_current_mtimes_returns_dict_keyed_by_package_name(tmp_path):
 
     assert "m" in result
     assert result["m"] == pytest.approx(mtime)
+
+
+def test_current_mtimes_skips_mods_missing_package_name(tmp_path):
+    """current_mtimes() excludes mods that have a `path` but no `package_name`."""
+    pack = tmp_path / "mod.pack"
+    pack.write_bytes(b"x")
+    mods = [{"name": "M", "path": str(pack)}]
+    result = current_mtimes(mods)
+    assert result == {}
+
+
+def test_current_mtimes_skips_mods_missing_path():
+    """current_mtimes() excludes mods that have a `package_name` but no `path`."""
+    mods = [{"name": "M", "package_name": "m"}]
+    result = current_mtimes(mods)
+    assert result == {}
+
+
+def test_current_mtimes_returns_none_for_unreadable_paths():
+    """current_mtimes() includes the key but maps it to None when the path does not exist."""
+    mods = [{"name": "M", "package_name": "m", "path": "/nonexistent/does_not_exist.pack"}]
+    result = current_mtimes(mods)
+    assert "m" in result
+    assert result["m"] is None
