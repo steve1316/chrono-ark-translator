@@ -42,8 +42,7 @@ export default function CrashCard({ snap, onUpdate, onDelete }: Props) {
         }
     }
 
-    const fmtBytes = (b: number) =>
-        b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`
+    const fmtBytes = (b: number) => (b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`)
 
     return (
         <div className="glass-card" style={{ padding: "1.25rem", marginBottom: "0.75rem" }}>
@@ -54,18 +53,11 @@ export default function CrashCard({ snap, onUpdate, onDelete }: Props) {
                 </span>
             </div>
             <p style={{ color: "var(--text-dim)" }}>
-                crash_report:{" "}
-                {snap.files.crash_report.present
-                    ? `${snap.files.crash_report.file_count} files / ${fmtBytes(snap.files.crash_report.total_bytes)}`
-                    : "missing"}
+                crash_report: {snap.files.crash_report.present ? `${snap.files.crash_report.file_count} files / ${fmtBytes(snap.files.crash_report.total_bytes)}` : "missing"}
                 {" - "}
-                logs:{" "}
-                {snap.files.logs.present
-                    ? `${snap.files.logs.file_count} files / ${fmtBytes(snap.files.logs.total_bytes)}`
-                    : "missing"}
+                logs: {snap.files.logs.present ? `${snap.files.logs.file_count} files / ${fmtBytes(snap.files.logs.total_bytes)}` : "missing"}
                 {" - "}
-                preferences.script.txt:{" "}
-                {snap.files["preferences.script.txt"].present ? fmtBytes(snap.files["preferences.script.txt"].total_bytes) : "missing"}
+                preferences.script.txt: {snap.files["preferences.script.txt"].present ? fmtBytes(snap.files["preferences.script.txt"].total_bytes) : "missing"}
             </p>
             <textarea
                 value={notes}
