@@ -12,7 +12,7 @@ class Issue(TypedDict):
         severity: Always 'error'; exists for forward compatibility.
         mod_package_name: Stable identity key for the mod.
         mod_name: Human-readable display name for the mod.
-        target: The bad reference itself - the missing effect category name or the missing path string.
+        target: The bad reference itself: missing effect category name, or missing path string.
         message: One-line human description suitable for direct UI display.
     """
 
