@@ -9,6 +9,7 @@ from backend.games.total_war_warhammer_3.validator import validate_registries
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # Helpers
 
+
 def _mod(name: str, package_name: str, **kwargs) -> dict:
     """Build a minimal mod dict with required identity fields plus any extras.
 
@@ -24,7 +25,9 @@ def _mod(name: str, package_name: str, **kwargs) -> dict:
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # Category check tests
 
+
 def test_empty_registries_yields_no_issues():
+    """No mods and no effects should produce zero issues."""
     issues = validate_registries([], {})
     assert issues == []
 
@@ -79,6 +82,7 @@ def test_multiple_missing_categories_for_one_mod():
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # Path check tests
 
+
 def test_missing_path_field_emits_issue():
     """Covers missing field, None, and empty string - all should emit missing_mod_path with target=''."""
     mods = [
@@ -89,6 +93,7 @@ def test_missing_path_field_emits_issue():
     issues = validate_registries(mods, {})
     path_issues = [i for i in issues if i["kind"] == "missing_mod_path"]
     assert len(path_issues) == 3
+    assert {i["mod_name"] for i in path_issues} == {"Mod A", "Mod B", "Mod C"}
     for issue in path_issues:
         assert issue["severity"] == "error"
         assert issue["target"] == ""
@@ -100,8 +105,7 @@ def test_existing_path_emits_no_issue(tmp_path: Path):
     real_file.write_bytes(b"x")
     mods = [_mod("Mod A", "mod_a", path=str(real_file))]
     issues = validate_registries(mods, {})
-    path_issues = [i for i in issues if i["kind"] == "missing_mod_path"]
-    assert path_issues == []
+    assert issues == []
 
 
 def test_nonexistent_path_emits_issue():
@@ -122,21 +126,28 @@ def test_nonexistent_path_emits_issue():
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # Sort and combined tests
 
+
 def test_issues_sorted_by_mod_name_then_kind_then_target():
-    """Verify sort order is (mod_name, kind, target) regardless of input order."""
+    """Verify sort order is (mod_name, kind, target) for all three sort keys.
+
+    Alpha Mod gets two missing categories (exercises target ordering within same name+kind)
+    plus a bad path (exercises kind ordering). Zeta Mod gets one missing category and a bad
+    path. Mods are given to validate_registries in reverse order to confirm input order is ignored.
+    """
     effects = {}
     mods = [
-        _mod("Zeta Mod", "zeta", path="/fake/z.pack", modified_attributes=["archer"]),
-        _mod("Alpha Mod", "alpha", path="/fake/a.pack", modified_attributes=["berserker"]),
+        _mod("Zeta Mod", "zeta", path="/fake/z.pack", modified_attributes=["cavalry"]),
+        _mod("Alpha Mod", "alpha", path="/fake/a.pack", modified_attributes=["archer", "berserker"]),
     ]
     issues = validate_registries(mods, effects)
-    # Path issues come from non-existing paths; category issues from missing effects.
-    # Sort key: (mod_name, kind, target).
-    names = [i["mod_name"] for i in issues]
-    # All Alpha Mod issues must appear before Zeta Mod issues.
-    alpha_indices = [j for j, i in enumerate(issues) if i["mod_name"] == "Alpha Mod"]
-    zeta_indices = [j for j, i in enumerate(issues) if i["mod_name"] == "Zeta Mod"]
-    assert max(alpha_indices) < min(zeta_indices)
+    expected = [
+        ("Alpha Mod", "missing_effect_category", "archer"),
+        ("Alpha Mod", "missing_effect_category", "berserker"),
+        ("Alpha Mod", "missing_mod_path", "/fake/a.pack"),
+        ("Zeta Mod", "missing_effect_category", "cavalry"),
+        ("Zeta Mod", "missing_mod_path", "/fake/z.pack"),
+    ]
+    assert [(i["mod_name"], i["kind"], i["target"]) for i in issues] == expected
 
 
 def test_both_kinds_for_one_mod():

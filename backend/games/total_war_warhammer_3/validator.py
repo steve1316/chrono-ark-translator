@@ -5,20 +5,23 @@ from typing import Literal, TypedDict
 
 
 class Issue(TypedDict):
-    """One broken cross-reference flagged by `validate_registries`."""
+    """One broken cross-reference flagged by `validate_registries`.
+
+    Fields:
+        kind: Discriminates the two check types.
+        severity: Always 'error'; exists for forward compatibility.
+        mod_package_name: Stable identity key for the mod.
+        mod_name: Human-readable display name for the mod.
+        target: The bad reference itself - the missing effect category name or the missing path string.
+        message: One-line human description suitable for direct UI display.
+    """
 
     kind: Literal["missing_effect_category", "missing_mod_path"]
-    """ Discriminates the two check types. """
     severity: Literal["error"]
-    """ Always 'error'; exists for forward compatibility. """
     mod_package_name: str
-    """ Stable identity key for the mod. """
     mod_name: str
-    """ Human-readable display name for the mod. """
     target: str
-    """ The bad reference itself - the missing effect category name or the missing path string. """
     message: str
-    """ One-line human description suitable for direct UI display. """
 
 
 def _is_file_safe(path: str) -> bool:
