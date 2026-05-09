@@ -54,7 +54,11 @@ export default function UpdateWidget() {
                     {syncing ? "Syncing..." : "Mark all as synced"}
                 </button>
             </div>
-            {!report.baseline_exists && <p style={{ marginTop: "0.75rem", fontStyle: "italic", color: "var(--text-dim)" }}>Baseline established. Mod updates will be detected from now on.</p>}
+            {!report.baseline_exists && (
+                <p style={{ marginTop: "0.75rem", fontStyle: "italic", color: "var(--text-dim)" }}>
+                    First-run baseline saved from current mtimes. Mod updates will appear here from the next change forward.
+                </p>
+            )}
             {count > 0 && (
                 <details open style={{ marginTop: "0.75rem" }}>
                     <summary style={{ cursor: "pointer" }}>Updated mods ({count})</summary>

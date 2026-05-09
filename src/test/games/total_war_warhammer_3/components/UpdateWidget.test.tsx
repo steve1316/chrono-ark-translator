@@ -52,7 +52,7 @@ describe("UpdateWidget", () => {
             report: { stale: [], baseline_exists: false, baseline_path: "/x", total_known: 200 },
         })
         render(withRouter(<UpdateWidget />))
-        expect(screen.getByText(/Baseline established/)).toBeInTheDocument()
+        expect(screen.getByText(/First-run baseline saved/i)).toBeInTheDocument()
     })
 
     it("renders stale list with humanized delta", () => {
@@ -67,6 +67,19 @@ describe("UpdateWidget", () => {
         render(withRouter(<UpdateWidget />))
         expect(screen.getByText("My Mod")).toBeInTheDocument()
         expect(screen.getByText(/2h ago/)).toBeInTheDocument()
+    })
+
+    it("renders 'just now' for negative delta (clock skew or immediate update)", () => {
+        defaultHook({
+            report: {
+                stale: [{ package_name: "my_mod", mod_name: "My Mod", path: "/mods/my_mod.pack", current_mtime: 1000, baseline_mtime: 1001, delta_seconds: -1 }],
+                baseline_exists: true,
+                baseline_path: "/x",
+                total_known: 200,
+            },
+        })
+        render(withRouter(<UpdateWidget />))
+        expect(screen.getByText(/just now/i)).toBeInTheDocument()
     })
 
     it("Mark all as synced button calls sync and shows Syncing... while pending", async () => {
