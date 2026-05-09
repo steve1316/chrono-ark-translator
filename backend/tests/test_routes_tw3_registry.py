@@ -16,7 +16,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "helper_scripts"
 
 
 def test_get_supported_mods_returns_data(monkeypatch):
-    monkeypatch.setattr("backend.games.total_war_warhammer_3.routes.registry.config.TW3_HELPER_PATH", str(FIXTURES))
+    monkeypatch.setattr("backend.games.total_war_warhammer_3.routes._paths.config.TW3_HELPER_PATH", str(FIXTURES))
     client = TestClient(app)
     res = client.get("/api/games/total_war_warhammer_3/supported-mods")
     assert res.status_code == 200
@@ -48,7 +48,7 @@ def test_get_supported_mods_returns_503_when_file_missing():
 
 
 def test_get_effects_returns_data(monkeypatch):
-    monkeypatch.setattr("backend.games.total_war_warhammer_3.routes.registry.config.TW3_HELPER_PATH", str(FIXTURES))
+    monkeypatch.setattr("backend.games.total_war_warhammer_3.routes._paths.config.TW3_HELPER_PATH", str(FIXTURES))
     client = TestClient(app)
     res = client.get("/api/games/total_war_warhammer_3/effects")
     assert res.status_code == 200

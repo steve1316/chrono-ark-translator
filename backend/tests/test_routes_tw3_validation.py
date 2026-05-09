@@ -18,8 +18,13 @@ FIXTURES = Path(__file__).parent / "fixtures" / "helper_scripts"
 
 @pytest.fixture(autouse=True, scope="module")
 def _reset_tw3_router_cache():
-    """The TW3 adapter caches its composed router class-level. Reset so the new
-    validation sub-router is included for the test session."""
+    """Reset the TW3 adapter's class-level router cache before this module runs.
+
+    `TotalWarWarhammer3Adapter._ROUTER` is a lazy singleton built on first property
+    access. If another test module has already triggered that build, the cached
+    router won't include the validation sub-router this file exercises. Setting it
+    to `None` forces a rebuild on next access.
+    """
     from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
 
     TotalWarWarhammer3Adapter._ROUTER = None
@@ -53,8 +58,13 @@ def test_get_validation_returns_503_when_helper_path_unset(monkeypatch):
     assert res.status_code == 503
 
 
-def test_get_validation_returns_503_when_supported_mods_missing():
-    """Returns 503 when `load_supported_mods` raises `RegistryFileMissingError`."""
+def test_get_validation_returns_503_when_supported_mods_missing(monkeypatch):
+    """Returns 503 when `load_supported_mods` raises `RegistryFileMissingError`.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture.
+    """
+    monkeypatch.setattr(config, "TW3_HELPER_PATH", "/fake/path")
     client = TestClient(app)
     with patch(
         "backend.games.total_war_warhammer_3.routes.validation.load_supported_mods",
@@ -65,8 +75,13 @@ def test_get_validation_returns_503_when_supported_mods_missing():
     assert "Registry unavailable" in res.json()["detail"]
 
 
-def test_get_validation_returns_503_when_effects_missing():
-    """Returns 503 when `load_supported_effects` raises `RegistryFileMissingError`."""
+def test_get_validation_returns_503_when_effects_missing(monkeypatch):
+    """Returns 503 when `load_supported_effects` raises `RegistryFileMissingError`.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture.
+    """
+    monkeypatch.setattr(config, "TW3_HELPER_PATH", "/fake/path")
     client = TestClient(app)
     with patch(
         "backend.games.total_war_warhammer_3.routes.validation.load_supported_effects",

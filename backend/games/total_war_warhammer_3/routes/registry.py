@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException
 
-from backend import config
 from backend.games.total_war_warhammer_3.helper_scripts_loader import (
     HelperScriptsLoaderError,
     HelperScriptsNotConfiguredError,
@@ -14,17 +11,9 @@ from backend.games.total_war_warhammer_3.helper_scripts_loader import (
     load_supported_effects,
     load_supported_mods,
 )
+from backend.games.total_war_warhammer_3.routes._paths import helper_scripts_path
 
 router = APIRouter()
-
-
-def _helper_scripts_path() -> Path:
-    """Resolve the configured helper_scripts directory from `config.TW3_HELPER_PATH`.
-
-    Returns:
-        Path object. May not exist on disk; the loader validates that.
-    """
-    return Path(config.TW3_HELPER_PATH or "")
 
 
 @router.get("/supported-mods")
@@ -39,7 +28,7 @@ def get_supported_mods():
         HTTPException(500): When the file fails to load (syntax error, missing constant).
     """
     try:
-        mods = load_supported_mods(_helper_scripts_path())
+        mods = load_supported_mods(helper_scripts_path())
     except (HelperScriptsNotConfiguredError, RegistryFileMissingError) as exc:
         raise HTTPException(status_code=503, detail=f"Registry unavailable: {exc}")
     except HelperScriptsLoaderError as exc:
@@ -59,7 +48,7 @@ def get_effects():
         HTTPException(500): When the file fails to load (syntax error, missing constant).
     """
     try:
-        effects = load_supported_effects(_helper_scripts_path())
+        effects = load_supported_effects(helper_scripts_path())
     except (HelperScriptsNotConfiguredError, RegistryFileMissingError) as exc:
         raise HTTPException(status_code=503, detail=f"Registry unavailable: {exc}")
     except HelperScriptsLoaderError as exc:
