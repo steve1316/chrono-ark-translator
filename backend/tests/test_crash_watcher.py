@@ -152,3 +152,32 @@ def test_delete_snapshot_removes_folder(staged):
 def test_delete_snapshot_raises_on_missing_id(staged):
     with pytest.raises(SnapshotNotFoundError):
         delete_snapshot("does-not-exist")
+
+
+def test_get_snapshot_folder_rejects_path_traversal(staged):
+    from backend.games.total_war_warhammer_3.crash_watcher import get_snapshot_folder
+
+    with pytest.raises(SnapshotNotFoundError):
+        get_snapshot_folder("..")
+    with pytest.raises(SnapshotNotFoundError):
+        get_snapshot_folder("../sensitive")
+    with pytest.raises(SnapshotNotFoundError):
+        get_snapshot_folder("..\\sensitive")
+
+
+def test_delete_snapshot_rejects_path_traversal(staged):
+    # Stage a sibling folder that should NOT be touched.
+    sensitive = staged["debugging"].parent / "sensitive"
+    sensitive.mkdir(parents=True, exist_ok=True)
+    (sensitive / "important.txt").write_text("keep me")
+
+    with pytest.raises(SnapshotNotFoundError):
+        delete_snapshot("../sensitive")
+
+    # Sensitive folder must still exist untouched.
+    assert (sensitive / "important.txt").read_text() == "keep me"
+
+
+def test_update_notes_rejects_path_traversal(staged):
+    with pytest.raises(SnapshotNotFoundError):
+        update_notes("../foo", "notes")

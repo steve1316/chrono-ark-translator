@@ -68,6 +68,29 @@ def _debugging_root() -> Path:
     return Path(raw).parent / "debugging"
 
 
+def get_snapshot_folder(snapshot_id: str) -> Path:
+    """Resolve `<debugging_root>/<snapshot_id>/` and validate containment.
+
+    Args:
+        snapshot_id: Folder name returned by `capture_snapshot`. Must not contain
+            path traversal sequences (`..`, absolute paths) -- those raise
+            `SnapshotNotFoundError`.
+
+    Raises:
+        SnapshotNotFoundError: When the resolved path escapes the debugging root.
+        WatcherDisabledError: When TW3_HELPER_PATH is unset.
+
+    Returns:
+        Resolved `Path` to the snapshot folder. The folder may or may not exist
+        on disk; callers must check separately.
+    """
+    root = _debugging_root().resolve()
+    folder = (root / snapshot_id).resolve()
+    if not folder.is_relative_to(root) or folder == root:
+        raise SnapshotNotFoundError(snapshot_id)
+    return folder
+
+
 def _free_folder_name(root: Path, base: str) -> Path:
     """Return `root/base`, suffixed with `-2`, `-3`, ... if it already exists.
 
@@ -218,7 +241,7 @@ def update_notes(snapshot_id: str, notes: str) -> dict:
     Returns:
         The updated manifest dict.
     """
-    folder = _debugging_root() / snapshot_id
+    folder = get_snapshot_folder(snapshot_id)
     manifest_path = folder / "snapshot.json"
     with _capture_lock:
         if not manifest_path.is_file():
@@ -239,7 +262,7 @@ def delete_snapshot(snapshot_id: str) -> None:
         SnapshotNotFoundError: When the folder does not exist.
         WatcherDisabledError: When TW3_HELPER_PATH is unset.
     """
-    folder = _debugging_root() / snapshot_id
+    folder = get_snapshot_folder(snapshot_id)
     with _capture_lock:
         if not folder.is_dir():
             raise SnapshotNotFoundError(snapshot_id)

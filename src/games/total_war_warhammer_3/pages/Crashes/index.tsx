@@ -46,13 +46,21 @@ export default function CrashesPage() {
     }
 
     const handleNotesUpdate = async (id: string, notes: string) => {
-        await updateCrashNotes(id, notes)
-        await refresh()
+        try {
+            await updateCrashNotes(id, notes)
+            await refresh()
+        } catch (err) {
+            console.error("notes update failed", err)
+        }
     }
 
     const handleDelete = async (id: string) => {
-        await deleteCrash(id)
-        await refresh()
+        try {
+            await deleteCrash(id)
+            await refresh()
+        } catch (err) {
+            console.error("delete failed", err)
+        }
     }
 
     if (error) {

@@ -101,3 +101,32 @@ def test_test_fire_returns_404_when_disabled(staged, monkeypatch):
     client = TestClient(app)
     res = client.post("/api/games/total_war_warhammer_3/crashes/test-fire")
     assert res.status_code == 404
+
+
+def test_reveal_returns_404_on_unknown(staged):
+    client = TestClient(app)
+    res = client.post("/api/games/total_war_warhammer_3/crashes/does-not-exist/reveal")
+    # On Windows: 404 (folder missing). On other platforms: 501 (Windows-only).
+    assert res.status_code in (404, 501)
+
+
+def test_reveal_returns_404_on_path_traversal(staged):
+    client = TestClient(app)
+    # URL-encoded `..` to bypass any naive routing strip.
+    res = client.post("/api/games/total_war_warhammer_3/crashes/%2E%2E%2Fsensitive/reveal")
+    assert res.status_code in (404, 501)
+
+
+def test_delete_returns_404_on_path_traversal(staged):
+    client = TestClient(app)
+    res = client.delete("/api/games/total_war_warhammer_3/crashes/%2E%2E%2Fsensitive")
+    assert res.status_code == 404
+
+
+def test_put_notes_returns_404_on_path_traversal(staged):
+    client = TestClient(app)
+    res = client.put(
+        "/api/games/total_war_warhammer_3/crashes/%2E%2E%2Fsensitive/notes",
+        json={"notes": "x"},
+    )
+    assert res.status_code == 404

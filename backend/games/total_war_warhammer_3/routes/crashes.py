@@ -15,12 +15,9 @@ router = APIRouter()
 
 
 class _NotesUpdate(BaseModel):
-    """Body for PUT /crashes/{id}/notes.
+    """Body for PUT /crashes/{id}/notes."""
 
-    Attributes:
-        notes: Free-text annotation to attach to the snapshot manifest. Last-write-wins.
-    """
-
+    # Free-text annotation to attach to the snapshot manifest. Last-write-wins.
     notes: str
 
 
@@ -106,21 +103,22 @@ def reveal_crash(snapshot_id: str):
     Args:
         snapshot_id: Folder name returned by `capture_snapshot`.
 
+    Returns:
+        `{"opened": str}` on success.
+
     Raises:
         HTTPException(404): When the snapshot does not exist.
         HTTPException(501): When not running on Windows.
         HTTPException(503): When TW3_HELPER_PATH is unset.
-
-    Returns:
-        `{"opened": str}` on success.
     """
     if not hasattr(os, "startfile"):
         raise HTTPException(status_code=501, detail="reveal is Windows-only")
     try:
-        root = crash_watcher._debugging_root()
+        folder = crash_watcher.get_snapshot_folder(snapshot_id)
+    except crash_watcher.SnapshotNotFoundError:
+        raise HTTPException(status_code=404, detail=f"snapshot not found: {snapshot_id}")
     except crash_watcher.WatcherDisabledError as exc:
         raise HTTPException(status_code=503, detail=f"Crash watcher unavailable: {exc}")
-    folder = root / snapshot_id
     if not folder.is_dir():
         raise HTTPException(status_code=404, detail=f"snapshot not found: {snapshot_id}")
     os.startfile(str(folder))  # type: ignore[attr-defined]
