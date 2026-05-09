@@ -36,6 +36,34 @@ export interface RunStateIdle {
 
 export type RunState = RunStateRunning | RunStateIdle
 
+export interface ValidationIssue {
+    /** Discriminator for the broken-reference category. */
+    kind: "missing_effect_category" | "missing_mod_path"
+    /** Severity tier. Currently always `"error"`. */
+    severity: "error"
+    /** Stable identity of the offending mod. */
+    mod_package_name: string
+    /** Display name of the offending mod. */
+    mod_name: string
+    /** The orphaned reference itself (missing category name or missing path string). */
+    target: string
+    /** Human-readable description suitable for direct display. */
+    message: string
+}
+
+/**
+ * Fetch the validation report from the TW3 backend.
+ *
+ * @returns Array of issues. Empty when all references resolve.
+ * @throws `RegistryError` On 5xx (typically helper_scripts misconfigured).
+ */
+export async function fetchValidation(): Promise<ValidationIssue[]> {
+    const res = await api.get("/validation")
+    if (!res.ok) throw await registryError(res)
+    const body = await res.json()
+    return body.issues as ValidationIssue[]
+}
+
 /**
  * Fetch the read-only `SUPPORTED_MODS` registry from the TW3 backend.
  *
