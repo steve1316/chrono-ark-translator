@@ -1,20 +1,26 @@
+import { useState } from "react"
 import { useValidation } from "../../hooks/useValidation"
 import RegistryErrorBanner from "../../components/RegistryErrorBanner"
 import type { ValidationIssue } from "../../api"
 
 /**
  * TW3 Validate page: surfaces broken cross-references in `SUPPORTED_MODS` /
- * `SUPPORTED_EFFECTS`. Subscribes to the shared `useValidation` poll, renders
- * issues grouped by kind, and supports manual refresh.
+ * `SUPPORTED_EFFECTS`. Subscribes to the shared `useValidation` poll, renders issues grouped by kind, and supports manual refresh.
  *
- * @returns A page rendering grouped validation issues, or a `RegistryErrorBanner`
- *     when the backend reports a configuration error.
+ * @returns A page rendering grouped validation issues, or a `RegistryErrorBanner` when the backend reports a configuration error.
  */
 export default function ValidatePage() {
-    const { issues, loading, error, refresh } = useValidation()
+    const { issues, error, refresh } = useValidation()
+    const [refreshing, setRefreshing] = useState(false)
 
-    const issueCount = issues?.length ?? 0
-    const countLabel = issueCount === 0 ? "No issues" : `${issueCount} ${issueCount === 1 ? "issue" : "issues"}`
+    const handleRefresh = async () => {
+        setRefreshing(true)
+        try {
+            await refresh()
+        } finally {
+            setRefreshing(false)
+        }
+    }
 
     if (error) {
         return (
@@ -38,20 +44,24 @@ export default function ValidatePage() {
                 <div className="title-group">
                     <h1>Validate</h1>
                     <p>Cross-reference check for `SUPPORTED_MODS` and `SUPPORTED_EFFECTS` entries.</p>
-                    <span style={{ fontSize: "0.85rem", color: issueCount === 0 ? "var(--text-dim)" : "var(--warning)" }}>{countLabel}</span>
+                    {issues !== null && (
+                        <span style={{ fontSize: "0.85rem", color: issues.length === 0 ? "var(--text-dim)" : "var(--warning)" }}>
+                            {issues.length === 0 ? "No issues" : `${issues.length} issue${issues.length === 1 ? "" : "s"}`}
+                        </span>
+                    )}
                 </div>
-                <button className="btn btn-outline" onClick={refresh}>
-                    Refresh
+                <button className="btn btn-outline" onClick={handleRefresh} disabled={refreshing}>
+                    {refreshing ? "Refreshing..." : "Refresh"}
                 </button>
             </div>
 
-            {loading && (
-                <div className="glass-card" style={{ padding: "1.5rem", textAlign: "center", color: "var(--text-dim)" }}>
-                    Loading...
+            {issues === null && !error && (
+                <div className="glass-card" style={{ padding: "1.5rem", textAlign: "center", color: "var(--text-dim)", fontStyle: "italic", opacity: 0.7 }}>
+                    Loading validation report...
                 </div>
             )}
 
-            {!loading && issues !== null && issues.length === 0 && (
+            {issues !== null && issues.length === 0 && (
                 <div className="glass-card" style={{ padding: "1.5rem", textAlign: "center", color: "var(--text-dim)" }}>
                     All references resolve.
                 </div>
@@ -84,12 +94,7 @@ interface IssueCardProps {
     issue: ValidationIssue
 }
 
-/**
- * Renders a single validation issue as a glass-card.
- *
- * @param issue The validation issue to display.
- * @returns A card with the mod name, target, and message.
- */
+/** Single issue card showing mod_name, target, and message. */
 function IssueCard({ issue }: IssueCardProps) {
     return (
         <div className="glass-card" style={{ padding: "1rem", marginTop: "0.5rem" }}>

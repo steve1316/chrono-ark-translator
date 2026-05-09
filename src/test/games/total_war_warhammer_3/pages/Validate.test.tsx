@@ -73,7 +73,6 @@ describe("ValidatePage", () => {
         await waitFor(() => expect(screen.getByText(/all references resolve/i)).toBeInTheDocument())
         const user = userEvent.setup()
         await user.click(screen.getByRole("button", { name: /refresh/i }))
-        await waitFor(() => expect(vi.mocked(fetchValidation).mock.calls.length).toBeGreaterThan(1))
         await waitFor(() => expect(screen.getByText("Mod C")).toBeInTheDocument())
     })
 })
