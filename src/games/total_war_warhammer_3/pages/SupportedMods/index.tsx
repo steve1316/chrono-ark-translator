@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { fetchSupportedMods, RegistryError } from "../../api"
-import type { SupportedMod } from "../../api"
+import type { SupportedMod, ValidationIssue } from "../../api"
 import RegistryErrorBanner from "../../components/RegistryErrorBanner"
+import ValidationBadge from "../../components/ValidationBadge"
+import { useValidation } from "../../hooks/useValidation"
 
 /**
  * Read-only table over `SUPPORTED_MODS` from the configured helper_scripts directory.
@@ -14,6 +16,7 @@ export default function SupportedModsPage() {
     const [mods, setMods] = useState<SupportedMod[] | null>(null)
     const [error, setError] = useState<RegistryError | null>(null)
     const [search, setSearch] = useState("")
+    const { issues: validationIssues } = useValidation()
 
     useEffect(() => {
         let cancelled = false
@@ -28,6 +31,16 @@ export default function SupportedModsPage() {
             cancelled = true
         }
     }, [])
+
+    const issuesByMod = useMemo(() => {
+        const map = new Map<string, ValidationIssue[]>()
+        for (const issue of validationIssues ?? []) {
+            const list = map.get(issue.mod_package_name) ?? []
+            list.push(issue)
+            map.set(issue.mod_package_name, list)
+        }
+        return map
+    }, [validationIssues])
 
     const filtered = useMemo(() => {
         if (!mods) return []
@@ -64,6 +77,7 @@ export default function SupportedModsPage() {
             <table className="data-table">
                 <thead>
                     <tr>
+                        <th style={{ width: "2.5rem", textAlign: "center" }}>Status</th>
                         <th>Name</th>
                         <th>Package</th>
                         <th>Modified Attributes</th>
@@ -73,6 +87,9 @@ export default function SupportedModsPage() {
                 <tbody>
                     {filtered.map((m) => (
                         <tr key={m.package_name}>
+                            <td style={{ width: "2.5rem", textAlign: "center" }}>
+                                <ValidationBadge issues={issuesByMod.get(m.package_name) ?? []} />
+                            </td>
                             <td>{m.name}</td>
                             <td>{m.package_name}</td>
                             <td>{(m.modified_attributes ?? []).join(", ")}</td>
