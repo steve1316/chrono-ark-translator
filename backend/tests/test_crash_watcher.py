@@ -125,3 +125,30 @@ def test_concurrent_captures_serialize(staged):
     assert len(results) == 2
     ids = {r["id"] for r in results}
     assert len(ids) == 2  # different folder names due to suffix logic
+
+
+def test_update_notes_round_trip(staged):
+    snap = capture_snapshot()
+    updated = update_notes(snap["id"], "siege battle turn 12")
+    assert updated["notes"] == "siege battle turn 12"
+    # Verify persistence: re-listing reads the manifest fresh from disk.
+    snapshots = list_snapshots()
+    matching = [s for s in snapshots if s["id"] == snap["id"]]
+    assert matching[0]["notes"] == "siege battle turn 12"
+
+
+def test_update_notes_raises_on_missing_id(staged):
+    with pytest.raises(SnapshotNotFoundError):
+        update_notes("does-not-exist", "x")
+
+
+def test_delete_snapshot_removes_folder(staged):
+    snap = capture_snapshot()
+    delete_snapshot(snap["id"])
+    assert list_snapshots() == []
+    assert not (staged["debugging"] / snap["id"]).exists()
+
+
+def test_delete_snapshot_raises_on_missing_id(staged):
+    with pytest.raises(SnapshotNotFoundError):
+        delete_snapshot("does-not-exist")

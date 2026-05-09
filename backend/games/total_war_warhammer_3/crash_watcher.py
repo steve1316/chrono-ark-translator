@@ -35,6 +35,7 @@ class SnapshotNotFoundError(CrashWatcherError):
 
 # Module-level state.
 _capture_lock = threading.Lock()
+_watcher_lock = threading.Lock()
 
 
 def _appdata_wh3() -> Path:
@@ -135,11 +136,11 @@ def capture_snapshot(trigger: str = "manual") -> dict:
     """
     wh3 = _appdata_wh3()
     debugging_root = _debugging_root()
-    debugging_root.mkdir(parents=True, exist_ok=True)
-
-    base = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
 
     with _capture_lock:
+        debugging_root.mkdir(parents=True, exist_ok=True)
+        now = datetime.now(timezone.utc)
+        base = now.strftime("%Y-%m-%d-%H%M%S")
         folder = _free_folder_name(debugging_root, base)
         folder.mkdir(parents=True)
 
@@ -162,7 +163,7 @@ def capture_snapshot(trigger: str = "manual") -> dict:
 
         manifest: dict[str, Any] = {
             "id": folder.name,
-            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "captured_at": now.isoformat(),
             "trigger": trigger,
             "source": str(wh3),
             "files": {
@@ -219,9 +220,9 @@ def update_notes(snapshot_id: str, notes: str) -> dict:
     """
     folder = _debugging_root() / snapshot_id
     manifest_path = folder / "snapshot.json"
-    if not manifest_path.is_file():
-        raise SnapshotNotFoundError(snapshot_id)
     with _capture_lock:
+        if not manifest_path.is_file():
+            raise SnapshotNotFoundError(snapshot_id)
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest["notes"] = notes
         manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -239,9 +240,10 @@ def delete_snapshot(snapshot_id: str) -> None:
         WatcherDisabledError: When TW3_HELPER_PATH is unset.
     """
     folder = _debugging_root() / snapshot_id
-    if not folder.is_dir():
-        raise SnapshotNotFoundError(snapshot_id)
-    shutil.rmtree(folder)
+    with _capture_lock:
+        if not folder.is_dir():
+            raise SnapshotNotFoundError(snapshot_id)
+        shutil.rmtree(folder)
 
 
 _observer = None
@@ -262,11 +264,12 @@ def _on_crash_detected() -> None:
 def _schedule_capture() -> None:
     """Reset the debounce timer; fire `_on_crash_detected` after `_DEBOUNCE_SECONDS`."""
     global _debounce_timer
-    if _debounce_timer is not None:
-        _debounce_timer.cancel()
-    _debounce_timer = threading.Timer(_DEBOUNCE_SECONDS, _on_crash_detected)
-    _debounce_timer.daemon = True
-    _debounce_timer.start()
+    with _watcher_lock:
+        if _debounce_timer is not None:
+            _debounce_timer.cancel()
+        _debounce_timer = threading.Timer(_DEBOUNCE_SECONDS, _on_crash_detected)
+        _debounce_timer.daemon = True
+        _debounce_timer.start()
 
 
 def start_watcher() -> None:
@@ -275,44 +278,48 @@ def start_watcher() -> None:
     Idempotent: safe to call multiple times.
     """
     global _observer
-    if _observer is not None:
-        return
-    try:
-        wh3 = _appdata_wh3()
-        _debugging_root()
-    except WatcherDisabledError as exc:
-        _logger.info("crash watcher disabled: %s", exc)
-        return
+    with _watcher_lock:
+        if _observer is not None:
+            return
+        try:
+            wh3 = _appdata_wh3()
+            _debugging_root()
+        except WatcherDisabledError as exc:
+            _logger.info("crash watcher disabled: %s", exc)
+            return
 
-    logs_dir = wh3 / "logs"
-    if not logs_dir.is_dir():
-        _logger.info("crash watcher disabled: logs dir missing at %s", logs_dir)
-        return
+        logs_dir = wh3 / "logs"
+        if not logs_dir.is_dir():
+            _logger.info("crash watcher disabled: logs dir missing at %s", logs_dir)
+            return
 
-    from watchdog.events import PatternMatchingEventHandler
-    from watchdog.observers import Observer
+        from watchdog.events import PatternMatchingEventHandler
+        from watchdog.observers import Observer
 
-    handler = PatternMatchingEventHandler(patterns=["*no_clean_exit"], ignore_directories=True)
-    handler.on_created = lambda _evt: _schedule_capture()
-    handler.on_modified = lambda _evt: _schedule_capture()
+        handler = PatternMatchingEventHandler(patterns=["*no_clean_exit"], ignore_directories=True)
+        handler.on_created = lambda _evt: _schedule_capture()
+        handler.on_modified = lambda _evt: _schedule_capture()
 
-    obs = Observer()
-    obs.schedule(handler, str(logs_dir), recursive=False)
-    obs.daemon = True
-    obs.start()
-    _observer = obs
-    _logger.info("crash watcher started; watching %s", logs_dir)
+        obs = Observer()
+        obs.schedule(handler, str(logs_dir), recursive=False)
+        obs.daemon = True
+        obs.start()
+        _observer = obs
+        _logger.info("crash watcher started; watching %s", logs_dir)
 
 
 def stop_watcher() -> None:
     """Stop the running observer, if any. Idempotent."""
     global _observer, _debounce_timer
-    if _debounce_timer is not None:
-        _debounce_timer.cancel()
-        _debounce_timer = None
-    if _observer is None:
-        return
-    _observer.stop()
-    _observer.join(timeout=5)
-    _observer = None
+    with _watcher_lock:
+        if _debounce_timer is not None:
+            _debounce_timer.cancel()
+            _debounce_timer = None
+        if _observer is None:
+            return
+        obs = _observer
+        _observer = None
+    # Stop and join outside the lock so a slow shutdown doesn't block other watcher operations.
+    obs.stop()
+    obs.join(timeout=5)
     _logger.info("crash watcher stopped")
