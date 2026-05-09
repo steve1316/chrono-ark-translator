@@ -24,7 +24,7 @@ from backend.games.total_war_warhammer_3.update_detector import (
 router = APIRouter()
 
 # Default baseline path; tests monkeypatch this attribute to redirect storage.
-_BASELINE_PATH = Path("backend/storage/games/total_war_warhammer_3/mod_mtimes.json")
+_BASELINE_PATH = Path(__file__).resolve().parents[3] / "storage" / "games" / "total_war_warhammer_3" / "mod_mtimes.json"
 
 
 def _read_baseline() -> tuple[dict[str, float | None], bool]:
@@ -51,6 +51,10 @@ def _write_baseline_atomic(baseline: dict[str, float | None]) -> None:
 
     Args:
         baseline: Dict of `{package_name: mtime_or_None}`.
+
+    Raises:
+        OSError: When the atomic rename fails (e.g. on Windows when another process holds the destination
+            file open). The route handler should translate this to a 500 response.
     """
     _BASELINE_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = _BASELINE_PATH.with_suffix(_BASELINE_PATH.suffix + ".tmp")
@@ -83,7 +87,10 @@ def get_updates():
     baseline, exists = _read_baseline()
     if not exists:
         baseline = current_mtimes(mods)
-        _write_baseline_atomic(baseline)
+        try:
+            _write_baseline_atomic(baseline)
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to write baseline: {exc}")
         return {
             "stale": [],
             "baseline_exists": False,
@@ -121,7 +128,10 @@ def post_updates_sync():
         raise HTTPException(status_code=500, detail=str(exc))
 
     baseline = current_mtimes(mods)
-    _write_baseline_atomic(baseline)
+    try:
+        _write_baseline_atomic(baseline)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to write baseline: {exc}")
     return {
         "synced_at": datetime.now(timezone.utc).isoformat(),
         "count": len(baseline),

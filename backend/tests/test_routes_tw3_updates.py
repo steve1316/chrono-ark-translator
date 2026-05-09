@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -137,6 +138,11 @@ def test_post_sync_writes_baseline_atomically(monkeypatch, baseline_path):
     res = client.post("/api/games/total_war_warhammer_3/updates/sync")
     assert res.status_code == 200
     assert baseline_path.exists()
+    body = res.json()
+    synced_at = body["synced_at"]
+    parsed = datetime.fromisoformat(synced_at)
+    assert parsed is not None
+    assert body["count"] == 2
     data = json.loads(baseline_path.read_text())
     assert isinstance(data, dict)
     assert "test_mod_a" in data
