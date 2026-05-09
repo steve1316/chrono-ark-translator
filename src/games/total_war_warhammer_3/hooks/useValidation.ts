@@ -27,7 +27,14 @@ const tick = async (): Promise<void> => {
         latestIssues = await fetchValidation()
         latestError = null
     } catch (err) {
-        if (err instanceof RegistryError) latestError = err
+        if (err instanceof RegistryError) {
+            latestError = err
+        } else {
+            // Network errors, JSON parse failures, etc. surface as a synthetic RegistryError
+            // so the UI flips out of loading state and can render a banner.
+            const detail = err instanceof Error ? err.message : "Unknown error during validation fetch"
+            latestError = new RegistryError(0, detail, null)
+        }
         // Preserve latestIssues on failure so the UI keeps its last-known good data.
     }
     broadcast()
@@ -53,7 +60,8 @@ interface UseValidationResult {
     loading: boolean
     /** Set when the most recent fetch failed; cleared on the next success. */
     error: RegistryError | null
-    /** Trigger an out-of-band fetch. Resolves when the next response lands. */
+    /** Trigger an immediate out-of-band poll and broadcast the result to all subscribers.
+     *  Resolves when the broadcast completes. */
     refresh: () => Promise<void>
 }
 
