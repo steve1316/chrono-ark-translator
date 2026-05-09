@@ -1,9 +1,5 @@
 """Tests for the TW3 crashes routes."""
 
-import json
-from pathlib import Path
-from unittest.mock import patch
-
 import pytest
 from fastapi.testclient import TestClient
 

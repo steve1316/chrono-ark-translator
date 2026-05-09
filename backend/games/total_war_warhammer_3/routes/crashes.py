@@ -15,7 +15,11 @@ router = APIRouter()
 
 
 class _NotesUpdate(BaseModel):
-    """Body for PUT /crashes/{id}/notes."""
+    """Body for PUT /crashes/{id}/notes.
+
+    Attributes:
+        notes: Free-text annotation to attach to the snapshot manifest. Last-write-wins.
+    """
 
     notes: str
 
