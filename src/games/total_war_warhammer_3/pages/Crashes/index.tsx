@@ -82,6 +82,9 @@ export default function CrashesPage() {
                 <div className="title-group">
                     <h1>Crashes</h1>
                     <p>Snapshots of `crash_report/` and `logs/` taken automatically when TWW3 crashes.</p>
+                    <p style={{ margin: "0.25rem 0 0 0", color: "var(--text-dim)", fontStyle: "italic" }}>
+                        The watcher captures snapshots automatically. Use <strong>Capture last crash</strong> only for a crash that happened while the backend was not running.
+                    </p>
                 </div>
                 <button className="btn btn-outline" onClick={handleCapture} disabled={capturing}>
                     {capturing ? "Capturing..." : "Capture last crash"}

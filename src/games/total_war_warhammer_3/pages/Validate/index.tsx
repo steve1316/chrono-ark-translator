@@ -55,6 +55,14 @@ export default function ValidatePage() {
                 </button>
             </div>
 
+            <div className="glass-card" style={{ padding: "1rem", marginBottom: "1rem" }}>
+                <p style={{ margin: 0, color: "var(--text-dim)" }}>
+                    Cross-reference check for the TW3 registries. Two kinds of broken references are flagged: a <code>modified_attributes</code> entry on a mod that doesn't match any category in
+                    <code> SUPPORTED_EFFECTS</code> (defined in <code>dynamic_rors_effects.py</code>), or a mod whose
+                    <code> path</code> no longer exists on disk. Issues here usually mean the mod registry needs an edit.
+                </p>
+            </div>
+
             {issues === null && !error && (
                 <div className="glass-card" style={{ padding: "1.5rem", textAlign: "center", color: "var(--text-dim)", fontStyle: "italic", opacity: 0.7 }}>
                     Loading validation report...
