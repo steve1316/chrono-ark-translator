@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom"
-import PackCard, { type PackCard as PackCardData } from "../../components/PackCard"
+import PackCard, { type PackEntry } from "../../components/PackCard"
 import ScriptRunButton from "../../components/ScriptRunButton"
 import UpdateWidget from "../../components/UpdateWidget"
 
-const PACKS: PackCardData[] = [
+const PACKS: PackEntry[] = [
     { title: "Nanu's Dynamic RoR Compat", workshopId: "3513364573", scriptId: "update_dynamic_rors" },
     { title: "Nanu's Dynamic RoR Leftover Vanilla", workshopId: "3532864014", scriptId: "update_dynamic_rors_vanilla" },
     { title: "2x Unit Size Compat", workshopId: "3621939685", scriptId: "update_double_unit_size" },
@@ -40,7 +40,7 @@ export default function DashboardPage() {
             </div>
             <div className="mod-grid">
                 {PACKS.map((pack) => (
-                    <PackCard key={pack.title} pack={pack} />
+                    <PackCard key={pack.workshopId} pack={pack} />
                 ))}
                 <Link to="/supported-mods" className="glass-card" style={{ padding: "1.25rem", textDecoration: "none", color: "var(--text-main)" }}>
                     <h3 style={{ marginTop: 0 }}>Supported Mods</h3>

@@ -4,7 +4,7 @@ import { API_BASE } from "../../../../config"
 import ScriptRunButton from "../ScriptRunButton"
 
 /** A single compat pack card shown on the TW3 Dashboard. */
-export interface PackCard {
+export interface PackEntry {
     /** Display name of the compat pack. */
     title: string
     /** Steam Workshop item ID. */
@@ -18,7 +18,7 @@ export interface PackCard {
 /** Props for PackCardComponent. */
 interface PackCardProps {
     /** A single entry from the TW3 `PACKS` array. */
-    pack: PackCard
+    pack: PackEntry
 }
 
 /**
