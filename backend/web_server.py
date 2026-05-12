@@ -21,19 +21,12 @@ from backend.scripts.migrate_storage_v1_to_v2 import run_migration
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """App lifespan hooks. Runs storage migration and starts the TW3 crash watcher.
+    """App lifespan hooks. Runs storage migration on startup.
 
-    Idempotent: the migration marker file makes subsequent migration runs a no-op,
-    and the watcher's `start_watcher()` is itself idempotent.
+    Idempotent: the migration marker file makes subsequent migration runs a no-op.
     """
-    from backend.games.total_war_warhammer_3.crash_watcher import start_watcher, stop_watcher
-
     run_migration()
-    start_watcher()
-    try:
-        yield
-    finally:
-        stop_watcher()
+    yield
 
 
 app = FastAPI(title="Chrono Ark Translator API", lifespan=lifespan)

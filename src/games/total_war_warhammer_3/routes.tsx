@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from "react-router-dom"
 import DashboardPage from "./pages/Dashboard"
 import SupportedModsPage from "./pages/SupportedMods"
 import ValidatePage from "./pages/Validate"
-import CrashesPage from "./pages/Crashes"
 import RunnerPage from "./pages/Runner"
 
 /**
@@ -17,7 +16,6 @@ export function TotalWarWarhammer3Routes() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/supported-mods" element={<SupportedModsPage />} />
             <Route path="/validate" element={<ValidatePage />} />
-            <Route path="/crashes" element={<CrashesPage />} />
             <Route path="/runner" element={<RunnerPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
