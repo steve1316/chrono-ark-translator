@@ -43,7 +43,6 @@ export default function ValidatePage() {
             <div className="dashboard-header">
                 <div className="title-group">
                     <h1>Validate</h1>
-                    <p>Cross-reference check for `SUPPORTED_MODS` and `SUPPORTED_EFFECTS` entries.</p>
                     {issues !== null && (
                         <span style={{ fontSize: "0.85rem", color: issues.length === 0 ? "var(--text-dim)" : "var(--warning)" }}>
                             {issues.length === 0 ? "No issues" : `${issues.length} issue${issues.length === 1 ? "" : "s"}`}
