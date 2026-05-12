@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
+from fastapi.testclient import TestClient
 
 from backend import config
 from backend.games.total_war_warhammer_3.routes._paths import tw3_workshop_content_dir
+from backend.web_server import app
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,10 +30,6 @@ def test_workshop_content_dir_returns_none_when_drive_unset(monkeypatch):
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # GET /packs/{workshop_id}/preview
-
-from fastapi.testclient import TestClient
-
-from backend.web_server import app
 
 
 def _set_drive(monkeypatch, tmp_path: Path) -> Path:

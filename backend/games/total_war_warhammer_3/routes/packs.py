@@ -44,6 +44,7 @@ def get_pack_preview(workshop_id: str):
     if folder is None or not folder.is_dir():
         raise HTTPException(status_code=404, detail="workshop folder not found")
 
+    # Sort entries for deterministic ordering when a folder contains multiple images.
     for entry in sorted(folder.iterdir()):
         if entry.is_file() and entry.suffix.lower() in _IMAGE_SUFFIXES:
             return FileResponse(entry, media_type=_MEDIA_TYPES[entry.suffix.lower()])
