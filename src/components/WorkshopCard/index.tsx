@@ -1,7 +1,7 @@
 import React, { useState, type HTMLAttributes, type ReactNode } from "react"
 
 /** Props for WorkshopCard. */
-interface WorkshopCardProps extends HTMLAttributes<HTMLDivElement> {
+interface WorkshopCardProps extends Omit<HTMLAttributes<HTMLDivElement>, "title"> {
     /** Absolute URL to the preview image. When omitted, null, or the image fires `onError`, a placeholder renders instead. */
     previewImageUrl?: string | null
     /** Alt text for the preview image. Defaults to a generic label so screen readers always have something to read. */
