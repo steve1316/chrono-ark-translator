@@ -15,7 +15,7 @@ interface Props {
  * Card representation of one TW3 supported-mod entry. Wraps `WorkshopCard`
  * with the mod's name, package name, derived workshop-id badge, and a body
  * slot containing the validation badge (when issues exist), the modified
- * attributes list (when non-empty), and the dim monospace `.pack` path.
+ * attributes list (when non-empty), and an "Open Workshop Folder" button (when `workshop_id` is set).
  *
  * @param mod The mod registry entry to render.
  * @param issues Validation issues affecting this mod; an empty array hides the badge.
