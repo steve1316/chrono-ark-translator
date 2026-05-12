@@ -24,11 +24,10 @@ const PACKS: PackCard[] = [
 ]
 
 /**
- * TW3 Dashboard: 6 pack cards + a Rebuild All button + 2 navigation cards for the
- * read-only registries. Last-run timestamps are session-only.
+ * TW3 Dashboard: 6 pack cards + a Rebuild All button + a navigation card for the
+ * read-only mod registry. Last-run timestamps are session-only.
  *
- * @returns A page that renders pack cards, each with a `ScriptRunButton`, plus
- *     links to Supported Mods and Effects.
+ * @returns A page that renders pack cards, each with a `ScriptRunButton`, plus a link to Supported Mods.
  */
 export default function DashboardPage() {
     return (
@@ -55,10 +54,6 @@ export default function DashboardPage() {
                 <Link to="/supported-mods" className="glass-card" style={{ padding: "1.25rem", textDecoration: "none", color: "var(--text-main)" }}>
                     <h3 style={{ marginTop: 0 }}>Supported Mods</h3>
                     <p style={{ color: "var(--text-dim)" }}>Browse the mod registry.</p>
-                </Link>
-                <Link to="/effects" className="glass-card" style={{ padding: "1.25rem", textDecoration: "none", color: "var(--text-main)" }}>
-                    <h3 style={{ marginTop: 0 }}>Effects</h3>
-                    <p style={{ color: "var(--text-dim)" }}>Browse the effects catalog.</p>
                 </Link>
             </div>
         </>

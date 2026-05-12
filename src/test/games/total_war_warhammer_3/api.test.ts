@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { fetchSupportedMods, fetchEffects, getCurrentRun, runStreamUrl, startRun } from "../../../games/total_war_warhammer_3/api"
+import { fetchSupportedMods, getCurrentRun, runStreamUrl, startRun } from "../../../games/total_war_warhammer_3/api"
 
 afterEach(() => {
     vi.restoreAllMocks()
@@ -18,12 +18,6 @@ describe("tw3 api wrappers", () => {
         const [url, init] = fetchMock.mock.calls[0]
         expect(String(url)).toContain("/api/games/total_war_warhammer_3/run/update_dynamic_rors")
         expect((init as RequestInit).method).toBe("POST")
-    })
-
-    it("fetchEffects hits /api/games/total_war_warhammer_3/effects", async () => {
-        const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ effects: {} }), { status: 200 }))
-        await fetchEffects()
-        expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/games/total_war_warhammer_3/effects"), undefined)
     })
 
     it("getCurrentRun hits /api/games/total_war_warhammer_3/run", async () => {
