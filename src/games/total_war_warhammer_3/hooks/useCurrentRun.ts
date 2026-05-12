@@ -14,6 +14,7 @@ const tick = async () => {
         currentState = { status: "idle" }
     }
     subscribers.forEach((cb) => cb(currentState))
+    if (currentState.status === "idle") stopPolling()
 }
 
 const startPolling = () => {
@@ -26,6 +27,11 @@ const stopPolling = () => {
     if (intervalId === null) return
     window.clearInterval(intervalId)
     intervalId = null
+}
+
+/** Resume polling immediately. Call after a run is launched so the next state change is observed. */
+export function kickPoll() {
+    startPolling()
 }
 
 /**
