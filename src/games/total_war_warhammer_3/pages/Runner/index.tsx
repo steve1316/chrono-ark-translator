@@ -100,11 +100,11 @@ export default function RunnerPage() {
     }, [run.status, run.status === "running" ? run.run_id : null])
 
     const handleStart = async (scriptId: string) => {
-        const label = labelFor(scriptId)
-        const time = new Date().toLocaleTimeString()
-        appendLine({ kind: "separator", text: `--- Starting ${label} at ${time} ---` })
         try {
             await startRun(scriptId)
+            const label = labelFor(scriptId)
+            const time = new Date().toLocaleTimeString()
+            appendLine({ kind: "separator", text: `--- Starting ${label} at ${time} ---` })
         } catch (err) {
             console.error("Failed to start run", err)
         } finally {
