@@ -3,10 +3,9 @@ import { FaExclamationCircle, FaSteam, FaSync } from "react-icons/fa"
 import type { ModStatus } from "../../shared_types"
 import { API_BASE } from "../../config"
 import { highlightMatch } from "../../utils/text"
+import WorkshopCard from "../WorkshopCard"
 
-/**
- * Props accepted by the {@link ModCard} component.
- */
+/** Props for ModCard. */
 interface ModCardProps {
     /** Full mod summary object including name, progress, and optional preview image. */
     mod: ModStatus
@@ -19,142 +18,120 @@ interface ModCardProps {
 }
 
 /**
- * Dashboard card for a single mod, displaying its preview image, translation
- * progress bar, summary statistics, and action buttons (view, Steam link, sync).
+ * Dashboard card for a single mod. Wraps `WorkshopCard` with the Chrono Ark
+ * mod-specific body (progress, stats, action buttons).
  *
- * Wrapped in `React.memo` to avoid unnecessary re-renders when sibling cards
- * update -- the card only re-renders when its own `mod`, `onClick`, or `onSync`
- * props change.
+ * Wrapped in `React.memo` to avoid unnecessary re-renders when sibling cards update.
  *
- * @param mod - The mod status data to display.
- * @param onClick - Handler invoked with the mod ID when the user wants to view its strings.
- * @param onSync - Handler invoked with the mod ID when the user wants to rescan files.
- * @param searchQuery - Optional search string for highlighting matched text in name/author.
+ * @param mod The mod status data to display.
+ * @param onClick Handler invoked with the mod ID when the user wants to view its strings.
+ * @param onSync Handler invoked with the mod ID when the user wants to rescan files.
+ * @param searchQuery Optional search string for highlighting matched text in name/author.
  * @returns The rendered mod card JSX.
  */
 const ModCard: React.FC<ModCardProps> = React.memo(({ mod, onClick, onSync, searchQuery = "" }) => {
+    const previewImageUrl = mod.preview_image ? `${API_BASE}${mod.preview_image}` : null
     return (
-        <div className="glass-card mod-card animate-fade-in" data-mod-id={mod.id}>
-            {/* --- Preview Image --- */}
-            {/* Only rendered when the backend has found a preview image for the mod.
-                Images are lazy-loaded to avoid blocking the initial paint of the grid. */}
-            {mod.preview_image && (
-                <div className="mod-preview">
-                    <img src={`${API_BASE}${mod.preview_image}`} alt={mod.name} loading="lazy" />
+        <WorkshopCard
+            data-mod-id={mod.id}
+            previewImageUrl={previewImageUrl}
+            previewAlt={mod.name}
+            title={highlightMatch(mod.name, searchQuery)}
+            idBadge={mod.id}
+            subtitle={<>by {highlightMatch(mod.author || "Unknown", searchQuery)}</>}
+        >
+            <div className="progress-section">
+                <div className="progress-info">
+                    <span>{mod.percentage}% Translated</span>
+                    <span>
+                        {mod.translated} / {mod.total} strings
+                    </span>
                 </div>
-            )}
-            <div className="mod-card-content">
-                {/* --- Header: name, author, ID badge --- */}
-                <div className="mod-header">
-                    <div className="mod-info">
-                        <h3>{highlightMatch(mod.name, searchQuery)}</h3>
-                        <span className="author">by {highlightMatch(mod.author || "Unknown", searchQuery)}</span>
-                    </div>
-                    <span className="id-badge">{mod.id}</span>
-                </div>
-
-                {/* --- Translation Progress --- */}
-                <div className="progress-section">
-                    <div className="progress-info">
-                        <span>{mod.percentage}% Translated</span>
-                        <span>
-                            {mod.translated} / {mod.total} strings
-                        </span>
-                    </div>
-                    <div className="progress-bar-bg" style={{ display: "flex" }}>
-                        {mod.user_translated > 0 && (
-                            <div
-                                title={`${mod.user_translated} translated by you`}
-                                style={{
-                                    height: "100%",
-                                    width: `${(mod.user_translated / mod.total) * 100}%`,
-                                    background: "var(--accent-gradient)",
-                                    transition: "width 1s ease-out",
-                                }}
-                            />
-                        )}
-                        {mod.untouched > 0 && (
-                            <div
-                                title={`${mod.untouched} untouched (pre-existing English)`}
-                                style={{
-                                    height: "100%",
-                                    width: `${(mod.untouched / mod.total) * 100}%`,
-                                    background: "rgba(148, 163, 184, 0.5)",
-                                    transition: "width 1s ease-out",
-                                }}
-                            />
-                        )}
-                    </div>
-                </div>
-
-                {/* --- Quick Stats --- */}
-                <div className="mod-stats">
-                    <div className="stat-item">
-                        <span className="stat-value">{mod.untranslated}</span>
-                        <span className="stat-label">Remaining</span>
-                    </div>
-                    <div className="stat-item">
-                        {/* DLL mods contain embedded strings extracted via decompilation;
-                            CSV mods use standard Chrono Ark localization spreadsheets. */}
-                        <span className="stat-value">{mod.has_dll ? "DLL" : "CSV"}</span>
-                        <span className="stat-label">Format</span>
-                    </div>
-                    {mod.has_changes && (
-                        <span
+                <div className="progress-bar-bg" style={{ display: "flex" }}>
+                    {mod.user_translated > 0 && (
+                        <div
+                            title={`${mod.user_translated} translated by you`}
                             style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "0.3rem",
-                                fontSize: "0.7rem",
-                                padding: "0.25rem 0.5rem",
-                                background: "rgba(251, 191, 36, 0.15)",
-                                border: "1px solid rgba(251, 191, 36, 0.3)",
-                                borderRadius: "6px",
-                                color: "#fbbf24",
-                                fontWeight: 600,
+                                height: "100%",
+                                width: `${(mod.user_translated / mod.total) * 100}%`,
+                                background: "var(--accent-gradient)",
+                                transition: "width 1s ease-out",
                             }}
-                            title="Has unsynced changes"
-                        >
-                            <FaExclamationCircle size={10} />
-                            Needs Sync
-                        </span>
+                        />
                     )}
-                </div>
-
-                {/* --- Action Buttons --- */}
-                <div className="mod-actions">
-                    <button className={`btn ${mod.untranslated > 0 ? "btn-warning" : "btn-primary"}`} style={{ flex: 1 }} onClick={() => onClick(mod.id)}>
-                        View Strings
-                    </button>
-                    {/* Steam Workshop link -- only shown if the mod has a URL. */}
-                    {mod.url && (
-                        <a
-                            href={mod.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-outline"
-                            title="Open mod page"
+                    {mod.untouched > 0 && (
+                        <div
+                            title={`${mod.untouched} untouched (pre-existing English)`}
                             style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: "42px",
-                                height: "42px",
-                                textDecoration: "none",
-                                color: "var(--text-main)",
-                                padding: "0",
+                                height: "100%",
+                                width: `${(mod.untouched / mod.total) * 100}%`,
+                                background: "rgba(148, 163, 184, 0.5)",
+                                transition: "width 1s ease-out",
                             }}
-                        >
-                            <FaSteam size={20} />
-                        </a>
+                        />
                     )}
-                    {/* Resync triggers POST /api/mods/{id}/sync to re-read files from disk. */}
-                    <button className="btn btn-outline" onClick={() => onSync(mod.id)} title="Rescan workshop folder">
-                        <FaSync />
-                    </button>
                 </div>
             </div>
-        </div>
+            <div className="mod-stats">
+                <div className="stat-item">
+                    <span className="stat-value">{mod.untranslated}</span>
+                    <span className="stat-label">Remaining</span>
+                </div>
+                <div className="stat-item">
+                    <span className="stat-value">{mod.has_dll ? "DLL" : "CSV"}</span>
+                    <span className="stat-label">Format</span>
+                </div>
+                {mod.has_changes && (
+                    <span
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.3rem",
+                            fontSize: "0.7rem",
+                            padding: "0.25rem 0.5rem",
+                            background: "rgba(251, 191, 36, 0.15)",
+                            border: "1px solid rgba(251, 191, 36, 0.3)",
+                            borderRadius: "6px",
+                            color: "#fbbf24",
+                            fontWeight: 600,
+                        }}
+                        title="Has unsynced changes"
+                    >
+                        <FaExclamationCircle size={10} />
+                        Needs Sync
+                    </span>
+                )}
+            </div>
+            <div className="mod-actions">
+                <button className={`btn ${mod.untranslated > 0 ? "btn-warning" : "btn-primary"}`} style={{ flex: 1 }} onClick={() => onClick(mod.id)}>
+                    View Strings
+                </button>
+                {mod.url && (
+                    <a
+                        href={mod.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-outline"
+                        title="Open mod page"
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: "42px",
+                            height: "42px",
+                            textDecoration: "none",
+                            color: "var(--text-main)",
+                            padding: "0",
+                        }}
+                    >
+                        <FaSteam size={20} />
+                    </a>
+                )}
+                <button className="btn btn-outline" onClick={() => onSync(mod.id)} title="Rescan workshop folder">
+                    <FaSync />
+                </button>
+            </div>
+        </WorkshopCard>
     )
 })
 

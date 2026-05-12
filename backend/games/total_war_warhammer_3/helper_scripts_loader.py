@@ -13,8 +13,36 @@ from __future__ import annotations
 import importlib.util
 import sys
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, Iterator
+
+
+_TW3_APPID_FOLDER = "1142710"
+
+
+def _derive_workshop_id(path: str | None) -> str | None:
+    """Extract the Steam Workshop item id from a TW3 `.pack` file path.
+
+    The local Steam Workshop convention is `<...>\\1142710\\<workshop_id>\\<file>.pack`,
+    so the workshop id is the immediate parent directory's name when its parent
+    is the TW3 appid folder. Returns `None` for paths that do not match this
+    convention or for empty / non-string inputs.
+
+    Args:
+        path: Filesystem path to a `.pack` file, or None.
+
+    Returns:
+        The workshop id as a string, or None when the path is empty or does not
+        match the expected `1142710/<workshop_id>/<file>.pack` shape.
+    """
+    if not path or not isinstance(path, str):
+        return None
+    parts = PurePath(path).parts
+    if len(parts) < 3:
+        return None
+    if parts[-3] != _TW3_APPID_FOLDER:
+        return None
+    return parts[-2]
 
 
 @contextmanager
@@ -108,9 +136,13 @@ def load_supported_mods(helper_scripts_path: Path) -> list[dict]:
         RegistryConstantNotFoundError: When `SUPPORTED_MODS` is not declared.
 
     Returns:
-        The `SUPPORTED_MODS` list of dicts.
+        The `SUPPORTED_MODS` list of dicts, each augmented with a derived `workshop_id` field
+        (None when the path does not follow the TW3 workshop convention).
     """
-    return _load_constant(helper_scripts_path, "supported_mods.py", "SUPPORTED_MODS")
+    mods = _load_constant(helper_scripts_path, "supported_mods.py", "SUPPORTED_MODS")
+    for mod in mods:
+        mod["workshop_id"] = _derive_workshop_id(mod.get("path"))
+    return mods
 
 
 def load_supported_effects(helper_scripts_path: Path) -> dict:

@@ -191,6 +191,7 @@ body {
     flex-direction: column;
     gap: 1.25rem;
     padding: 0 1.5rem 1.5rem;
+    flex: 1;
 }
 
 .mod-preview {

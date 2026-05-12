@@ -2,14 +2,14 @@ import { useEffect, useMemo, useState } from "react"
 import { fetchSupportedMods, RegistryError } from "../../api"
 import type { SupportedMod, ValidationIssue } from "../../api"
 import RegistryErrorBanner from "../../components/RegistryErrorBanner"
-import ValidationBadge from "../../components/ValidationBadge"
+import SupportedModCard from "../../components/SupportedModCard"
 import { useValidation } from "../../hooks/useValidation"
 
 /**
- * Read-only table over `SUPPORTED_MODS` from the configured helper_scripts directory.
+ * Read-only card grid over `SUPPORTED_MODS` from the configured helper_scripts directory.
  * Search filters across `name` and `package_name`.
  *
- * @returns A page that renders a searchable table of TW3 supported mods, or a
+ * @returns A page that renders a searchable card grid of TW3 supported mods, or a
  *     `RegistryErrorBanner` when the backend reports a configuration error.
  */
 export default function SupportedModsPage() {
@@ -44,9 +44,10 @@ export default function SupportedModsPage() {
 
     const filtered = useMemo(() => {
         if (!mods) return []
+        const visible = mods.filter((m) => m.package_name !== "vanilla")
         const q = search.trim().toLowerCase()
-        if (!q) return mods
-        return mods.filter((m) => m.name.toLowerCase().includes(q) || m.package_name.toLowerCase().includes(q))
+        if (!q) return visible
+        return visible.filter((m) => m.name.toLowerCase().includes(q) || m.package_name.toLowerCase().includes(q))
     }, [mods, search])
 
     if (error) {
@@ -74,30 +75,11 @@ export default function SupportedModsPage() {
                     style={{ width: 320, padding: "0.5rem 0.75rem", borderRadius: 8 }}
                 />
             </div>
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        <th style={{ width: "2.5rem", textAlign: "center" }}>Status</th>
-                        <th>Name</th>
-                        <th>Package</th>
-                        <th>Modified Attributes</th>
-                        <th>Path</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {filtered.map((m) => (
-                        <tr key={m.package_name}>
-                            <td style={{ width: "2.5rem", textAlign: "center" }}>
-                                <ValidationBadge issues={issuesByMod.get(m.package_name) ?? []} />
-                            </td>
-                            <td>{m.name}</td>
-                            <td>{m.package_name}</td>
-                            <td>{(m.modified_attributes ?? []).join(", ")}</td>
-                            <td style={{ fontFamily: "monospace", color: "var(--text-dim)" }}>{m.path}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+            <div className="mod-grid">
+                {filtered.map((m) => (
+                    <SupportedModCard key={m.package_name} mod={m} issues={issuesByMod.get(m.package_name) ?? []} />
+                ))}
+            </div>
         </>
     )
 }

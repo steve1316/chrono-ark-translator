@@ -11,6 +11,8 @@ export interface SupportedMod {
     path: string
     /** Optional list of attributes this mod modifies. */
     modified_attributes?: string[]
+    /** Steam Workshop item id derived from `path`. Null when the path does not follow the TW3 workshop convention. */
+    workshop_id?: string | null
     [key: string]: unknown
 }
 

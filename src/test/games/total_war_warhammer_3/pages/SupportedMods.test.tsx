@@ -30,7 +30,7 @@ function withRouter(ui: React.ReactNode) {
 }
 
 describe("SupportedMods page", () => {
-    it("renders fetched mods in a table", async () => {
+    it("renders fetched mods as a card grid", async () => {
         defaultHook()
         vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ mods: [{ name: "Mod A", package_name: "mod_a", path: "/a", modified_attributes: ["melee"] }] }), { status: 200 }))
         render(withRouter(<SupportedModsPage />))
@@ -57,6 +57,24 @@ describe("SupportedMods page", () => {
         await userEvent.type(search, "banana")
         expect(screen.queryByText("Apple Mod")).not.toBeInTheDocument()
         expect(screen.getByText("Banana Mod")).toBeInTheDocument()
+    })
+
+    it("hides the vanilla entry from the card grid", async () => {
+        defaultHook()
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    mods: [
+                        { name: "Vanilla", package_name: "vanilla", path: "", modified_attributes: [] },
+                        { name: "Real Mod", package_name: "pak_real", path: "/path/real.pack", modified_attributes: [] },
+                    ],
+                }),
+                { status: 200 }
+            )
+        )
+        render(withRouter(<SupportedModsPage />))
+        await waitFor(() => expect(screen.getByText("Real Mod")).toBeInTheDocument())
+        expect(screen.queryByText("Vanilla")).not.toBeInTheDocument()
     })
 
     it("shows RegistryErrorBanner on 503", async () => {

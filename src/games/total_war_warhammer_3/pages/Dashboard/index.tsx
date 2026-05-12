@@ -1,20 +1,9 @@
 import { Link } from "react-router-dom"
+import PackCard, { type PackEntry } from "../../components/PackCard"
 import ScriptRunButton from "../../components/ScriptRunButton"
 import UpdateWidget from "../../components/UpdateWidget"
 
-/** A single compat pack card shown on the Dashboard. */
-interface PackCard {
-    /** Display name of the compat pack. */
-    title: string
-    /** Steam Workshop item ID. */
-    workshopId: string
-    /** Backend script id that rebuilds this pack. */
-    scriptId: string
-    /** Optional note shown when multiple packs share a script. */
-    sharedNote?: string
-}
-
-const PACKS: PackCard[] = [
+const PACKS: PackEntry[] = [
     { title: "Nanu's Dynamic RoR Compat", workshopId: "3513364573", scriptId: "update_dynamic_rors" },
     { title: "Nanu's Dynamic RoR Leftover Vanilla", workshopId: "3532864014", scriptId: "update_dynamic_rors_vanilla" },
     { title: "2x Unit Size Compat", workshopId: "3621939685", scriptId: "update_double_unit_size" },
@@ -51,12 +40,7 @@ export default function DashboardPage() {
             </div>
             <div className="mod-grid">
                 {PACKS.map((pack) => (
-                    <div key={pack.title} className="glass-card" style={{ padding: "1.25rem" }}>
-                        <h3 style={{ marginTop: 0 }}>{pack.title}</h3>
-                        <p style={{ color: "var(--text-dim)" }}>Workshop ID: {pack.workshopId}</p>
-                        {pack.sharedNote && <p style={{ fontSize: "0.85em", color: "var(--text-dim)" }}>{pack.sharedNote}</p>}
-                        <ScriptRunButton scriptId={pack.scriptId} label="Rebuild" />
-                    </div>
+                    <PackCard key={pack.workshopId} pack={pack} />
                 ))}
                 <Link to="/supported-mods" className="glass-card" style={{ padding: "1.25rem", textDecoration: "none", color: "var(--text-main)" }}>
                     <h3 style={{ marginTop: 0 }}>Supported Mods</h3>
