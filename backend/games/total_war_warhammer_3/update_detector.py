@@ -5,6 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
+# Package names excluded from update detection because they don't track Steam Workshop updates
+# (e.g. the "vanilla" entry points at the game's base files which Steam Workshop doesn't update).
+_EXCLUDED_PACKAGE_NAMES = frozenset({"vanilla"})
+
 
 class StaleMod(TypedDict):
     """A mod whose `.pack` file is newer than the stored baseline mtime.
@@ -61,6 +65,8 @@ def detect_updates(mods: list[dict], baseline: dict[str, float | None]) -> list[
         path = mod.get("path")
         if package_name is None or path is None:
             continue
+        if package_name in _EXCLUDED_PACKAGE_NAMES:
+            continue
 
         baseline_mtime = baseline.get(package_name)
         if baseline_mtime is None:
@@ -102,6 +108,8 @@ def current_mtimes(mods: list[dict]) -> dict[str, float | None]:
         package_name = mod.get("package_name")
         path = mod.get("path")
         if package_name is None or path is None:
+            continue
+        if package_name in _EXCLUDED_PACKAGE_NAMES:
             continue
         result[package_name] = _safe_mtime(path)
     return result
