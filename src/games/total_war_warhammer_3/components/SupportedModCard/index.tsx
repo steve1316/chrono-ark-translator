@@ -14,7 +14,7 @@ interface Props {
 /**
  * Card representation of one TW3 supported-mod entry. Wraps `WorkshopCard`
  * with the mod's name, package name, derived workshop-id badge, and a body
- * slot containing the validation badge (when issues exist), the modified
+ * slot containing the expandable validation-issues block (when issues exist), the modified
  * attributes list (when non-empty), and an "Open Workshop Folder" button (when `workshop_id` is set).
  *
  * @param mod The mod registry entry to render.
@@ -26,12 +26,19 @@ const SupportedModCard = ({ mod, issues }: Props) => {
     return (
         <WorkshopCard previewImageUrl={previewImageUrl} previewAlt={mod.name} title={mod.name} idBadge={mod.workshop_id ?? undefined} subtitle={mod.package_name}>
             {issues.length > 0 && (
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <ValidationBadge issues={issues} />
-                    <span style={{ fontSize: "0.85em", color: "var(--warning)" }}>
-                        {issues.length} validation issue{issues.length === 1 ? "" : "s"}
-                    </span>
-                </div>
+                <details>
+                    <summary style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                        <ValidationBadge issues={issues} />
+                        <span style={{ fontSize: "0.85em", color: "var(--warning)" }}>
+                            {issues.length} validation issue{issues.length === 1 ? "" : "s"}
+                        </span>
+                    </summary>
+                    <ul style={{ margin: "0.5rem 0 0 1.25rem", padding: 0, fontSize: "0.8em", color: "var(--text-dim)", wordBreak: "break-word" }}>
+                        {issues.map((issue, i) => (
+                            <li key={i}>{issue.message}</li>
+                        ))}
+                    </ul>
+                </details>
             )}
             {mod.modified_attributes && mod.modified_attributes.length > 0 && (
                 <p style={{ margin: 0, fontSize: "0.9em" }}>

@@ -72,6 +72,16 @@ describe("SupportedModCard", () => {
         expect(screen.queryByLabelText(/validation issue/i)).not.toBeInTheDocument()
     })
 
+    it("renders each issue message inside the expandable details element", () => {
+        const issues: ValidationIssue[] = [
+            { ...ISSUE, message: "Effect category 'foo' is not in SUPPORTED_EFFECTS" },
+            { ...ISSUE, message: "Path '/x.pack' does not exist on disk" },
+        ]
+        render(<SupportedModCard mod={BASE_MOD} issues={issues} />)
+        expect(screen.getByText(issues[0].message)).toBeInTheDocument()
+        expect(screen.getByText(issues[1].message)).toBeInTheDocument()
+    })
+
     it("omits the Open Workshop Folder button when workshop_id is null", () => {
         render(<SupportedModCard mod={MOD_WITHOUT_WORKSHOP_ID} issues={[]} />)
         expect(screen.queryByRole("button", { name: /Open Workshop Folder/i })).not.toBeInTheDocument()
