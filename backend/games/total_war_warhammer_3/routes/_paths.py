@@ -23,8 +23,7 @@ def tw3_workshop_content_dir(workshop_id: str) -> Path | None:
     """Resolve the local Steam Workshop folder for a TW3 workshop item.
 
     Builds `<steam_library_drive>\\SteamLibrary\\steamapps\\workshop\\content\\1142710\\<workshop_id>`
-    from `config.TW3_STEAM_LIBRARY_DRIVE`. The folder may not exist on disk;
-    callers should check.
+    from `config.TW3_STEAM_LIBRARY_DRIVE`. The folder may not exist on disk. Callers should validate before use.
 
     Args:
         workshop_id: Numeric Steam Workshop item id (the caller is responsible for sanitizing).
