@@ -1,24 +1,43 @@
-import { useEffect, useRef, useState } from "react"
-import { cancelRun, getCurrentRun, runStreamUrl, startRun } from "../../api"
-import type { RunState } from "../../api"
-import { useCurrentRun } from "../../hooks/useCurrentRun"
+import { useEffect, useRef } from "react"
+import { cancelRun, runStreamUrl, startRun } from "../../api"
+import { kickPoll, useCurrentRun } from "../../hooks/useCurrentRun"
+import { appendLine } from "../../hooks/useRunnerLog"
+import ScriptCard, { type ScriptEntry } from "../../components/ScriptCard"
+import RunnerLogTerminal from "../../components/RunnerLogTerminal"
 
-const SCRIPTS: { id: string; label: string }[] = [
-    { id: "update_dynamic_rors", label: "Dynamic RoR (default)" },
-    { id: "update_dynamic_rors_vanilla", label: "Dynamic RoR (--vanilla)" },
-    { id: "update_double_unit_size", label: "2x Unit Size" },
-    { id: "update_modified_attribute_mods", label: "Modified Attributes (3 packs)" },
-    { id: "process_main_units_tables", label: "Land Encounters" },
-    { id: "update", label: "Update" },
+/** The set of registered helper scripts shown on the Runner page. */
+const SCRIPTS: ScriptEntry[] = [
+    {
+        id: "update_dynamic_rors",
+        label: "Dynamic RoR (default)",
+        description: "Regenerate the Dynamic RoR pack from the current set of installed mods. Default mode - run this most often.",
+    },
+    {
+        id: "update_dynamic_rors_vanilla",
+        label: "Dynamic RoR (--vanilla)",
+        description: "Regenerate the Dynamic RoR pack with the --vanilla flag. Builds against the base game only, ignoring installed mods.",
+    },
+    {
+        id: "update_double_unit_size",
+        label: "2x Unit Size",
+        description: "Regenerate the 2x Unit Size pack. Doubles unit sizes (and 4x for some unit categories) and rescales mass/HP.",
+    },
+    {
+        id: "update_modified_attribute_mods",
+        label: "Modified Attributes (3 packs)",
+        description: "Regenerate the three Modified Attributes compat packs.",
+    },
+    {
+        id: "process_main_units_tables",
+        label: "Land Encounters",
+        description: "Pre-process main_units and land_units tables for the Land Encounters workflow.",
+    },
+    {
+        id: "update",
+        label: "Update",
+        description: "Top-level pipeline that runs every other update script in sequence.",
+    },
 ]
-
-/** A single line of streamed stdout from the active run. */
-interface LogLine {
-    /** The text content of the log line. */
-    line: string
-    /** ISO timestamp of when the line was emitted. */
-    ts: string
-}
 
 /** Payload delivered on the SSE "done" event when a run finishes. */
 interface DoneEvent {
@@ -29,30 +48,16 @@ interface DoneEvent {
 }
 
 /**
- * TW3 Runner page: starts helper_scripts/update_*.py via subprocess and streams
- * the live stdout via SSE. Single-run-at-a-time; cancel via DELETE.
+ * TW3 Runner page. Renders a grid of `ScriptCard` instances and a persistent `RunnerLogTerminal` below. Starting a run appends a separator into the shared log; the active card swaps Run for Cancel and siblings disable. SSE lines append into the same shared log as data entries, with a closing separator on `done`.
  *
- * @returns A button grid in idle state, or a live log + cancel button when a run is in flight.
+ * @returns The Runner page composition.
  */
 export default function RunnerPage() {
-    const polledRun = useCurrentRun()
-    const [localRun, setLocalRun] = useState<RunState | null>(null)
-    const run = localRun ?? polledRun
-    const [lines, setLines] = useState<LogLine[]>([])
-    const [doneInfo, setDoneInfo] = useState<{ scriptId: string; info: DoneEvent } | null>(null)
+    const run = useCurrentRun()
     const sourceRef = useRef<EventSource | null>(null)
-    // Tracks whether polledRun has been updated at least once since localRun was set.
-    const polledAfterLocalSet = useRef(false)
+    const activeScriptIdRef = useRef<string | null>(null)
 
-    // Mark that a fresh poll response has arrived whenever polledRun changes.
-    useEffect(() => {
-        polledAfterLocalSet.current = true
-    }, [polledRun])
-
-    // Keep localRun in sync: once the poll catches up, clear the override.
-    useEffect(() => {
-        if (localRun && polledAfterLocalSet.current) setLocalRun(null)
-    }, [polledRun, localRun])
+    const labelFor = (scriptId: string): string => SCRIPTS.find((s) => s.id === scriptId)?.label ?? scriptId
 
     useEffect(() => {
         if (run.status !== "running") {
@@ -62,15 +67,14 @@ export default function RunnerPage() {
         }
         if (sourceRef.current) return // already attached
 
+        activeScriptIdRef.current = run.script_id
         const es = new EventSource(runStreamUrl())
         sourceRef.current = es
-        setLines([])
-        setDoneInfo(null)
 
         es.onmessage = (evt) => {
             try {
-                const payload = JSON.parse(evt.data) as LogLine
-                setLines((prev) => [...prev, payload])
+                const payload = JSON.parse(evt.data) as { line: string; ts: string }
+                appendLine({ kind: "data", line: payload.line, ts: payload.ts })
             } catch {
                 /* ignore malformed lines */
             }
@@ -78,12 +82,15 @@ export default function RunnerPage() {
         es.addEventListener("done", (evt) => {
             try {
                 const info = JSON.parse((evt as MessageEvent).data) as DoneEvent
-                setDoneInfo({ scriptId: run.status === "running" ? run.script_id : "", info })
+                const label = labelFor(activeScriptIdRef.current ?? "")
+                const duration = info.duration_seconds != null ? `${info.duration_seconds.toFixed(0)}s` : "unknown time"
+                appendLine({ kind: "separator", text: `--- ${label} exited with code ${info.exit_code} in ${duration} ---` })
             } catch {
                 /* ignore */
             }
             es.close()
             sourceRef.current = null
+            activeScriptIdRef.current = null
         })
         return () => {
             es.close()
@@ -95,56 +102,47 @@ export default function RunnerPage() {
     const handleStart = async (scriptId: string) => {
         try {
             await startRun(scriptId)
-            // Immediately refresh state so the UI switches to log view without waiting for the next poll.
-            const next = await getCurrentRun()
-            polledAfterLocalSet.current = false
-            setLocalRun(next)
+            const label = labelFor(scriptId)
+            const time = new Date().toLocaleTimeString()
+            appendLine({ kind: "separator", text: `--- Starting ${label} at ${time} ---` })
         } catch (err) {
             console.error("Failed to start run", err)
+        } finally {
+            kickPoll()
         }
     }
 
-    if (run.status === "running") {
-        return (
-            <>
-                <div className="dashboard-header">
-                    <div className="title-group">
-                        <h1>Running: {run.script_id}</h1>
-                        <p>Started at {new Date(run.started_at).toLocaleTimeString()}</p>
-                    </div>
-                    <button className="btn btn-outline" onClick={cancelRun}>
-                        Cancel
-                    </button>
-                </div>
-                <pre style={{ maxHeight: 600, overflowY: "auto", padding: "1rem", background: "rgba(0,0,0,0.3)", fontFamily: "monospace" }}>
-                    {lines.map((l, i) => (
-                        <div key={i}>{l.line}</div>
-                    ))}
-                </pre>
-            </>
-        )
+    const handleCancel = async () => {
+        try {
+            await cancelRun()
+        } catch (err) {
+            console.error("Failed to cancel run", err)
+        }
     }
+
+    const runningScriptId = run.status === "running" ? run.script_id : null
 
     return (
         <>
             <div className="dashboard-header">
                 <div className="title-group">
                     <h1>Runner</h1>
-                    <p>Run any of the helper_scripts/update_*.py scripts.</p>
+                    <p>Run any of the helper_scripts/update_*.py scripts. Output accumulates in the terminal below across runs.</p>
                 </div>
             </div>
-            {doneInfo && (
-                <div className="glass-card" style={{ padding: "1rem", marginBottom: "0.75rem" }}>
-                    Last run: {doneInfo.scriptId} exited with code {doneInfo.info.exit_code} in {doneInfo.info.duration_seconds?.toFixed(0)}s.
-                </div>
-            )}
             <div className="mod-grid">
                 {SCRIPTS.map((s) => (
-                    <button key={s.id} className="btn btn-primary" onClick={() => handleStart(s.id)}>
-                        {s.label}
-                    </button>
+                    <ScriptCard
+                        key={s.id}
+                        script={s}
+                        running={runningScriptId === s.id}
+                        disabled={runningScriptId !== null && runningScriptId !== s.id}
+                        onRun={handleStart}
+                        onCancel={handleCancel}
+                    />
                 ))}
             </div>
+            <RunnerLogTerminal />
         </>
     )
 }
