@@ -2,18 +2,6 @@ import { Link } from "react-router-dom"
 import ScriptRunButton from "../../components/ScriptRunButton"
 import UpdateWidget from "../../components/UpdateWidget"
 
-/** A single compat pack card shown on the Dashboard. */
-interface PackCard {
-    /** Display name of the compat pack. */
-    title: string
-    /** Steam Workshop item ID. */
-    workshopId: string
-    /** Backend script id that rebuilds this pack. */
-    scriptId: string
-    /** Optional note shown when multiple packs share a script. */
-    sharedNote?: string
-}
-
 const PACKS: PackCard[] = [
     { title: "Nanu's Dynamic RoR Compat", workshopId: "3513364573", scriptId: "update_dynamic_rors" },
     { title: "Nanu's Dynamic RoR Leftover Vanilla", workshopId: "3532864014", scriptId: "update_dynamic_rors_vanilla" },
