@@ -16,16 +16,16 @@ describe("WorkshopCard", () => {
         expect(img.src).toContain("/api/preview.png")
     })
 
-    it("renders a placeholder when previewImageUrl is null", () => {
+    it("does not render the preview slot when previewImageUrl is null", () => {
         render(<WorkshopCard title="t" previewImageUrl={null} />)
         expect(screen.queryByRole("img")).not.toBeInTheDocument()
-        expect(screen.getByTestId("workshop-card-placeholder")).toBeInTheDocument()
+        expect(screen.queryByTestId("workshop-card-placeholder")).not.toBeInTheDocument()
     })
 
-    it("renders a placeholder when previewImageUrl is omitted", () => {
+    it("does not render the preview slot when previewImageUrl is omitted", () => {
         render(<WorkshopCard title="t" />)
         expect(screen.queryByRole("img")).not.toBeInTheDocument()
-        expect(screen.getByTestId("workshop-card-placeholder")).toBeInTheDocument()
+        expect(screen.queryByTestId("workshop-card-placeholder")).not.toBeInTheDocument()
     })
 
     it("swaps to the placeholder when the image fires onError", () => {

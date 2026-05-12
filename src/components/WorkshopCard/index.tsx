@@ -33,31 +33,32 @@ interface WorkshopCardProps extends HTMLAttributes<HTMLDivElement> {
  */
 const WorkshopCard: React.FC<WorkshopCardProps> = ({ previewImageUrl, previewAlt = "Preview image", title, idBadge, subtitle, children, className, ...rest }) => {
     const [imageFailed, setImageFailed] = useState(false)
-    const showImage = previewImageUrl && !imageFailed
 
     return (
         <div className={`glass-card mod-card animate-fade-in${className ? ` ${className}` : ""}`} {...rest}>
-            <div className="mod-preview">
-                {showImage ? (
-                    <img src={previewImageUrl} alt={previewAlt} loading="lazy" onError={() => setImageFailed(true)} />
-                ) : (
-                    <div
-                        data-testid="workshop-card-placeholder"
-                        style={{
-                            width: "100%",
-                            height: "100%",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            background: "rgba(255,255,255,0.04)",
-                            color: "var(--text-dim, #777)",
-                            fontSize: "0.8rem",
-                        }}
-                    >
-                        {idBadge ?? "No preview"}
-                    </div>
-                )}
-            </div>
+            {previewImageUrl && (
+                <div className="mod-preview">
+                    {!imageFailed ? (
+                        <img src={previewImageUrl} alt={previewAlt} loading="lazy" onError={() => setImageFailed(true)} />
+                    ) : (
+                        <div
+                            data-testid="workshop-card-placeholder"
+                            style={{
+                                width: "100%",
+                                height: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "rgba(255,255,255,0.04)",
+                                color: "var(--text-dim, #777)",
+                                fontSize: "0.8rem",
+                            }}
+                        >
+                            {idBadge ?? "No preview"}
+                        </div>
+                    )}
+                </div>
+            )}
             <div className="mod-card-content">
                 <div className="mod-header">
                     <div className="mod-info">
