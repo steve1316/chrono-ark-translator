@@ -59,6 +59,24 @@ describe("SupportedMods page", () => {
         expect(screen.getByText("Banana Mod")).toBeInTheDocument()
     })
 
+    it("hides the vanilla entry from the card grid", async () => {
+        defaultHook()
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    mods: [
+                        { name: "Vanilla", package_name: "vanilla", path: "", modified_attributes: [] },
+                        { name: "Real Mod", package_name: "pak_real", path: "/path/real.pack", modified_attributes: [] },
+                    ],
+                }),
+                { status: 200 }
+            )
+        )
+        render(withRouter(<SupportedModsPage />))
+        await waitFor(() => expect(screen.getByText("Real Mod")).toBeInTheDocument())
+        expect(screen.queryByText("Vanilla")).not.toBeInTheDocument()
+    })
+
     it("shows RegistryErrorBanner on 503", async () => {
         defaultHook()
         vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ detail: "helper_scripts_path not configured" }), { status: 503 }))

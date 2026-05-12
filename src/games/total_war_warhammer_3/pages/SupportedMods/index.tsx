@@ -44,9 +44,10 @@ export default function SupportedModsPage() {
 
     const filtered = useMemo(() => {
         if (!mods) return []
+        const visible = mods.filter((m) => m.package_name !== "vanilla")
         const q = search.trim().toLowerCase()
-        if (!q) return mods
-        return mods.filter((m) => m.name.toLowerCase().includes(q) || m.package_name.toLowerCase().includes(q))
+        if (!q) return visible
+        return visible.filter((m) => m.name.toLowerCase().includes(q) || m.package_name.toLowerCase().includes(q))
     }, [mods, search])
 
     if (error) {
