@@ -49,7 +49,7 @@ const SupportedModCard = ({ mod, issues }: Props) => {
                             console.error("Failed to open workshop folder:", err)
                         }
                     }}
-                    style={{ alignSelf: "flex-start", fontSize: "0.85em" }}
+                    style={{ alignSelf: "flex-start", fontSize: "0.85em", marginTop: "auto" }}
                 >
                     Open Workshop Folder
                 </button>
