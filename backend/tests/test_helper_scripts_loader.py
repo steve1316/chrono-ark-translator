@@ -9,6 +9,7 @@ from backend.games.total_war_warhammer_3.helper_scripts_loader import (
     RegistryConstantNotFoundError,
     RegistryFileMissingError,
     RegistryFileSyntaxError,
+    _derive_workshop_id,
     load_supported_effects,
     load_supported_mods,
 )
@@ -73,3 +74,23 @@ def test_load_resolves_sibling_imports():
     assert result == [{"name": "uses sibling", "value": "loaded-from-sibling"}]
     # `sys.path` must be restored to its pre-call state.
     assert before == after
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# _derive_workshop_id
+
+
+def test_derive_workshop_id_returns_id_when_grandparent_is_appid():
+    path = r"F:\SteamLibrary\steamapps\workshop\content\1142710\3513364573\dynamic_rors_compat.pack"
+    assert _derive_workshop_id(path) == "3513364573"
+
+
+def test_derive_workshop_id_returns_none_when_grandparent_is_not_appid():
+    path = r"C:\some\other\folder\3513364573\dynamic_rors_compat.pack"
+    assert _derive_workshop_id(path) is None
+
+
+def test_derive_workshop_id_returns_none_for_empty_path():
+    assert _derive_workshop_id("") is None
+    assert _derive_workshop_id(None) is None
