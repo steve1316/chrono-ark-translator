@@ -30,7 +30,7 @@ interface PackCardProps {
  * @returns The rendered TW3 pack card.
  */
 const PackCardComponent = ({ pack }: PackCardProps) => {
-    const previewImageUrl = `${API_BASE}/api/games/total_war_warhammer_3/packs/${pack.workshopId}/preview`
+    const previewImageUrl = `${API_BASE}/games/total_war_warhammer_3/packs/${pack.workshopId}/preview`
     const workshopUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${pack.workshopId}`
     return (
         <WorkshopCard previewImageUrl={previewImageUrl} previewAlt={pack.title} title={pack.title} idBadge={pack.workshopId}>
