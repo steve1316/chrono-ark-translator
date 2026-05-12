@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 from backend.games.total_war_warhammer_3.helper_scripts_loader import (
     HelperScriptsNotConfiguredError,
     RegistryFileMissingError,
-    RegistryFileSyntaxError,
 )
 from backend.web_server import app
 
@@ -45,23 +44,3 @@ def test_get_supported_mods_returns_503_when_file_missing():
         res = client.get("/api/games/total_war_warhammer_3/supported-mods")
     assert res.status_code == 503
     assert "Registry unavailable" in res.json()["detail"]
-
-
-def test_get_effects_returns_data(monkeypatch):
-    monkeypatch.setattr("backend.games.total_war_warhammer_3.routes._paths.config.TW3_HELPER_PATH", str(FIXTURES))
-    client = TestClient(app)
-    res = client.get("/api/games/total_war_warhammer_3/effects")
-    assert res.status_code == 200
-    body = res.json()
-    assert "infantry" in body["effects"]
-
-
-def test_get_effects_returns_500_on_syntax_error():
-    client = TestClient(app)
-    with patch(
-        "backend.games.total_war_warhammer_3.routes.registry.load_supported_effects",
-        side_effect=RegistryFileSyntaxError("oops"),
-    ):
-        res = client.get("/api/games/total_war_warhammer_3/effects")
-    assert res.status_code == 500
-    assert "oops" in res.json()["detail"]

@@ -129,19 +129,6 @@ export async function fetchSupportedMods(): Promise<SupportedMod[]> {
 }
 
 /**
- * Fetch the read-only `SUPPORTED_EFFECTS` registry from the TW3 backend.
- *
- * @returns Nested category dict from the source `dynamic_rors_effects.py`.
- * @throws `RegistryError` On backend 5xx.
- */
-export async function fetchEffects(): Promise<Record<string, unknown>> {
-    const res = await api.get("/effects")
-    if (!res.ok) throw await registryError(res)
-    const body = await res.json()
-    return body.effects
-}
-
-/**
  * Start a script run on the backend.
  *
  * @param scriptId Key into the backend `SCRIPT_REGISTRY`.

@@ -144,3 +144,43 @@ def test_current_mtimes_returns_none_for_unreadable_paths():
     result = current_mtimes(mods)
     assert "m" in result
     assert result["m"] is None
+
+
+def test_vanilla_package_is_excluded_from_detection(tmp_path):
+    """Mods with `package_name='vanilla'` are silently skipped regardless of mtime."""
+    real_pack = tmp_path / "real.pack"
+    real_pack.write_bytes(b"x")
+    os.utime(real_pack, (2000.0, 2000.0))
+
+    fake_vanilla = tmp_path / "vanilla.pack"
+    fake_vanilla.write_bytes(b"x")
+    os.utime(fake_vanilla, (2000.0, 2000.0))
+
+    mods = [
+        {"name": "Vanilla", "package_name": "vanilla", "path": str(fake_vanilla)},
+        {"name": "Real", "package_name": "real", "path": str(real_pack)},
+    ]
+    baseline = {"vanilla": 1000.0, "real": 1000.0}
+
+    issues = detect_updates(mods, baseline)
+
+    assert len(issues) == 1
+    assert issues[0]["package_name"] == "real"
+
+
+def test_vanilla_package_is_excluded_from_current_mtimes(tmp_path):
+    """`current_mtimes` never includes a vanilla key, even when the path is real."""
+    fake_vanilla = tmp_path / "vanilla.pack"
+    fake_vanilla.write_bytes(b"x")
+    real_pack = tmp_path / "real.pack"
+    real_pack.write_bytes(b"x")
+
+    mods = [
+        {"name": "Vanilla", "package_name": "vanilla", "path": str(fake_vanilla)},
+        {"name": "Real", "package_name": "real", "path": str(real_pack)},
+    ]
+
+    result = current_mtimes(mods)
+
+    assert "vanilla" not in result
+    assert "real" in result

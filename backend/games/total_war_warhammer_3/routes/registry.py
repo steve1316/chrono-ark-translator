@@ -8,7 +8,6 @@ from backend.games.total_war_warhammer_3.helper_scripts_loader import (
     HelperScriptsLoaderError,
     HelperScriptsNotConfiguredError,
     RegistryFileMissingError,
-    load_supported_effects,
     load_supported_mods,
 )
 from backend.games.total_war_warhammer_3.routes._paths import helper_scripts_path
@@ -34,23 +33,3 @@ def get_supported_mods():
     except HelperScriptsLoaderError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     return {"mods": mods}
-
-
-@router.get("/effects")
-def get_effects():
-    """Return SUPPORTED_EFFECTS from the configured helper_scripts directory.
-
-    Returns:
-        `{"effects": {...}}` on success.
-
-    Raises:
-        HTTPException(503): When helper_scripts_path is unset or the file is missing.
-        HTTPException(500): When the file fails to load (syntax error, missing constant).
-    """
-    try:
-        effects = load_supported_effects(helper_scripts_path())
-    except (HelperScriptsNotConfiguredError, RegistryFileMissingError) as exc:
-        raise HTTPException(status_code=503, detail=f"Registry unavailable: {exc}")
-    except HelperScriptsLoaderError as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-    return {"effects": effects}

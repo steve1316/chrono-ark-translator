@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom"
 import { startRun } from "../../api"
-import { useCurrentRun } from "../../hooks/useCurrentRun"
+import { kickPoll, useCurrentRun } from "../../hooks/useCurrentRun"
 
 /** Props for `ScriptRunButton`. */
 interface Props {
@@ -29,6 +29,8 @@ export default function ScriptRunButton({ scriptId, label }: Props) {
             navigate("/runner")
         } catch (err) {
             console.error("Failed to start run", err)
+        } finally {
+            kickPoll()
         }
     }
 

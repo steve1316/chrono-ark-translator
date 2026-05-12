@@ -43,7 +43,6 @@ export default function ValidatePage() {
             <div className="dashboard-header">
                 <div className="title-group">
                     <h1>Validate</h1>
-                    <p>Cross-reference check for `SUPPORTED_MODS` and `SUPPORTED_EFFECTS` entries.</p>
                     {issues !== null && (
                         <span style={{ fontSize: "0.85rem", color: issues.length === 0 ? "var(--text-dim)" : "var(--warning)" }}>
                             {issues.length === 0 ? "No issues" : `${issues.length} issue${issues.length === 1 ? "" : "s"}`}
@@ -53,6 +52,14 @@ export default function ValidatePage() {
                 <button className="btn btn-outline" onClick={handleRefresh} disabled={refreshing}>
                     {refreshing ? "Refreshing..." : "Refresh"}
                 </button>
+            </div>
+
+            <div className="glass-card" style={{ padding: "1rem", marginBottom: "1rem" }}>
+                <p style={{ margin: 0, color: "var(--text-dim)" }}>
+                    Cross-reference check for the TW3 registries. Two kinds of broken references are flagged: a <code>modified_attributes</code> entry on a mod that doesn't match any category in
+                    <code> SUPPORTED_EFFECTS</code> (defined in <code>dynamic_rors_effects.py</code>), or a mod whose
+                    <code> path</code> no longer exists on disk. Issues here usually mean the mod registry needs an edit.
+                </p>
             </div>
 
             {issues === null && !error && (
