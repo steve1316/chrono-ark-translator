@@ -54,7 +54,7 @@ const WorkshopCard: React.FC<WorkshopCardProps> = ({ previewImageUrl, previewAlt
                             fontSize: "0.8rem",
                         }}
                     >
-                        No preview
+                        {idBadge ?? "No preview"}
                     </div>
                 )}
             </div>

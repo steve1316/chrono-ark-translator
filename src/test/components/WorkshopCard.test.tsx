@@ -37,8 +37,9 @@ describe("WorkshopCard", () => {
     })
 
     it("renders the idBadge when provided", () => {
-        render(<WorkshopCard title="t" idBadge="1234567890" />)
-        expect(screen.getByText("1234567890")).toBeInTheDocument()
+        const { container } = render(<WorkshopCard title="t" idBadge="1234567890" />)
+        const badge = container.querySelector(".id-badge")
+        expect(badge?.textContent).toBe("1234567890")
     })
 
     it("renders the subtitle when provided", () => {
