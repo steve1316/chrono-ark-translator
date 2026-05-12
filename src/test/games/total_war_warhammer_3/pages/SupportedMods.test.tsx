@@ -30,7 +30,7 @@ function withRouter(ui: React.ReactNode) {
 }
 
 describe("SupportedMods page", () => {
-    it("renders fetched mods in a table", async () => {
+    it("renders fetched mods as a card grid", async () => {
         defaultHook()
         vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ mods: [{ name: "Mod A", package_name: "mod_a", path: "/a", modified_attributes: ["melee"] }] }), { status: 200 }))
         render(withRouter(<SupportedModsPage />))
