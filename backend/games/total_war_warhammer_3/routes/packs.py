@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 
 from fastapi import APIRouter, HTTPException
@@ -50,3 +51,32 @@ def get_pack_preview(workshop_id: str):
             return FileResponse(entry, media_type=_MEDIA_TYPES[entry.suffix.lower()])
 
     raise HTTPException(status_code=404, detail="no preview image found")
+
+
+@router.post("/packs/{workshop_id}/open")
+def open_pack_folder(workshop_id: str):
+    """Open the local Steam Workshop folder for `workshop_id` in the system file explorer.
+
+    Args:
+        workshop_id: Numeric Steam Workshop item id.
+
+    Returns:
+        `{"status": "success"}` when the folder is opened.
+
+    Raises:
+        HTTPException(400): When `workshop_id` is not purely numeric.
+        HTTPException(404): When the Steam library drive is unset or the workshop folder does not exist on disk.
+        HTTPException(500): When the OS call to open the folder fails.
+    """
+    if not _WORKSHOP_ID_RE.fullmatch(workshop_id):
+        raise HTTPException(status_code=400, detail="workshop_id must be numeric")
+
+    folder = tw3_workshop_content_dir(workshop_id)
+    if folder is None or not folder.is_dir():
+        raise HTTPException(status_code=404, detail="workshop folder not found")
+
+    try:
+        os.startfile(folder)
+        return {"status": "success"}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to open folder: {exc}")

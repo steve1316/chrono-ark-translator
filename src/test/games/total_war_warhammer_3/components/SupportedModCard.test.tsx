@@ -29,13 +29,13 @@ const ISSUE: ValidationIssue = {
 } as unknown as ValidationIssue
 
 describe("SupportedModCard", () => {
-    it("renders the mod name, package_name subtitle, idBadge, and path", () => {
+    it("renders the mod name, package_name subtitle, idBadge, and open-folder button", () => {
         const { container } = render(<SupportedModCard mod={BASE_MOD} issues={[]} />)
         expect(screen.getByRole("heading", { name: BASE_MOD.name, level: 3 })).toBeInTheDocument()
         expect(screen.getByText(BASE_MOD.package_name)).toBeInTheDocument()
         const badge = container.querySelector(".id-badge")
         expect(badge?.textContent).toBe(BASE_MOD.workshop_id)
-        expect(screen.getByText(BASE_MOD.path)).toBeInTheDocument()
+        expect(screen.getByRole("button", { name: /Open Workshop Folder/i })).toBeInTheDocument()
     })
 
     it("renders the preview image url when workshop_id is set", () => {
@@ -70,5 +70,10 @@ describe("SupportedModCard", () => {
     it("does not render the ValidationBadge when issues are empty", () => {
         render(<SupportedModCard mod={BASE_MOD} issues={[]} />)
         expect(screen.queryByLabelText(/validation issue/i)).not.toBeInTheDocument()
+    })
+
+    it("omits the Open Workshop Folder button when workshop_id is null", () => {
+        render(<SupportedModCard mod={MOD_WITHOUT_WORKSHOP_ID} issues={[]} />)
+        expect(screen.queryByRole("button", { name: /Open Workshop Folder/i })).not.toBeInTheDocument()
     })
 })

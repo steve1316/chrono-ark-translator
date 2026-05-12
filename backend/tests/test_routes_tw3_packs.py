@@ -15,6 +15,7 @@ from backend.web_server import app
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # tw3_workshop_content_dir helper
 
+
 def test_workshop_content_dir_builds_path_from_drive(monkeypatch):
     """When `TW3_STEAM_LIBRARY_DRIVE` is set, the helper joins the well-known suffix."""
     monkeypatch.setattr(config, "TW3_STEAM_LIBRARY_DRIVE", "F:")
@@ -97,4 +98,41 @@ def test_preview_returns_400_when_workshop_id_non_numeric():
 def test_preview_returns_404_when_drive_unset(monkeypatch):
     monkeypatch.setattr(config, "TW3_STEAM_LIBRARY_DRIVE", "")
     res = TestClient(app).get("/api/games/total_war_warhammer_3/packs/999/preview")
+    assert res.status_code == 404
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# POST /packs/{workshop_id}/open
+
+
+def test_open_pack_folder_invokes_os_startfile_on_success(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    workshop_dir = parent / "999"
+    workshop_dir.mkdir()
+    called_with: list[Path] = []
+    monkeypatch.setattr("os.startfile", lambda path: called_with.append(Path(path)))
+    res = TestClient(app).post("/api/games/total_war_warhammer_3/packs/999/open")
+    assert res.status_code == 200
+    assert res.json() == {"status": "success"}
+    assert called_with == [workshop_dir]
+
+
+def test_open_pack_folder_returns_404_when_folder_missing(monkeypatch, tmp_path):
+    _set_drive(monkeypatch, tmp_path)
+    monkeypatch.setattr("os.startfile", lambda path: None)
+    res = TestClient(app).post("/api/games/total_war_warhammer_3/packs/999/open")
+    assert res.status_code == 404
+
+
+def test_open_pack_folder_returns_400_when_workshop_id_non_numeric(monkeypatch):
+    monkeypatch.setattr("os.startfile", lambda path: None)
+    res = TestClient(app).post("/api/games/total_war_warhammer_3/packs/abc/open")
+    assert res.status_code == 400
+
+
+def test_open_pack_folder_returns_404_when_drive_unset(monkeypatch):
+    monkeypatch.setattr(config, "TW3_STEAM_LIBRARY_DRIVE", "")
+    monkeypatch.setattr("os.startfile", lambda path: None)
+    res = TestClient(app).post("/api/games/total_war_warhammer_3/packs/999/open")
     assert res.status_code == 404
