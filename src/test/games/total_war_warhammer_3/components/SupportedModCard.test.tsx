@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import userEvent from "@testing-library/user-event"
+import { describe, expect, it, vi } from "vitest"
 
 import SupportedModCard from "../../../../games/total_war_warhammer_3/components/SupportedModCard"
 import type { SupportedMod, ValidationIssue } from "../../../../games/total_war_warhammer_3/api"
@@ -85,5 +86,18 @@ describe("SupportedModCard", () => {
     it("omits the Open Workshop Folder button when workshop_id is null", () => {
         render(<SupportedModCard mod={MOD_WITHOUT_WORKSHOP_ID} issues={[]} />)
         expect(screen.queryByRole("button", { name: /Open Workshop Folder/i })).not.toBeInTheDocument()
+    })
+
+    it("renders an Edit button and calls onEdit with package_name when clicked", async () => {
+        const onEdit = vi.fn()
+        render(<SupportedModCard mod={BASE_MOD} issues={[]} onEdit={onEdit} />)
+        const editBtn = screen.getByRole("button", { name: /Edit/i })
+        await userEvent.click(editBtn)
+        expect(onEdit).toHaveBeenCalledWith(BASE_MOD.package_name)
+    })
+
+    it("omits the Edit button when onEdit is not provided", () => {
+        render(<SupportedModCard mod={BASE_MOD} issues={[]} />)
+        expect(screen.queryByRole("button", { name: /Edit/i })).not.toBeInTheDocument()
     })
 })
