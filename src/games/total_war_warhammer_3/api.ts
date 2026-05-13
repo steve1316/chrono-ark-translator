@@ -13,6 +13,12 @@ export interface SupportedMod {
     modified_attributes?: string[]
     /** Steam Workshop item id derived from `path`. Null when the path does not follow the TW3 workshop convention. */
     workshop_id?: string | null
+    /** Maps glob patterns to faction codes, overriding the default faction detection. */
+    pattern_overrides?: Record<string, string>
+    /** Maps lord/hero `key` values to allowed lord and hero lists, overriding the default character set. */
+    character_overrides?: Record<string, { allowed_lords?: unknown[]; allowed_heroes?: unknown[] }>
+    /** When true, the mod is excluded from the auto-generation pass entirely. */
+    ignore_generation?: boolean
     [key: string]: unknown
 }
 

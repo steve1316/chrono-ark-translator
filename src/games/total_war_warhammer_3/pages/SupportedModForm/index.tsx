@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { createSupportedMod, fetchSupportedEffectsCategories, fetchSupportedMods, updateSupportedMod } from "../../api"
 import BasicsSection, { emptyBasicsState, type BasicsState } from "./sections/Basics"
 import ModifiedAttributesSection from "./sections/ModifiedAttributes"
+import PatternOverridesSection, { type PatternOverrideRow } from "./sections/PatternOverrides"
 
 /**
  * Add / edit page for a single `SUPPORTED_MODS` entry. Detects mode from
@@ -20,6 +21,7 @@ const SupportedModFormPage = () => {
     const [basics, setBasics] = useState<BasicsState>(emptyBasicsState)
     const [modifiedAttributes, setModifiedAttributes] = useState<string[]>([])
     const [effectCategories, setEffectCategories] = useState<string[]>([])
+    const [patternOverrides, setPatternOverrides] = useState<PatternOverrideRow[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -44,6 +46,8 @@ const SupportedModFormPage = () => {
                     path: target.path ?? "",
                 })
                 setModifiedAttributes(target.modified_attributes ?? [])
+                const rows: PatternOverrideRow[] = Object.entries((target.pattern_overrides ?? {}) as Record<string, string>).map(([pattern, faction]) => ({ pattern, faction }))
+                setPatternOverrides(rows)
             })
             .catch((err: unknown) => setErrorMessage(err instanceof Error ? err.message : "Failed to load mod"))
     }, [isEdit, packageName])
@@ -55,6 +59,7 @@ const SupportedModFormPage = () => {
         custom_path: basics.custom_path,
         path: basics.custom_path ? basics.path : undefined,
         modified_attributes: modifiedAttributes,
+        pattern_overrides: patternOverrides.length > 0 ? Object.fromEntries(patternOverrides.map((r) => [r.pattern, r.faction])) : undefined,
     })
 
     const handleSave = async () => {
@@ -98,6 +103,7 @@ const SupportedModFormPage = () => {
             {errorMessage && <p style={{ color: "var(--warning)" }}>{errorMessage}</p>}
             <BasicsSection value={basics} onChange={setBasics} lockPackageName={isEdit} />
             <ModifiedAttributesSection value={modifiedAttributes} suggestions={effectCategories} onChange={setModifiedAttributes} />
+            <PatternOverridesSection value={patternOverrides} onChange={setPatternOverrides} />
         </div>
     )
 }
