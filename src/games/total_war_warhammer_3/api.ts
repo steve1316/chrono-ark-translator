@@ -191,6 +191,61 @@ export class RegistryError extends Error {
     }
 }
 
+/**
+ * Create a new SUPPORTED_MODS entry.
+ *
+ * @param entry Full entry payload including `name`, `package_name`, optional `workshop_id` / `path`, `modified_attributes`, optional `pattern_overrides`, `character_overrides`, `ignore_generation`.
+ * @returns The freshly reloaded `SupportedMod[]` list.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function createSupportedMod(entry: Record<string, unknown>): Promise<SupportedMod[]> {
+    const res = await api.post("/supported-mods", { entry })
+    if (!res.ok) throw await registryError(res)
+    const body = await res.json()
+    return body.mods as SupportedMod[]
+}
+
+/**
+ * Replace an existing SUPPORTED_MODS entry by its `package_name`.
+ *
+ * @param packageName Stable identifier of the entry to replace.
+ * @param entry Replacement entry payload (same shape as create).
+ * @returns The freshly reloaded list.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function updateSupportedMod(packageName: string, entry: Record<string, unknown>): Promise<SupportedMod[]> {
+    const res = await api.put(`/supported-mods/${encodeURIComponent(packageName)}`, { entry })
+    if (!res.ok) throw await registryError(res)
+    const body = await res.json()
+    return body.mods as SupportedMod[]
+}
+
+/**
+ * Remove a SUPPORTED_MODS entry by its `package_name`.
+ *
+ * @param packageName Stable identifier of the entry to remove.
+ * @returns The freshly reloaded list.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function deleteSupportedMod(packageName: string): Promise<SupportedMod[]> {
+    const res = await api.delete(`/supported-mods/${encodeURIComponent(packageName)}`)
+    if (!res.ok) throw await registryError(res)
+    const body = await res.json()
+    return body.mods as SupportedMod[]
+}
+
+/**
+ * Fetch the top-level SUPPORTED_EFFECTS category names for the Modified Attributes autocomplete.
+ *
+ * @returns Sorted list of category names.
+ */
+export async function fetchSupportedEffectsCategories(): Promise<string[]> {
+    const res = await api.get("/supported-effects")
+    if (!res.ok) return []
+    const body = await res.json()
+    return (body.categories ?? []) as string[]
+}
+
 async function registryError(res: Response): Promise<RegistryError> {
     let detail = res.statusText
     let missing: string[] | null = null
