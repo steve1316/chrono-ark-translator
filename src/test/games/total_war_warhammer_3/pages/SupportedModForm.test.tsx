@@ -1,0 +1,62 @@
+import { render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import { MemoryRouter, Route, Routes } from "react-router-dom"
+import { afterEach, describe, expect, it, vi } from "vitest"
+
+import SupportedModFormPage from "../../../../games/total_war_warhammer_3/pages/SupportedModForm"
+
+afterEach(() => {
+    vi.restoreAllMocks()
+    vi.resetAllMocks()
+})
+
+function renderForm(path: string) {
+    return render(
+        <MemoryRouter initialEntries={[path]}>
+            <Routes>
+                <Route path="/supported-mods/new" element={<SupportedModFormPage />} />
+                <Route path="/supported-mods/edit/:packageName" element={<SupportedModFormPage />} />
+                <Route path="/supported-mods" element={<div>Mods list page</div>} />
+            </Routes>
+        </MemoryRouter>,
+    )
+}
+
+describe("SupportedModFormPage", () => {
+    it("renders the Basics section with empty fields in add mode", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ categories: [] }), { status: 200 }))
+        renderForm("/supported-mods/new")
+        expect(await screen.findByLabelText(/^Name/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/Package name/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/Workshop ID/i)).toBeInTheDocument()
+        expect(screen.getByRole("button", { name: /Save/i })).toBeInTheDocument()
+        expect(screen.getByRole("button", { name: /Cancel/i })).toBeInTheDocument()
+        expect(screen.queryByRole("button", { name: /Delete/i })).not.toBeInTheDocument()
+    })
+
+    it("posts the form to /supported-mods on Save in add mode", async () => {
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url: RequestInfo | URL, init?: RequestInit) => {
+            const u = url.toString()
+            if (u.endsWith("/supported-effects")) {
+                return Promise.resolve(new Response(JSON.stringify({ categories: [] }), { status: 200 }))
+            }
+            if (u.endsWith("/supported-mods") && init?.method === "POST") {
+                return Promise.resolve(new Response(JSON.stringify({ mods: [] }), { status: 200 }))
+            }
+            return Promise.resolve(new Response("{}", { status: 200 }))
+        })
+        renderForm("/supported-mods/new")
+        await userEvent.type(await screen.findByLabelText(/^Name/i), "My Mod")
+        await userEvent.type(screen.getByLabelText(/Package name/i), "my_mod.pack")
+        await userEvent.type(screen.getByLabelText(/Workshop ID/i), "12345")
+        await userEvent.click(screen.getByRole("button", { name: /Save/i }))
+        await waitFor(() => {
+            const postCall = fetchSpy.mock.calls.find(([url, init]) => url.toString().endsWith("/supported-mods") && (init as RequestInit | undefined)?.method === "POST")
+            expect(postCall).toBeTruthy()
+            const body = JSON.parse(((postCall![1] as RequestInit).body as string) ?? "{}")
+            expect(body.entry.name).toBe("My Mod")
+            expect(body.entry.package_name).toBe("my_mod.pack")
+            expect(body.entry.workshop_id).toBe("12345")
+        })
+    })
+})
