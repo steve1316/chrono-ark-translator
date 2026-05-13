@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 
-import { createSupportedMod, fetchSupportedMods, updateSupportedMod } from "../../api"
+import { createSupportedMod, fetchSupportedEffectsCategories, fetchSupportedMods, updateSupportedMod } from "../../api"
 import BasicsSection, { emptyBasicsState, type BasicsState } from "./sections/Basics"
+import ModifiedAttributesSection from "./sections/ModifiedAttributes"
 
 /**
  * Add / edit page for a single `SUPPORTED_MODS` entry. Detects mode from
@@ -17,8 +18,14 @@ const SupportedModFormPage = () => {
     const isEdit = Boolean(packageName)
 
     const [basics, setBasics] = useState<BasicsState>(emptyBasicsState)
+    const [modifiedAttributes, setModifiedAttributes] = useState<string[]>([])
+    const [effectCategories, setEffectCategories] = useState<string[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+    useEffect(() => {
+        fetchSupportedEffectsCategories().then(setEffectCategories).catch(() => setEffectCategories([]))
+    }, [])
 
     useEffect(() => {
         if (!isEdit || !packageName) return
@@ -36,6 +43,7 @@ const SupportedModFormPage = () => {
                     custom_path: !target.workshop_id && Boolean(target.path),
                     path: target.path ?? "",
                 })
+                setModifiedAttributes(target.modified_attributes ?? [])
             })
             .catch((err: unknown) => setErrorMessage(err instanceof Error ? err.message : "Failed to load mod"))
     }, [isEdit, packageName])
@@ -46,7 +54,7 @@ const SupportedModFormPage = () => {
         workshop_id: basics.custom_path ? undefined : basics.workshop_id,
         custom_path: basics.custom_path,
         path: basics.custom_path ? basics.path : undefined,
-        modified_attributes: [],
+        modified_attributes: modifiedAttributes,
     })
 
     const handleSave = async () => {
@@ -89,6 +97,7 @@ const SupportedModFormPage = () => {
             </div>
             {errorMessage && <p style={{ color: "var(--warning)" }}>{errorMessage}</p>}
             <BasicsSection value={basics} onChange={setBasics} lockPackageName={isEdit} />
+            <ModifiedAttributesSection value={modifiedAttributes} suggestions={effectCategories} onChange={setModifiedAttributes} />
         </div>
     )
 }
