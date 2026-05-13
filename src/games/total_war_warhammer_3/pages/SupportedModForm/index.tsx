@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom"
 
 import { createSupportedMod, fetchSupportedEffectsCategories, fetchSupportedMods, updateSupportedMod } from "../../api"
 import BasicsSection, { emptyBasicsState, type BasicsState } from "./sections/Basics"
+import CharacterOverridesSection, { type CharacterRow, type FactionEntry } from "./sections/CharacterOverrides"
 import ModifiedAttributesSection from "./sections/ModifiedAttributes"
 import PatternOverridesSection, { type PatternOverrideRow } from "./sections/PatternOverrides"
 
@@ -22,6 +23,7 @@ const SupportedModFormPage = () => {
     const [modifiedAttributes, setModifiedAttributes] = useState<string[]>([])
     const [effectCategories, setEffectCategories] = useState<string[]>([])
     const [patternOverrides, setPatternOverrides] = useState<PatternOverrideRow[]>([])
+    const [characterOverrides, setCharacterOverrides] = useState<FactionEntry[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -48,6 +50,14 @@ const SupportedModFormPage = () => {
                 setModifiedAttributes(target.modified_attributes ?? [])
                 const rows: PatternOverrideRow[] = Object.entries((target.pattern_overrides ?? {}) as Record<string, string>).map(([pattern, faction]) => ({ pattern, faction }))
                 setPatternOverrides(rows)
+                const factions: FactionEntry[] = Object.entries((target.character_overrides ?? {}) as Record<string, { allowed_lords?: CharacterRow[]; allowed_heroes?: CharacterRow[] }>).map(
+                    ([faction, body]) => ({
+                        faction,
+                        allowed_lords: (body.allowed_lords ?? []).map((r) => ({ land_unit: r.land_unit ?? "", agent_subtype: r.agent_subtype ?? "", skill_overrides: r.skill_overrides ?? "" })),
+                        allowed_heroes: (body.allowed_heroes ?? []).map((r) => ({ land_unit: r.land_unit ?? "", agent_subtype: r.agent_subtype ?? "", skill_overrides: r.skill_overrides ?? "" })),
+                    }),
+                )
+                setCharacterOverrides(factions)
             })
             .catch((err: unknown) => setErrorMessage(err instanceof Error ? err.message : "Failed to load mod"))
     }, [isEdit, packageName])
@@ -60,6 +70,12 @@ const SupportedModFormPage = () => {
         path: basics.custom_path ? basics.path : undefined,
         modified_attributes: modifiedAttributes,
         pattern_overrides: patternOverrides.length > 0 ? Object.fromEntries(patternOverrides.map((r) => [r.pattern, r.faction])) : undefined,
+        character_overrides: characterOverrides.length > 0 ? Object.fromEntries(
+            characterOverrides.map((f) => [f.faction, {
+                allowed_lords: f.allowed_lords.filter((r) => r.land_unit || r.agent_subtype).map((r) => ({ land_unit: r.land_unit, agent_subtype: r.agent_subtype, ...(r.skill_overrides ? { skill_overrides: r.skill_overrides } : {}) })),
+                allowed_heroes: f.allowed_heroes.filter((r) => r.land_unit || r.agent_subtype).map((r) => ({ land_unit: r.land_unit, agent_subtype: r.agent_subtype, ...(r.skill_overrides ? { skill_overrides: r.skill_overrides } : {}) })),
+            }]),
+        ) : undefined,
     })
 
     const handleSave = async () => {
@@ -104,6 +120,7 @@ const SupportedModFormPage = () => {
             <BasicsSection value={basics} onChange={setBasics} lockPackageName={isEdit} />
             <ModifiedAttributesSection value={modifiedAttributes} suggestions={effectCategories} onChange={setModifiedAttributes} />
             <PatternOverridesSection value={patternOverrides} onChange={setPatternOverrides} />
+            <CharacterOverridesSection value={characterOverrides} onChange={setCharacterOverrides} />
         </div>
     )
 }
