@@ -11,6 +11,7 @@ from backend.games.total_war_warhammer_3.helper_scripts_loader import (
     HelperScriptsLoaderError,
     HelperScriptsNotConfiguredError,
     RegistryFileMissingError,
+    load_supported_effects_categories,
     load_supported_mods,
     supported_mods_source_path,
 )
@@ -158,3 +159,25 @@ def delete_supported_mods(package_name: str):
     except EntryNotFoundError:
         raise HTTPException(status_code=404, detail=f"Mod not found: {package_name}")
     return {"mods": _write_and_reload(new_source)}
+
+
+@router.get("/supported-effects")
+def get_supported_effects():
+    """Return the top-level keys of `SUPPORTED_EFFECTS`.
+
+    Used by the Supported Mods CRUD form's Modified Attributes autocomplete.
+
+    Returns:
+        `{"categories": [...]}` on success.
+
+    Raises:
+        HTTPException(503): When helper_scripts_path is unset or the file is missing.
+        HTTPException(500): When the file fails to load.
+    """
+    try:
+        categories = load_supported_effects_categories(helper_scripts_path())
+    except (HelperScriptsNotConfiguredError, RegistryFileMissingError) as exc:
+        raise HTTPException(status_code=503, detail=f"Registry unavailable: {exc}")
+    except HelperScriptsLoaderError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return {"categories": categories}

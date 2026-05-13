@@ -148,3 +148,20 @@ def test_delete_supported_mods_returns_404_when_missing(monkeypatch, tmp_path):
     _setup_helper_with_two(monkeypatch, tmp_path)
     res = TestClient(app).delete("/api/games/total_war_warhammer_3/supported-mods/ghost.pack")
     assert res.status_code == 404
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# GET /supported-effects
+
+
+def test_get_supported_effects_returns_top_level_keys(monkeypatch, tmp_path):
+    helper = tmp_path / "helper_scripts"
+    helper.mkdir()
+    (helper / "dynamic_rors_effects.py").write_text(
+        'SUPPORTED_EFFECTS = {"melee_attack": {"id": 1}, "missile_damage": {"id": 2}}\n'
+    )
+    monkeypatch.setattr("backend.config.TW3_HELPER_PATH", str(helper))
+    res = TestClient(app).get("/api/games/total_war_warhammer_3/supported-effects")
+    assert res.status_code == 200
+    assert sorted(res.json()["categories"]) == ["melee_attack", "missile_damage"]
