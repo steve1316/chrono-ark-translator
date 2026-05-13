@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 
-import { createSupportedMod, fetchSupportedEffectsCategories, fetchSupportedMods, updateSupportedMod } from "../../api"
+import ConfirmModal from "../../../../components/ConfirmModal"
+import { createSupportedMod, deleteSupportedMod, fetchSupportedEffectsCategories, fetchSupportedMods, updateSupportedMod } from "../../api"
 import BasicsSection, { emptyBasicsState, type BasicsState } from "./sections/Basics"
 import CharacterOverridesSection, { type CharacterRow, type FactionEntry } from "./sections/CharacterOverrides"
 import ModifiedAttributesSection from "./sections/ModifiedAttributes"
 import PatternOverridesSection, { type PatternOverrideRow } from "./sections/PatternOverrides"
+import MiscSection from "./sections/Misc"
 
 /**
  * Add / edit page for a single `SUPPORTED_MODS` entry. Detects mode from
@@ -24,6 +26,8 @@ const SupportedModFormPage = () => {
     const [effectCategories, setEffectCategories] = useState<string[]>([])
     const [patternOverrides, setPatternOverrides] = useState<PatternOverrideRow[]>([])
     const [characterOverrides, setCharacterOverrides] = useState<FactionEntry[]>([])
+    const [ignoreGeneration, setIgnoreGeneration] = useState(false)
+    const [confirmDelete, setConfirmDelete] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -58,6 +62,7 @@ const SupportedModFormPage = () => {
                     }),
                 )
                 setCharacterOverrides(factions)
+                setIgnoreGeneration(Boolean((target as Record<string, unknown>).ignore_generation))
             })
             .catch((err: unknown) => setErrorMessage(err instanceof Error ? err.message : "Failed to load mod"))
     }, [isEdit, packageName])
@@ -70,6 +75,7 @@ const SupportedModFormPage = () => {
         path: basics.custom_path ? basics.path : undefined,
         modified_attributes: modifiedAttributes,
         pattern_overrides: patternOverrides.length > 0 ? Object.fromEntries(patternOverrides.map((r) => [r.pattern, r.faction])) : undefined,
+        ignore_generation: ignoreGeneration ? true : undefined,
         character_overrides: characterOverrides.length > 0 ? Object.fromEntries(
             characterOverrides.map((f) => [f.faction, {
                 allowed_lords: f.allowed_lords.filter((r) => r.land_unit || r.agent_subtype).map((r) => ({ land_unit: r.land_unit, agent_subtype: r.agent_subtype, ...(r.skill_overrides ? { skill_overrides: r.skill_overrides } : {}) })),
@@ -77,6 +83,21 @@ const SupportedModFormPage = () => {
             }]),
         ) : undefined,
     })
+
+    const handleDelete = async () => {
+        if (!packageName) return
+        setSubmitting(true)
+        setErrorMessage(null)
+        try {
+            await deleteSupportedMod(packageName)
+            navigate("/supported-mods")
+        } catch (err: unknown) {
+            setErrorMessage(err instanceof Error ? err.message : "Delete failed")
+        } finally {
+            setSubmitting(false)
+            setConfirmDelete(false)
+        }
+    }
 
     const handleSave = async () => {
         if (!basics.name.trim()) {
@@ -108,6 +129,11 @@ const SupportedModFormPage = () => {
             <div className="dashboard-header">
                 <h1>{isEdit ? `Edit Mod: ${packageName}` : "Add Mod"}</h1>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
+                    {isEdit && (
+                        <button type="button" className="btn btn-danger" onClick={() => setConfirmDelete(true)} disabled={submitting}>
+                            Delete
+                        </button>
+                    )}
                     <button type="button" className="btn btn-primary" onClick={handleSave} disabled={submitting}>
                         {submitting ? "Saving..." : "Save"}
                     </button>
@@ -121,6 +147,17 @@ const SupportedModFormPage = () => {
             <ModifiedAttributesSection value={modifiedAttributes} suggestions={effectCategories} onChange={setModifiedAttributes} />
             <PatternOverridesSection value={patternOverrides} onChange={setPatternOverrides} />
             <CharacterOverridesSection value={characterOverrides} onChange={setCharacterOverrides} />
+            <MiscSection ignoreGeneration={ignoreGeneration} onChange={setIgnoreGeneration} />
+            {confirmDelete && (
+                <ConfirmModal
+                    title="Delete mod?"
+                    message={`Permanently remove ${packageName} from SUPPORTED_MODS?`}
+                    confirmLabel="Confirm"
+                    cancelLabel="Cancel"
+                    onConfirm={handleDelete}
+                    onCancel={() => setConfirmDelete(false)}
+                />
+            )}
         </div>
     )
 }

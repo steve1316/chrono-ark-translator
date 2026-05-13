@@ -34,6 +34,31 @@ describe("SupportedModFormPage", () => {
         expect(screen.queryByRole("button", { name: /Delete/i })).not.toBeInTheDocument()
     })
 
+    it("renders a Delete button and confirms before firing DELETE in edit mode", async () => {
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url: RequestInfo | URL, init?: RequestInit) => {
+            const u = url.toString()
+            if (u.endsWith("/supported-effects")) {
+                return Promise.resolve(new Response(JSON.stringify({ categories: [] }), { status: 200 }))
+            }
+            if (u.endsWith("/supported-mods") && (!init || init.method !== "POST")) {
+                return Promise.resolve(new Response(JSON.stringify({ mods: [{ name: "Target", package_name: "target.pack", path: "", workshop_id: null, modified_attributes: [] }] }), { status: 200 }))
+            }
+            if (u.endsWith("/supported-mods/target.pack") && init?.method === "DELETE") {
+                return Promise.resolve(new Response(JSON.stringify({ mods: [] }), { status: 200 }))
+            }
+            return Promise.resolve(new Response("{}", { status: 200 }))
+        })
+        renderForm("/supported-mods/edit/target.pack")
+        await waitFor(() => expect(screen.getByDisplayValue("Target")).toBeInTheDocument())
+        await userEvent.click(screen.getByRole("button", { name: /Delete/i }))
+        // Confirm modal appears - click its primary confirm button.
+        await userEvent.click(await screen.findByRole("button", { name: /Confirm/i }))
+        await waitFor(() => {
+            const deleteCall = fetchSpy.mock.calls.find(([url, init]) => url.toString().endsWith("/supported-mods/target.pack") && (init as RequestInit | undefined)?.method === "DELETE")
+            expect(deleteCall).toBeTruthy()
+        })
+    })
+
     it("posts the form to /supported-mods on Save in add mode", async () => {
         const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url: RequestInfo | URL, init?: RequestInit) => {
             const u = url.toString()
