@@ -72,3 +72,79 @@ def test_post_supported_mods_returns_503_when_helper_path_unset(monkeypatch):
     body = {"entry": {"name": "X", "package_name": "x.pack", "modified_attributes": []}}
     res = TestClient(app).post("/api/games/total_war_warhammer_3/supported-mods", json=body)
     assert res.status_code == 503
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# PUT /supported-mods/{package_name}
+
+
+_TWO_ENTRY_FIXTURE = '''from utilities import STEAM_LIBRARY_DRIVE
+
+SUPPORTED_MODS = [
+    {
+        "name": "Vanilla",
+        "package_name": "vanilla",
+        "path": "",
+        "modified_attributes": [],
+    },
+    {
+        "name": "Old Name",
+        "package_name": "target.pack",
+        "path": f"{STEAM_LIBRARY_DRIVE}/SteamLibrary/steamapps/workshop/content/1142710/111/target.pack",
+        "modified_attributes": [],
+    },
+]
+'''
+
+
+def _setup_helper_with_two(monkeypatch, tmp_path):
+    helper = tmp_path / "helper_scripts"
+    helper.mkdir()
+    (helper / "utilities.py").write_text('STEAM_LIBRARY_DRIVE = "F:"\n')
+    (helper / "supported_mods.py").write_text(_TWO_ENTRY_FIXTURE)
+    monkeypatch.setattr("backend.config.TW3_HELPER_PATH", str(helper))
+    return helper
+
+
+def test_put_supported_mods_updates_existing_entry(monkeypatch, tmp_path):
+    _setup_helper_with_two(monkeypatch, tmp_path)
+    body = {
+        "entry": {
+            "name": "New Name",
+            "package_name": "target.pack",
+            "workshop_id": "222",
+            "modified_attributes": ["ranged_damage"],
+        }
+    }
+    res = TestClient(app).put("/api/games/total_war_warhammer_3/supported-mods/target.pack", json=body)
+    assert res.status_code == 200
+    mods = res.json()["mods"]
+    target = next(m for m in mods if m["package_name"] == "target.pack")
+    assert target["name"] == "New Name"
+
+
+def test_put_supported_mods_returns_404_when_missing(monkeypatch, tmp_path):
+    _setup_helper_with_two(monkeypatch, tmp_path)
+    body = {"entry": {"name": "X", "package_name": "ghost.pack", "modified_attributes": []}}
+    res = TestClient(app).put("/api/games/total_war_warhammer_3/supported-mods/ghost.pack", json=body)
+    assert res.status_code == 404
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# DELETE /supported-mods/{package_name}
+
+
+def test_delete_supported_mods_removes_entry(monkeypatch, tmp_path):
+    _setup_helper_with_two(monkeypatch, tmp_path)
+    res = TestClient(app).delete("/api/games/total_war_warhammer_3/supported-mods/target.pack")
+    assert res.status_code == 200
+    mods = res.json()["mods"]
+    assert all(m["package_name"] != "target.pack" for m in mods)
+
+
+def test_delete_supported_mods_returns_404_when_missing(monkeypatch, tmp_path):
+    _setup_helper_with_two(monkeypatch, tmp_path)
+    res = TestClient(app).delete("/api/games/total_war_warhammer_3/supported-mods/ghost.pack")
+    assert res.status_code == 404

@@ -103,3 +103,58 @@ def post_supported_mods(body: SupportedModBody):
     except DuplicatePackageError as exc:
         raise HTTPException(status_code=409, detail=f"Package already exists: {exc}")
     return {"mods": _write_and_reload(new_source)}
+
+
+@router.put("/supported-mods/{package_name}")
+def put_supported_mods(package_name: str, body: SupportedModBody):
+    """Replace an existing SUPPORTED_MODS entry, keyed by `package_name`.
+
+    Args:
+        package_name: Package name of the entry to replace.
+        body: Wrapper containing the replacement entry payload.
+
+    Returns:
+        `{"mods": [...]}` - the freshly loaded list.
+
+    Raises:
+        HTTPException(404): When no entry with `package_name` exists.
+        HTTPException(503): When helper_scripts is unset or missing.
+        HTTPException(500): When the file fails to parse or write.
+    """
+    try:
+        source_path = supported_mods_source_path(helper_scripts_path())
+        if not source_path.is_file():
+            raise HTTPException(status_code=503, detail="supported_mods.py not found")
+        new_source = update_entry(source_path.read_text(encoding="utf-8"), package_name, body.entry)
+    except HelperScriptsNotConfiguredError as exc:
+        raise HTTPException(status_code=503, detail=f"Registry unavailable: {exc}")
+    except EntryNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Mod not found: {package_name}")
+    return {"mods": _write_and_reload(new_source)}
+
+
+@router.delete("/supported-mods/{package_name}")
+def delete_supported_mods(package_name: str):
+    """Remove an existing SUPPORTED_MODS entry, keyed by `package_name`.
+
+    Args:
+        package_name: Package name of the entry to remove.
+
+    Returns:
+        `{"mods": [...]}` - the freshly loaded list.
+
+    Raises:
+        HTTPException(404): When no entry with `package_name` exists.
+        HTTPException(503): When helper_scripts is unset or missing.
+        HTTPException(500): When the file fails to parse or write.
+    """
+    try:
+        source_path = supported_mods_source_path(helper_scripts_path())
+        if not source_path.is_file():
+            raise HTTPException(status_code=503, detail="supported_mods.py not found")
+        new_source = remove_entry(source_path.read_text(encoding="utf-8"), package_name)
+    except HelperScriptsNotConfiguredError as exc:
+        raise HTTPException(status_code=503, detail=f"Registry unavailable: {exc}")
+    except EntryNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Mod not found: {package_name}")
+    return {"mods": _write_and_reload(new_source)}
