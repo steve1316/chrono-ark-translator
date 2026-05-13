@@ -49,26 +49,30 @@ const SupportedModCard = ({ mod, issues, onEdit }: Props) => {
                     <strong>Modified attributes:</strong> {mod.modified_attributes.join(", ")}
                 </p>
             )}
-            {onEdit && (
-                <button type="button" className="btn btn-outline" onClick={() => onEdit(mod.package_name)} style={{ alignSelf: "flex-start", fontSize: "0.85em" }}>
-                    Edit
-                </button>
-            )}
-            {mod.workshop_id && (
-                <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={async () => {
-                        try {
-                            await fetch(`${API_BASE}/games/total_war_warhammer_3/packs/${mod.workshop_id}/open`, { method: "POST" })
-                        } catch (err) {
-                            console.error("Failed to open workshop folder:", err)
-                        }
-                    }}
-                    style={{ alignSelf: "flex-start", fontSize: "0.85em", marginTop: "auto" }}
-                >
-                    Open Workshop Folder
-                </button>
+            {(onEdit || mod.workshop_id) && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "auto" }}>
+                    {onEdit && (
+                        <button type="button" className="btn btn-outline" onClick={() => onEdit(mod.package_name)} style={{ fontSize: "0.85em" }}>
+                            Edit
+                        </button>
+                    )}
+                    {mod.workshop_id && (
+                        <button
+                            type="button"
+                            className="btn btn-outline"
+                            onClick={async () => {
+                                try {
+                                    await fetch(`${API_BASE}/games/total_war_warhammer_3/packs/${mod.workshop_id}/open`, { method: "POST" })
+                                } catch (err) {
+                                    console.error("Failed to open workshop folder:", err)
+                                }
+                            }}
+                            style={{ fontSize: "0.85em" }}
+                        >
+                            Open Workshop Folder
+                        </button>
+                    )}
+                </div>
             )}
         </WorkshopCard>
     )
