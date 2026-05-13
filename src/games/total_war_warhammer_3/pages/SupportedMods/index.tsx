@@ -7,8 +7,9 @@ import SupportedModCard from "../../components/SupportedModCard"
 import { useValidation } from "../../hooks/useValidation"
 
 /**
- * Read-only card grid over `SUPPORTED_MODS` from the configured helper_scripts directory.
- * Search filters across `name` and `package_name`.
+ * Card grid over `SUPPORTED_MODS` from the configured helper_scripts directory. Supports add, edit,
+ * and delete via the `+ Add Mod` button and the per-card Edit button. Search filters across `name`
+ * and `package_name`.
  *
  * @returns A page that renders a searchable card grid of TW3 supported mods, or a
  *     `RegistryErrorBanner` when the backend reports a configuration error.
@@ -66,7 +67,7 @@ export default function SupportedModsPage() {
             <div className="dashboard-header">
                 <div className="title-group">
                     <h1>Supported Mods</h1>
-                    <p>Read-only view of `SUPPORTED_MODS` from helper_scripts/supported_mods.py.</p>
+                    <p>Manage `SUPPORTED_MODS` entries in helper_scripts/supported_mods.py.</p>
                 </div>
                 <input
                     type="text"
