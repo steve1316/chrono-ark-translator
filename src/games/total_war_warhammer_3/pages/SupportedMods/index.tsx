@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { fetchSupportedMods, RegistryError } from "../../api"
 import type { SupportedMod, ValidationIssue } from "../../api"
 import RegistryErrorBanner from "../../components/RegistryErrorBanner"
@@ -13,6 +14,7 @@ import { useValidation } from "../../hooks/useValidation"
  *     `RegistryErrorBanner` when the backend reports a configuration error.
  */
 export default function SupportedModsPage() {
+    const navigate = useNavigate()
     const [mods, setMods] = useState<SupportedMod[] | null>(null)
     const [error, setError] = useState<RegistryError | null>(null)
     const [search, setSearch] = useState("")
@@ -74,10 +76,13 @@ export default function SupportedModsPage() {
                     onChange={(e) => setSearch(e.target.value)}
                     style={{ width: 320, padding: "0.5rem 0.75rem", borderRadius: 8 }}
                 />
+                <button type="button" className="btn btn-primary" onClick={() => navigate("/supported-mods/new")} style={{ marginLeft: "0.5rem" }}>
+                    + Add Mod
+                </button>
             </div>
             <div className="mod-grid">
                 {filtered.map((m) => (
-                    <SupportedModCard key={m.package_name} mod={m} issues={issuesByMod.get(m.package_name) ?? []} />
+                    <SupportedModCard key={m.package_name} mod={m} issues={issuesByMod.get(m.package_name) ?? []} onEdit={(pn) => navigate(`/supported-mods/edit/${encodeURIComponent(pn)}`)} />
                 ))}
             </div>
         </>
