@@ -261,3 +261,36 @@ def test_post_sync_then_get_returns_no_stale(monkeypatch, baseline_path):
     body = get_res.json()
     assert body["stale"] == []
     assert body["baseline_exists"] is True
+
+
+def test_concurrent_get_updates_do_not_corrupt_baseline(monkeypatch, baseline_path, tmp_path):
+    """Two simultaneous GET /updates calls leave the baseline file as valid JSON."""
+    import threading as _threading
+
+    helper = tmp_path / "helper_scripts"
+    helper.mkdir()
+    pack = tmp_path / "concurrent.pack"
+    pack.write_bytes(b"hello world")
+    os.utime(pack, (1000.0, 1000.0))
+    (helper / "supported_mods.py").write_text(
+        f'SUPPORTED_MODS = [\n    {{"name": "M", "package_name": "m", "path": r"{pack}"}},\n]\n'
+    )
+    monkeypatch.setattr(config, "TW3_HELPER_PATH", str(helper))
+
+    client = TestClient(app)
+    results = []
+
+    def call():
+        res = client.get("/api/games/total_war_warhammer_3/updates")
+        results.append(res.status_code)
+
+    threads = [_threading.Thread(target=call) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert all(s == 200 for s in results)
+    # The baseline file must still parse cleanly.
+    parsed = json.loads(baseline_path.read_text(encoding="utf-8"))
+    assert isinstance(parsed, dict)
