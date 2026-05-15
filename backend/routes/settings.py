@@ -73,6 +73,8 @@ async def get_settings():
         tw3_helper_path=config.TW3_HELPER_PATH,
         tw3_rpfm_cli_path=config.TW3_RPFM_CLI_PATH,
         tw3_steam_library_drive=config.TW3_STEAM_LIBRARY_DRIVE,
+        steamcmd_path=config.STEAMCMD_PATH,
+        steam_username=config.STEAM_USERNAME,
         games={game_id: {} for game_id in registry_list_games()},
     )
 
@@ -176,6 +178,14 @@ async def update_settings(payload: SettingsUpdate):
     if payload.tw3_steam_library_drive is not None:
         config.TW3_STEAM_LIBRARY_DRIVE = payload.tw3_steam_library_drive
         env_updates["CATL_TW3_STEAM_LIBRARY_DRIVE"] = payload.tw3_steam_library_drive
+
+    if payload.steamcmd_path is not None:
+        config.STEAMCMD_PATH = payload.steamcmd_path
+        env_updates["CATL_STEAMCMD_PATH"] = payload.steamcmd_path
+
+    if payload.steam_username is not None:
+        config.STEAM_USERNAME = payload.steam_username
+        env_updates["CATL_STEAM_USERNAME"] = payload.steam_username
 
     if env_updates:
         _update_env_file(env_updates)

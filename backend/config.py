@@ -104,3 +104,9 @@ Empty default means preflight will fail until the user configures it via
 the env var or settings UI. Exposed to helper_scripts subprocess as the
 STEAM_LIBRARY_DRIVE environment variable.
 """
+
+STEAMCMD_PATH = os.environ.get("CATL_STEAMCMD_PATH", "")
+"""Absolute path to steamcmd.exe. Empty default disables the Publish to Workshop feature."""
+
+STEAM_USERNAME = os.environ.get("CATL_STEAM_USERNAME", "")
+"""Steam account username used for `steamcmd +login`. No password is stored - SteamCMD relies on its cached sentry file from the user's one-time interactive login."""
