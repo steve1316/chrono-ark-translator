@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from backend import config
 from backend.routes.helpers import _adapter
-from backend.routes import ollama, llamacpp, settings
+from backend.routes import ollama, llamacpp, settings, steamcmd
 from backend.games.registry import list_games, get_adapter
 from backend.scripts.migrate_storage_v1_to_v2 import run_migration
 
@@ -45,6 +45,7 @@ app.add_middleware(
 app.include_router(ollama.router)
 app.include_router(llamacpp.router)
 app.include_router(settings.router)
+app.include_router(steamcmd.router)
 
 # Mount each registered adapter's router under /api/games/<id>/...
 for _game_id in list_games():
