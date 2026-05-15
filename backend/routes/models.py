@@ -156,6 +156,8 @@ class SettingsResponse(BaseModel):
         tw3_helper_path: Path to the TW3 helper_scripts directory.
         tw3_rpfm_cli_path: Path to rpfm_cli.exe (blank = use default inside helper_scripts).
         tw3_steam_library_drive: Drive letter for the Steam library (e.g. `"F:"`).
+        steamcmd_path: Path to `steamcmd.exe` used by the Publish to Workshop feature.
+        steam_username: Steam account username for `steamcmd +login` (no password stored).
     """
 
     provider: str
@@ -183,6 +185,8 @@ class SettingsResponse(BaseModel):
     tw3_helper_path: str = ""
     tw3_rpfm_cli_path: str = ""
     tw3_steam_library_drive: str = ""
+    steamcmd_path: str = ""
+    steam_username: str = ""
     games: dict[str, dict] = {}
 
 
@@ -213,6 +217,8 @@ class SettingsUpdate(BaseModel):
         tw3_helper_path: New path to the TW3 helper_scripts directory.
         tw3_rpfm_cli_path: New path to rpfm_cli.exe.
         tw3_steam_library_drive: New Steam library drive letter.
+        steamcmd_path: New path to `steamcmd.exe`.
+        steam_username: New Steam account username.
     """
 
     provider: Optional[str] = None
@@ -237,6 +243,8 @@ class SettingsUpdate(BaseModel):
     tw3_helper_path: Optional[str] = None
     tw3_rpfm_cli_path: Optional[str] = None
     tw3_steam_library_drive: Optional[str] = None
+    steamcmd_path: Optional[str] = None
+    steam_username: Optional[str] = None
 
 
 class GlossaryReplacePreview(BaseModel):

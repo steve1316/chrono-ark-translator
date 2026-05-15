@@ -11,7 +11,9 @@ from backend.games.total_war_warhammer_3.helper_scripts_loader import (
     RegistryFileSyntaxError,
     _derive_workshop_id,
     load_supported_effects,
+    load_supported_effects_categories,
     load_supported_mods,
+    supported_mods_source_path,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "helper_scripts"
@@ -94,3 +96,24 @@ def test_derive_workshop_id_returns_none_when_grandparent_is_not_appid():
 def test_derive_workshop_id_returns_none_for_empty_path():
     assert _derive_workshop_id("") is None
     assert _derive_workshop_id(None) is None
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# load_supported_effects_categories + supported_mods_source_path
+
+
+def test_load_supported_effects_categories_returns_top_level_keys(tmp_path):
+    helper = tmp_path / "helper_scripts"
+    helper.mkdir()
+    (helper / "dynamic_rors_effects.py").write_text(
+        'SUPPORTED_EFFECTS = {"melee_attack": {"id": 1}, "missile_damage": {"id": 2}}\n'
+    )
+    cats = load_supported_effects_categories(helper)
+    assert sorted(cats) == ["melee_attack", "missile_damage"]
+
+
+def test_supported_mods_source_path_returns_expected_filename(tmp_path):
+    helper = tmp_path / "helper_scripts"
+    helper.mkdir()
+    assert supported_mods_source_path(helper) == helper / "supported_mods.py"

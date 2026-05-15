@@ -18,6 +18,14 @@ export function gameApi(gameId: string) {
                 body: body == null ? undefined : JSON.stringify(body),
                 ...init,
             }),
+        put: (path: string, body?: unknown, init?: RequestInit) =>
+            fetch(`${base}${path}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: body == null ? undefined : JSON.stringify(body),
+                ...init,
+            }),
+        delete: (path: string, init?: RequestInit) => fetch(`${base}${path}`, { method: "DELETE", ...init }),
         url: (path: string) => `${base}${path}`,
     }
 }

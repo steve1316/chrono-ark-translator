@@ -161,3 +161,36 @@ def load_supported_effects(helper_scripts_path: Path) -> dict:
         The `SUPPORTED_EFFECTS` dict.
     """
     return _load_constant(helper_scripts_path, "dynamic_rors_effects.py", "SUPPORTED_EFFECTS")
+
+
+def supported_mods_source_path(helper_scripts_path: Path) -> Path:
+    """Return the absolute path to the `supported_mods.py` file inside helper_scripts.
+
+    Args:
+        helper_scripts_path: Configured `helper_scripts/` directory.
+
+    Returns:
+        Path to the `.py` file. May not exist. Callers should validate.
+    """
+    return helper_scripts_path / "supported_mods.py"
+
+
+def load_supported_effects_categories(helper_scripts_path: Path) -> list[str]:
+    """Return the top-level category names from `SUPPORTED_EFFECTS`.
+
+    Used by the Supported Mods CRUD form's Modified Attributes autocomplete.
+
+    Args:
+        helper_scripts_path: Configured `helper_scripts/` directory.
+
+    Raises:
+        HelperScriptsNotConfiguredError: When `helper_scripts_path` is missing.
+        RegistryFileMissingError: When `dynamic_rors_effects.py` is absent.
+        RegistryFileSyntaxError: When the file fails to compile.
+        RegistryConstantNotFoundError: When `SUPPORTED_EFFECTS` is not declared.
+
+    Returns:
+        Sorted list of top-level keys from `SUPPORTED_EFFECTS`.
+    """
+    effects = load_supported_effects(helper_scripts_path)
+    return sorted(effects.keys())

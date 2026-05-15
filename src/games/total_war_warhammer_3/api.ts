@@ -13,6 +13,12 @@ export interface SupportedMod {
     modified_attributes?: string[]
     /** Steam Workshop item id derived from `path`. Null when the path does not follow the TW3 workshop convention. */
     workshop_id?: string | null
+    /** Maps glob patterns to faction codes, overriding the default faction detection. */
+    pattern_overrides?: Record<string, string>
+    /** Maps lord/hero `key` values to allowed lord and hero lists, overriding the default character set. */
+    character_overrides?: Record<string, { allowed_lords?: unknown[]; allowed_heroes?: unknown[] }>
+    /** When true, the mod is excluded from the auto-generation pass entirely. */
+    ignore_generation?: boolean
     [key: string]: unknown
 }
 
@@ -174,6 +180,40 @@ export function runStreamUrl(): string {
     return api.url("/run/stream")
 }
 
+/** Handle returned by `publishPack` describing the spawned SteamCMD subprocess. */
+export interface PublishHandle {
+    /** Unique identifier for this publish run, generated server-side. */
+    publish_id: string
+    /** Steam Workshop item id being updated. */
+    workshop_id: string
+    /** ISO timestamp of when SteamCMD was spawned. */
+    started_at: string
+}
+
+/**
+ * Spawn SteamCMD on the backend to push the local workshop folder as an update to an existing Workshop item.
+ *
+ * @param workshopId Numeric Steam Workshop item id of the existing entry to update.
+ * @param changenote Update note shown in the Workshop changelog. Empty string omits the field from the VDF.
+ * @returns Handle describing the started publish run.
+ * @throws `RegistryError` On any non-2xx response. `missing` is populated when preflight fails (HTTP 400 with `{missing: [...]}`).
+ */
+export async function publishPack(workshopId: string, changenote: string): Promise<PublishHandle> {
+    const res = await api.post(`/packs/${encodeURIComponent(workshopId)}/publish`, { changenote })
+    if (!res.ok) throw await registryError(res)
+    return res.json()
+}
+
+/**
+ * Build the SSE stream URL for an in-flight publish.
+ *
+ * @param workshopId Numeric Steam Workshop item id whose publish to follow.
+ * @returns Absolute URL the frontend can pass to `new EventSource(...)`.
+ */
+export function publishStreamUrl(workshopId: string): string {
+    return api.url(`/packs/${encodeURIComponent(workshopId)}/publish/stream`)
+}
+
 /** Surfaces backend registry/runner errors with status, detail, and optional missing-list. */
 export class RegistryError extends Error {
     /** HTTP status code returned by the backend. */
@@ -189,6 +229,61 @@ export class RegistryError extends Error {
         this.detail = detail
         this.missing = missing
     }
+}
+
+/**
+ * Create a new SUPPORTED_MODS entry.
+ *
+ * @param entry Full entry payload including `name`, `package_name`, optional `workshop_id` / `path`, `modified_attributes`, optional `pattern_overrides`, `character_overrides`, `ignore_generation`.
+ * @returns The freshly reloaded `SupportedMod[]` list.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function createSupportedMod(entry: Record<string, unknown>): Promise<SupportedMod[]> {
+    const res = await api.post("/supported-mods", { entry })
+    if (!res.ok) throw await registryError(res)
+    const body = await res.json()
+    return body.mods as SupportedMod[]
+}
+
+/**
+ * Replace an existing SUPPORTED_MODS entry by its `package_name`.
+ *
+ * @param packageName Stable identifier of the entry to replace.
+ * @param entry Replacement entry payload (same shape as create).
+ * @returns The freshly reloaded list.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function updateSupportedMod(packageName: string, entry: Record<string, unknown>): Promise<SupportedMod[]> {
+    const res = await api.put(`/supported-mods/${encodeURIComponent(packageName)}`, { entry })
+    if (!res.ok) throw await registryError(res)
+    const body = await res.json()
+    return body.mods as SupportedMod[]
+}
+
+/**
+ * Remove a SUPPORTED_MODS entry by its `package_name`.
+ *
+ * @param packageName Stable identifier of the entry to remove.
+ * @returns The freshly reloaded list.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function deleteSupportedMod(packageName: string): Promise<SupportedMod[]> {
+    const res = await api.delete(`/supported-mods/${encodeURIComponent(packageName)}`)
+    if (!res.ok) throw await registryError(res)
+    const body = await res.json()
+    return body.mods as SupportedMod[]
+}
+
+/**
+ * Fetch the top-level SUPPORTED_EFFECTS category names for the Modified Attributes autocomplete.
+ *
+ * @returns Sorted list of category names.
+ */
+export async function fetchSupportedEffectsCategories(): Promise<string[]> {
+    const res = await api.get("/supported-effects")
+    if (!res.ok) return []
+    const body = await res.json()
+    return (body.categories ?? []) as string[]
 }
 
 async function registryError(res: Response): Promise<RegistryError> {
