@@ -6,7 +6,6 @@ import pytest
 
 from backend.games.total_war_warhammer_3.update_detector import (
     StaleMod,
-    current_mtimes,
     detect_updates,
 )
 
@@ -108,44 +107,6 @@ def test_stale_sorted_by_delta_descending(tmp_path):
     assert issues[0]["delta_seconds"] > issues[1]["delta_seconds"]
 
 
-def test_current_mtimes_returns_dict_keyed_by_package_name(tmp_path):
-    """current_mtimes() returns a dict keyed by package_name with the correct shape."""
-    pack = tmp_path / "mod.pack"
-    pack.write_bytes(b"x")
-    mtime = 1234.0
-    os.utime(pack, (mtime, mtime))
-
-    mods = [{"name": "M", "package_name": "m", "path": str(pack)}]
-    result = current_mtimes(mods)
-
-    assert "m" in result
-    assert result["m"] == pytest.approx(mtime)
-
-
-def test_current_mtimes_skips_mods_missing_package_name(tmp_path):
-    """current_mtimes() excludes mods that have a `path` but no `package_name`."""
-    pack = tmp_path / "mod.pack"
-    pack.write_bytes(b"x")
-    mods = [{"name": "M", "path": str(pack)}]
-    result = current_mtimes(mods)
-    assert result == {}
-
-
-def test_current_mtimes_skips_mods_missing_path():
-    """current_mtimes() excludes mods that have a `package_name` but no `path`."""
-    mods = [{"name": "M", "package_name": "m"}]
-    result = current_mtimes(mods)
-    assert result == {}
-
-
-def test_current_mtimes_returns_none_for_unreadable_paths():
-    """current_mtimes() includes the key but maps it to None when the path does not exist."""
-    mods = [{"name": "M", "package_name": "m", "path": "/nonexistent/does_not_exist.pack"}]
-    result = current_mtimes(mods)
-    assert "m" in result
-    assert result["m"] is None
-
-
 def test_vanilla_package_is_excluded_from_detection(tmp_path):
     """Mods with `package_name='vanilla'` are silently skipped regardless of mtime."""
     real_pack = tmp_path / "real.pack"
@@ -166,24 +127,6 @@ def test_vanilla_package_is_excluded_from_detection(tmp_path):
 
     assert len(issues) == 1
     assert issues[0]["package_name"] == "real"
-
-
-def test_vanilla_package_is_excluded_from_current_mtimes(tmp_path):
-    """`current_mtimes` never includes a vanilla key, even when the path is real."""
-    fake_vanilla = tmp_path / "vanilla.pack"
-    fake_vanilla.write_bytes(b"x")
-    real_pack = tmp_path / "real.pack"
-    real_pack.write_bytes(b"x")
-
-    mods = [
-        {"name": "Vanilla", "package_name": "vanilla", "path": str(fake_vanilla)},
-        {"name": "Real", "package_name": "real", "path": str(real_pack)},
-    ]
-
-    result = current_mtimes(mods)
-
-    assert "vanilla" not in result
-    assert "real" in result
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -218,3 +161,38 @@ def test_sha256_file_handles_large_file_in_chunks(tmp_path):
     assert result is not None
     assert result.startswith("sha256:")
     assert len(result) == len("sha256:") + 64
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# current_baseline
+
+
+from backend.games.total_war_warhammer_3.update_detector import current_baseline
+
+
+def test_current_baseline_returns_mtime_and_hash_per_mod(tmp_path):
+    """Each mod with a readable path gets an entry with `mtime` and a `sha256:` hash."""
+    pack = tmp_path / "real.pack"
+    pack.write_bytes(b"hello world")
+    os.utime(pack, (1000.0, 1000.0))
+    mods = [{"name": "M", "package_name": "m", "path": str(pack)}]
+
+    result = current_baseline(mods)
+
+    assert "m" in result
+    assert result["m"]["mtime"] == 1000.0
+    assert result["m"]["hash"] == "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+
+
+def test_current_baseline_excludes_vanilla(tmp_path):
+    """The `vanilla` package is omitted from the baseline."""
+    mods = [{"name": "Vanilla", "package_name": "vanilla", "path": str(tmp_path / "vanilla.pack")}]
+    assert current_baseline(mods) == {}
+
+
+def test_current_baseline_records_none_hash_when_path_unreadable(tmp_path):
+    """An unreadable path produces an entry with `mtime: None` and `hash: None`."""
+    mods = [{"name": "M", "package_name": "m", "path": str(tmp_path / "missing.pack")}]
+    result = current_baseline(mods)
+    assert result == {"m": {"mtime": None, "hash": None}}

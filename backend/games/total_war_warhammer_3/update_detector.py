@@ -14,6 +14,20 @@ _HASH_PREFIX = "sha256:"
 _HASH_CHUNK_BYTES = 1024 * 1024  # 1 MB chunked read.
 
 
+class BaselineEntry(TypedDict):
+    """One entry in the on-disk baseline.
+
+    Fields:
+        mtime: Last-known mtime in Unix epoch seconds, or `None` if the file was unreadable
+            when the baseline was captured.
+        hash: SHA-256 of the file content as `sha256:<hex>`, or `None` if unreadable or
+            never captured yet.
+    """
+
+    mtime: float | None
+    hash: str | None
+
+
 class StaleMod(TypedDict):
     """A mod whose `.pack` file is newer than the stored baseline mtime.
 
@@ -120,18 +134,19 @@ def detect_updates(mods: list[dict], baseline: dict[str, float | None]) -> list[
     return stale
 
 
-def current_mtimes(mods: list[dict]) -> dict[str, float | None]:
-    """Walk `mods` once and return a dict mapping `package_name` to the current mtime.
+def current_baseline(mods: list[dict]) -> dict[str, BaselineEntry]:
+    """Walk `mods` once and return a `{package_name: BaselineEntry}` dict.
 
-    Mods missing `package_name` or `path` are excluded from the result entirely.
+    Mods missing `package_name` or `path` are excluded entirely. Excluded package
+    names (e.g. `vanilla`) are also omitted.
 
     Args:
         mods: List of mod dicts, each expected to have `package_name` and `path` keys.
 
     Returns:
-        A dict of `{package_name: mtime_or_None}` for every mod that has both keys.
+        A dict mapping `package_name` to `{mtime, hash}` for every eligible mod.
     """
-    result: dict[str, float | None] = {}
+    result: dict[str, BaselineEntry] = {}
     for mod in mods:
         package_name = mod.get("package_name")
         path = mod.get("path")
@@ -139,5 +154,7 @@ def current_mtimes(mods: list[dict]) -> dict[str, float | None]:
             continue
         if package_name in _EXCLUDED_PACKAGE_NAMES:
             continue
-        result[package_name] = _safe_mtime(path)
+        mtime = _safe_mtime(path)
+        file_hash = _sha256_file(path) if mtime is not None else None
+        result[package_name] = {"mtime": mtime, "hash": file_hash}
     return result
