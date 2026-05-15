@@ -122,6 +122,12 @@ const SettingsPage: React.FC = () => {
     const [originalTw3RpfmCliPath, setOriginalTw3RpfmCliPath] = useState("")
     const [tw3SteamLibraryDrive, setTw3SteamLibraryDrive] = useState("")
     const [originalTw3SteamLibraryDrive, setOriginalTw3SteamLibraryDrive] = useState("")
+    const [steamcmdPath, setSteamcmdPath] = useState("")
+    const [originalSteamcmdPath, setOriginalSteamcmdPath] = useState("")
+    const [steamUsername, setSteamUsername] = useState("")
+    const [originalSteamUsername, setOriginalSteamUsername] = useState("")
+    const [steamcmdInstalling, setSteamcmdInstalling] = useState(false)
+    const [steamcmdInstallError, setSteamcmdInstallError] = useState<string | null>(null)
 
     // Ollama-specific state
     const [ollamaStatus, setOllamaStatus] = useState<string>("unknown")
@@ -192,7 +198,9 @@ const SettingsPage: React.FC = () => {
         JSON.stringify(ignoredMods) !== JSON.stringify(originalIgnoredMods) ||
         tw3HelperPath !== originalTw3HelperPath ||
         tw3RpfmCliPath !== originalTw3RpfmCliPath ||
-        tw3SteamLibraryDrive !== originalTw3SteamLibraryDrive
+        tw3SteamLibraryDrive !== originalTw3SteamLibraryDrive ||
+        steamcmdPath !== originalSteamcmdPath ||
+        steamUsername !== originalSteamUsername
 
     // Fetch current settings from the backend on mount.
     // Uses AbortController so React StrictMode's double-mount doesn't
@@ -237,6 +245,10 @@ const SettingsPage: React.FC = () => {
                 setOriginalTw3RpfmCliPath(data.tw3_rpfm_cli_path || "")
                 setTw3SteamLibraryDrive(data.tw3_steam_library_drive || "")
                 setOriginalTw3SteamLibraryDrive(data.tw3_steam_library_drive || "")
+                setSteamcmdPath(data.steamcmd_path || "")
+                setOriginalSteamcmdPath(data.steamcmd_path || "")
+                setSteamUsername(data.steam_username || "")
+                setOriginalSteamUsername(data.steam_username || "")
                 setClaudeModel(data.claude_model || "claude-sonnet-4-6")
                 setOriginalClaudeModel(data.claude_model || "claude-sonnet-4-6")
                 setOpenaiModel(data.openai_model || "gpt-4.1")
@@ -351,6 +363,8 @@ const SettingsPage: React.FC = () => {
         if (tw3HelperPath !== originalTw3HelperPath) payload.tw3_helper_path = tw3HelperPath
         if (tw3RpfmCliPath !== originalTw3RpfmCliPath) payload.tw3_rpfm_cli_path = tw3RpfmCliPath
         if (tw3SteamLibraryDrive !== originalTw3SteamLibraryDrive) payload.tw3_steam_library_drive = tw3SteamLibraryDrive
+        if (steamcmdPath !== originalSteamcmdPath) payload.steamcmd_path = steamcmdPath
+        if (steamUsername !== originalSteamUsername) payload.steam_username = steamUsername
 
         try {
             const res = await fetch(`${API_BASE}/settings`, {
@@ -401,6 +415,10 @@ const SettingsPage: React.FC = () => {
             setOriginalTw3RpfmCliPath(data.tw3_rpfm_cli_path || "")
             setTw3SteamLibraryDrive(data.tw3_steam_library_drive || "")
             setOriginalTw3SteamLibraryDrive(data.tw3_steam_library_drive || "")
+            setSteamcmdPath(data.steamcmd_path || "")
+            setOriginalSteamcmdPath(data.steamcmd_path || "")
+            setSteamUsername(data.steam_username || "")
+            setOriginalSteamUsername(data.steam_username || "")
             setClaudeModel(data.claude_model || "claude-sonnet-4-6")
             setOriginalClaudeModel(data.claude_model || "claude-sonnet-4-6")
             setOpenaiModel(data.openai_model || "gpt-4.1")
@@ -1577,6 +1595,76 @@ const SettingsPage: React.FC = () => {
                     placeholder="F:"
                     value={tw3SteamLibraryDrive}
                     onChange={(e) => setTw3SteamLibraryDrive(e.target.value)}
+                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8 }}
+                />
+            </div>
+
+            {/* Steam Account (Publish to Workshop) */}
+            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
+                <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-main)" }}>Steam Account</h3>
+                <p style={{ color: "var(--text-dim)", marginBottom: "1rem" }}>
+                    Used by the Publish to Workshop button on the TW3 Dashboard. After saving, run <code>steamcmd +login &lt;username&gt;</code> once in a terminal to complete Steam Guard
+                    authentication. SteamCMD will cache the session for ~2 weeks.
+                </p>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.5rem" }}>
+                    <label style={{ color: "var(--text-dim)" }}>SteamCMD path (steamcmd.exe)</label>
+                    <button
+                        className="btn btn-outline"
+                        onClick={async () => {
+                            setSteamcmdInstalling(true)
+                            setSteamcmdInstallError(null)
+                            try {
+                                const res = await fetch(`${API_BASE}/steamcmd/install`, { method: "POST" })
+                                const data = await res.json()
+                                if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`)
+                                setSteamcmdPath(data.path)
+                                setOriginalSteamcmdPath(data.path)
+                            } catch (err) {
+                                setSteamcmdInstallError(err instanceof Error ? err.message : String(err))
+                            } finally {
+                                setSteamcmdInstalling(false)
+                            }
+                        }}
+                        disabled={steamcmdInstalling}
+                        style={{ fontSize: "0.85rem", padding: "0.25rem 0.75rem" }}
+                        title="Download and extract steamcmd.zip into backend storage, then auto-fill the path below."
+                    >
+                        {steamcmdInstalling ? "Installing..." : "Install SteamCMD"}
+                    </button>
+                </div>
+                {steamcmdInstallError && (
+                    <div
+                        style={{
+                            padding: "0.5rem 0.75rem",
+                            marginBottom: "0.5rem",
+                            background: "rgba(239,68,68,0.15)",
+                            color: "#ff8a8a",
+                            border: "1px solid rgba(239,68,68,0.3)",
+                            borderRadius: 6,
+                            fontSize: "0.85rem",
+                        }}
+                    >
+                        Install failed: {steamcmdInstallError}
+                    </div>
+                )}
+                <input
+                    type="text"
+                    className="btn-outline"
+                    placeholder="C:\\steamcmd\\steamcmd.exe"
+                    value={steamcmdPath}
+                    onChange={(e) => setSteamcmdPath(e.target.value)}
+                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "1rem" }}
+                />
+
+                <label style={{ display: "block", marginBottom: "0.5rem", color: "var(--text-dim)" }}>Steam username</label>
+                <input
+                    type="text"
+                    className="btn-outline"
+                    placeholder="your_steam_username"
+                    value={steamUsername}
+                    onChange={(e) => setSteamUsername(e.target.value)}
+                    autoComplete="off"
                     style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8 }}
                 />
             </div>
