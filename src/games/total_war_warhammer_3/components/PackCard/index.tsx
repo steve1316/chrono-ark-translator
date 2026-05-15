@@ -1,6 +1,8 @@
+import { useState } from "react"
 import { FaSteam } from "react-icons/fa"
 import WorkshopCard from "../../../../components/WorkshopCard"
 import { API_BASE } from "../../../../config"
+import PublishWorkshopDialog from "../PublishWorkshopDialog"
 import ScriptRunButton from "../ScriptRunButton"
 
 /** A single compat pack card shown on the TW3 Dashboard. */
@@ -30,35 +32,42 @@ interface PackCardProps {
  * @returns The rendered TW3 pack card.
  */
 const PackCardComponent = ({ pack }: PackCardProps) => {
+    const [publishOpen, setPublishOpen] = useState(false)
     const previewImageUrl = `${API_BASE}/games/total_war_warhammer_3/packs/${pack.workshopId}/preview`
     const workshopUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${pack.workshopId}`
     return (
-        <WorkshopCard previewImageUrl={previewImageUrl} previewAlt={pack.title} title={pack.title} idBadge={pack.workshopId}>
-            {pack.sharedNote && <p style={{ fontSize: "0.85em", color: "var(--text-dim)", margin: "0.5rem 0" }}>{pack.sharedNote}</p>}
-            <div className="mod-actions">
-                <ScriptRunButton scriptId={pack.scriptId} label="Rebuild" />
-                <a
-                    href={workshopUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-outline"
-                    aria-label="Open Steam workshop page"
-                    title="Open Steam workshop page"
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: "42px",
-                        height: "42px",
-                        textDecoration: "none",
-                        color: "var(--text-main)",
-                        padding: "0",
-                    }}
-                >
-                    <FaSteam size={20} />
-                </a>
-            </div>
-        </WorkshopCard>
+        <>
+            <WorkshopCard previewImageUrl={previewImageUrl} previewAlt={pack.title} title={pack.title} idBadge={pack.workshopId}>
+                {pack.sharedNote && <p style={{ fontSize: "0.85em", color: "var(--text-dim)", margin: "0.5rem 0" }}>{pack.sharedNote}</p>}
+                <div className="mod-actions">
+                    <ScriptRunButton scriptId={pack.scriptId} label="Rebuild" />
+                    <button className="btn btn-outline" onClick={() => setPublishOpen(true)} title="Push the local pack to the Steam Workshop">
+                        Publish
+                    </button>
+                    <a
+                        href={workshopUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-outline"
+                        aria-label="Open Steam workshop page"
+                        title="Open Steam workshop page"
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: "42px",
+                            height: "42px",
+                            textDecoration: "none",
+                            color: "var(--text-main)",
+                            padding: "0",
+                        }}
+                    >
+                        <FaSteam size={20} />
+                    </a>
+                </div>
+            </WorkshopCard>
+            {publishOpen && <PublishWorkshopDialog workshopId={pack.workshopId} title={pack.title} onClose={() => setPublishOpen(false)} />}
+        </>
     )
 }
 
