@@ -184,3 +184,37 @@ def test_vanilla_package_is_excluded_from_current_mtimes(tmp_path):
 
     assert "vanilla" not in result
     assert "real" in result
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# _sha256_file
+
+
+from backend.games.total_war_warhammer_3.update_detector import _sha256_file
+
+
+def test_sha256_file_returns_prefixed_hex_for_known_bytes(tmp_path):
+    """Hashing a fixture with known bytes returns the expected `sha256:<hex>` string."""
+    pack = tmp_path / "known.pack"
+    pack.write_bytes(b"hello world")
+    # echo -n "hello world" | sha256sum
+    expected = "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+    assert _sha256_file(str(pack)) == expected
+
+
+def test_sha256_file_returns_none_for_unreadable_path(tmp_path):
+    """A path that does not exist returns `None`, not a raised exception."""
+    missing = tmp_path / "does_not_exist.pack"
+    assert _sha256_file(str(missing)) is None
+
+
+def test_sha256_file_handles_large_file_in_chunks(tmp_path):
+    """A multi-MB file hashes correctly via the 1 MB chunked read loop."""
+    pack = tmp_path / "big.pack"
+    # 3 MB of repeating bytes - exercises the chunk loop without being slow.
+    pack.write_bytes(b"\xab" * (3 * 1024 * 1024))
+    result = _sha256_file(str(pack))
+    assert result is not None
+    assert result.startswith("sha256:")
+    assert len(result) == len("sha256:") + 64

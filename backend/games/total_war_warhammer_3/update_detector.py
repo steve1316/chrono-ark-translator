@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import TypedDict
 
 # Package names excluded from update detection because they don't track Steam Workshop updates
 # (e.g. the "vanilla" entry points at the game's base files which Steam Workshop doesn't update).
 _EXCLUDED_PACKAGE_NAMES = frozenset({"vanilla"})
+
+_HASH_PREFIX = "sha256:"
+_HASH_CHUNK_BYTES = 1024 * 1024  # 1 MB chunked read.
 
 
 class StaleMod(TypedDict):
@@ -28,6 +32,30 @@ class StaleMod(TypedDict):
     current_mtime: float
     baseline_mtime: float
     delta_seconds: float
+
+
+def _sha256_file(path: str) -> str | None:
+    """Return the SHA-256 of `path` as `sha256:<hex>`, or `None` if unreadable.
+
+    Reads the file in 1 MB chunks so multi-GB packs do not pin memory.
+
+    Args:
+        path: Filesystem path to a `.pack` file.
+
+    Returns:
+        The hash string prefixed with `sha256:`, or `None` if the file cannot be opened or read.
+    """
+    digest = hashlib.sha256()
+    try:
+        with open(path, "rb") as fh:
+            while True:
+                chunk = fh.read(_HASH_CHUNK_BYTES)
+                if not chunk:
+                    break
+                digest.update(chunk)
+    except OSError:
+        return None
+    return f"{_HASH_PREFIX}{digest.hexdigest()}"
 
 
 def _safe_mtime(path: str) -> float | None:
