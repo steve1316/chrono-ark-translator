@@ -180,6 +180,40 @@ export function runStreamUrl(): string {
     return api.url("/run/stream")
 }
 
+/** Handle returned by `publishPack` describing the spawned SteamCMD subprocess. */
+export interface PublishHandle {
+    /** Unique identifier for this publish run, generated server-side. */
+    publish_id: string
+    /** Steam Workshop item id being updated. */
+    workshop_id: string
+    /** ISO timestamp of when SteamCMD was spawned. */
+    started_at: string
+}
+
+/**
+ * Spawn SteamCMD on the backend to push the local workshop folder as an update to an existing Workshop item.
+ *
+ * @param workshopId Numeric Steam Workshop item id of the existing entry to update.
+ * @param changenote Update note shown in the Workshop changelog. Empty string omits the field from the VDF.
+ * @returns Handle describing the started publish run.
+ * @throws `RegistryError` On any non-2xx response. `missing` is populated when preflight fails (HTTP 400 with `{missing: [...]}`).
+ */
+export async function publishPack(workshopId: string, changenote: string): Promise<PublishHandle> {
+    const res = await api.post(`/packs/${encodeURIComponent(workshopId)}/publish`, { changenote })
+    if (!res.ok) throw await registryError(res)
+    return res.json()
+}
+
+/**
+ * Build the SSE stream URL for an in-flight publish.
+ *
+ * @param workshopId Numeric Steam Workshop item id whose publish to follow.
+ * @returns Absolute URL the frontend can pass to `new EventSource(...)`.
+ */
+export function publishStreamUrl(workshopId: string): string {
+    return api.url(`/packs/${encodeURIComponent(workshopId)}/publish/stream`)
+}
+
 /** Surfaces backend registry/runner errors with status, detail, and optional missing-list. */
 export class RegistryError extends Error {
     /** HTTP status code returned by the backend. */
