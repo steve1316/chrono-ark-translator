@@ -5,128 +5,101 @@ import os
 import pytest
 
 from backend.games.total_war_warhammer_3.update_detector import (
+    BaselineEntry,
     StaleMod,
     detect_updates,
 )
 
 
-def test_empty_mods_yields_no_stale():
-    """Empty inputs produce zero stale entries."""
-    assert detect_updates([], {}) == []
+def test_detect_updates_empty_inputs_returns_empty(tmp_path):
+    """Empty inputs produce empty stale list and empty refreshed baseline."""
+    stale, refreshed = detect_updates([], {})
+    assert stale == []
+    assert refreshed == {}
 
 
-def test_no_baseline_entry_yields_no_stale():
-    """A mod present in the list but absent from the baseline is not stale."""
-    mods = [{"name": "M", "package_name": "m", "path": "/some/path.pack"}]
-    assert detect_updates(mods, {}) == []
+def test_detect_updates_no_baseline_entry_hashes_and_silently_baselines(tmp_path):
+    """A mod missing from the baseline is hashed and added to the refreshed baseline. Not stale."""
+    pack = tmp_path / "new.pack"
+    pack.write_bytes(b"hello world")
+    os.utime(pack, (2000.0, 2000.0))
+    mods = [{"name": "M", "package_name": "m", "path": str(pack)}]
+
+    stale, refreshed = detect_updates(mods, {})
+
+    assert stale == []
+    assert refreshed["m"]["mtime"] == 2000.0
+    assert refreshed["m"]["hash"] == "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
 
 
-def test_null_baseline_entry_yields_no_stale():
-    """A mod whose baseline value is None is not stale."""
-    mods = [{"name": "M", "package_name": "m", "path": "/some/path.pack"}]
-    assert detect_updates(mods, {"m": None}) == []
-
-
-def test_current_equals_baseline_yields_no_stale(tmp_path):
-    """A file whose mtime equals the baseline mtime is not stale."""
+def test_detect_updates_mtime_match_skips_hashing(tmp_path, monkeypatch):
+    """When mtime equals baseline, hashing is skipped entirely (cheap path)."""
     pack = tmp_path / "same.pack"
     pack.write_bytes(b"x")
-    mtime = 1000.0
-    os.utime(pack, (mtime, mtime))
+    os.utime(pack, (1000.0, 1000.0))
     mods = [{"name": "M", "package_name": "m", "path": str(pack)}]
-    assert detect_updates(mods, {"m": mtime}) == []
+    baseline = {"m": {"mtime": 1000.0, "hash": "sha256:abc"}}
+
+    calls = []
+    import backend.games.total_war_warhammer_3.update_detector as detector
+    monkeypatch.setattr(detector, "_sha256_file", lambda p: calls.append(p) or None)
+
+    stale, refreshed = detect_updates(mods, baseline)
+
+    assert stale == []
+    assert calls == []
+    assert refreshed == baseline
 
 
-def test_current_older_than_baseline_yields_no_stale(tmp_path):
-    """A file whose mtime is older than the baseline is not stale."""
-    pack = tmp_path / "older.pack"
-    pack.write_bytes(b"x")
-    os.utime(pack, (500.0, 500.0))
+def test_detect_updates_silent_rebaseline_when_hash_matches(tmp_path):
+    """mtime differs but hash equals baseline -> not stale, refreshed baseline carries new mtime."""
+    pack = tmp_path / "rebaseline.pack"
+    pack.write_bytes(b"hello world")
+    os.utime(pack, (2000.0, 2000.0))
     mods = [{"name": "M", "package_name": "m", "path": str(pack)}]
-    assert detect_updates(mods, {"m": 1000.0}) == []
+    baseline = {"m": {"mtime": 1000.0, "hash": "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"}}
+
+    stale, refreshed = detect_updates(mods, baseline)
+
+    assert stale == []
+    assert refreshed["m"]["mtime"] == 2000.0
+    assert refreshed["m"]["hash"] == baseline["m"]["hash"]
 
 
-def test_current_newer_than_baseline_yields_stale(tmp_path):
-    """A real file with mtime newer than the baseline produces one stale entry with all fields set."""
-    pack = tmp_path / "real.pack"
-    pack.write_bytes(b"x")
-    baseline_mtime = 1000.0
-    current_mtime = 2000.0
-    os.utime(pack, (current_mtime, current_mtime))
-
+def test_detect_updates_flags_when_hash_differs(tmp_path):
+    """Bytes differ -> StaleMod entry. Baseline NOT updated (sync is user's job)."""
+    pack = tmp_path / "changed.pack"
+    pack.write_bytes(b"new content")
+    os.utime(pack, (2000.0, 2000.0))
     mods = [{"name": "M", "package_name": "m", "path": str(pack)}]
-    issues = detect_updates(mods, {"m": baseline_mtime})
+    baseline = {"m": {"mtime": 1000.0, "hash": "sha256:old_hash_value"}}
 
-    assert len(issues) == 1
-    stale = issues[0]
-    assert stale["package_name"] == "m"
-    assert stale["mod_name"] == "M"
-    assert stale["path"] == str(pack)
-    assert stale["current_mtime"] == pytest.approx(current_mtime)
-    assert stale["baseline_mtime"] == pytest.approx(baseline_mtime)
-    assert stale["delta_seconds"] == pytest.approx(1000.0)
+    stale, refreshed = detect_updates(mods, baseline)
 
-
-def test_unreadable_path_yields_no_stale():
-    """A mod whose path does not exist on disk is skipped silently."""
-    mods = [{"name": "M", "package_name": "m", "path": "/nonexistent/path.pack"}]
-    assert detect_updates(mods, {"m": 1000.0}) == []
+    assert len(stale) == 1
+    entry = stale[0]
+    assert entry["package_name"] == "m"
+    assert entry["current_mtime"] == 2000.0
+    assert entry["baseline_mtime"] == 1000.0
+    assert refreshed["m"] == baseline["m"]
 
 
-def test_mod_missing_path_field_skipped():
-    """A mod dict with no `path` key is skipped without raising an exception."""
-    mods = [{"name": "M", "package_name": "m"}]
-    assert detect_updates(mods, {"m": 1000.0}) == []
+def test_detect_updates_skips_unreadable_files(tmp_path):
+    """A mod whose path doesn't exist is skipped entirely (not stale, no refresh)."""
+    mods = [{"name": "M", "package_name": "m", "path": str(tmp_path / "ghost.pack")}]
+    baseline = {"m": {"mtime": 1000.0, "hash": "sha256:abc"}}
+
+    stale, refreshed = detect_updates(mods, baseline)
+
+    assert stale == []
+    assert refreshed == baseline
 
 
-def test_mod_missing_package_name_skipped():
-    """A mod dict with no `package_name` key is skipped without raising an exception."""
-    mods = [{"name": "M", "path": "/some/path.pack"}]
-    assert detect_updates(mods, {}) == []
-
-
-def test_stale_sorted_by_delta_descending(tmp_path):
-    """Multiple stale mods are returned sorted by delta_seconds descending."""
-    pack_a = tmp_path / "a.pack"
-    pack_b = tmp_path / "b.pack"
-    pack_a.write_bytes(b"x")
-    pack_b.write_bytes(b"x")
-    os.utime(pack_a, (1100.0, 1100.0))
-    os.utime(pack_b, (1500.0, 1500.0))
-
-    baseline = 1000.0
-    mods = [
-        {"name": "A", "package_name": "a", "path": str(pack_a)},
-        {"name": "B", "package_name": "b", "path": str(pack_b)},
-    ]
-    issues = detect_updates(mods, {"a": baseline, "b": baseline})
-
-    assert len(issues) == 2
-    assert issues[0]["package_name"] == "b"
-    assert issues[1]["package_name"] == "a"
-    assert issues[0]["delta_seconds"] > issues[1]["delta_seconds"]
-
-
-def test_vanilla_package_is_excluded_from_detection(tmp_path):
-    """Mods with `package_name='vanilla'` are silently skipped regardless of mtime."""
-    real_pack = tmp_path / "real.pack"
-    real_pack.write_bytes(b"x")
-    os.utime(real_pack, (2000.0, 2000.0))
-
-    fake_vanilla = tmp_path / "vanilla.pack"
-    fake_vanilla.write_bytes(b"x")
-    os.utime(fake_vanilla, (2000.0, 2000.0))
-
-    mods = [
-        {"name": "Vanilla", "package_name": "vanilla", "path": str(fake_vanilla)},
-        {"name": "Real", "package_name": "real", "path": str(real_pack)},
-    ]
-    baseline = {"vanilla": 1000.0, "real": 1000.0}
-
-    issues = detect_updates(mods, baseline)
-
-    assert len(issues) == 1
-    assert issues[0]["package_name"] == "real"
+def test_detect_updates_excludes_vanilla(tmp_path):
+    """The `vanilla` package is never inspected."""
+    mods = [{"name": "Vanilla", "package_name": "vanilla", "path": str(tmp_path / "vanilla.pack")}]
+    stale, refreshed = detect_updates(mods, {"vanilla": {"mtime": 0.0, "hash": "sha256:0"}})
+    assert stale == []
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////

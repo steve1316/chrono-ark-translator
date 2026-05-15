@@ -87,20 +87,30 @@ def _safe_mtime(path: str) -> float | None:
         return None
 
 
-def detect_updates(mods: list[dict], baseline: dict[str, float | None]) -> list[StaleMod]:
-    """Return mods whose `.pack` file is newer than the stored baseline mtime.
+def detect_updates(
+    mods: list[dict],
+    baseline: dict[str, BaselineEntry],
+) -> tuple[list[StaleMod], dict[str, BaselineEntry]]:
+    """Return `(stale_list, refreshed_baseline)` after a hybrid mtime+hash scan.
 
-    Skips mods missing `package_name` or `path`, mods with no or None baseline entry,
-    and mods whose path cannot be stat'd. Results are sorted by `delta_seconds` descending.
+    mtime is the cheap pre-filter. When a mod's current mtime equals the stored mtime,
+    no hash is computed. When mtime differs, the file is hashed:
+      - If the new hash matches the baseline hash, the entry is silently re-baselined
+        (mtime updated, mod NOT in stale list).
+      - If the new hash differs, the mod is added to the stale list and the baseline
+        is left intact for that mod (the user must call sync to acknowledge).
 
     Args:
-        mods: List of mod dicts, each expected to have `package_name`, `path`, and `name` keys.
-        baseline: Map of `package_name` to the last-known mtime (or None if never recorded).
+        mods: List of mod dicts with `name`, `package_name`, `path`.
+        baseline: Map of `package_name` to `BaselineEntry`.
 
     Returns:
-        A list of `StaleMod` dicts sorted by `delta_seconds` descending.
+        `(stale, refreshed_baseline)`. `refreshed_baseline` is a NEW dict, never the
+        same reference as the input. Callers can compare references or check for
+        per-entry mtime drift to decide whether to write to disk.
     """
     stale: list[StaleMod] = []
+    refreshed: dict[str, BaselineEntry] = dict(baseline)
 
     for mod in mods:
         package_name = mod.get("package_name")
@@ -110,28 +120,42 @@ def detect_updates(mods: list[dict], baseline: dict[str, float | None]) -> list[
         if package_name in _EXCLUDED_PACKAGE_NAMES:
             continue
 
-        baseline_mtime = baseline.get(package_name)
-        if baseline_mtime is None:
+        cur_mtime = _safe_mtime(path)
+        if cur_mtime is None:
             continue
 
-        current_mtime = _safe_mtime(path)
-        if current_mtime is None:
+        entry = refreshed.get(package_name)
+        if entry is None or entry.get("mtime") is None:
+            # New mod or previously unreadable - silently capture and continue.
+            cur_hash = _sha256_file(path)
+            refreshed[package_name] = {"mtime": cur_mtime, "hash": cur_hash}
             continue
 
-        if current_mtime > baseline_mtime:
-            stale.append(
-                StaleMod(
-                    package_name=package_name,
-                    mod_name=mod.get("name", ""),
-                    path=path,
-                    current_mtime=current_mtime,
-                    baseline_mtime=baseline_mtime,
-                    delta_seconds=current_mtime - baseline_mtime,
-                )
+        if cur_mtime == entry["mtime"]:
+            continue  # Cheap path.
+
+        cur_hash = _sha256_file(path)
+        if cur_hash is None:
+            continue  # Unreadable mid-scan, skip.
+
+        if cur_hash == entry["hash"]:
+            refreshed[package_name] = {"mtime": cur_mtime, "hash": entry["hash"]}
+            continue
+
+        # Truly different bytes.
+        stale.append(
+            StaleMod(
+                package_name=package_name,
+                mod_name=mod.get("name", ""),
+                path=path,
+                current_mtime=cur_mtime,
+                baseline_mtime=entry["mtime"],
+                delta_seconds=cur_mtime - entry["mtime"],
             )
+        )
 
     stale.sort(key=lambda s: s["delta_seconds"], reverse=True)
-    return stale
+    return stale, refreshed
 
 
 def current_baseline(mods: list[dict]) -> dict[str, BaselineEntry]:
