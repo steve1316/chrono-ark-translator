@@ -26,7 +26,7 @@ from backend.games.total_war_warhammer_3.update_detector import (
 
 router = APIRouter()
 
-# Default baseline paths; tests monkeypatch these to redirect storage.
+# Default baseline paths. Tests monkeypatch these to redirect storage.
 _STORAGE_DIR = Path(__file__).resolve().parents[3] / "storage" / "games" / "total_war_warhammer_3"
 _BASELINE_PATH = _STORAGE_DIR / "mod_baseline.json"
 _LEGACY_BASELINE_PATH = _STORAGE_DIR / "mod_mtimes.json"
