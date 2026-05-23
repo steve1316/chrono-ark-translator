@@ -100,9 +100,7 @@ describe("GameSwitcher (segmented)", () => {
 
     it("renders a single-letter fallback glyph for a game with no branding entry", async () => {
         vi.spyOn(globalThis, "fetch").mockImplementationOnce(() =>
-            Promise.resolve(
-                new Response(JSON.stringify([...GAMES, { game_id: "future_game", display_name: "Future Game", icon: "", capabilities: [] }]), { status: 200 }),
-            ),
+            Promise.resolve(new Response(JSON.stringify([...GAMES, { game_id: "future_game", display_name: "Future Game", icon: "", capabilities: [] }]), { status: 200 }))
         )
         render(wrap(<GameSwitcher activeGameId="chrono_ark" onChange={vi.fn()} />))
         const futurePill = await screen.findByRole("radio", { name: /Future Game/i })

@@ -55,9 +55,7 @@ describe("Sidebar active-game header", () => {
 
     it("omits the subtitle for a game with no branding entry", async () => {
         vi.spyOn(globalThis, "fetch").mockImplementationOnce(() =>
-            Promise.resolve(
-                new Response(JSON.stringify([{ game_id: "future_game", display_name: "Future Game", icon: "", capabilities: [] }]), { status: 200 }),
-            ),
+            Promise.resolve(new Response(JSON.stringify([{ game_id: "future_game", display_name: "Future Game", icon: "", capabilities: [] }]), { status: 200 }))
         )
         render(wrap(<Sidebar activeGameId="future_game" onGameChange={vi.fn()} />))
         const title = await screen.findByTestId("sidebar-game-title")
