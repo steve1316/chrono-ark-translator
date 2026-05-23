@@ -57,6 +57,41 @@ def get_pack_preview(workshop_id: str):
     raise HTTPException(status_code=404, detail="no preview image found")
 
 
+@router.get("/packs/{workshop_id}/last_modified")
+def get_pack_last_modified(workshop_id: str):
+    """Return the newest mtime among files inside the local Workshop folder for `workshop_id`.
+
+    Used by the TW3 Dashboard to surface "Updated Nh ago" beneath each pack card. The newest mtime across the
+    folder's files captures the last time the user rebuilt or otherwise touched the pack on disk.
+
+    Args:
+        workshop_id: Numeric Steam Workshop item id.
+
+    Returns:
+        `{"last_modified_unix": float | None}` - the most recent mtime in the folder as a unix timestamp, or
+        `None` when the folder is present but contains no files.
+
+    Raises:
+        HTTPException(400): When `workshop_id` is not purely numeric.
+        HTTPException(404): When the Steam library drive is unset or the workshop folder does not exist on disk.
+    """
+    if not _WORKSHOP_ID_RE.fullmatch(workshop_id):
+        raise HTTPException(status_code=400, detail="workshop_id must be numeric")
+
+    folder = tw3_workshop_content_dir(workshop_id)
+    if folder is None or not folder.is_dir():
+        raise HTTPException(status_code=404, detail="workshop folder not found")
+
+    newest: float | None = None
+    for entry in folder.iterdir():
+        if entry.is_file():
+            mtime = entry.stat().st_mtime
+            if newest is None or mtime > newest:
+                newest = mtime
+
+    return {"last_modified_unix": newest}
+
+
 @router.post("/packs/{workshop_id}/open")
 def open_pack_folder(workshop_id: str):
     """Open the local Steam Workshop folder for `workshop_id` in the system file explorer.

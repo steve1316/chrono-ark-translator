@@ -114,6 +114,53 @@ def test_preview_returns_404_when_drive_unset(monkeypatch):
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # //////////////////////////////////////////////////////////////////////////////////////////////////
+# GET /packs/{workshop_id}/last_modified
+
+
+def test_last_modified_returns_newest_mtime_in_folder(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    workshop_dir = parent / "999"
+    workshop_dir.mkdir()
+    older = workshop_dir / "thumbnail.jpg"
+    older.write_bytes(b"img")
+    newer = workshop_dir / "thing.pack"
+    newer.write_bytes(b"pack")
+    import os as _os
+
+    _os.utime(older, (1_700_000_000, 1_700_000_000))
+    _os.utime(newer, (1_750_000_000, 1_750_000_000))
+    res = TestClient(app).get("/api/games/total_war_warhammer_3/packs/999/last_modified")
+    assert res.status_code == 200
+    assert res.json() == {"last_modified_unix": 1_750_000_000.0}
+
+
+def test_last_modified_returns_null_when_folder_empty(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    (parent / "999").mkdir()
+    res = TestClient(app).get("/api/games/total_war_warhammer_3/packs/999/last_modified")
+    assert res.status_code == 200
+    assert res.json() == {"last_modified_unix": None}
+
+
+def test_last_modified_returns_404_when_folder_missing(monkeypatch, tmp_path):
+    _set_drive(monkeypatch, tmp_path)
+    res = TestClient(app).get("/api/games/total_war_warhammer_3/packs/999/last_modified")
+    assert res.status_code == 404
+
+
+def test_last_modified_returns_400_when_workshop_id_non_numeric():
+    res = TestClient(app).get("/api/games/total_war_warhammer_3/packs/abc/last_modified")
+    assert res.status_code == 400
+
+
+def test_last_modified_returns_404_when_drive_unset(monkeypatch):
+    monkeypatch.setattr(config, "TW3_STEAM_LIBRARY_DRIVE", "")
+    res = TestClient(app).get("/api/games/total_war_warhammer_3/packs/999/last_modified")
+    assert res.status_code == 404
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
 # POST /packs/{workshop_id}/open
 
 
