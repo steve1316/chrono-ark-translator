@@ -1,9 +1,25 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { FaSteam } from "react-icons/fa"
 import WorkshopCard from "../../../../components/WorkshopCard"
 import { API_BASE } from "../../../../config"
 import PublishWorkshopDialog from "../PublishWorkshopDialog"
 import ScriptRunButton from "../ScriptRunButton"
+
+/**
+ * Format a unix timestamp as a relative "Updated Nh ago" string.
+ *
+ * Always expresses the delta in whole hours so the dashboard reads consistently across packs.
+ *
+ * @param lastModifiedUnix Unix timestamp (seconds) of the last modification.
+ * @param nowMs Current epoch time in milliseconds; defaulted to `Date.now()` so tests can inject a fixed clock.
+ * @returns A human-readable label such as `"Updated 3h ago"`, or `"Updated <1h ago"` when the delta is sub-hour.
+ */
+export function formatHoursAgo(lastModifiedUnix: number, nowMs: number = Date.now()): string {
+    const deltaSeconds = Math.max(0, nowMs / 1000 - lastModifiedUnix)
+    const hours = Math.floor(deltaSeconds / 3600)
+    if (hours < 1) return "Updated <1h ago"
+    return `Updated ${hours}h ago`
+}
 
 /** A single compat pack card shown on the TW3 Dashboard. */
 export interface PackEntry {
@@ -33,11 +49,30 @@ interface PackCardProps {
  */
 const PackCardComponent = ({ pack }: PackCardProps) => {
     const [publishOpen, setPublishOpen] = useState(false)
+    const [lastModifiedUnix, setLastModifiedUnix] = useState<number | null>(null)
     const previewImageUrl = `${API_BASE}/games/total_war_warhammer_3/packs/${pack.workshopId}/preview`
     const workshopUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${pack.workshopId}`
+
+    useEffect(() => {
+        let cancelled = false
+        fetch(`${API_BASE}/games/total_war_warhammer_3/packs/${pack.workshopId}/last_modified`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((body) => {
+                if (cancelled || body == null) return
+                const ts = body.last_modified_unix
+                if (typeof ts === "number") setLastModifiedUnix(ts)
+            })
+            .catch(() => {})
+        return () => {
+            cancelled = true
+        }
+    }, [pack.workshopId])
+
+    const subtitle = lastModifiedUnix !== null ? formatHoursAgo(lastModifiedUnix) : undefined
+
     return (
         <>
-            <WorkshopCard previewImageUrl={previewImageUrl} previewAlt={pack.title} title={pack.title} idBadge={pack.workshopId}>
+            <WorkshopCard previewImageUrl={previewImageUrl} previewAlt={pack.title} title={pack.title} idBadge={pack.workshopId} subtitle={subtitle}>
                 {pack.sharedNote && <p style={{ fontSize: "0.85em", color: "var(--text-dim)", margin: "0.5rem 0" }}>{pack.sharedNote}</p>}
                 <div className="mod-actions">
                     <ScriptRunButton scriptId={pack.scriptId} label="Rebuild" />

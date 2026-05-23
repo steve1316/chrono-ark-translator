@@ -1,12 +1,12 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 vi.mock("../../../../games/total_war_warhammer_3/components/ScriptRunButton", () => ({
     default: ({ label }: { label: string }) => <button>{label}</button>,
 }))
 
-import PackCard from "../../../../games/total_war_warhammer_3/components/PackCard"
+import PackCard, { formatHoursAgo } from "../../../../games/total_war_warhammer_3/components/PackCard"
 
 const BASE_PACK = {
     title: "Nanu's Dynamic RoR Compat",
@@ -15,6 +15,14 @@ const BASE_PACK = {
 }
 
 const wrap = (ui: React.ReactNode) => <MemoryRouter>{ui}</MemoryRouter>
+
+beforeEach(() => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ last_modified_unix: null }), { status: 200 }))
+})
+
+afterEach(() => {
+    vi.restoreAllMocks()
+})
 
 describe("PackCard", () => {
     it("renders the pack title and the workshopId in the badge", () => {
@@ -48,5 +56,44 @@ describe("PackCard", () => {
         render(wrap(<PackCard pack={BASE_PACK} />))
         const img = screen.getByAltText(BASE_PACK.title) as HTMLImageElement
         expect(img.src).toContain(`/api/games/total_war_warhammer_3/packs/${BASE_PACK.workshopId}/preview`)
+    })
+
+    it("renders an 'Updated Nh ago' subtitle from the last_modified endpoint", async () => {
+        const nowSeconds = Math.floor(Date.now() / 1000)
+        const fiveHoursAgo = nowSeconds - 5 * 3600
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ last_modified_unix: fiveHoursAgo }), { status: 200 }))
+        render(wrap(<PackCard pack={BASE_PACK} />))
+        await waitFor(() => expect(screen.getByText("Updated 5h ago")).toBeInTheDocument())
+    })
+
+    it("omits the subtitle when the endpoint returns null", async () => {
+        render(wrap(<PackCard pack={BASE_PACK} />))
+        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled())
+        expect(screen.queryByText(/Updated /)).not.toBeInTheDocument()
+    })
+
+    it("omits the subtitle when the endpoint returns 404", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("", { status: 404 }))
+        render(wrap(<PackCard pack={BASE_PACK} />))
+        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled())
+        expect(screen.queryByText(/Updated /)).not.toBeInTheDocument()
+    })
+})
+
+describe("formatHoursAgo", () => {
+    it("formats a delta of multiple hours as 'Updated Nh ago'", () => {
+        const now = 1_750_000_000_000
+        expect(formatHoursAgo(now / 1000 - 5 * 3600, now)).toBe("Updated 5h ago")
+        expect(formatHoursAgo(now / 1000 - 72 * 3600, now)).toBe("Updated 72h ago")
+    })
+
+    it("renders sub-hour deltas as 'Updated <1h ago'", () => {
+        const now = 1_750_000_000_000
+        expect(formatHoursAgo(now / 1000 - 60, now)).toBe("Updated <1h ago")
+    })
+
+    it("clamps negative deltas (clock skew) to '<1h ago'", () => {
+        const now = 1_750_000_000_000
+        expect(formatHoursAgo(now / 1000 + 3600, now)).toBe("Updated <1h ago")
     })
 })
