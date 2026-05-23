@@ -32,7 +32,11 @@ def tw3_workshop_content_dir(workshop_id: str) -> Path | None:
         Resolved `Path` to the workshop content directory, or `None` when the
         Steam library drive setting is empty.
     """
-    drive = config.TW3_STEAM_LIBRARY_DRIVE or ""
+    drive = (config.TW3_STEAM_LIBRARY_DRIVE or "").strip()
     if not drive:
         return None
+    # A bare drive spec like "F:" is drive-relative on Windows. Promote it to "F:\" so the join produces an absolute path
+    # instead of one relative to the current directory on that drive.
+    if len(drive) == 2 and drive.endswith(":"):
+        drive = drive + "\\"
     return Path(drive) / "SteamLibrary" / "steamapps" / "workshop" / "content" / TW3_APPID / workshop_id

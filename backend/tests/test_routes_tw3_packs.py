@@ -17,9 +17,20 @@ from backend.web_server import app
 
 
 def test_workshop_content_dir_builds_path_from_drive(monkeypatch):
-    """When `TW3_STEAM_LIBRARY_DRIVE` is set, the helper joins the well-known suffix."""
+    """When `TW3_STEAM_LIBRARY_DRIVE` is set to a bare drive like 'F:', the helper joins the well-known suffix and yields an
+    absolute path. Previously `Path("F:") / "SteamLibrary"` produced the drive-relative 'F:SteamLibrary', which made SteamCMD
+    look for the workshop folder under its own CWD on the F: drive and fail with 'no content'.
+    """
     monkeypatch.setattr(config, "TW3_STEAM_LIBRARY_DRIVE", "F:")
-    assert tw3_workshop_content_dir("1234567890") == Path("F:") / "SteamLibrary" / "steamapps" / "workshop" / "content" / "1142710" / "1234567890"
+    resolved = tw3_workshop_content_dir("1234567890")
+    assert resolved == Path("F:\\") / "SteamLibrary" / "steamapps" / "workshop" / "content" / "1142710" / "1234567890"
+    assert resolved.is_absolute()
+
+
+def test_workshop_content_dir_accepts_drive_with_trailing_separator(monkeypatch):
+    """A drive value that already includes a trailing separator (e.g. 'F:\\') resolves to the same absolute path."""
+    monkeypatch.setattr(config, "TW3_STEAM_LIBRARY_DRIVE", "F:\\")
+    assert tw3_workshop_content_dir("1234567890") == Path("F:\\") / "SteamLibrary" / "steamapps" / "workshop" / "content" / "1142710" / "1234567890"
 
 
 def test_workshop_content_dir_returns_none_when_drive_unset(monkeypatch):
