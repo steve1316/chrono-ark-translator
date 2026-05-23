@@ -9,9 +9,17 @@ const GAMES = [
     { game_id: "total_war_warhammer_3", display_name: "Warhammer III", icon: "", capabilities: [] },
 ]
 
+const navigateMock = vi.fn()
+
+vi.mock("react-router-dom", async () => {
+    const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom")
+    return { ...actual, useNavigate: () => navigateMock }
+})
+
 const wrap = (ui: React.ReactNode) => <MemoryRouter>{ui}</MemoryRouter>
 
 beforeEach(() => {
+    navigateMock.mockReset()
     vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
         const url = String(input)
         if (url.endsWith("/games")) {
@@ -26,98 +34,80 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks())
 
-describe("GameSwitcher", () => {
-    it("renders the active game's display_name on the trigger button", async () => {
-        render(wrap(<GameSwitcher activeGameId="chrono_ark" onChange={vi.fn()} />))
-        const trigger = await screen.findByRole("button", { name: /Chrono Ark/i })
-        expect(trigger).toBeInTheDocument()
+describe("GameSwitcher (segmented)", () => {
+    it("renders nothing while the games list is empty", () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
+        const { container } = render(wrap(<GameSwitcher activeGameId="chrono_ark" onChange={vi.fn()} />))
+        expect(container).toBeEmptyDOMElement()
     })
 
-    it("opens the menu when the trigger is clicked", async () => {
+    it("renders one radio pill per game with the active pill marked aria-checked", async () => {
         render(wrap(<GameSwitcher activeGameId="chrono_ark" onChange={vi.fn()} />))
-        const trigger = await screen.findByRole("button", { name: /Chrono Ark/i })
-        await userEvent.setup().click(trigger)
-        expect(screen.getByRole("listbox")).toBeInTheDocument()
-        expect(screen.getAllByRole("option")).toHaveLength(2)
-        expect(screen.getByRole("option", { name: /Warhammer III/i })).toBeInTheDocument()
+        const group = await screen.findByRole("radiogroup", { name: /active game/i })
+        const pills = await screen.findAllByRole("radio")
+        expect(group).toBeInTheDocument()
+        expect(pills).toHaveLength(2)
+        expect(screen.getByRole("radio", { name: /Chrono Ark/i })).toHaveAttribute("aria-checked", "true")
+        expect(screen.getByRole("radio", { name: /Warhammer III/i })).toHaveAttribute("aria-checked", "false")
     })
 
-    it("closes the menu when the trigger is clicked again", async () => {
+    it("renders each pill's logo image with the display name as alt text", async () => {
         render(wrap(<GameSwitcher activeGameId="chrono_ark" onChange={vi.fn()} />))
-        const user = userEvent.setup()
-        const trigger = await screen.findByRole("button", { name: /Chrono Ark/i })
-        await user.click(trigger)
-        expect(screen.getByRole("listbox")).toBeInTheDocument()
-        await user.click(trigger)
-        expect(screen.queryByRole("listbox")).not.toBeInTheDocument()
+        await screen.findByRole("radiogroup", { name: /active game/i })
+        expect(screen.getByAltText("Chrono Ark")).toBeInTheDocument()
+        expect(screen.getByAltText("Warhammer III")).toBeInTheDocument()
     })
 
-    it("closes the menu and triggers the settings POST when an option is clicked", async () => {
+    it("clicking an inactive pill POSTs the settings, calls onChange, and navigates to /", async () => {
         const onChange = vi.fn()
         render(wrap(<GameSwitcher activeGameId="chrono_ark" onChange={onChange} />))
         const user = userEvent.setup()
-        const trigger = await screen.findByRole("button", { name: /Chrono Ark/i })
-        await user.click(trigger)
-        const wh3 = screen.getByRole("option", { name: /Warhammer III/i })
-        await user.click(wh3)
-        expect(screen.queryByRole("listbox")).not.toBeInTheDocument()
+        const inactive = await screen.findByRole("radio", { name: /Warhammer III/i })
+        await user.click(inactive)
         const calls = vi.mocked(globalThis.fetch).mock.calls
         const settingsCall = calls.find(([url]) => String(url).endsWith("/settings"))
-        expect(settingsCall).toBeDefined()
-        expect((settingsCall![1] as RequestInit).method).toBe("POST")
-        expect((settingsCall![1] as RequestInit).body).toContain("total_war_warhammer_3")
+        expect(settingsCall).toBeTruthy()
+        expect(JSON.parse(String(settingsCall![1]!.body))).toEqual({ active_game: "total_war_warhammer_3" })
         expect(onChange).toHaveBeenCalledWith("total_war_warhammer_3")
+        expect(navigateMock).toHaveBeenCalledWith("/")
     })
 
-    it("does not POST when the active option is clicked", async () => {
+    it("clicking the already-active pill does nothing", async () => {
         const onChange = vi.fn()
         render(wrap(<GameSwitcher activeGameId="chrono_ark" onChange={onChange} />))
         const user = userEvent.setup()
-        const trigger = await screen.findByRole("button", { name: /Chrono Ark/i })
-        await user.click(trigger)
-        const activeOption = screen.getByRole("option", { name: /Chrono Ark/i })
-        await user.click(activeOption)
-        expect(onChange).not.toHaveBeenCalled()
+        const active = await screen.findByRole("radio", { name: /Chrono Ark/i })
+        await user.click(active)
         const calls = vi.mocked(globalThis.fetch).mock.calls
         const settingsCall = calls.find(([url]) => String(url).endsWith("/settings"))
         expect(settingsCall).toBeUndefined()
+        expect(onChange).not.toHaveBeenCalled()
+        expect(navigateMock).not.toHaveBeenCalled()
     })
 
-    it("closes the menu on mousedown outside the wrapper", async () => {
-        const Wrapper = () => (
-            <>
-                <div data-testid="outside">Outside</div>
-                <GameSwitcher activeGameId="chrono_ark" onChange={vi.fn()} />
-            </>
+    it("ArrowRight from the active pill moves focus to the other pill, and Enter selects it", async () => {
+        const onChange = vi.fn()
+        render(wrap(<GameSwitcher activeGameId="chrono_ark" onChange={onChange} />))
+        const user = userEvent.setup()
+        const active = await screen.findByRole("radio", { name: /Chrono Ark/i })
+        active.focus()
+        await user.keyboard("{ArrowRight}")
+        expect(screen.getByRole("radio", { name: /Warhammer III/i })).toHaveFocus()
+        await user.keyboard("{Enter}")
+        expect(onChange).toHaveBeenCalledWith("total_war_warhammer_3")
+        expect(navigateMock).toHaveBeenCalledWith("/")
+    })
+
+    it("renders a single-letter fallback glyph for a game with no branding entry", async () => {
+        vi.spyOn(globalThis, "fetch").mockImplementationOnce(() =>
+            Promise.resolve(
+                new Response(JSON.stringify([...GAMES, { game_id: "future_game", display_name: "Future Game", icon: "", capabilities: [] }]), { status: 200 }),
+            ),
         )
-        render(wrap(<Wrapper />))
-        const user = userEvent.setup()
-        const trigger = await screen.findByRole("button", { name: /Chrono Ark/i })
-        await user.click(trigger)
-        expect(screen.getByRole("listbox")).toBeInTheDocument()
-        const outside = screen.getByTestId("outside")
-        await user.click(outside)
-        expect(screen.queryByRole("listbox")).not.toBeInTheDocument()
-    })
-
-    it("closes the menu when Escape is pressed", async () => {
         render(wrap(<GameSwitcher activeGameId="chrono_ark" onChange={vi.fn()} />))
-        const user = userEvent.setup()
-        const trigger = await screen.findByRole("button", { name: /Chrono Ark/i })
-        await user.click(trigger)
-        expect(screen.getByRole("listbox")).toBeInTheDocument()
-        await user.keyboard("{Escape}")
-        expect(screen.queryByRole("listbox")).not.toBeInTheDocument()
-    })
-
-    it("marks the active option with aria-selected=true", async () => {
-        render(wrap(<GameSwitcher activeGameId="chrono_ark" onChange={vi.fn()} />))
-        const user = userEvent.setup()
-        const trigger = await screen.findByRole("button", { name: /Chrono Ark/i })
-        await user.click(trigger)
-        const activeOption = screen.getByRole("option", { name: /Chrono Ark/i })
-        const inactiveOption = screen.getByRole("option", { name: /Warhammer III/i })
-        expect(activeOption).toHaveAttribute("aria-selected", "true")
-        expect(inactiveOption).toHaveAttribute("aria-selected", "false")
+        const futurePill = await screen.findByRole("radio", { name: /Future Game/i })
+        expect(futurePill).toBeInTheDocument()
+        expect(futurePill).toHaveTextContent("F")
+        expect(screen.queryByAltText("Future Game")).toBeNull()
     })
 })

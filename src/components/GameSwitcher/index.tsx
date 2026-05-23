@@ -1,27 +1,28 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { fetchGames, type GameMetadata } from "../../api/games"
 import { API_BASE } from "../../config"
+import { getBranding } from "./branding"
 
 interface GameSwitcherProps {
-    /** The currently active game's id; used to highlight the matching option and label the trigger. */
+    /** The currently active game's id. Used to mark the matching pill as `aria-checked` and to skip the POST when re-clicked. */
     activeGameId: string
     /** Called with the new game id after the backend confirms the switch. */
     onChange: (gameId: string) => void
 }
 
 /**
- * Glass-card dropdown that lets the user switch between registered games. Loads the list of games from `GET /api/games` on mount. Clicking the trigger button toggles an absolutely-positioned menu of options below. Selecting a non-active option posts to `POST /api/settings` so the backend rotates its adapter, calls `onChange` to update App-level state, then resets the URL to `/` so the new game's default route can take over.
+ * Two-pill segmented toggle for switching between registered games. Each pill shows the game's square logo (or a single-letter glyph fallback) and is wired as a `role="radio"` inside a `role="radiogroup"`.
+ * Selection POSTs `{ active_game: gameId }` to `/api/settings`, calls `onChange`, then resets the URL to `/` so the new game's default route can take over.
  *
- * @param activeGameId The currently active game's id; used to highlight the matching option and label the trigger.
+ * @param activeGameId The currently active game's id.
  * @param onChange Called with the new game id after the backend confirms the switch.
- * @returns A glass-card trigger plus an optional menu, or `null` while the games list is still loading.
+ * @returns The radiogroup of pills, or `null` while the games list is still loading.
  */
 const GameSwitcher = ({ activeGameId, onChange }: GameSwitcherProps) => {
     const [games, setGames] = useState<GameMetadata[]>([])
-    const [isOpen, setIsOpen] = useState(false)
-    const wrapperRef = useRef<HTMLDivElement | null>(null)
     const navigate = useNavigate()
+    const pillRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
     useEffect(() => {
         fetchGames()
@@ -29,31 +30,7 @@ const GameSwitcher = ({ activeGameId, onChange }: GameSwitcherProps) => {
             .catch((err) => console.error("Failed to load games:", err))
     }, [])
 
-    useEffect(() => {
-        if (!isOpen) return
-
-        const onOutsideClick = (evt: MouseEvent) => {
-            const target = evt.target as Node
-            if (wrapperRef.current && target && !wrapperRef.current.contains(target)) {
-                setIsOpen(false)
-            }
-        }
-
-        const onKey = (evt: KeyboardEvent) => {
-            if (evt.key === "Escape") setIsOpen(false)
-        }
-
-        document.addEventListener("mousedown", onOutsideClick)
-        document.addEventListener("keydown", onKey)
-
-        return () => {
-            document.removeEventListener("mousedown", onOutsideClick)
-            document.removeEventListener("keydown", onKey)
-        }
-    }, [isOpen])
-
     const handleSelect = async (gameId: string) => {
-        setIsOpen(false)
         if (gameId === activeGameId) return
         const res = await fetch(`${API_BASE}/settings`, {
             method: "POST",
@@ -67,110 +44,82 @@ const GameSwitcher = ({ activeGameId, onChange }: GameSwitcherProps) => {
         }
     }
 
+    const handleKey = (evt: KeyboardEvent<HTMLButtonElement>, idx: number) => {
+        if (games.length === 0) return
+        if (evt.key === "ArrowRight" || evt.key === "ArrowDown") {
+            evt.preventDefault()
+            const next = games[(idx + 1) % games.length]
+            pillRefs.current[next.game_id]?.focus()
+        } else if (evt.key === "ArrowLeft" || evt.key === "ArrowUp") {
+            evt.preventDefault()
+            const prev = games[(idx - 1 + games.length) % games.length]
+            pillRefs.current[prev.game_id]?.focus()
+        } else if (evt.key === "Enter" || evt.key === " ") {
+            evt.preventDefault()
+            const current = games[idx]
+            void handleSelect(current.game_id)
+        }
+    }
+
     if (games.length === 0) return null
 
-    const active = games.find((g) => g.game_id === activeGameId)
-    const activeLabel = active?.display_name ?? activeGameId
-
     return (
-        <div ref={wrapperRef} style={{ position: "relative", padding: "0.5rem 0.25rem", borderBottom: "1px solid var(--glass-border, #333)", zIndex: 100 }}>
-            <button
-                type="button"
-                aria-haspopup="listbox"
-                aria-expanded={isOpen}
-                aria-controls="gameswitcher-listbox"
-                onClick={() => setIsOpen((o) => !o)}
-                style={{
-                    width: "100%",
-                    padding: "0.5rem 0.5rem",
-                    background: "var(--glass-bg, rgba(255,255,255,0.05))",
-                    border: "1px solid var(--glass-border, #333)",
-                    borderRadius: 6,
-                    color: "var(--text-main, #eee)",
-                    cursor: "pointer",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    fontSize: "0.95rem",
-                    fontWeight: 600,
-                }}
-            >
-                <span style={{ whiteSpace: "nowrap" }}>{activeLabel}</span>
-                <span
-                    aria-hidden="true"
-                    style={{
-                        display: "inline-block",
-                        transition: "transform 0.15s ease",
-                        transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                        fontSize: "0.7rem",
-                        color: "var(--text-dim, #777)",
-                    }}
-                >
-                    v
-                </span>
-            </button>
-            {isOpen && (
-                <ul
-                    id="gameswitcher-listbox"
-                    role="listbox"
-                    style={{
-                        listStyle: "none",
-                        margin: 0,
-                        padding: "0.25rem",
-                        position: "absolute",
-                        top: "100%",
-                        left: "0.25rem",
-                        right: "0.25rem",
-                        background: "var(--bg-color, #05070a)",
-                        backdropFilter: "blur(8px)",
-                        WebkitBackdropFilter: "blur(8px)",
-                        border: "1px solid var(--glass-border, rgba(255,255,255,0.1))",
-                        borderRadius: 6,
-                        zIndex: 10,
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
-                    }}
-                >
-                    {games.map((g) => {
-                        const selected = g.game_id === activeGameId
-                        return (
-                            <li
-                                key={g.game_id}
-                                role="option"
-                                aria-selected={selected}
-                                tabIndex={0}
-                                onClick={() => handleSelect(g.game_id)}
-                                onKeyDown={(evt) => {
-                                    if (evt.key === "Enter" || evt.key === " ") {
-                                        evt.preventDefault()
-                                        handleSelect(g.game_id)
-                                    }
-                                }}
-                                style={{
-                                    padding: "0.5rem 0.75rem",
-                                    borderRadius: 4,
-                                    cursor: "pointer",
-                                    background: selected ? "var(--glass-bg-strong, rgba(255,255,255,0.08))" : "transparent",
-                                    color: "var(--text-main, #eee)",
-                                    fontSize: "0.9rem",
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!selected) e.currentTarget.style.background = "rgba(255,255,255,0.04)"
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!selected) e.currentTarget.style.background = "transparent"
-                                }}
-                            >
-                                <span style={{ whiteSpace: "nowrap" }}>{g.display_name}</span>
-                            </li>
-                        )
-                    })}
-                </ul>
-            )}
+        <div role="radiogroup" aria-label="Active game" className="game-switcher">
+            {games.map((g, idx) => {
+                const branding = getBranding(g.game_id)
+                const selected = g.game_id === activeGameId
+                const pillStyle: React.CSSProperties = selected
+                    ? {
+                          borderColor: branding.accent,
+                          boxShadow: `0 0 14px ${hexToRgba(branding.accent, 0.28)}`,
+                          backgroundImage: `${branding.gradient}, var(--glass-bg)`,
+                          backgroundBlendMode: "overlay",
+                      }
+                    : {}
+                return (
+                    <button
+                        key={g.game_id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        aria-label={g.display_name}
+                        tabIndex={selected ? 0 : -1}
+                        ref={(el) => {
+                            pillRefs.current[g.game_id] = el
+                        }}
+                        onClick={() => void handleSelect(g.game_id)}
+                        onKeyDown={(e) => handleKey(e, idx)}
+                        className={`game-switcher__pill${selected ? " game-switcher__pill--active" : ""}`}
+                        style={pillStyle}
+                    >
+                        {branding.logo ? (
+                            <img src={branding.logo} alt={g.display_name} className="game-switcher__logo" draggable={false} />
+                        ) : (
+                            <span className="game-switcher__fallback" aria-hidden="true">
+                                {g.display_name.charAt(0).toUpperCase()}
+                            </span>
+                        )}
+                    </button>
+                )
+            })}
         </div>
     )
+}
+
+/**
+ * Converts a `#rrggbb` color string to `rgba(r,g,b,alpha)`. Used to derive accent glows from the per-game accent color at runtime. Falls back to a neutral grey on parse failure.
+ *
+ * @param hex A `#rrggbb` color string.
+ * @param alpha Alpha value between 0 and 1.
+ * @returns An `rgba(...)` string usable directly in a CSS `box-shadow`.
+ */
+function hexToRgba(hex: string, alpha: number): string {
+    const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+    if (!match) return `rgba(148, 163, 184, ${alpha})`
+    const r = parseInt(match[1], 16)
+    const g = parseInt(match[2], 16)
+    const b = parseInt(match[3], 16)
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 export default GameSwitcher
