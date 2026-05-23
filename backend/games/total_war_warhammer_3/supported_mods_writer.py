@@ -75,12 +75,7 @@ def _value_to_cst(value: Any) -> cst.BaseExpression:
     if isinstance(value, list):
         return cst.List(elements=[cst.Element(value=_value_to_cst(item)) for item in value])
     if isinstance(value, dict):
-        return cst.Dict(
-            elements=[
-                cst.DictElement(key=_value_to_cst(str(k)), value=_value_to_cst(v))
-                for k, v in value.items()
-            ]
-        )
+        return cst.Dict(elements=[cst.DictElement(key=_value_to_cst(str(k)), value=_value_to_cst(v)) for k, v in value.items()])
     raise WriterError(f"Unsupported value type: {type(value).__name__}")
 
 
@@ -263,11 +258,7 @@ def remove_entry(source: str, package_name: str) -> str:
     """
     module = cst.parse_module(source)
     list_node = _find_supported_mods_list(module)
-    new_elements = [
-        element
-        for element in list_node.elements
-        if not (isinstance(element.value, cst.Dict) and _entry_package_name(element.value) == package_name)
-    ]
+    new_elements = [element for element in list_node.elements if not (isinstance(element.value, cst.Dict) and _entry_package_name(element.value) == package_name)]
     if len(new_elements) == len(list_node.elements):
         raise EntryNotFoundError(package_name)
     new_list = list_node.with_changes(elements=new_elements)

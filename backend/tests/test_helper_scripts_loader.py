@@ -106,9 +106,7 @@ def test_derive_workshop_id_returns_none_for_empty_path():
 def test_load_supported_effects_categories_returns_top_level_keys(tmp_path):
     helper = tmp_path / "helper_scripts"
     helper.mkdir()
-    (helper / "dynamic_rors_effects.py").write_text(
-        'SUPPORTED_EFFECTS = {"melee_attack": {"id": 1}, "missile_damage": {"id": 2}}\n'
-    )
+    (helper / "dynamic_rors_effects.py").write_text('SUPPORTED_EFFECTS = {"melee_attack": {"id": 1}, "missile_damage": {"id": 2}}\n')
     cats = load_supported_effects_categories(helper)
     assert sorted(cats) == ["melee_attack", "missile_damage"]
 

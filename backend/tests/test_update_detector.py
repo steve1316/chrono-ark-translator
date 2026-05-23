@@ -42,6 +42,7 @@ def test_detect_updates_mtime_match_skips_hashing(tmp_path, monkeypatch):
 
     calls = []
     import backend.games.total_war_warhammer_3.update_detector as detector
+
     monkeypatch.setattr(detector, "_sha256_file", lambda p: calls.append(p) or None)
 
     stale, refreshed = detect_updates(mods, baseline)

@@ -13,7 +13,7 @@ from backend.games.total_war_warhammer_3.supported_mods_writer import (
 )
 
 
-_BASE_SOURCE = '''from utilities import STEAM_LIBRARY_DRIVE
+_BASE_SOURCE = """from utilities import STEAM_LIBRARY_DRIVE
 
 SUPPORTED_MODS = [
     {
@@ -23,7 +23,7 @@ SUPPORTED_MODS = [
         "modified_attributes": [],
     },
 ]
-'''
+"""
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,7 +52,7 @@ def test_add_entry_appends_new_workshop_mod():
 # update_entry
 
 
-_TWO_ENTRY_SOURCE = '''from utilities import STEAM_LIBRARY_DRIVE
+_TWO_ENTRY_SOURCE = """from utilities import STEAM_LIBRARY_DRIVE
 
 SUPPORTED_MODS = [
     {
@@ -68,7 +68,7 @@ SUPPORTED_MODS = [
         "modified_attributes": ["melee_attack"],
     },
 ]
-'''
+"""
 
 
 def test_update_entry_replaces_existing_by_package_name():
@@ -130,7 +130,7 @@ def test_add_entry_emits_plain_string_for_custom_path():
     result = add_entry(_BASE_SOURCE, entry)
     assert '"path": "/absolute/custom/path/special.pack"' in result
     # No f-string for this entry.
-    assert 'STEAM_LIBRARY_DRIVE}/SteamLibrary/steamapps/workshop/content/1142710//special.pack' not in result
+    assert "STEAM_LIBRARY_DRIVE}/SteamLibrary/steamapps/workshop/content/1142710//special.pack" not in result
 
 
 def test_add_entry_serializes_pattern_overrides_and_character_overrides():
@@ -161,7 +161,7 @@ def test_add_entry_serializes_pattern_overrides_and_character_overrides():
 
 
 def test_writer_preserves_module_level_comments():
-    source = '''# Top of file comment.
+    source = """# Top of file comment.
 from utilities import STEAM_LIBRARY_DRIVE
 
 # Above the list.
@@ -175,7 +175,7 @@ SUPPORTED_MODS = [
 ]
 
 # After the list.
-'''
+"""
     result = add_entry(source, {"name": "New", "package_name": "new.pack", "workshop_id": "1", "modified_attributes": []})
     assert "# Top of file comment." in result
     assert "# Above the list." in result

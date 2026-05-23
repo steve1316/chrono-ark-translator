@@ -108,15 +108,11 @@ def test_get_updates_silent_rebaseline_writes_back(monkeypatch, baseline_path, t
     pack = tmp_path / "real.pack"
     pack.write_bytes(b"hello world")
     os.utime(pack, (1000.0, 1000.0))
-    (helper / "supported_mods.py").write_text(
-        f'SUPPORTED_MODS = [\n    {{"name": "M", "package_name": "m", "path": r"{pack}"}},\n]\n'
-    )
+    (helper / "supported_mods.py").write_text(f'SUPPORTED_MODS = [\n    {{"name": "M", "package_name": "m", "path": r"{pack}"}},\n]\n')
     monkeypatch.setattr(config, "TW3_HELPER_PATH", str(helper))
 
     # Pre-write the baseline with the CORRECT hash but the OLD mtime.
-    baseline_path.write_text(json.dumps({
-        "m": {"mtime": 1000.0, "hash": "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"}
-    }), encoding="utf-8")
+    baseline_path.write_text(json.dumps({"m": {"mtime": 1000.0, "hash": "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"}}), encoding="utf-8")
 
     # Touch: bump mtime, same bytes.
     os.utime(pack, (2000.0, 2000.0))
@@ -138,14 +134,10 @@ def test_get_updates_flags_when_bytes_change(monkeypatch, baseline_path, tmp_pat
     pack = tmp_path / "changed.pack"
     pack.write_bytes(b"original content")
     os.utime(pack, (1000.0, 1000.0))
-    (helper / "supported_mods.py").write_text(
-        f'SUPPORTED_MODS = [\n    {{"name": "M", "package_name": "m", "path": r"{pack}"}},\n]\n'
-    )
+    (helper / "supported_mods.py").write_text(f'SUPPORTED_MODS = [\n    {{"name": "M", "package_name": "m", "path": r"{pack}"}},\n]\n')
     monkeypatch.setattr(config, "TW3_HELPER_PATH", str(helper))
 
-    baseline_path.write_text(json.dumps({
-        "m": {"mtime": 1000.0, "hash": "sha256:original_placeholder"}
-    }), encoding="utf-8")
+    baseline_path.write_text(json.dumps({"m": {"mtime": 1000.0, "hash": "sha256:original_placeholder"}}), encoding="utf-8")
 
     # Rewrite with new content + new mtime.
     pack.write_bytes(b"NEW CONTENT - definitely different")
@@ -169,15 +161,11 @@ def test_post_updates_sync_rehashes_everything(monkeypatch, baseline_path, tmp_p
     pack = tmp_path / "sync.pack"
     pack.write_bytes(b"hello world")
     os.utime(pack, (1000.0, 1000.0))
-    (helper / "supported_mods.py").write_text(
-        f'SUPPORTED_MODS = [\n    {{"name": "M", "package_name": "m", "path": r"{pack}"}},\n]\n'
-    )
+    (helper / "supported_mods.py").write_text(f'SUPPORTED_MODS = [\n    {{"name": "M", "package_name": "m", "path": r"{pack}"}},\n]\n')
     monkeypatch.setattr(config, "TW3_HELPER_PATH", str(helper))
 
     # Pre-write garbage baseline.
-    baseline_path.write_text(json.dumps({
-        "m": {"mtime": 0.0, "hash": "sha256:garbage"}
-    }), encoding="utf-8")
+    baseline_path.write_text(json.dumps({"m": {"mtime": 0.0, "hash": "sha256:garbage"}}), encoding="utf-8")
 
     res = TestClient(app).post("/api/games/total_war_warhammer_3/updates/sync")
     assert res.status_code == 200
@@ -272,9 +260,7 @@ def test_concurrent_get_updates_do_not_corrupt_baseline(monkeypatch, baseline_pa
     pack = tmp_path / "concurrent.pack"
     pack.write_bytes(b"hello world")
     os.utime(pack, (1000.0, 1000.0))
-    (helper / "supported_mods.py").write_text(
-        f'SUPPORTED_MODS = [\n    {{"name": "M", "package_name": "m", "path": r"{pack}"}},\n]\n'
-    )
+    (helper / "supported_mods.py").write_text(f'SUPPORTED_MODS = [\n    {{"name": "M", "package_name": "m", "path": r"{pack}"}},\n]\n')
     monkeypatch.setattr(config, "TW3_HELPER_PATH", str(helper))
 
     client = TestClient(app)

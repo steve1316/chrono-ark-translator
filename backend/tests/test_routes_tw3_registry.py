@@ -10,7 +10,7 @@ from backend.web_server import app
 # POST /supported-mods
 
 
-_FIXTURE_SOURCE = '''from utilities import STEAM_LIBRARY_DRIVE
+_FIXTURE_SOURCE = """from utilities import STEAM_LIBRARY_DRIVE
 
 SUPPORTED_MODS = [
     {
@@ -20,7 +20,7 @@ SUPPORTED_MODS = [
         "modified_attributes": [],
     },
 ]
-'''
+"""
 
 
 def _setup_helper(monkeypatch, tmp_path):
@@ -79,7 +79,7 @@ def test_post_supported_mods_returns_503_when_helper_path_unset(monkeypatch):
 # PUT /supported-mods/{package_name}
 
 
-_TWO_ENTRY_FIXTURE = '''from utilities import STEAM_LIBRARY_DRIVE
+_TWO_ENTRY_FIXTURE = """from utilities import STEAM_LIBRARY_DRIVE
 
 SUPPORTED_MODS = [
     {
@@ -95,7 +95,7 @@ SUPPORTED_MODS = [
         "modified_attributes": [],
     },
 ]
-'''
+"""
 
 
 def _setup_helper_with_two(monkeypatch, tmp_path):
@@ -158,9 +158,7 @@ def test_delete_supported_mods_returns_404_when_missing(monkeypatch, tmp_path):
 def test_get_supported_effects_returns_top_level_keys(monkeypatch, tmp_path):
     helper = tmp_path / "helper_scripts"
     helper.mkdir()
-    (helper / "dynamic_rors_effects.py").write_text(
-        'SUPPORTED_EFFECTS = {"melee_attack": {"id": 1}, "missile_damage": {"id": 2}}\n'
-    )
+    (helper / "dynamic_rors_effects.py").write_text('SUPPORTED_EFFECTS = {"melee_attack": {"id": 1}, "missile_damage": {"id": 2}}\n')
     monkeypatch.setattr("backend.config.TW3_HELPER_PATH", str(helper))
     res = TestClient(app).get("/api/games/total_war_warhammer_3/supported-effects")
     assert res.status_code == 200
