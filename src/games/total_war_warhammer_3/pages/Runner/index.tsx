@@ -123,7 +123,7 @@ export default function RunnerPage() {
     const runningScriptId = run.status === "running" ? run.script_id : null
 
     return (
-        <>
+        <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 4rem)" }}>
             <div className="dashboard-header">
                 <div className="title-group">
                     <h1>Runner</h1>
@@ -132,17 +132,10 @@ export default function RunnerPage() {
             </div>
             <div className="mod-grid">
                 {SCRIPTS.map((s) => (
-                    <ScriptCard
-                        key={s.id}
-                        script={s}
-                        running={runningScriptId === s.id}
-                        disabled={runningScriptId !== null && runningScriptId !== s.id}
-                        onRun={handleStart}
-                        onCancel={handleCancel}
-                    />
+                    <ScriptCard key={s.id} script={s} running={runningScriptId === s.id} disabled={runningScriptId !== null && runningScriptId !== s.id} onRun={handleStart} onCancel={handleCancel} />
                 ))}
             </div>
-            <RunnerLogTerminal />
-        </>
+            <RunnerLogTerminal fill />
+        </div>
     )
 }
