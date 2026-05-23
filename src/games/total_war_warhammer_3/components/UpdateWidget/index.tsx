@@ -60,7 +60,7 @@ export default function UpdateWidget() {
                 </p>
             )}
             {count > 0 && (
-                <details open style={{ marginTop: "0.75rem" }}>
+                <details style={{ marginTop: "0.75rem" }}>
                     <summary style={{ cursor: "pointer" }}>Updated mods ({count})</summary>
                     <ul style={{ paddingLeft: "1.25rem", marginTop: "0.5rem" }}>
                         {report.stale.map((s) => (
