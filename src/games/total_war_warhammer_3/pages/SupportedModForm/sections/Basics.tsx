@@ -53,11 +53,24 @@ const BasicsSection = ({ value, onChange, lockPackageName }: Props) => {
             </label>
             <label style={{ display: "block", marginBottom: "0.75rem" }}>
                 <span style={{ display: "block", marginBottom: "0.25rem" }}>Package name</span>
-                <input className="btn-outline" type="text" value={value.package_name} disabled={lockPackageName} onChange={(e) => onChange({ ...value, package_name: e.target.value })} style={{ width: "100%", padding: "0.5rem" }} />
+                <input
+                    className="btn-outline"
+                    type="text"
+                    value={value.package_name}
+                    disabled={lockPackageName}
+                    onChange={(e) => onChange({ ...value, package_name: e.target.value })}
+                    style={{ width: "100%", padding: "0.5rem" }}
+                />
             </label>
             <label style={{ display: "block", marginBottom: "0.75rem" }}>
                 <span style={{ display: "block", marginBottom: "0.25rem" }}>Workshop ID</span>
-                <input className="btn-outline" type="text" value={value.workshop_id} onChange={(e) => onChange({ ...value, workshop_id: e.target.value })} style={{ width: "100%", padding: "0.5rem" }} />
+                <input
+                    className="btn-outline"
+                    type="text"
+                    value={value.workshop_id}
+                    onChange={(e) => onChange({ ...value, workshop_id: e.target.value })}
+                    style={{ width: "100%", padding: "0.5rem" }}
+                />
             </label>
             <label style={{ display: "block", marginBottom: "0.75rem" }}>
                 <input type="checkbox" checked={value.custom_path} onChange={(e) => onChange({ ...value, custom_path: e.target.checked })} /> Custom path (advanced)
@@ -65,7 +78,13 @@ const BasicsSection = ({ value, onChange, lockPackageName }: Props) => {
             {value.custom_path && (
                 <label style={{ display: "block", marginBottom: "0.75rem" }}>
                     <span style={{ display: "block", marginBottom: "0.25rem" }}>Custom path</span>
-                    <input className="btn-outline" type="text" value={value.path} onChange={(e) => onChange({ ...value, path: e.target.value })} style={{ width: "100%", padding: "0.5rem", fontFamily: "monospace" }} />
+                    <input
+                        className="btn-outline"
+                        type="text"
+                        value={value.path}
+                        onChange={(e) => onChange({ ...value, path: e.target.value })}
+                        style={{ width: "100%", padding: "0.5rem", fontFamily: "monospace" }}
+                    />
                 </label>
             )}
             {previewUrl && (

@@ -32,7 +32,9 @@ const SupportedModFormPage = () => {
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
     useEffect(() => {
-        fetchSupportedEffectsCategories().then(setEffectCategories).catch(() => setEffectCategories([]))
+        fetchSupportedEffectsCategories()
+            .then(setEffectCategories)
+            .catch(() => setEffectCategories([]))
     }, [])
 
     useEffect(() => {
@@ -59,7 +61,7 @@ const SupportedModFormPage = () => {
                         faction,
                         allowed_lords: (body.allowed_lords ?? []).map((r) => ({ land_unit: r.land_unit ?? "", agent_subtype: r.agent_subtype ?? "", skill_overrides: r.skill_overrides ?? "" })),
                         allowed_heroes: (body.allowed_heroes ?? []).map((r) => ({ land_unit: r.land_unit ?? "", agent_subtype: r.agent_subtype ?? "", skill_overrides: r.skill_overrides ?? "" })),
-                    }),
+                    })
                 )
                 setCharacterOverrides(factions)
                 setIgnoreGeneration(Boolean((target as Record<string, unknown>).ignore_generation))
@@ -76,12 +78,22 @@ const SupportedModFormPage = () => {
         modified_attributes: modifiedAttributes,
         pattern_overrides: patternOverrides.length > 0 ? Object.fromEntries(patternOverrides.map((r) => [r.pattern, r.faction])) : undefined,
         ignore_generation: ignoreGeneration ? true : undefined,
-        character_overrides: characterOverrides.length > 0 ? Object.fromEntries(
-            characterOverrides.map((f) => [f.faction, {
-                allowed_lords: f.allowed_lords.filter((r) => r.land_unit || r.agent_subtype).map((r) => ({ land_unit: r.land_unit, agent_subtype: r.agent_subtype, ...(r.skill_overrides ? { skill_overrides: r.skill_overrides } : {}) })),
-                allowed_heroes: f.allowed_heroes.filter((r) => r.land_unit || r.agent_subtype).map((r) => ({ land_unit: r.land_unit, agent_subtype: r.agent_subtype, ...(r.skill_overrides ? { skill_overrides: r.skill_overrides } : {}) })),
-            }]),
-        ) : undefined,
+        character_overrides:
+            characterOverrides.length > 0
+                ? Object.fromEntries(
+                      characterOverrides.map((f) => [
+                          f.faction,
+                          {
+                              allowed_lords: f.allowed_lords
+                                  .filter((r) => r.land_unit || r.agent_subtype)
+                                  .map((r) => ({ land_unit: r.land_unit, agent_subtype: r.agent_subtype, ...(r.skill_overrides ? { skill_overrides: r.skill_overrides } : {}) })),
+                              allowed_heroes: f.allowed_heroes
+                                  .filter((r) => r.land_unit || r.agent_subtype)
+                                  .map((r) => ({ land_unit: r.land_unit, agent_subtype: r.agent_subtype, ...(r.skill_overrides ? { skill_overrides: r.skill_overrides } : {}) })),
+                          },
+                      ])
+                  )
+                : undefined,
     })
 
     const handleDelete = async () => {

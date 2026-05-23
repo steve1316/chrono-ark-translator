@@ -18,7 +18,7 @@ function renderForm(path: string) {
                 <Route path="/supported-mods/edit/:packageName" element={<SupportedModFormPage />} />
                 <Route path="/supported-mods" element={<div>Mods list page</div>} />
             </Routes>
-        </MemoryRouter>,
+        </MemoryRouter>
     )
 }
 

@@ -43,18 +43,40 @@ const CharacterOverridesSection = ({ value, onChange }: Props) => {
         } as Partial<FactionEntry>)
     const addRow = (fIdx: number, key: "allowed_lords" | "allowed_heroes") =>
         updateFaction(fIdx, { [key]: [...value[fIdx][key], { land_unit: "", agent_subtype: "", skill_overrides: "" }] } as Partial<FactionEntry>)
-    const removeRow = (fIdx: number, key: "allowed_lords" | "allowed_heroes", rIdx: number) =>
-        updateFaction(fIdx, { [key]: value[fIdx][key].filter((_, i) => i !== rIdx) } as Partial<FactionEntry>)
+    const removeRow = (fIdx: number, key: "allowed_lords" | "allowed_heroes", rIdx: number) => updateFaction(fIdx, { [key]: value[fIdx][key].filter((_, i) => i !== rIdx) } as Partial<FactionEntry>)
 
     const renderRows = (fIdx: number, key: "allowed_lords" | "allowed_heroes", label: string) => (
         <div style={{ marginBottom: "0.75rem" }}>
             <h4 style={{ margin: "0.5rem 0" }}>{label}</h4>
             {value[fIdx][key].map((row, rIdx) => (
                 <div key={rIdx} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
-                    <input className="btn-outline" type="text" placeholder="land_unit" value={row.land_unit} onChange={(e) => updateRow(fIdx, key, rIdx, { land_unit: e.target.value })} style={{ flex: 2, padding: "0.5rem" }} />
-                    <input className="btn-outline" type="text" placeholder="agent_subtype" value={row.agent_subtype} onChange={(e) => updateRow(fIdx, key, rIdx, { agent_subtype: e.target.value })} style={{ flex: 2, padding: "0.5rem" }} />
-                    <input className="btn-outline" type="text" placeholder="skill_overrides (comma-separated)" value={row.skill_overrides} onChange={(e) => updateRow(fIdx, key, rIdx, { skill_overrides: e.target.value })} style={{ flex: 3, padding: "0.5rem" }} />
-                    <button type="button" className="btn btn-outline" onClick={() => removeRow(fIdx, key, rIdx)}>Remove</button>
+                    <input
+                        className="btn-outline"
+                        type="text"
+                        placeholder="land_unit"
+                        value={row.land_unit}
+                        onChange={(e) => updateRow(fIdx, key, rIdx, { land_unit: e.target.value })}
+                        style={{ flex: 2, padding: "0.5rem" }}
+                    />
+                    <input
+                        className="btn-outline"
+                        type="text"
+                        placeholder="agent_subtype"
+                        value={row.agent_subtype}
+                        onChange={(e) => updateRow(fIdx, key, rIdx, { agent_subtype: e.target.value })}
+                        style={{ flex: 2, padding: "0.5rem" }}
+                    />
+                    <input
+                        className="btn-outline"
+                        type="text"
+                        placeholder="skill_overrides (comma-separated)"
+                        value={row.skill_overrides}
+                        onChange={(e) => updateRow(fIdx, key, rIdx, { skill_overrides: e.target.value })}
+                        style={{ flex: 3, padding: "0.5rem" }}
+                    />
+                    <button type="button" className="btn btn-outline" onClick={() => removeRow(fIdx, key, rIdx)}>
+                        Remove
+                    </button>
                 </div>
             ))}
             <button type="button" className="btn btn-outline" onClick={() => addRow(fIdx, key)}>
@@ -71,9 +93,17 @@ const CharacterOverridesSection = ({ value, onChange }: Props) => {
                     <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.5rem" }}>
                         <label style={{ flex: 1 }}>
                             <span style={{ marginRight: "0.5rem" }}>Faction</span>
-                            <input className="btn-outline" type="text" value={faction.faction} onChange={(e) => updateFaction(fIdx, { faction: e.target.value })} style={{ padding: "0.5rem", width: "60%" }} />
+                            <input
+                                className="btn-outline"
+                                type="text"
+                                value={faction.faction}
+                                onChange={(e) => updateFaction(fIdx, { faction: e.target.value })}
+                                style={{ padding: "0.5rem", width: "60%" }}
+                            />
                         </label>
-                        <button type="button" className="btn btn-outline" onClick={() => onChange(value.filter((_, i) => i !== fIdx))}>Remove faction</button>
+                        <button type="button" className="btn btn-outline" onClick={() => onChange(value.filter((_, i) => i !== fIdx))}>
+                            Remove faction
+                        </button>
                     </div>
                     {renderRows(fIdx, "allowed_lords", "Allowed Lords")}
                     {renderRows(fIdx, "allowed_heroes", "Allowed Heroes")}

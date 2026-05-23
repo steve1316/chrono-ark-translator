@@ -79,7 +79,7 @@ describe("Runner page", () => {
 
     it("appends SSE data lines into the terminal", async () => {
         vi.spyOn(globalThis, "fetch").mockResolvedValue(
-            new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 }),
+            new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 })
         )
         render(wrap(<RunnerPage />))
         await waitFor(() => expect(FakeEventSource.instances.length).toBe(1))
@@ -89,7 +89,7 @@ describe("Runner page", () => {
 
     it("preserves terminal output after a run ends", async () => {
         vi.spyOn(globalThis, "fetch").mockResolvedValue(
-            new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 }),
+            new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 })
         )
         render(wrap(<RunnerPage />))
         await waitFor(() => expect(FakeEventSource.instances.length).toBe(1))
@@ -111,7 +111,7 @@ describe("Runner page", () => {
 
     it("re-attaches the SSE stream when mounted while a run is already in progress", async () => {
         vi.spyOn(globalThis, "fetch").mockResolvedValue(
-            new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 5 }), { status: 200 }),
+            new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 5 }), { status: 200 })
         )
         render(wrap(<RunnerPage />))
         await waitFor(() => expect(FakeEventSource.instances.length).toBe(1))

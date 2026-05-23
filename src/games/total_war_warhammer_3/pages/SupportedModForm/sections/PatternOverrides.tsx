@@ -29,8 +29,22 @@ const PatternOverridesSection = ({ value, onChange }: Props) => {
             <legend style={{ padding: "0 0.5rem" }}>Pattern Overrides</legend>
             {value.map((row, idx) => (
                 <div key={idx} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                    <input className="btn-outline" type="text" value={row.pattern} onChange={(e) => update(idx, { pattern: e.target.value })} placeholder="pattern" style={{ flex: 1, padding: "0.5rem" }} />
-                    <input className="btn-outline" type="text" value={row.faction} onChange={(e) => update(idx, { faction: e.target.value })} placeholder="faction" style={{ flex: 1, padding: "0.5rem" }} />
+                    <input
+                        className="btn-outline"
+                        type="text"
+                        value={row.pattern}
+                        onChange={(e) => update(idx, { pattern: e.target.value })}
+                        placeholder="pattern"
+                        style={{ flex: 1, padding: "0.5rem" }}
+                    />
+                    <input
+                        className="btn-outline"
+                        type="text"
+                        value={row.faction}
+                        onChange={(e) => update(idx, { faction: e.target.value })}
+                        placeholder="faction"
+                        style={{ flex: 1, padding: "0.5rem" }}
+                    />
                     <button type="button" className="btn btn-outline" onClick={() => onChange(value.filter((_, i) => i !== idx))}>
                         Remove
                     </button>

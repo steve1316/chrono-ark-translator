@@ -38,7 +38,12 @@ const ModifiedAttributesSection = ({ value, suggestions, onChange }: Props) => {
                 {value.map((attr) => (
                     <span key={attr} className="id-badge" style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
                         {attr}
-                        <button type="button" aria-label={`Remove ${attr}`} onClick={() => onChange(value.filter((v) => v !== attr))} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}>
+                        <button
+                            type="button"
+                            aria-label={`Remove ${attr}`}
+                            onClick={() => onChange(value.filter((v) => v !== attr))}
+                            style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}
+                        >
                             x
                         </button>
                     </span>
