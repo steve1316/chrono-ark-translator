@@ -113,16 +113,12 @@ def test_extract_parent_pack_strings_skips_extraction_when_cache_fresh(monkeypat
         "key\ttext\ttooltip\n#Loc;1;text/x.loc\t\t\nk\tcached\tfalse\n", encoding="utf-8"
     )
 
-    called = {"count": 0}
+    run_mock = MagicMock(side_effect=AssertionError("subprocess.run must not be called when cache is fresh"))
+    monkeypatch.setattr(subprocess, "run", run_mock)
 
-    def boom(*a, **kw):
-        called["count"] += 1
-        raise AssertionError("subprocess.run must not be called when cache is fresh")
-
-    monkeypatch.setattr(subprocess, "run", boom)
     result = extract_parent_pack_strings(pack, Path("/fake/rpfm_cli.exe"), cache_dir)
 
-    assert called["count"] == 0
+    run_mock.assert_not_called()
     assert result["x.loc.tsv"]["k"].text == "cached"
 
 
