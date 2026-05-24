@@ -304,6 +304,11 @@ body {
     gap: 0.75rem;
 }
 
+/* Pin the action row to the bottom of the card body so cards in the same grid row align consistently regardless of header / note length. */
+.mod-card-content > .mod-actions:last-child {
+    margin-top: auto;
+}
+
 .mod-actions-group {
     display: flex;
     align-items: center;
