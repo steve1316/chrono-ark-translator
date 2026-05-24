@@ -1,24 +1,37 @@
 """Total War: Warhammer III adapter.
 
-Composes the read-only registry routes and the script runner under
-`/api/games/total_war_warhammer_3`.
+Composes the read-only registry routes, the script runner, the pack routes,
+and the new translation routes under `/api/games/total_war_warhammer_3`.
+Implements both `GameAdapter` (chassis) and `TranslationCapability` (translation
+pipeline) for the user's Cathay-themed Chinese -> English translation mods.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Optional
+
 from fastapi import APIRouter
 
-from backend.games.base import GameAdapter
+from backend.games.base import GameAdapter, ModInfo
+from backend.games.capabilities.translation import TranslationCapability
+from backend.games.total_war_warhammer_3 import translation_context as tc
+from backend.games.total_war_warhammer_3.loc_extractor import read_translation_loc_tsv
+from backend.games.total_war_warhammer_3.translation_mods import (
+    WH3_TRANSLATION_MODS,
+    get_translation_mod,
+)
+from backend.models import LocString
 
 
-class TotalWarWarhammer3Adapter(GameAdapter):
-    """Total War: Warhammer III game adapter.
-
-    Exposes the read-only registries (`SUPPORTED_MODS`, `SUPPORTED_EFFECTS`) and
-    the helper_scripts script runner (subprocess + SSE log streaming).
-    """
+class TotalWarWarhammer3Adapter(GameAdapter, TranslationCapability):
+    """Total War: Warhammer III game adapter with translation capability."""
 
     _ROUTER: APIRouter | None = None
+
+    # //////////////////////////////////////////////////////////////////////////////////////////////////
+    # //////////////////////////////////////////////////////////////////////////////////////////////////
+    # GameAdapter chassis
 
     @property
     def game_id(self) -> str:
@@ -34,7 +47,7 @@ class TotalWarWarhammer3Adapter(GameAdapter):
 
     @property
     def capabilities(self) -> list[str]:
-        return []
+        return ["translation"]
 
     @property
     def router(self) -> APIRouter:
@@ -58,3 +71,122 @@ class TotalWarWarhammer3Adapter(GameAdapter):
             "rpfm_cli_path": {"type": "str", "default": ""},
             "steam_library_drive": {"type": "str", "default": ""},
         }
+
+    # //////////////////////////////////////////////////////////////////////////////////////////////////
+    # //////////////////////////////////////////////////////////////////////////////////////////////////
+    # TranslationCapability
+
+    @property
+    def target_language(self) -> str:
+        return "English"
+
+    @property
+    def source_languages(self) -> list[str]:
+        return ["Chinese"]
+
+    def get_translation_context(self) -> str:
+        return tc.GAME_CONTEXT
+
+    def get_format_preservation_rules(self) -> list[str]:
+        return list(tc.FORMAT_PRESERVATION_RULES)
+
+    def get_style_examples(self, source_lang: str = "Chinese") -> dict[str, list[tuple[str, str]]]:
+        examples = tc.STYLE_EXAMPLES_BY_LANG.get(source_lang, [])
+        return {"unit_descriptions": examples}
+
+    def get_glossary_categories(self) -> dict[str, str | list[str]]:
+        return dict(tc.GLOSSARY_CATEGORIES)
+
+    @property
+    def base_game_path(self) -> Optional[Path]:
+        return None
+
+    def extract_base_game_strings(self, game_path: Optional[Path] = None) -> dict[str, LocString]:
+        return {}
+
+    def scan_mods(self, search_path: Optional[Path] = None) -> list[ModInfo]:
+        """Return the static list of WH3 translation mods.
+
+        Unlike Chrono Ark which scans a workshop dir, WH3 translation mods
+        are explicitly registered in `translation_mods.WH3_TRANSLATION_MODS`.
+
+        Args:
+            search_path: Ignored. Kept for interface compatibility.
+
+        Returns:
+            List of `ModInfo` derived from the static registry.
+        """
+        return [
+            ModInfo(
+                mod_id=m.workshop_id,
+                name=m.display_name,
+                author="",
+                path=m.local_source_dir,
+                has_loc_files=True,
+                has_dll=False,
+            )
+            for m in WH3_TRANSLATION_MODS
+        ]
+
+    def extract_strings(self, mod_path: Path) -> tuple[dict[str, LocString], list[str]]:
+        """Read every `.loc.tsv` under `mod_path/text/**`.
+
+        Args:
+            mod_path: Local source directory for a translation mod.
+
+        Returns:
+            Tuple of (`{stable_id: LocString}`, warnings).
+            `stable_id` is `"<normalized_filename>::<loc_key>"`.
+        """
+        warnings: list[str] = []
+        strings: dict[str, LocString] = {}
+        text_dir = mod_path / "text"
+        if not text_dir.exists():
+            warnings.append(f"No text/ directory under {mod_path}")
+            return strings, warnings
+
+        from backend.games.total_war_warhammer_3.loc_extractor import normalize_loc_filename
+
+        for tsv in text_dir.rglob("*.loc.tsv"):
+            try:
+                rows = read_translation_loc_tsv(tsv)
+            except Exception as e:  # noqa: BLE001
+                warnings.append(f"Failed to parse {tsv.name}: {e}")
+                continue
+            norm = normalize_loc_filename(tsv.name)
+            for key, row in rows.items():
+                stable_id = f"{norm}::{key}"
+                strings[stable_id] = LocString(
+                    key=key,
+                    type="loc",
+                    desc="",
+                    translations={"English": row.text},
+                    source_file=norm,
+                )
+        return strings, warnings
+
+    def detect_source_language(self, loc_string: LocString) -> Optional[str]:
+        return "Chinese"
+
+    def get_untranslated(self, strings: dict[str, LocString]) -> dict[str, LocString]:
+        return {
+            sid: s
+            for sid, s in strings.items()
+            if not s.translations.get("English", "").strip()
+        }
+
+    def export_strings(self, output_path: Path, entries: list[LocString]) -> None:
+        """Not implemented: WH3 translation export is handled by the existing
+        pack rebuild + publish workflow, not by this method."""
+        raise NotImplementedError(
+            "WH3 translation export uses the existing pack rebuild flow; "
+            "see backend/games/total_war_warhammer_3/routes/packs.py."
+        )
+
+    def get_mod_url(self, mod_id: str) -> Optional[str]:
+        if get_translation_mod(mod_id) is None:
+            return None
+        return f"https://steamcommunity.com/sharedfiles/filedetails/?id={mod_id}"
+
+    def get_translation_overrides_dir(self) -> Optional[Path]:
+        return None
