@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -17,6 +18,7 @@ from backend.games.total_war_warhammer_3 import translation_store_helpers as sto
 from backend.games.total_war_warhammer_3.loc_extractor import (
     LocRow,
     extract_parent_pack_strings,
+    normalize_loc_filename,
     read_translation_loc_tsv,
 )
 from backend.games.total_war_warhammer_3.routes._paths import tw3_workshop_content_dir
@@ -47,8 +49,6 @@ def _extract_translation_strings(mod: WH3TranslationMod) -> dict[str, dict[str, 
     Returns:
         Dict mapping normalized filename to `{key: LocRow}`.
     """
-    from backend.games.total_war_warhammer_3.loc_extractor import normalize_loc_filename
-
     out: dict[str, dict[str, LocRow]] = {}
     text_dir = mod.local_source_dir / "text"
     if not text_dir.exists():
@@ -240,7 +240,7 @@ def rescan(mod_id: str) -> RescanSummary:
 
 
 @router.get("/mods/{mod_id}/strings")
-def get_strings(mod_id: str, status: str | None = None) -> list[dict]:
+def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stale", "orphan"] | None = None) -> list[dict]:
     """Return drift rows for a mod, optionally filtered by status.
 
     Args:

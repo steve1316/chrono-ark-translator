@@ -1,4 +1,4 @@
-"""Read and write `.loc.tsv` files for Total War: Warhammer III mods.
+"""Read `.loc.tsv` files and extract parent-pack strings via the RPFM CLI for Total War: Warhammer III mods.
 
 RPFM exports loc tables as TSV with two header lines:
   Line 0: literal header `key\ttext\ttooltip`

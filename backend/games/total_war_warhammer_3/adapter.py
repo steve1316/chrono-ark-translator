@@ -16,7 +16,10 @@ from fastapi import APIRouter
 from backend.games.base import GameAdapter, ModInfo
 from backend.games.capabilities.translation import TranslationCapability
 from backend.games.total_war_warhammer_3 import translation_context as tc
-from backend.games.total_war_warhammer_3.loc_extractor import read_translation_loc_tsv
+from backend.games.total_war_warhammer_3.loc_extractor import (
+    normalize_loc_filename,
+    read_translation_loc_tsv,
+)
 from backend.games.total_war_warhammer_3.translation_mods import (
     WH3_TRANSLATION_MODS,
     get_translation_mod,
@@ -144,8 +147,6 @@ class TotalWarWarhammer3Adapter(GameAdapter, TranslationCapability):
         if not text_dir.exists():
             warnings.append(f"No text/ directory under {mod_path}")
             return strings, warnings
-
-        from backend.games.total_war_warhammer_3.loc_extractor import normalize_loc_filename
 
         for tsv in text_dir.rglob("*.loc.tsv"):
             try:
