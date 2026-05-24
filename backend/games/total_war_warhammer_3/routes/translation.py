@@ -1,0 +1,330 @@
+"""REST endpoints for the WH3 translation pipeline.
+
+All endpoints are mounted under `/api/games/total_war_warhammer_3/translation`.
+Heavy I/O (RPFM extract, TSV scan) is wrapped behind module-level helpers so
+tests can monkeypatch them in isolation.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from backend.games.total_war_warhammer_3 import translation_store_helpers as store
+from backend.games.total_war_warhammer_3.loc_extractor import (
+    LocRow,
+    extract_parent_pack_strings,
+    read_translation_loc_tsv,
+)
+from backend.games.total_war_warhammer_3.routes._paths import tw3_workshop_content_dir
+from backend.games.total_war_warhammer_3.translation_drift import (
+    DriftRow,
+    compute_drift,
+    hash_text,
+)
+from backend.games.total_war_warhammer_3.translation_mods import (
+    WH3_TRANSLATION_MODS,
+    WH3TranslationMod,
+    get_translation_mod,
+)
+
+router = APIRouter(prefix="/translation", tags=["translation"])
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# Helpers (extracted as module-level functions so tests can monkeypatch them)
+
+def _extract_translation_strings(mod: WH3TranslationMod) -> dict[str, dict[str, LocRow]]:
+    """Read all `.loc.tsv` files under `mod.local_source_dir/text/**`.
+
+    Args:
+        mod: The translation mod whose local source dir to scan.
+
+    Returns:
+        Dict mapping normalized filename to `{key: LocRow}`.
+    """
+    from backend.games.total_war_warhammer_3.loc_extractor import normalize_loc_filename
+
+    out: dict[str, dict[str, LocRow]] = {}
+    text_dir = mod.local_source_dir / "text"
+    if not text_dir.exists():
+        return out
+    for tsv in text_dir.rglob("*.loc.tsv"):
+        norm = normalize_loc_filename(tsv.name)
+        out[norm] = read_translation_loc_tsv(tsv)
+    return out
+
+
+def _extract_all_parent_strings(mod: WH3TranslationMod) -> dict[str, dict[str, LocRow]]:
+    """Extract `.loc` strings from every parent `.pack` declared on `mod`.
+
+    Reads `rpfm_cli_path` from `backend.config.TW3_RPFM_CLI_PATH` (the same
+    pattern used by `routes/runner.py`).
+
+    Args:
+        mod: The translation mod whose parent packs to extract.
+
+    Returns:
+        Merged dict mapping normalized filename to `{key: LocRow}` across all parents.
+
+    Raises:
+        HTTPException: If `TW3_RPFM_CLI_PATH` is not configured or the Steam library drive is
+            not configured.
+    """
+    from backend import config
+
+    rpfm_str = config.TW3_RPFM_CLI_PATH or ""
+    rpfm = Path(rpfm_str) if rpfm_str else Path()
+    if not rpfm_str or not rpfm.exists():
+        raise HTTPException(500, "rpfm_cli_path is not configured or does not exist on disk")
+
+    merged: dict[str, dict[str, LocRow]] = {}
+    for parent_id in mod.parent_workshop_ids:
+        parent_dir = tw3_workshop_content_dir(parent_id)
+        if parent_dir is None:
+            raise HTTPException(500, "TW3 Steam library drive is not configured")
+        if not parent_dir.exists():
+            continue
+        packs = sorted(parent_dir.glob("*.pack"))
+        if not packs:
+            continue
+        cache_dir = store.parent_pack_cache_dir(parent_id)
+        for pack in packs:
+            extracted = extract_parent_pack_strings(pack, rpfm, cache_dir)
+            for filename, rows in extracted.items():
+                merged.setdefault(filename, {}).update(rows)
+    return merged
+
+
+def _require_mod(mod_id: str) -> WH3TranslationMod:
+    """Look up a mod by ID or raise 404.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+
+    Returns:
+        The matching `WH3TranslationMod`.
+
+    Raises:
+        HTTPException: 404 if `mod_id` is not in the registry.
+    """
+    mod = get_translation_mod(mod_id)
+    if mod is None:
+        raise HTTPException(404, f"WH3 translation mod {mod_id} not registered")
+    return mod
+
+
+def _serialize_drift_row(row: DriftRow) -> dict:
+    """Convert a `DriftRow` to a JSON-serializable dict.
+
+    Args:
+        row: The drift row to serialize.
+
+    Returns:
+        Dict with `source_filename`, `key`, `parent_text`, `translation_text`, and `status`.
+    """
+    return {
+        "source_filename": row.source_filename,
+        "key": row.key,
+        "parent_text": row.parent_text,
+        "translation_text": row.translation_text,
+        "status": row.status,
+    }
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# Route models
+
+class TranslationModSummary(BaseModel):
+    """One translation-mod summary row."""
+
+    workshop_id: str
+    display_name: str
+    parent_workshop_ids: list[str]
+    local_source_dir: str
+    source_language: str
+    target_language: str
+
+
+class RescanSummary(BaseModel):
+    """Per-status row counts after a rescan."""
+
+    mod_id: str
+    counts: dict[str, int]
+    scanned_at: str
+
+
+class TranslationEdit(BaseModel):
+    """Request body for `PUT /strings/{key}`."""
+
+    text: str
+
+
+class ModContext(BaseModel):
+    """Request body for `PUT /mod-context`."""
+
+    source_game: str = ""
+    character_name: str = ""
+    background: str = ""
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# Routes
+
+@router.get("/mods", response_model=list[TranslationModSummary])
+def list_translation_mods() -> list[TranslationModSummary]:
+    """Return the static registry of WH3 translation mods.
+
+    Returns:
+        List of `TranslationModSummary` entries, one per registered mod.
+    """
+    return [
+        TranslationModSummary(
+            workshop_id=m.workshop_id,
+            display_name=m.display_name,
+            parent_workshop_ids=list(m.parent_workshop_ids),
+            local_source_dir=str(m.local_source_dir),
+            source_language=m.source_language,
+            target_language=m.target_language,
+        )
+        for m in WH3_TRANSLATION_MODS
+    ]
+
+
+@router.post("/mods/{mod_id}/rescan", response_model=RescanSummary)
+def rescan(mod_id: str) -> RescanSummary:
+    """Re-extract parent strings, re-read local translations, compute drift.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+
+    Returns:
+        `RescanSummary` with per-status counts and scan timestamp.
+
+    Raises:
+        HTTPException: 404 if `mod_id` is not registered.
+    """
+    mod = _require_mod(mod_id)
+    parent = _extract_all_parent_strings(mod)
+    translation = _extract_translation_strings(mod)
+    snapshot = store.load_parent_snapshot(mod_id)
+
+    drift = compute_drift(parent=parent, translation=translation, snapshot=snapshot)
+
+    # Initialize snapshot for never-before-seen keys so they show as
+    # untranslated rather than stale on future scans.
+    next_snapshot = {fn: dict(d) for fn, d in snapshot.items()}
+    for row in drift:
+        if row.parent_text is None:
+            continue
+        next_snapshot.setdefault(row.source_filename, {})
+        if row.key not in next_snapshot[row.source_filename]:
+            next_snapshot[row.source_filename][row.key] = hash_text(row.parent_text)
+    store.save_parent_snapshot(mod_id, next_snapshot)
+
+    counts: dict[str, int] = {"translated": 0, "untranslated": 0, "stale": 0, "orphan": 0}
+    for row in drift:
+        counts[row.status] += 1
+
+    return RescanSummary(
+        mod_id=mod_id,
+        counts=counts,
+        scanned_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+
+@router.get("/mods/{mod_id}/strings")
+def get_strings(mod_id: str, status: str | None = None) -> list[dict]:
+    """Return drift rows for a mod, optionally filtered by status.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+        status: Optional status filter (`"translated"`, `"untranslated"`, `"stale"`, `"orphan"`).
+
+    Returns:
+        List of serialized `DriftRow` dicts.
+
+    Raises:
+        HTTPException: 404 if `mod_id` is not registered.
+    """
+    mod = _require_mod(mod_id)
+    parent = _extract_all_parent_strings(mod)
+    translation = _extract_translation_strings(mod)
+    snapshot = store.load_parent_snapshot(mod_id)
+
+    drift = compute_drift(parent=parent, translation=translation, snapshot=snapshot)
+
+    if status:
+        drift = [r for r in drift if r.status == status]
+
+    return [_serialize_drift_row(r) for r in drift]
+
+
+@router.put("/mods/{mod_id}/strings/{key}")
+def put_string(mod_id: str, key: str, edit: TranslationEdit) -> dict:
+    """Persist a translation edit.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+        key: The string key to save.
+        edit: Request body containing the translated text.
+
+    Returns:
+        `{"status": "ok"}` on success.
+
+    Raises:
+        HTTPException: 404 if `mod_id` is not registered.
+    """
+    _require_mod(mod_id)
+    raw = store.load_translations_raw(mod_id)
+    now = datetime.now(timezone.utc).isoformat()
+    existing = raw.get(key, {})
+    raw[key] = {
+        "text": edit.text,
+        "created_at": existing.get("created_at") or now,
+        "updated_at": now,
+    }
+    store.save_translations_raw(mod_id, raw)
+    return {"status": "ok"}
+
+
+@router.get("/mods/{mod_id}/mod-context")
+def get_mod_context(mod_id: str) -> dict:
+    """Return the mod context for a registered translation mod.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+
+    Returns:
+        Dict with mod context fields (`source_game`, `character_name`, `background`).
+
+    Raises:
+        HTTPException: 404 if `mod_id` is not registered.
+    """
+    _require_mod(mod_id)
+    return store.load_character_context(mod_id)
+
+
+@router.put("/mods/{mod_id}/mod-context")
+def put_mod_context(mod_id: str, ctx: ModContext) -> dict:
+    """Save mod context for a registered translation mod.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+        ctx: Request body containing the context fields.
+
+    Returns:
+        `{"status": "ok"}` on success.
+
+    Raises:
+        HTTPException: 404 if `mod_id` is not registered.
+    """
+    _require_mod(mod_id)
+    store.save_character_context(mod_id, ctx.model_dump())
+    return {"status": "ok"}
