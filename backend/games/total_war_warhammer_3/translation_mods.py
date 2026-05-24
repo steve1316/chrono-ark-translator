@@ -1,0 +1,97 @@
+"""Registry of WH3 translation mods the user maintains.
+
+Each entry pairs a user-published translation workshop ID with the parent
+mod(s) whose `.loc` strings the translation covers. The local source dir is
+the absolute path to the loose `.loc.tsv` files the user edits.
+
+`Cathay Dragons Battle in the Field` is intentionally omitted from this
+initial registry: the spec flags that no local source dir is confirmed for
+parent workshop ID `3061752415`. Add it once the user confirms the dir.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class WH3TranslationMod:
+    """One translation mod entry.
+
+    Attributes:
+        workshop_id: Steam Workshop ID of the published translation mod.
+        display_name: Human-readable name shown in the dashboard.
+        parent_workshop_ids: Steam Workshop IDs of the parent mod(s) whose
+            strings this translation covers. Multiple IDs are used for
+            collection translations (e.g. Deer24).
+        local_source_dir: Absolute path to the directory holding the loose
+            `.loc.tsv` files the user edits.
+        source_language: Source language of the parent mod's text.
+            Currently always `"Chinese"`.
+        target_language: Target language. Currently always `"English"`.
+    """
+
+    workshop_id: str
+    display_name: str
+    parent_workshop_ids: tuple[str, ...]
+    local_source_dir: Path
+    source_language: str = "Chinese"
+    target_language: str = "English"
+
+
+_LOCAL_ROOT = Path(r"C:\Users\steve1316\Documents\GitHub\totalwar-modding\warhammer3_mods")
+
+WH3_TRANSLATION_MODS: tuple[WH3TranslationMod, ...] = (
+    WH3TranslationMod(
+        workshop_id="3315737452",
+        display_name="Zerooz Cathy Alternative English Translation",
+        parent_workshop_ids=("2901237965",),
+        local_source_dir=_LOCAL_ROOT / "Zerooz_English_Translation_corrections",
+    ),
+    WH3TranslationMod(
+        workshop_id="3317696617",
+        display_name="Dragon General Fu Yuanshan Reforged Alternative English Translation",
+        parent_workshop_ids=("3316985957",),
+        local_source_dir=_LOCAL_ROOT / "zzz_cth_fuyuanshan_faction_Alternative_English_Translation",
+    ),
+    WH3TranslationMod(
+        workshop_id="3392058226",
+        display_name="Whc's Cathay unit pack - War under Heaven Alternative English Translation",
+        parent_workshop_ids=("3297754796",),
+        local_source_dir=_LOCAL_ROOT / "zzz_@whc_cth_unit_wuh_Alternative_English_Translation",
+    ),
+    WH3TranslationMod(
+        workshop_id="3393724674",
+        display_name="Deer24 Alternative English Translation Collection",
+        parent_workshop_ids=(
+            "2789903784",
+            "2804084630",
+            "2908711955",
+            "2859396310",
+            "2872222879",
+        ),
+        local_source_dir=_LOCAL_ROOT / "zzz_DEER24_Alternative_English_Translation",
+    ),
+    WH3TranslationMod(
+        workshop_id="3393724734",
+        display_name="Great Harmony Sentinel Alternative English Translation",
+        parent_workshop_ids=("3442971928",),
+        local_source_dir=_LOCAL_ROOT / "zzz_Great_Harmony_Sentinel_Alternative_English_Translation",
+    ),
+)
+
+
+def get_translation_mod(workshop_id: str) -> WH3TranslationMod | None:
+    """Look up a translation mod by its workshop ID.
+
+    Args:
+        workshop_id: Steam Workshop ID of the translation mod.
+
+    Returns:
+        The matching `WH3TranslationMod`, or `None` if not registered.
+    """
+    for mod in WH3_TRANSLATION_MODS:
+        if mod.workshop_id == workshop_id:
+            return mod
+    return None
