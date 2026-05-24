@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 
 import EditableCell from "../../../../components/EditableCell"
@@ -25,6 +25,8 @@ const TranslationDetailsPage: React.FC = () => {
     const [loading, setLoading] = useState(true)
     const [statusText, setStatusText] = useState<string>("")
     const [translating, setTranslating] = useState(false)
+
+    const skipInitialFilterEffect = useRef(true)
 
     const loadStrings = useCallback(
         async (status: WH3DriftStatus | "all") => {
@@ -58,6 +60,10 @@ const TranslationDetailsPage: React.FC = () => {
     }, [workshopId, loadStrings])
 
     useEffect(() => {
+        if (skipInitialFilterEffect.current) {
+            skipInitialFilterEffect.current = false
+            return
+        }
         loadStrings(filter)
     }, [filter, loadStrings])
 
@@ -88,15 +94,23 @@ const TranslationDetailsPage: React.FC = () => {
 
     const runTranslateBatch = useCallback(
         async (targetStatus: "untranslated" | "stale") => {
-            const candidates = strings.filter((r) => r.status === targetStatus).map((r) => r.key)
-            if (candidates.length === 0) return
-            if (candidates.length > BATCH_LIMIT) {
-                const ok = window.confirm(`${candidates.length} rows match. Translating in batches of ${BATCH_LIMIT} may take a while and cost API credits. Continue?`)
-                if (!ok) return
-            }
             setTranslating(true)
-            setStatusText(`Translating ${candidates.length} rows...`)
+            setStatusText("Loading candidates...")
             try {
+                const targetRows = await fetchStrings(workshopId, targetStatus)
+                const candidates = targetRows.map((r) => r.key)
+                if (candidates.length === 0) {
+                    setStatusText("No rows match the target status")
+                    return
+                }
+                if (candidates.length > BATCH_LIMIT) {
+                    const ok = window.confirm(`${candidates.length} rows match. Translating in batches of ${BATCH_LIMIT} may take a while and cost API credits. Continue?`)
+                    if (!ok) {
+                        setStatusText("")
+                        return
+                    }
+                }
+                setStatusText(`Translating ${candidates.length} rows...`)
                 for (let i = 0; i < candidates.length; i += BATCH_LIMIT) {
                     const batch = candidates.slice(i, i + BATCH_LIMIT)
                     await translateBatch(workshopId, batch)
@@ -111,7 +125,7 @@ const TranslationDetailsPage: React.FC = () => {
                 setTranslating(false)
             }
         },
-        [strings, workshopId, filter, loadStrings]
+        [workshopId, filter, loadStrings]
     )
 
     const onSaveContext = useCallback(async () => {
