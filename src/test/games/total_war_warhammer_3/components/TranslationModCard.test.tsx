@@ -17,9 +17,7 @@ const MOD: WH3TranslationModSummary = {
 const wrap = (ui: React.ReactNode) => <MemoryRouter>{ui}</MemoryRouter>
 
 beforeEach(() => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify({ mod_id: "x", counts: { translated: 0, untranslated: 0, stale: 0, orphan: 0 }, scanned_at: "" }), { status: 200 }),
-    )
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ mod_id: "x", counts: { translated: 0, untranslated: 0, stale: 0, orphan: 0 }, scanned_at: "" }), { status: 200 }))
 })
 
 afterEach(() => {
