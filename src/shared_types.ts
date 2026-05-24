@@ -164,3 +164,62 @@ export type ModDetail = {
     /** All localizable strings extracted from the mod. */
     strings: LocString[]
 }
+
+// //////////////////////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////////////////////////
+// Total War: Warhammer III - translation mod types
+//
+// Mirrors the response shapes from `backend/games/total_war_warhammer_3/routes/translation.py`.
+
+/** Summary row returned by `GET /api/games/total_war_warhammer_3/translation/mods`. */
+export interface WH3TranslationModSummary {
+    /** Steam Workshop ID of the published translation mod. */
+    workshop_id: string
+    /** Human-readable display name shown in the dashboard. */
+    display_name: string
+    /** Steam Workshop IDs of the parent mod(s) whose strings this translation covers. */
+    parent_workshop_ids: string[]
+    /** Absolute filesystem path to the local `.loc.tsv` source folder. */
+    local_source_dir: string
+    /** Source language of the parent mod's text (e.g. `"Chinese"`). */
+    source_language: string
+    /** Target language of the translation (e.g. `"English"`). */
+    target_language: string
+}
+
+/** Status of one row in the drift report. */
+export type WH3DriftStatus = "translated" | "untranslated" | "stale" | "orphan"
+
+/** One row returned by `GET /api/games/total_war_warhammer_3/translation/mods/{id}/strings`. */
+export interface WH3DriftRow {
+    /** Normalized parent `.loc.tsv` filename this row belongs to. */
+    source_filename: string
+    /** Localization key. */
+    key: string
+    /** Current parent source text. `null` only when `status === "orphan"`. */
+    parent_text: string | null
+    /** Current translation text. `null` only when `status === "untranslated"`. */
+    translation_text: string | null
+    /** Drift status. */
+    status: WH3DriftStatus
+}
+
+/** Summary returned by `POST /api/games/total_war_warhammer_3/translation/mods/{id}/rescan`. */
+export interface WH3RescanSummary {
+    /** Workshop ID that was rescanned. */
+    mod_id: string
+    /** Per-status row counts. */
+    counts: Record<WH3DriftStatus, number>
+    /** ISO timestamp of when the rescan completed. */
+    scanned_at: string
+}
+
+/** Body of `GET/PUT /api/games/total_war_warhammer_3/translation/mods/{id}/mod-context`. */
+export interface WH3ModContext {
+    /** Source-game identifier (e.g. `"WH3"`). Free-form. */
+    source_game: string
+    /** Short name or role (e.g. `"Zerooz Cathy"`). Free-form. */
+    character_name: string
+    /** Multi-line background / lore that gets injected into the LLM prompt. */
+    background: string
+}
