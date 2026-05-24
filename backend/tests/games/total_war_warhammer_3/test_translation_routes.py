@@ -101,3 +101,42 @@ def test_mod_context_round_trip(client: TestClient):
     got = client.get("/api/games/total_war_warhammer_3/translation/mods/3315737452/mod-context").json()
     assert got["character_name"] == "Zerooz Cathy"
     assert got["background"] == "Cathay units."
+
+
+def test_translate_batch_calls_claude_and_saves_results(client: TestClient, monkeypatch):
+    """The batch endpoint hands untranslated rows to ClaudeProvider and persists results.
+
+    `ClaudeProvider.translate_batch` takes `entries: list[tuple[str, str]]` and
+    builds the system prompt internally - the route should pass game_context,
+    format_rules, style_examples, target_lang as separate kwargs.
+    """
+    calls: dict = {}
+
+    def fake_translate_batch(
+        self, entries, source_lang, glossary_prompt, **kwargs
+    ):
+        calls["source_lang"] = source_lang
+        calls["target_lang"] = kwargs.get("target_lang", "English")
+        calls["game_context"] = kwargs.get("game_context", "")
+        calls["keys"] = [k for k, _ in entries]
+        return ({k: f"EN({v})" for k, v in entries}, [])
+
+    monkeypatch.setattr(
+        "backend.translator.claude_provider.ClaudeProvider.translate_batch",
+        fake_translate_batch,
+    )
+
+    resp = client.post(
+        "/api/games/total_war_warhammer_3/translation/mods/3315737452/translate",
+        json={"keys": ["k2"]},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["translated"] == 1
+    assert calls["source_lang"] == "Chinese"
+    assert calls["target_lang"] == "English"
+    assert "Warhammer III" in calls["game_context"]
+    assert calls["keys"] == ["k2"]
+
+    from backend.games.total_war_warhammer_3.translation_store_helpers import load_translations
+    assert load_translations("3315737452")["k2"] == "EN(新文本)"

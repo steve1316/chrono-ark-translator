@@ -311,6 +311,73 @@ def get_mod_context(mod_id: str) -> dict:
     return store.load_character_context(mod_id)
 
 
+class TranslateBatchRequest(BaseModel):
+    """Request body for `POST /mods/{mod_id}/translate`."""
+
+    keys: list[str]
+
+
+@router.post("/mods/{mod_id}/translate")
+def translate_batch(mod_id: str, req: TranslateBatchRequest) -> dict:
+    """Translate the given keys via Claude and persist into `translations.json`.
+
+    `ClaudeProvider.translate_batch` takes `entries: list[tuple[str, str]]` and
+    builds the system + user prompts internally via `TranslationProvider.build_prompt`.
+    We pass the WH3 adapter's translation-context strings as kwargs so the prompt
+    is WH3-specific.
+
+    Args:
+        mod_id: Workshop ID of the WH3 translation mod.
+        req: List of loc keys to translate. Source text is looked up from the
+            most recent parent extraction.
+
+    Returns:
+        `{"translated": N, "suggested_terms": [...]}`.
+    """
+    from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
+    from backend.translator.claude_provider import ClaudeProvider
+
+    mod = _require_mod(mod_id)
+    parent = _extract_all_parent_strings(mod)
+
+    # Flatten parent into {key: source_text} for the keys the user wants translated.
+    src: dict[str, str] = {}
+    for rows in parent.values():
+        for key, row in rows.items():
+            if key in req.keys:
+                src[key] = row.text
+    if not src:
+        return {"translated": 0, "suggested_terms": []}
+
+    adapter = TotalWarWarhammer3Adapter()
+    entries = list(src.items())
+
+    provider = ClaudeProvider()
+    translations, suggested_terms = provider.translate_batch(
+        entries,
+        mod.source_language,
+        "No glossary available.",  # per-mod glossary wiring deferred to Plan 2
+        game_context=adapter.get_translation_context(),
+        format_rules=adapter.get_format_preservation_rules(),
+        style_examples=adapter.get_style_examples(mod.source_language),
+        character_context=None,  # mod-context wiring deferred to Plan 2
+        target_lang=mod.target_language,
+    )
+
+    raw = store.load_translations_raw(mod_id)
+    now = datetime.now(timezone.utc).isoformat()
+    for key, text in translations.items():
+        existing = raw.get(key, {})
+        raw[key] = {
+            "text": text,
+            "created_at": existing.get("created_at") or now,
+            "updated_at": now,
+        }
+    store.save_translations_raw(mod_id, raw)
+
+    return {"translated": len(translations), "suggested_terms": suggested_terms}
+
+
 @router.put("/mods/{mod_id}/mod-context")
 def put_mod_context(mod_id: str, ctx: ModContext) -> dict:
     """Save mod context for a registered translation mod.
