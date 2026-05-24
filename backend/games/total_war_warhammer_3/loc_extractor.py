@@ -9,6 +9,8 @@ Lines 2+ are data rows.
 from __future__ import annotations
 
 import csv
+import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -76,3 +78,132 @@ def read_translation_loc_tsv(path: Path) -> dict[str, LocRow]:
                 continue
             rows[key] = LocRow(key=key, text=text, tooltip=_parse_tooltip(tooltip))
     return rows
+
+
+def normalize_loc_filename(name: str) -> str:
+    """Strip leading non-alphanumeric prefix and lowercase.
+
+    Removes RPFM load-order prefixes like `@@` and `!!!` so that translation
+    and parent loc files can be matched up regardless of prefix.
+
+    Args:
+        name: The `.loc.tsv` filename (basename only).
+
+    Returns:
+        Normalized lowercase filename with leading non-alphanumeric prefix removed.
+    """
+    stripped = re.sub(r"^[^A-Za-z0-9]+", "", name)
+    return stripped.lower()
+
+
+def _pack_mtime_path(cache_dir: Path) -> Path:
+    """Return the path to the cached mtime sentinel file.
+
+    Args:
+        cache_dir: The per-pack cache directory.
+
+    Returns:
+        Path to `pack_mtime.txt` inside `cache_dir`.
+    """
+    return cache_dir / "pack_mtime.txt"
+
+
+def _extracted_dir(cache_dir: Path) -> Path:
+    """Return the directory where RPFM writes extracted TSV files.
+
+    Args:
+        cache_dir: The per-pack cache directory.
+
+    Returns:
+        Path to the `extracted` subdirectory inside `cache_dir`.
+    """
+    return cache_dir / "extracted"
+
+
+def _read_cached_mtime(cache_dir: Path) -> int | None:
+    """Read the previously-recorded pack mtime from disk.
+
+    Args:
+        cache_dir: The per-pack cache directory.
+
+    Returns:
+        The cached mtime as an integer, or None if unavailable.
+    """
+    p = _pack_mtime_path(cache_dir)
+    if not p.exists():
+        return None
+    try:
+        return int(p.read_text(encoding="utf-8").strip())
+    except (ValueError, OSError):
+        return None
+
+
+def _read_all_extracted(cache_dir: Path) -> dict[str, dict[str, LocRow]]:
+    """Parse every `.loc.tsv` file in the extracted subdirectory.
+
+    Args:
+        cache_dir: The per-pack cache directory.
+
+    Returns:
+        Dictionary mapping normalized loc filename to its parsed rows.
+    """
+    out: dict[str, dict[str, LocRow]] = {}
+    extracted = _extracted_dir(cache_dir)
+    if not extracted.exists():
+        return out
+    for tsv in extracted.rglob("*.loc.tsv"):
+        out[normalize_loc_filename(tsv.name)] = read_translation_loc_tsv(tsv)
+    return out
+
+
+def extract_parent_pack_strings(
+    pack_path: Path,
+    rpfm_cli_path: Path,
+    cache_dir: Path,
+) -> dict[str, dict[str, LocRow]]:
+    """Extract all `.loc` tables from a binary `.pack` via RPFM CLI.
+
+    Re-extracts only when the source `.pack` mtime differs from the cached
+    mtime. Otherwise returns the previously-extracted TSVs from disk.
+
+    Args:
+        pack_path: Absolute path to the parent `.pack` file.
+        rpfm_cli_path: Absolute path to the `rpfm_cli` executable.
+        cache_dir: Per-parent-mod cache directory. Created if absent.
+
+    Returns:
+        `{normalized_loc_filename: {loc_key: LocRow}}`.
+
+    Raises:
+        FileNotFoundError: If `pack_path` does not exist.
+        RuntimeError: If the RPFM CLI subprocess returns a non-zero exit code.
+    """
+    if not pack_path.exists():
+        raise FileNotFoundError(f"pack not found: {pack_path}")
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    current_mtime = int(pack_path.stat().st_mtime)
+    cached_mtime = _read_cached_mtime(cache_dir)
+
+    if cached_mtime == current_mtime and _extracted_dir(cache_dir).exists():
+        return _read_all_extracted(cache_dir)
+
+    extracted = _extracted_dir(cache_dir)
+    extracted.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        str(rpfm_cli_path),
+        "--game-selected", "warhammer_3",
+        "pack", "extract",
+        "-p", str(pack_path),
+        "-F", "loc",
+        "-o", str(extracted),
+    ]
+    result = subprocess.run(cmd, capture_output=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"RPFM CLI failed (exit {result.returncode}): {result.stderr.decode('utf-8', errors='replace')}"
+        )
+
+    _pack_mtime_path(cache_dir).write_text(str(current_mtime), encoding="utf-8")
+    return _read_all_extracted(cache_dir)
