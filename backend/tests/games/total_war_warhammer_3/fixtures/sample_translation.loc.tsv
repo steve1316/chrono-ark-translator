@@ -1,0 +1,5 @@
+key	text	tooltip
+#Loc;1;text/sample.loc		
+land_units_onscreen_name_def_inf_daughters_of_khaine	Daughters of Khaine	true
+unit_description_short_texts_text_def_inf_daughters_of_khaine	They attack enemies with venomous daggers and excellent armor.	true
+empty_value_test	 	false
