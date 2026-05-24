@@ -41,6 +41,13 @@ beforeEach(() => {
     FakeEventSource.instances = []
     ;(globalThis as unknown as { EventSource: typeof FakeEventSource }).EventSource = FakeEventSource
     _resetUseRunnerLogForTests()
+    vi.spyOn(globalThis, "fetch").mockImplementation((url: unknown) => {
+        const urlStr = String(url)
+        if (urlStr.includes("/translation/mods")) {
+            return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+        }
+        return Promise.resolve(new Response(JSON.stringify({ status: "idle" }), { status: 200 }))
+    })
 })
 
 afterEach(() => vi.restoreAllMocks())
@@ -48,39 +55,48 @@ afterEach(() => vi.restoreAllMocks())
 const wrap = (ui: React.ReactNode) => <MemoryRouter>{ui}</MemoryRouter>
 
 describe("Runner page", () => {
-    it("renders 6 script cards in idle state", async () => {
-        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ status: "idle" }), { status: 200 }))
+    it("renders 7 script cards in idle state", async () => {
         render(wrap(<RunnerPage />))
-        await waitFor(() => expect(screen.getAllByRole("button", { name: /^run$/i })).toHaveLength(6))
+        await waitFor(() => expect(screen.getAllByRole("button", { name: /^run$/i })).toHaveLength(7))
     })
 
     it("renders descriptions on each card", async () => {
-        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ status: "idle" }), { status: 200 }))
         render(wrap(<RunnerPage />))
         await waitFor(() => expect(screen.getAllByText(/Regenerate the Dynamic RoR pack/i).length).toBeGreaterThan(0))
     })
 
     it("starts a run, disables sibling cards, and shows Cancel on the active card", async () => {
-        const fetchMock = vi
-            .spyOn(globalThis, "fetch")
-            .mockResolvedValueOnce(new Response(JSON.stringify({ status: "idle" }), { status: 200 }))
-            .mockResolvedValueOnce(new Response(JSON.stringify({ run_id: "x", script_id: "update", started_at: new Date().toISOString() }), { status: 200 }))
-            .mockResolvedValue(new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 }))
+        const fetchMock = vi.mocked(globalThis.fetch)
+        fetchMock.mockImplementationOnce((url: unknown) => {
+            const urlStr = String(url)
+            if (urlStr.includes("/translation/mods")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+            return Promise.resolve(new Response(JSON.stringify({ status: "idle" }), { status: 200 }))
+        })
+        fetchMock.mockImplementationOnce((url: unknown) =>
+            Promise.resolve(new Response(JSON.stringify({ run_id: "x", script_id: "update", started_at: new Date().toISOString() }), { status: 200 }))
+        )
+        fetchMock.mockImplementation((url: unknown) => {
+            const urlStr = String(url)
+            if (urlStr.includes("/translation/mods")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+            return Promise.resolve(new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 }))
+        })
         render(wrap(<RunnerPage />))
-        await waitFor(() => expect(screen.getAllByRole("button", { name: /^run$/i })).toHaveLength(6))
+        await waitFor(() => expect(screen.getAllByRole("button", { name: /^run$/i })).toHaveLength(7))
         const runButtons = screen.getAllByRole("button", { name: /^run$/i })
         await userEvent.setup().click(runButtons[runButtons.length - 1])
         await waitFor(() => expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument())
         const remainingRunButtons = screen.getAllByRole("button", { name: /^run$/i })
-        expect(remainingRunButtons).toHaveLength(5)
+        expect(remainingRunButtons).toHaveLength(6)
         for (const btn of remainingRunButtons) expect(btn).toBeDisabled()
         expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/run/update"), expect.objectContaining({ method: "POST" }))
     })
 
     it("appends SSE data lines into the terminal", async () => {
-        vi.spyOn(globalThis, "fetch").mockResolvedValue(
-            new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 })
-        )
+        vi.mocked(globalThis.fetch).mockImplementation((url: unknown) => {
+            const urlStr = String(url)
+            if (urlStr.includes("/translation/mods")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+            return Promise.resolve(new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 }))
+        })
         render(wrap(<RunnerPage />))
         await waitFor(() => expect(FakeEventSource.instances.length).toBe(1))
         FakeEventSource.instances[0].emit(JSON.stringify({ line: "hello world", ts: "2026-05-12T00:00:00Z" }))
@@ -88,9 +104,11 @@ describe("Runner page", () => {
     })
 
     it("preserves terminal output after a run ends", async () => {
-        vi.spyOn(globalThis, "fetch").mockResolvedValue(
-            new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 })
-        )
+        vi.mocked(globalThis.fetch).mockImplementation((url: unknown) => {
+            const urlStr = String(url)
+            if (urlStr.includes("/translation/mods")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+            return Promise.resolve(new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 }))
+        })
         render(wrap(<RunnerPage />))
         await waitFor(() => expect(FakeEventSource.instances.length).toBe(1))
         FakeEventSource.instances[0].emit(JSON.stringify({ line: "prior run line", ts: "2026-05-12T00:00:00Z" }))
@@ -100,9 +118,12 @@ describe("Runner page", () => {
     })
 
     it("calls DELETE /run on cancel", async () => {
-        const fetchMock = vi
-            .spyOn(globalThis, "fetch")
-            .mockResolvedValue(new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 }))
+        const fetchMock = vi.mocked(globalThis.fetch)
+        fetchMock.mockImplementation((url: unknown) => {
+            const urlStr = String(url)
+            if (urlStr.includes("/translation/mods")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+            return Promise.resolve(new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 0 }), { status: 200 }))
+        })
         render(wrap(<RunnerPage />))
         await waitFor(() => screen.getByRole("button", { name: /cancel/i }))
         await userEvent.setup().click(screen.getByRole("button", { name: /cancel/i }))
@@ -110,9 +131,11 @@ describe("Runner page", () => {
     })
 
     it("re-attaches the SSE stream when mounted while a run is already in progress", async () => {
-        vi.spyOn(globalThis, "fetch").mockResolvedValue(
-            new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 5 }), { status: 200 })
-        )
+        vi.mocked(globalThis.fetch).mockImplementation((url: unknown) => {
+            const urlStr = String(url)
+            if (urlStr.includes("/translation/mods")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }))
+            return Promise.resolve(new Response(JSON.stringify({ status: "running", run_id: "x", script_id: "update", started_at: new Date().toISOString(), lines_emitted: 5 }), { status: 200 }))
+        })
         render(wrap(<RunnerPage />))
         await waitFor(() => expect(FakeEventSource.instances.length).toBe(1))
     })
