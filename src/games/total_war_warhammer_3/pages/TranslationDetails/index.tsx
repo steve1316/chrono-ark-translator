@@ -78,7 +78,9 @@ const TranslationDetailsPage: React.FC = () => {
         async (key: string, text: string) => {
             try {
                 await saveString(workshopId, key, text)
-                setStrings((prev) => prev.map((r) => (r.key === key ? { ...r, translation_text: text, provider: "manual", status: r.status === "untranslated" ? "translated" : r.status } : r)))
+                setStrings((prev) =>
+                    prev.map((r) => (r.key === key ? { ...r, translation_text: text, provider: "manual", status: r.status === "untranslated" || r.status === "stale" ? "translated" : r.status } : r))
+                )
                 setStatusText(`Saved ${key}`)
             } catch (e) {
                 setStatusText(`Save failed: ${(e as Error).message}`)
