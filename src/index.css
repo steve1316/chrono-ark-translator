@@ -962,3 +962,54 @@ th {
     gap: 0.75rem;
     margin-top: 1.25rem;
 }
+
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* WH3 history modal snapshot rows */
+.snapshot-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.snapshot-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+}
+.snapshot-meta {
+    display: flex;
+    flex-direction: column;
+}
+.snapshot-label {
+    font-weight: 500;
+    color: var(--text-main);
+}
+.snapshot-sub {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+.snapshot-kind {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    margin-right: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.snapshot-kind.auto {
+    background: rgba(96, 165, 250, 0.2);
+    color: #93c5fd;
+}
+.snapshot-kind.manual {
+    background: rgba(167, 139, 250, 0.2);
+    color: #c4b5fd;
+}
+.snapshot-actions {
+    display: flex;
+    gap: 0.5rem;
+}
