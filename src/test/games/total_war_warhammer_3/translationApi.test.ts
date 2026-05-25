@@ -1,6 +1,28 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { fetchModContext, fetchStrings, listTranslationMods, rescanMod, saveModContext, saveString, translateBatch } from "../../../games/total_war_warhammer_3/translationApi"
+import {
+    addGlossaryTerm,
+    clearTranslations,
+    createSnapshot,
+    deleteGlossaryTerm,
+    deleteSnapshot,
+    fetchModContext,
+    fetchStrings,
+    glossaryApplyAll,
+    glossarySuggestEdits,
+    listApiResponses,
+    listSnapshots,
+    listTranslationMods,
+    loadGlossary,
+    rescanMod,
+    restoreSnapshot,
+    saveModContext,
+    saveString,
+    scanTerms,
+    syncChanges,
+    translateBatch,
+    updateGlossaryTerm,
+} from "../../../games/total_war_warhammer_3/translationApi"
 import { RegistryError } from "../../../games/total_war_warhammer_3/api"
 
 const PREFIX = "/api/games/total_war_warhammer_3/translation"
@@ -90,5 +112,111 @@ describe("translationApi", () => {
         mockFetchError(404, "not registered")
         await expect(listTranslationMods()).rejects.toBeInstanceOf(RegistryError)
         await expect(listTranslationMods()).rejects.toMatchObject({ status: 404, detail: "not registered" })
+    })
+})
+
+describe("plan3 routes", () => {
+    it("syncChanges POSTs to /sync and returns per_file map", async () => {
+        const spy = mockFetchOk({ per_file: { "C:\\x.loc.tsv": 2 } })
+        const result = await syncChanges("123")
+        expect(result.per_file["C:\\x.loc.tsv"]).toBe(2)
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining("/translation/mods/123/sync"), expect.objectContaining({ method: "POST" }))
+    })
+
+    it("clearTranslations returns the cleared count", async () => {
+        mockFetchOk({ cleared: 7 })
+        const result = await clearTranslations("123")
+        expect(result.cleared).toBe(7)
+    })
+
+    it("listSnapshots returns SnapshotMeta list", async () => {
+        mockFetchOk([{ ulid: "01H", created_at: "2026-05-25T00:00:00Z", label: "x", kind: "auto" }])
+        const result = await listSnapshots("123")
+        expect(result.length).toBe(1)
+        expect(result[0].kind).toBe("auto")
+    })
+
+    it("createSnapshot POSTs label and returns new meta", async () => {
+        const spy = mockFetchOk({ ulid: "01J", label: "my save", kind: "manual" })
+        const result = await createSnapshot("123", "my save")
+        expect(result.ulid).toBe("01J")
+        const [, init] = spy.mock.calls[0]
+        expect(JSON.parse((init as RequestInit).body as string)).toEqual({ label: "my save" })
+    })
+
+    it("restoreSnapshot POSTs to /restore", async () => {
+        const spy = mockFetchOk({ status: "ok" })
+        await restoreSnapshot("123", "01H")
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining("/translation/mods/123/snapshots/01H/restore"), expect.objectContaining({ method: "POST" }))
+    })
+
+    it("deleteSnapshot DELETEs by ulid", async () => {
+        const spy = mockFetchOk({ status: "ok" })
+        await deleteSnapshot("123", "01H")
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining("/translation/mods/123/snapshots/01H"), expect.objectContaining({ method: "DELETE" }))
+    })
+
+    it("loadGlossary GETs and returns the dict", async () => {
+        mockFetchOk({ Phoenix: { source: "凤", category: "factions" } })
+        const result = await loadGlossary("123")
+        expect(result.Phoenix.source).toBe("凤")
+    })
+
+    it("addGlossaryTerm POSTs the entry", async () => {
+        const spy = mockFetchOk({ status: "ok" })
+        await addGlossaryTerm("123", { english: "Phoenix", source: "凤", category: "factions" })
+        const [, init] = spy.mock.calls[0]
+        expect(JSON.parse((init as RequestInit).body as string)).toEqual({ english: "Phoenix", source: "凤", category: "factions" })
+    })
+
+    it("updateGlossaryTerm PUTs by english key", async () => {
+        const spy = mockFetchOk({ status: "ok" })
+        await updateGlossaryTerm("123", "Phoenix", { english: "Phoenix Lord", source: "凤", category: "factions" })
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining("/translation/mods/123/glossary/Phoenix"), expect.objectContaining({ method: "PUT" }))
+    })
+
+    it("deleteGlossaryTerm DELETEs by english key", async () => {
+        const spy = mockFetchOk({ status: "ok" })
+        await deleteGlossaryTerm("123", "Phoenix")
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining("/translation/mods/123/glossary/Phoenix"), expect.objectContaining({ method: "DELETE" }))
+    })
+
+    it("glossaryApplyAll POSTs old_english + new_english", async () => {
+        const spy = mockFetchOk({ replaced: 3 })
+        const result = await glossaryApplyAll("123", "Cathay Phoenix", "Cathayan Phoenix")
+        expect(result.replaced).toBe(3)
+        const [, init] = spy.mock.calls[0]
+        expect(JSON.parse((init as RequestInit).body as string)).toEqual({ old_english: "Cathay Phoenix", new_english: "Cathayan Phoenix" })
+    })
+
+    it("glossarySuggestEdits POSTs and returns suggestions", async () => {
+        mockFetchOk([{ english: "Sky", source: "天", source_lang: "Chinese", category: "lore_terms", reason: "common" }])
+        const result = await glossarySuggestEdits("123")
+        expect(result.length).toBe(1)
+        expect(result[0].english).toBe("Sky")
+    })
+
+    it("scanTerms POSTs and returns suggestions", async () => {
+        mockFetchOk([{ english: "Phoenix", source: "凤", source_lang: "Chinese", category: "factions", reason: "recurring" }])
+        const result = await scanTerms("123")
+        expect(result.length).toBe(1)
+    })
+
+    it("listApiResponses GETs and returns the list", async () => {
+        mockFetchOk([
+            {
+                timestamp: "2026-05-25T00:00:00Z",
+                kind: "translate-batch",
+                provider: "claude",
+                model: "claude",
+                input_tokens: null,
+                output_tokens: null,
+                cost_usd: null,
+                keys_or_inputs: ["k1"],
+                raw_response: "{}",
+            },
+        ])
+        const result = await listApiResponses("123")
+        expect(result[0].kind).toBe("translate-batch")
     })
 })

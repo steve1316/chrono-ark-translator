@@ -190,7 +190,9 @@ export interface WH3TranslationModSummary {
 /** Status of one row in the drift report. */
 export type WH3DriftStatus = "translated" | "untranslated" | "stale" | "orphan"
 
-/** One row returned by `GET /api/games/total_war_warhammer_3/translation/mods/{id}/strings`. */
+/**
+ * One row in `GET /translation/mods/{id}/strings` (extended for Plan 3b).
+ */
 export interface WH3DriftRow {
     /** Normalized parent `.loc.tsv` filename this row belongs to. */
     source_filename: string
@@ -202,6 +204,8 @@ export interface WH3DriftRow {
     translation_text: string | null
     /** Drift status. */
     status: WH3DriftStatus
+    /** Who/what produced the current translation. `null` when untranslated. */
+    provider: string | null
 }
 
 /** Summary returned by `POST /api/games/total_war_warhammer_3/translation/mods/{id}/rescan`. */
@@ -222,4 +226,54 @@ export interface WH3ModContext {
     character_name: string
     /** Multi-line background / lore that gets injected into the LLM prompt. */
     background: string
+}
+
+/** One row in `GET /translation/mods/{id}/glossary` response (also used in POST/PUT bodies). */
+export interface WH3GlossaryEntry {
+    /** Canonical English term (also the dict key on the wire). */
+    english: string
+    /** Source-language form (e.g. Chinese characters). */
+    source: string
+    /** Category label (e.g. `"factions"`). */
+    category: string
+}
+
+/** Metadata for one entry in `GET /translation/mods/{id}/snapshots`. */
+export interface WH3SnapshotMeta {
+    /** Sortable-by-time snapshot identifier. */
+    ulid: string
+    /** ISO timestamp when the snapshot was taken. */
+    created_at: string
+    /** Human-readable description (e.g. `"pre-clear-translations"`). */
+    label: string
+    /** `"auto"` (snapshot taken by the backend before a destructive op) or `"manual"` (user-initiated). */
+    kind: "auto" | "manual"
+}
+
+/** One entry in `GET /translation/mods/{id}/api-responses`. */
+export interface WH3ApiResponseEntry {
+    /** ISO timestamp when the call returned. */
+    timestamp: string
+    /** Kind of API call: `"translate-batch"`, `"scan-terms"`, or `"suggest-edits"`. */
+    kind: "translate-batch" | "scan-terms" | "suggest-edits"
+    /** Provider that fielded the call (e.g. `"claude"`). */
+    provider: string
+    /** Model identifier (currently always `"claude"`, placeholder for future expansion). */
+    model: string
+    /** Token usage in. `null` when the provider does not report it. */
+    input_tokens: number | null
+    /** Token usage out. */
+    output_tokens: number | null
+    /** Estimated cost in USD. */
+    cost_usd: number | null
+    /** Keys (translate-batch) or input strings (scan-terms / suggest-edits) sent to the provider. */
+    keys_or_inputs: string[]
+    /** Raw JSON response body as returned by the provider. */
+    raw_response: string
+}
+
+/** Response body of `POST /translation/mods/{id}/sync`. */
+export interface WH3SyncResult {
+    /** Map from absolute `.loc.tsv` path to number of keys written into it. */
+    per_file: Record<string, number>
 }
