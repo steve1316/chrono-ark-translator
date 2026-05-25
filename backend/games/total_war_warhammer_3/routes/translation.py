@@ -40,6 +40,7 @@ router = APIRouter(prefix="/translation", tags=["translation"])
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # Helpers (extracted as module-level functions so tests can monkeypatch them)
 
+
 def _extract_translation_strings(mod: WH3TranslationMod) -> dict[str, dict[str, LocRow]]:
     """Read all `.loc.tsv` files under `mod.local_source_dir/text/**`.
 
@@ -62,8 +63,9 @@ def _extract_translation_strings(mod: WH3TranslationMod) -> dict[str, dict[str, 
 def _extract_all_parent_strings(mod: WH3TranslationMod) -> dict[str, dict[str, LocRow]]:
     """Extract `.loc` strings from every parent `.pack` declared on `mod`.
 
-    Reads `rpfm_cli_path` from `backend.config.TW3_RPFM_CLI_PATH` (the same
-    pattern used by `routes/runner.py`).
+    Resolves `rpfm_cli_path` the same way `script_runner._preflight` does: prefer
+    `config.TW3_RPFM_CLI_PATH` when set, otherwise fall back to `rpfm_cli.exe`
+    inside `config.TW3_HELPER_PATH`.
 
     Args:
         mod: The translation mod whose parent packs to extract.
@@ -72,15 +74,19 @@ def _extract_all_parent_strings(mod: WH3TranslationMod) -> dict[str, dict[str, L
         Merged dict mapping normalized filename to `{key: LocRow}` across all parents.
 
     Raises:
-        HTTPException: If `TW3_RPFM_CLI_PATH` is not configured or the Steam library drive is
-            not configured.
+        HTTPException: If neither `TW3_RPFM_CLI_PATH` nor `<TW3_HELPER_PATH>/rpfm_cli.exe`
+            resolves to a file on disk, or the Steam library drive is not configured.
     """
     from backend import config
 
     rpfm_str = config.TW3_RPFM_CLI_PATH or ""
-    rpfm = Path(rpfm_str) if rpfm_str else Path()
-    if not rpfm_str or not rpfm.exists():
-        raise HTTPException(500, "rpfm_cli_path is not configured or does not exist on disk")
+    if rpfm_str:
+        rpfm: Path | None = Path(rpfm_str)
+    else:
+        helper_str = config.TW3_HELPER_PATH or ""
+        rpfm = Path(helper_str) / "rpfm_cli.exe" if helper_str else None
+    if rpfm is None or not rpfm.is_file():
+        raise HTTPException(500, f"rpfm_cli not found (tried {rpfm or 'TW3_RPFM_CLI_PATH'}); set CATL_TW3_RPFM_CLI_PATH or place rpfm_cli.exe in CATL_TW3_HELPER_PATH")
 
     merged: dict[str, dict[str, LocRow]] = {}
     for parent_id in mod.parent_workshop_ids:
@@ -140,6 +146,7 @@ def _serialize_drift_row(row: DriftRow) -> dict:
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # Route models
 
+
 class TranslationModSummary(BaseModel):
     """One translation-mod summary row."""
 
@@ -176,6 +183,7 @@ class ModContext(BaseModel):
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # Routes
+
 
 @router.get("/mods", response_model=list[TranslationModSummary])
 def list_translation_mods() -> list[TranslationModSummary]:
