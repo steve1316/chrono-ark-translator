@@ -42,7 +42,11 @@ def test_list_translation_mods_returns_registry(client: TestClient):
     data = resp.json()
     assert len(data) == 5
     assert {m["workshop_id"] for m in data} == {
-        "3315737452", "3317696617", "3392058226", "3393724674", "3393724734",
+        "3315737452",
+        "3317696617",
+        "3392058226",
+        "3393724674",
+        "3393724734",
     }
 
 
@@ -59,14 +63,14 @@ def test_rescan_returns_drift_summary(client: TestClient):
 
 def test_get_strings_filters_by_status(client: TestClient):
     client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/rescan")
-    resp = client.get(
-        "/api/games/total_war_warhammer_3/translation/mods/3315737452/strings?status=untranslated"
-    )
+    resp = client.get("/api/games/total_war_warhammer_3/translation/mods/3315737452/strings?status=untranslated")
     assert resp.status_code == 200
     rows = resp.json()
     assert len(rows) == 1
     assert rows[0]["key"] == "k2"
     assert rows[0]["status"] == "untranslated"
+    # New: each row now has a `provider` field.
+    assert "provider" in rows[0]
 
 
 def test_put_string_persists_translation(client: TestClient):
@@ -82,13 +86,16 @@ def test_put_string_persists_translation(client: TestClient):
     # k2 still untranslated because we save into translations.json which is read by
     # _extract_translation_strings, but the stub ignores that. So just check persistence:
     from backend.games.total_war_warhammer_3.translation_store_helpers import load_translations
+
     assert load_translations("3315737452")["k2"] == "New translation"
+    from backend.games.total_war_warhammer_3.translation_store_helpers import load_translations_raw
+
+    raw = load_translations_raw("3315737452")
+    assert raw["k2"]["provider"] == "manual"
 
 
 def test_get_strings_404s_for_unknown_mod(client: TestClient):
-    resp = client.get(
-        "/api/games/total_war_warhammer_3/translation/mods/999/strings"
-    )
+    resp = client.get("/api/games/total_war_warhammer_3/translation/mods/999/strings")
     assert resp.status_code == 404
 
 
@@ -112,9 +119,7 @@ def test_translate_batch_calls_claude_and_saves_results(client: TestClient, monk
     """
     calls: dict = {}
 
-    def fake_translate_batch(
-        self, entries, source_lang, glossary_prompt, **kwargs
-    ):
+    def fake_translate_batch(self, entries, source_lang, glossary_prompt, **kwargs):
         calls["source_lang"] = source_lang
         calls["target_lang"] = kwargs.get("target_lang", "English")
         calls["game_context"] = kwargs.get("game_context", "")
@@ -139,4 +144,9 @@ def test_translate_batch_calls_claude_and_saves_results(client: TestClient, monk
     assert calls["keys"] == ["k2"]
 
     from backend.games.total_war_warhammer_3.translation_store_helpers import load_translations
+
     assert load_translations("3315737452")["k2"] == "EN(新文本)"
+    from backend.games.total_war_warhammer_3.translation_store_helpers import load_translations_raw
+
+    raw = load_translations_raw("3315737452")
+    assert raw["k2"]["provider"] == "claude"

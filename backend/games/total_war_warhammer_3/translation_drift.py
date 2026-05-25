@@ -27,6 +27,8 @@ class DriftRow:
         parent_text: Current parent source text, or `None` for orphan rows.
         translation_text: Current translation text, or `None` for untranslated rows.
         status: One of `translated`, `untranslated`, `stale`, `orphan`.
+        provider: Who/what produced the current translation - `"claude"`, `"manual"`,
+            or `None` when the row is untranslated. Defaults to `None`.
     """
 
     source_filename: str
@@ -34,6 +36,7 @@ class DriftRow:
     parent_text: str | None
     translation_text: str | None
     status: DriftStatus
+    provider: str | None = None
 
 
 def hash_text(text: str) -> str:

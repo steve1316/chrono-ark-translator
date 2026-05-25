@@ -101,3 +101,14 @@ def test_drift_row_default_translation_text_is_none():
         status="untranslated",
     )
     assert row.translation_text is None
+
+
+def test_drift_row_default_provider_is_none():
+    row = DriftRow(
+        source_filename="a.loc.tsv",
+        key="k",
+        parent_text="x",
+        translation_text=None,
+        status="untranslated",
+    )
+    assert row.provider is None

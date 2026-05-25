@@ -131,7 +131,7 @@ def _serialize_drift_row(row: DriftRow) -> dict:
         row: The drift row to serialize.
 
     Returns:
-        Dict with `source_filename`, `key`, `parent_text`, `translation_text`, and `status`.
+        Dict with `source_filename`, `key`, `parent_text`, `translation_text`, `status`, and `provider`.
     """
     return {
         "source_filename": row.source_filename,
@@ -139,6 +139,7 @@ def _serialize_drift_row(row: DriftRow) -> dict:
         "parent_text": row.parent_text,
         "translation_text": row.translation_text,
         "status": row.status,
+        "provider": row.provider,
     }
 
 
@@ -251,6 +252,9 @@ def rescan(mod_id: str) -> RescanSummary:
 def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stale", "orphan"] | None = None) -> list[dict]:
     """Return drift rows for a mod, optionally filtered by status.
 
+    Overlays `translations.json` onto the drift rows so any in-flight edits (user PUTs, Claude batches) reflect immediately - their `translation_text`
+    and `provider` come from translations.json when present, otherwise from the user's `.loc.tsv` content with `provider` defaulting to `"manual"`.
+
     Args:
         mod_id: Steam Workshop ID of the translation mod.
         status: Optional status filter (`"translated"`, `"untranslated"`, `"stale"`, `"orphan"`).
@@ -268,10 +272,47 @@ def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stal
 
     drift = compute_drift(parent=parent, translation=translation, snapshot=snapshot)
 
-    if status:
-        drift = [r for r in drift if r.status == status]
+    raw_translations = store.load_translations_raw(mod_id)
 
-    return [_serialize_drift_row(r) for r in drift]
+    overlaid: list[DriftRow] = []
+    for row in drift:
+        entry = raw_translations.get(row.key)
+        if entry and entry.get("text"):
+            override_text = entry["text"]
+            override_provider = entry.get("provider") or "manual"
+            # If the row was untranslated on the file system but translations.json has it, promote it to translated per the parent hash.
+            if row.status == "untranslated":
+                new_status = "translated"
+            else:
+                new_status = row.status
+            overlaid.append(
+                DriftRow(
+                    source_filename=row.source_filename,
+                    key=row.key,
+                    parent_text=row.parent_text,
+                    translation_text=override_text,
+                    status=new_status,
+                    provider=override_provider,
+                )
+            )
+        else:
+            # Existing .loc.tsv translation (or untranslated). Default provider to "manual" when text is present, None when absent.
+            provider = "manual" if row.translation_text else None
+            overlaid.append(
+                DriftRow(
+                    source_filename=row.source_filename,
+                    key=row.key,
+                    parent_text=row.parent_text,
+                    translation_text=row.translation_text,
+                    status=row.status,
+                    provider=provider,
+                )
+            )
+
+    if status:
+        overlaid = [r for r in overlaid if r.status == status]
+
+    return [_serialize_drift_row(r) for r in overlaid]
 
 
 @router.put("/mods/{mod_id}/strings/{key}")
@@ -297,6 +338,7 @@ def put_string(mod_id: str, key: str, edit: TranslationEdit) -> dict:
         "text": edit.text,
         "created_at": existing.get("created_at") or now,
         "updated_at": now,
+        "provider": "manual",
     }
     store.save_translations_raw(mod_id, raw)
     return {"status": "ok"}
@@ -380,6 +422,7 @@ def translate_batch(mod_id: str, req: TranslateBatchRequest) -> dict:
             "text": text,
             "created_at": existing.get("created_at") or now,
             "updated_at": now,
+            "provider": "claude",
         }
     store.save_translations_raw(mod_id, raw)
 
