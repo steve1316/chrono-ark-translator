@@ -103,7 +103,7 @@ export async function saveModContext(workshopId: string, ctx: WH3ModContext): Pr
  * @returns Count of translated rows and any suggested glossary terms.
  * @throws `RegistryError` On any non-2xx response.
  */
-export async function translateBatch(workshopId: string, keys: string[]): Promise<{ translated: number; suggested_terms: unknown[] }> {
+export async function translateBatch(workshopId: string, keys: string[]): Promise<{ translated: number; suggested_terms: TermSuggestion[] }> {
     const res = await api.post(`/translation/mods/${encodeURIComponent(workshopId)}/translate`, { keys })
     if (!res.ok) throw await registryError(res)
     return res.json()

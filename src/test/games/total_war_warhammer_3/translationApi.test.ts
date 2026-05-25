@@ -123,10 +123,11 @@ describe("plan3 routes", () => {
         expect(spy).toHaveBeenCalledWith(expect.stringContaining("/translation/mods/123/sync"), expect.objectContaining({ method: "POST" }))
     })
 
-    it("clearTranslations returns the cleared count", async () => {
-        mockFetchOk({ cleared: 7 })
+    it("clearTranslations POSTs to /clear-translations and returns the cleared count", async () => {
+        const spy = mockFetchOk({ cleared: 7 })
         const result = await clearTranslations("123")
         expect(result.cleared).toBe(7)
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining("/translation/mods/123/clear-translations"), expect.objectContaining({ method: "POST" }))
     })
 
     it("listSnapshots returns SnapshotMeta list", async () => {
