@@ -7,6 +7,7 @@ tests can monkeypatch them in isolation.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -425,6 +426,23 @@ def translate_batch(mod_id: str, req: TranslateBatchRequest) -> dict:
             "provider": "claude",
         }
     store.save_translations_raw(mod_id, raw)
+
+    from backend.games.total_war_warhammer_3 import api_responses_store
+
+    api_responses_store.append(
+        mod_id,
+        {
+            "timestamp": now,
+            "kind": "translate-batch",
+            "provider": "claude",
+            "model": "claude",  # provider doesn't expose the model id back through this path
+            "input_tokens": None,
+            "output_tokens": None,
+            "cost_usd": None,
+            "keys_or_inputs": list(src.keys()),
+            "raw_response": json.dumps(translations, ensure_ascii=False),
+        },
+    )
 
     return {"translated": len(translations), "suggested_terms": suggested_terms}
 

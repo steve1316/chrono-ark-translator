@@ -173,3 +173,10 @@ def test_translate_batch_calls_claude_and_saves_results(client: TestClient, monk
 
     raw = load_translations_raw("3315737452")
     assert raw["k2"]["provider"] == "claude"
+
+    from backend.games.total_war_warhammer_3.api_responses_store import list_entries
+
+    entries = list_entries("3315737452")
+    assert len(entries) == 1
+    assert entries[0]["kind"] == "translate-batch"
+    assert "k2" in entries[0]["keys_or_inputs"]
