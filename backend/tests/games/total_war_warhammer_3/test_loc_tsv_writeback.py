@@ -7,7 +7,9 @@ import pytest
 from backend.games.total_war_warhammer_3.loc_tsv_writeback import (
     apply_row_patches,
     read_loc_tsv_lines,
+    sync_translations_to_loc_tsv,
 )
+from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
 
 
 def _write_loc_tsv(path: Path, body: str) -> None:
@@ -80,3 +82,74 @@ def test_apply_row_patches_creates_file_when_missing(tmp_path: Path):
     assert body.startswith("key\ttext\ttooltip\n")
     assert "#Loc;1;text/new.loc\t\t" in body
     assert "key_a\tHello\ttrue" in body
+
+
+def test_sync_updates_existing_file_in_place(tmp_path: Path, monkeypatch):
+    """Sync resolves source_filename -> existing prefixed user file and patches it."""
+    local_dir = tmp_path / "translation_mod"
+    text_dir = local_dir / "text"
+    text_dir.mkdir(parents=True)
+    user_file = text_dir / "@@my_units.loc.tsv"
+    _write_loc_tsv(
+        user_file,
+        "key\ttext\ttooltip\n#Loc;1;text/@@my_units.loc\t\t\nkey_a\tOld A\ttrue\n",
+    )
+
+    mod = WH3TranslationMod(
+        workshop_id="abc",
+        display_name="t",
+        parent_workshop_ids=("p",),
+        local_source_dir=local_dir,
+    )
+
+    # Drift rows pointing at the normalized filename
+    drift_rows = [
+        {"source_filename": "my_units.loc.tsv", "key": "key_a", "translation_text": "New A"},
+        {"source_filename": "my_units.loc.tsv", "key": "key_new", "translation_text": "Brand new"},
+    ]
+    result = sync_translations_to_loc_tsv(mod, drift_rows)
+
+    body = user_file.read_text(encoding="utf-8")
+    assert "key_a\tNew A\ttrue" in body
+    assert "key_new\tBrand new\ttrue" in body
+    assert result == {str(user_file): 2}
+
+
+def test_sync_creates_new_file_with_prefix_when_no_existing_match(tmp_path: Path):
+    local_dir = tmp_path / "translation_mod"
+    (local_dir / "text").mkdir(parents=True)
+
+    mod = WH3TranslationMod(
+        workshop_id="abc",
+        display_name="t",
+        parent_workshop_ids=("p",),
+        local_source_dir=local_dir,
+        prefix="!!!",
+    )
+    drift_rows = [
+        {"source_filename": "new_unit.loc.tsv", "key": "k1", "translation_text": "Hello"},
+    ]
+    result = sync_translations_to_loc_tsv(mod, drift_rows)
+
+    expected = local_dir / "text" / "!!!new_unit.loc.tsv"
+    assert expected.exists()
+    assert "k1\tHello\ttrue" in expected.read_text(encoding="utf-8")
+    assert result == {str(expected): 1}
+
+
+def test_sync_skips_rows_with_null_translation_text(tmp_path: Path):
+    local_dir = tmp_path / "translation_mod"
+    (local_dir / "text").mkdir(parents=True)
+    mod = WH3TranslationMod(
+        workshop_id="abc",
+        display_name="t",
+        parent_workshop_ids=("p",),
+        local_source_dir=local_dir,
+    )
+    drift_rows = [
+        {"source_filename": "a.loc.tsv", "key": "k1", "translation_text": None},
+        {"source_filename": "a.loc.tsv", "key": "k2", "translation_text": "x"},
+    ]
+    result = sync_translations_to_loc_tsv(mod, drift_rows)
+    # Only one file touched, with one patch.
+    assert sum(result.values()) == 1

@@ -14,6 +14,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from backend.games.total_war_warhammer_3.loc_extractor import normalize_loc_filename
+from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
+
 
 def read_loc_tsv_lines(path: Path) -> list[str]:
     """Read a `.loc.tsv` file as a list of lines (no trailing newline).
@@ -86,3 +89,60 @@ def apply_row_patches(path: Path, patches: dict[str, str]) -> None:
         lines.append(f"{key}\t{text}\ttrue")
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _find_existing_user_file(mod: WH3TranslationMod, normalized_filename: str) -> Path | None:
+    """Find the user's `.loc.tsv` file that maps to a normalized parent filename.
+
+    Walks `mod.local_source_dir/text/**` looking for any `.loc.tsv` whose
+    `normalize_loc_filename(name)` matches.
+
+    Args:
+        mod: The translation mod whose source dir to search.
+        normalized_filename: The target normalized filename, e.g. `"def_units.loc.tsv"`.
+
+    Returns:
+        Path to the matching file if found; otherwise `None`.
+    """
+    text_dir = mod.local_source_dir / "text"
+    if not text_dir.exists():
+        return None
+    for candidate in text_dir.rglob("*.loc.tsv"):
+        if normalize_loc_filename(candidate.name) == normalized_filename:
+            return candidate
+    return None
+
+
+def sync_translations_to_loc_tsv(mod: WH3TranslationMod, drift_rows: list[dict]) -> dict[str, int]:
+    """Apply each drift row's `translation_text` to the matching user `.loc.tsv`.
+
+    Drift rows with `translation_text is None` are skipped. Rows are grouped by `source_filename`. Each group is applied to either the user's existing
+    matching file (resolved via `_find_existing_user_file`) or a new file created at `<local_source_dir>/text/<mod.prefix><source_filename>` when no
+    match exists.
+
+    Args:
+        mod: The translation mod whose `.loc.tsv` files to update.
+        drift_rows: List of drift-row dicts (as returned by `GET /strings`). Each row needs at minimum `source_filename`, `key`, `translation_text`.
+
+    Returns:
+        Mapping `{absolute_path: patch_count}` describing how many keys were written to each file.
+    """
+    by_file: dict[str, dict[str, str]] = {}
+    for row in drift_rows:
+        text = row.get("translation_text")
+        if text is None:
+            continue
+        fname = row["source_filename"]
+        by_file.setdefault(fname, {})[row["key"]] = text
+
+    result: dict[str, int] = {}
+    for fname, patches in by_file.items():
+        target = _find_existing_user_file(mod, fname)
+        if target is None:
+            target = mod.local_source_dir / "text" / f"{mod.prefix}{fname}"
+        apply_row_patches(target, patches)
+        result[str(target)] = len(patches)
+    return result
+
+
+__all__ = ["read_loc_tsv_lines", "apply_row_patches", "sync_translations_to_loc_tsv"]
