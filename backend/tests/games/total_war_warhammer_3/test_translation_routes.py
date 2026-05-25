@@ -73,6 +73,29 @@ def test_get_strings_filters_by_status(client: TestClient):
     assert "provider" in rows[0]
 
 
+def test_get_strings_overlay_from_translations_json(client: TestClient):
+    """Verify `get_strings` overlays `translations.json` onto drift rows.
+
+    A key with no `.loc.tsv` translation but a seeded `translations.json` entry should appear as translated with the seeded text and provider.
+    """
+    from datetime import datetime, timezone
+
+    from backend.games.total_war_warhammer_3.translation_store_helpers import save_translations_raw
+
+    now = datetime.now(timezone.utc).isoformat()
+    save_translations_raw(
+        "3315737452",
+        {"k2": {"text": "Seeded", "provider": "claude", "created_at": now, "updated_at": now}},
+    )
+
+    resp = client.get("/api/games/total_war_warhammer_3/translation/mods/3315737452/strings")
+    assert resp.status_code == 200
+    rows = {r["key"]: r for r in resp.json()}
+    assert rows["k2"]["translation_text"] == "Seeded"
+    assert rows["k2"]["provider"] == "claude"
+    assert rows["k2"]["status"] == "translated"
+
+
 def test_put_string_persists_translation(client: TestClient):
     client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/rescan")
     resp = client.put(
