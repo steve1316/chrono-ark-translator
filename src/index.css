@@ -919,3 +919,44 @@ th {
     font-size: 0.85rem;
     margin-bottom: 0.25rem;
 }
+
+/* WH3 translation modal scaffolding (shared by all Plan 3 modals) */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.modal-panel {
+    max-height: 85vh;
+    overflow: auto;
+    padding: 1.5rem 2rem;
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.75rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+}
