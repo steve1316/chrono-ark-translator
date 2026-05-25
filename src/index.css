@@ -1077,3 +1077,51 @@ th {
     word-break: break-all;
     max-height: 50vh;
 }
+
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* WH3 scan-for-terms / suggest-edits suggestion rows */
+.glossary-group {
+    margin-bottom: 1rem;
+}
+.glossary-group-header {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    padding: 0.25rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.4rem;
+}
+.suggestion-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+}
+.suggestion-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+.suggestion-meta {
+    flex: 1;
+    min-width: 0;
+}
+.suggestion-english {
+    font-weight: 500;
+    color: var(--text-main);
+}
+.suggestion-source {
+    color: var(--text-dim);
+}
+.suggestion-reason {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 0.15rem;
+}
+.suggestion-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
