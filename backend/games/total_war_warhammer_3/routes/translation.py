@@ -464,3 +464,356 @@ def put_mod_context(mod_id: str, ctx: ModContext) -> dict:
     _require_mod(mod_id)
     store.save_character_context(mod_id, ctx.model_dump())
     return {"status": "ok"}
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# Plan 3 routes
+
+
+class SnapshotCreateRequest(BaseModel):
+    """Request body for `POST /mods/{mod_id}/snapshots`."""
+
+    label: str = "manual save"
+
+
+class GlossaryEntry(BaseModel):
+    """One glossary entry. `english` is the key; `source` and `category` are the values."""
+
+    english: str
+    source: str = ""
+    category: str = ""
+
+
+class GlossaryApplyAllRequest(BaseModel):
+    """Body for `POST /glossary/apply-all`."""
+
+    old_english: str
+    new_english: str
+
+
+@router.post("/mods/{mod_id}/clear-translations")
+def clear_translations(mod_id: str) -> dict:
+    """Wipe all translation_text values for a mod. Takes a pre-clear auto-snapshot.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+
+    Returns:
+        `{"cleared": N}` - number of rows that had text cleared.
+    """
+    from backend.games.total_war_warhammer_3 import snapshot_store
+
+    mod = _require_mod(mod_id)
+    snapshot_store.create_snapshot(mod_id, label="pre-clear-translations", kind="auto", local_source_dir=mod.local_source_dir)
+    raw = store.load_translations_raw(mod_id)
+    count = sum(1 for entry in raw.values() if isinstance(entry, dict) and entry.get("text"))
+    store.save_translations_raw(mod_id, {})
+    return {"cleared": count}
+
+
+@router.post("/mods/{mod_id}/sync")
+def sync_changes(mod_id: str) -> dict:
+    """Apply translations.json into the user's .loc.tsv files (surgical patch).
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+
+    Returns:
+        `{"per_file": {absolute_path: count}}` describing the writeback.
+    """
+    from backend.games.total_war_warhammer_3 import snapshot_store
+    from backend.games.total_war_warhammer_3.loc_tsv_writeback import sync_translations_to_loc_tsv
+
+    mod = _require_mod(mod_id)
+    snapshot_store.create_snapshot(mod_id, label="pre-sync", kind="auto", local_source_dir=mod.local_source_dir)
+    drift = get_strings(mod_id)
+    per_file = sync_translations_to_loc_tsv(mod, drift)
+    return {"per_file": per_file}
+
+
+@router.get("/mods/{mod_id}/snapshots")
+def get_snapshots(mod_id: str) -> list[dict]:
+    """Return snapshot metadata for a mod, newest first.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+
+    Returns:
+        List of `{ulid, created_at, label, kind}` entries; empty when no snapshots exist.
+    """
+    from backend.games.total_war_warhammer_3 import snapshot_store
+
+    _require_mod(mod_id)
+    return snapshot_store.list_snapshots(mod_id)
+
+
+@router.post("/mods/{mod_id}/snapshots")
+def post_snapshot(mod_id: str, req: SnapshotCreateRequest) -> dict:
+    """Create a manual snapshot of the mod's full state.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        req: Request body with the human-readable snapshot label.
+
+    Returns:
+        `{"ulid": str, "label": str, "kind": "manual"}` for the new snapshot.
+    """
+    from backend.games.total_war_warhammer_3 import snapshot_store
+
+    mod = _require_mod(mod_id)
+    sid = snapshot_store.create_snapshot(mod_id, label=req.label, kind="manual", local_source_dir=mod.local_source_dir)
+    return {"ulid": sid, "label": req.label, "kind": "manual"}
+
+
+@router.post("/mods/{mod_id}/snapshots/{sid}/restore")
+def post_restore_snapshot(mod_id: str, sid: str) -> dict:
+    """Restore a mod's state from a snapshot. Auto-creates a pre-restore snapshot first.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        sid: ULID of the snapshot to restore.
+
+    Returns:
+        `{"status": "ok"}` on success.
+
+    Raises:
+        HTTPException: 404 when the snapshot does not exist.
+    """
+    from backend.games.total_war_warhammer_3 import snapshot_store
+
+    mod = _require_mod(mod_id)
+    try:
+        snapshot_store.restore_snapshot(mod_id, sid, local_source_dir=mod.local_source_dir)
+    except FileNotFoundError:
+        raise HTTPException(404, f"snapshot {sid} not found")
+    return {"status": "ok"}
+
+
+@router.delete("/mods/{mod_id}/snapshots/{sid}")
+def delete_snapshot_route(mod_id: str, sid: str) -> dict:
+    """Delete one snapshot from a mod's history.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        sid: ULID of the snapshot to delete.
+
+    Returns:
+        `{"status": "ok"}` on success.
+    """
+    from backend.games.total_war_warhammer_3 import snapshot_store
+
+    _require_mod(mod_id)
+    snapshot_store.delete_snapshot(mod_id, sid)
+    return {"status": "ok"}
+
+
+@router.get("/mods/{mod_id}/glossary")
+def get_glossary(mod_id: str) -> dict:
+    """Return the per-mod glossary.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+
+    Returns:
+        Glossary dict keyed by English term.
+    """
+    from backend.games.total_war_warhammer_3 import glossary_store
+
+    _require_mod(mod_id)
+    return glossary_store.load_glossary(mod_id)
+
+
+@router.post("/mods/{mod_id}/glossary")
+def post_glossary_term(mod_id: str, entry: GlossaryEntry) -> dict:
+    """Add or replace a glossary entry.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        entry: Glossary entry with `english`, `source`, `category`.
+
+    Returns:
+        `{"status": "ok"}` on success.
+    """
+    from backend.games.total_war_warhammer_3 import glossary_store
+
+    _require_mod(mod_id)
+    glossary_store.add_term(mod_id, entry.model_dump())
+    return {"status": "ok"}
+
+
+@router.put("/mods/{mod_id}/glossary/{english}")
+def put_glossary_term(mod_id: str, english: str, entry: GlossaryEntry) -> dict:
+    """Update (and optionally rename) a glossary entry.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        english: Existing English term key to update.
+        entry: New `{english, source, category}` values. A different `english` renames the entry.
+
+    Returns:
+        `{"status": "ok"}` on success.
+    """
+    from backend.games.total_war_warhammer_3 import glossary_store
+
+    _require_mod(mod_id)
+    glossary_store.update_term(mod_id, english, entry.model_dump())
+    return {"status": "ok"}
+
+
+@router.delete("/mods/{mod_id}/glossary/{english}")
+def delete_glossary_term(mod_id: str, english: str) -> dict:
+    """Delete a glossary entry by English term.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        english: English term key to delete.
+
+    Returns:
+        `{"status": "ok"}` on success.
+    """
+    from backend.games.total_war_warhammer_3 import glossary_store
+
+    _require_mod(mod_id)
+    glossary_store.delete_term(mod_id, english)
+    return {"status": "ok"}
+
+
+@router.post("/mods/{mod_id}/glossary/apply-all")
+def post_glossary_apply_all(mod_id: str, req: GlossaryApplyAllRequest) -> dict:
+    """Word-boundary find-and-replace `old_english` -> `new_english` across all translations.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        req: Request body with `old_english` and `new_english`.
+
+    Returns:
+        `{"replaced": N}` - total count of substitutions performed.
+    """
+    from backend.games.total_war_warhammer_3 import glossary_store, snapshot_store
+
+    mod = _require_mod(mod_id)
+    snapshot_store.create_snapshot(mod_id, label=f"pre-apply-all rename {req.old_english}", kind="auto", local_source_dir=mod.local_source_dir)
+    count = glossary_store.apply_term_rename(mod_id, req.old_english, req.new_english)
+    return {"replaced": count}
+
+
+@router.post("/mods/{mod_id}/glossary/suggest-edits")
+def post_glossary_suggest_edits(mod_id: str) -> list[dict]:
+    """Ask Claude for refinements to the current glossary. Logs to api_responses.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+
+    Returns:
+        List of suggested glossary edits from Claude.
+    """
+    from backend.games.total_war_warhammer_3 import api_responses_store, glossary_store
+    from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
+    from backend.translator.claude_provider import ClaudeProvider
+
+    mod = _require_mod(mod_id)
+    adapter = TotalWarWarhammer3Adapter()
+
+    parent = _extract_all_parent_strings(mod)
+    sample: dict[str, str] = {}
+    for rows in parent.values():
+        for key, row in rows.items():
+            if len(sample) >= 25:
+                break
+            sample[key] = row.text
+        if len(sample) >= 25:
+            break
+
+    glossary_section = json.dumps(glossary_store.load_glossary(mod_id), ensure_ascii=False, indent=2)
+    _, suggestions = ClaudeProvider().translate_batch(
+        list(sample.items()),
+        mod.source_language,
+        glossary_prompt=f"Current glossary (suggest improvements via suggested_terms only):\n{glossary_section}",
+        game_context=adapter.get_translation_context(),
+        format_rules=adapter.get_format_preservation_rules(),
+        style_examples=adapter.get_style_examples(mod.source_language),
+        character_context=None,
+        target_lang=mod.target_language,
+    )
+
+    api_responses_store.append(mod_id, {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "kind": "suggest-edits",
+        "provider": "claude",
+        "model": "claude",
+        "input_tokens": None,
+        "output_tokens": None,
+        "cost_usd": None,
+        "keys_or_inputs": list(sample.keys()),
+        "raw_response": json.dumps(suggestions, ensure_ascii=False),
+    })
+    return suggestions
+
+
+@router.post("/mods/{mod_id}/scan-terms")
+def post_scan_terms(mod_id: str) -> list[dict]:
+    """Scan all parent source text in the mod for recurring proper nouns. Logs to api_responses.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+
+    Returns:
+        List of suggested terms from Claude.
+    """
+    from backend.games.total_war_warhammer_3 import api_responses_store
+    from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
+    from backend.translator.claude_provider import ClaudeProvider
+
+    mod = _require_mod(mod_id)
+    adapter = TotalWarWarhammer3Adapter()
+
+    parent = _extract_all_parent_strings(mod)
+    entries: list[tuple[str, str]] = []
+    for rows in parent.values():
+        for key, row in rows.items():
+            entries.append((key, row.text))
+            if len(entries) >= 100:
+                break
+        if len(entries) >= 100:
+            break
+
+    _, suggestions = ClaudeProvider().translate_batch(
+        entries,
+        mod.source_language,
+        glossary_prompt="Identify recurring proper nouns and domain-specific terms via suggested_terms. Do NOT translate.",
+        game_context=adapter.get_translation_context(),
+        format_rules=adapter.get_format_preservation_rules(),
+        style_examples=adapter.get_style_examples(mod.source_language),
+        character_context=None,
+        target_lang=mod.target_language,
+    )
+
+    api_responses_store.append(mod_id, {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "kind": "scan-terms",
+        "provider": "claude",
+        "model": "claude",
+        "input_tokens": None,
+        "output_tokens": None,
+        "cost_usd": None,
+        "keys_or_inputs": [k for k, _ in entries],
+        "raw_response": json.dumps(suggestions, ensure_ascii=False),
+    })
+    return suggestions
+
+
+@router.get("/mods/{mod_id}/api-responses")
+def get_api_responses(mod_id: str) -> list[dict]:
+    """List all API response entries for a mod, newest first.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+
+    Returns:
+        List of audit entries (newest first); empty when no log exists.
+    """
+    from backend.games.total_war_warhammer_3 import api_responses_store
+
+    _require_mod(mod_id)
+    return api_responses_store.list_entries(mod_id)
