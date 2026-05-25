@@ -191,19 +191,25 @@ def extract_parent_pack_strings(
     extracted = _extracted_dir(cache_dir)
     extracted.mkdir(parents=True, exist_ok=True)
 
+    # Locate the schema next to rpfm_cli.exe so .loc tables decode into TSV during extract.
+    schema_path = rpfm_cli_path.parent / "schemas" / "schema_wh3.ron"
+
     cmd = [
         str(rpfm_cli_path),
-        "--game-selected", "warhammer_3",
-        "pack", "extract",
-        "-p", str(pack_path),
-        "-F", "loc",
-        "-o", str(extracted),
+        "--game",
+        "warhammer_3",
+        "pack",
+        "extract",
+        "--pack-path",
+        str(pack_path),
+        "--tables-as-tsv",
+        str(schema_path),
+        "--folder-path",
+        f"text;{extracted}",
     ]
-    result = subprocess.run(cmd, capture_output=True)
+    result = subprocess.run(cmd, capture_output=True, cwd=str(rpfm_cli_path.parent))
     if result.returncode != 0:
-        raise RuntimeError(
-            f"RPFM CLI failed (exit {result.returncode}): {result.stderr.decode('utf-8', errors='replace')}"
-        )
+        raise RuntimeError(f"RPFM CLI failed (exit {result.returncode}): {result.stderr.decode('utf-8', errors='replace')}")
 
     _pack_mtime_path(cache_dir).write_text(str(current_mtime), encoding="utf-8")
     return _read_all_extracted(cache_dir)

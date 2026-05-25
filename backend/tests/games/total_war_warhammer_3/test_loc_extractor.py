@@ -78,9 +78,7 @@ def test_extract_parent_pack_strings_invokes_rpfm_cli(monkeypatch, tmp_path: Pat
         out_dir = cache_dir / "extracted"
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "@@zerooz_def_units.loc.tsv").write_text(
-            "key\ttext\ttooltip\n"
-            "#Loc;1;text/@@zerooz_def_units.loc\t\t\n"
-            "land_units_onscreen_name_def_inf_x\tFrom parent\ttrue\n",
+            "key\ttext\ttooltip\n" "#Loc;1;text/@@zerooz_def_units.loc\t\t\n" "land_units_onscreen_name_def_inf_x\tFrom parent\ttrue\n",
             encoding="utf-8",
         )
         result = MagicMock()
@@ -94,7 +92,9 @@ def test_extract_parent_pack_strings_invokes_rpfm_cli(monkeypatch, tmp_path: Pat
     result = extract_parent_pack_strings(pack, rpfm, cache_dir)
 
     assert "rpfm_cli" in str(captured["cmd"][0]).lower() or captured["cmd"][0] == str(rpfm)
-    assert "--game-selected" in captured["cmd"] or "-g" in captured["cmd"]
+    assert "--game" in captured["cmd"] or "-g" in captured["cmd"]
+    assert "warhammer_3" in captured["cmd"]
+    assert "--tables-as-tsv" in captured["cmd"]
     assert str(pack) in captured["cmd"]
     assert "zerooz_def_units.loc.tsv" in result
     assert result["zerooz_def_units.loc.tsv"]["land_units_onscreen_name_def_inf_x"].text == "From parent"
@@ -109,9 +109,7 @@ def test_extract_parent_pack_strings_skips_extraction_when_cache_fresh(monkeypat
     (cache_dir / "pack_mtime.txt").write_text(str(int(pack.stat().st_mtime)), encoding="utf-8")
     extracted = cache_dir / "extracted"
     extracted.mkdir()
-    (extracted / "@@x.loc.tsv").write_text(
-        "key\ttext\ttooltip\n#Loc;1;text/x.loc\t\t\nk\tcached\tfalse\n", encoding="utf-8"
-    )
+    (extracted / "@@x.loc.tsv").write_text("key\ttext\ttooltip\n#Loc;1;text/x.loc\t\t\nk\tcached\tfalse\n", encoding="utf-8")
 
     run_mock = MagicMock(side_effect=AssertionError("subprocess.run must not be called when cache is fresh"))
     monkeypatch.setattr(subprocess, "run", run_mock)
