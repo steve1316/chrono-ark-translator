@@ -1,0 +1,124 @@
+"""Per-mod glossary CRUD wrappers for the WH3 translation flow.
+
+Stores the per-mod glossary at `<root>/mods/{id}/glossary.json` as a flat dict keyed by English term. Entries have `source` and `category` fields. The shared
+`backend.data.glossary_manager` module handles disk IO using a `{"terms": {...}}` wrapper. This module pins it to the WH3 game id, flattens/unflattens the
+wrapper, and adds the apply-rename helper that does word-boundary substitution across translations.json.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+from backend.data import glossary_manager as gm
+from backend.games.storage_paths import game_storage_path
+
+GAME_ID = "total_war_warhammer_3"
+
+
+def _root() -> Path:
+    return game_storage_path(GAME_ID)
+
+
+def load_glossary(mod_id: str) -> dict:
+    """Load the per-mod glossary as `{english_term: {source, category}}`.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+
+    Returns:
+        Glossary dict; empty when no file exists.
+    """
+    raw = gm.load_mod_glossary(mod_id, storage_path=_root())
+    return dict(raw.get("terms", {}))
+
+
+def _save(mod_id: str, glossary: dict) -> None:
+    gm.save_mod_glossary(mod_id, {"terms": glossary}, storage_path=_root())
+
+
+def add_term(mod_id: str, entry: dict) -> None:
+    """Add or replace a glossary entry.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        entry: `{english, source, category}` dict. The `english` key becomes the glossary key.
+
+    Raises:
+        ValueError: When `entry` is missing the `english` key.
+    """
+    english = entry.get("english")
+    if not english:
+        raise ValueError("entry must include 'english'")
+    glossary = load_glossary(mod_id)
+    glossary[english] = {"source": entry.get("source", ""), "category": entry.get("category", "")}
+    _save(mod_id, glossary)
+
+
+def update_term(mod_id: str, old_english: str, entry: dict) -> None:
+    """Update an existing entry, handling rename.
+
+    When `entry["english"]` differs from `old_english`, the old key is removed and the new one written.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        old_english: The current English term key.
+        entry: Updated `{english, source, category}` dict.
+
+    Raises:
+        ValueError: When `entry` is missing the `english` key.
+    """
+    new_english = entry.get("english")
+    if not new_english:
+        raise ValueError("entry must include 'english'")
+    glossary = load_glossary(mod_id)
+    if old_english in glossary and old_english != new_english:
+        del glossary[old_english]
+    glossary[new_english] = {"source": entry.get("source", ""), "category": entry.get("category", "")}
+    _save(mod_id, glossary)
+
+
+def delete_term(mod_id: str, english: str) -> None:
+    """Remove a glossary entry by English term.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        english: The English term key to delete.
+    """
+    glossary = load_glossary(mod_id)
+    glossary.pop(english, None)
+    _save(mod_id, glossary)
+
+
+def apply_term_rename(mod_id: str, old_english: str, new_english: str) -> int:
+    """Word-boundary find-and-replace `old_english` -> `new_english` across all translations.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        old_english: The previous canonical English term.
+        new_english: The new English term that should replace it.
+
+    Returns:
+        Total count of replacements performed across all translations.
+    """
+    path = _root() / "mods" / mod_id / "translations.json"
+    if not path.exists():
+        return 0
+    with path.open("r", encoding="utf-8") as f:
+        raw = json.load(f)
+
+    pattern = re.compile(r"\b" + re.escape(old_english) + r"\b")
+    total = 0
+    for key, entry in raw.items():
+        if not isinstance(entry, dict):
+            continue
+        text = entry.get("text") or ""
+        new_text, count = pattern.subn(new_english, text)
+        if count > 0 and new_text != text:
+            entry["text"] = new_text
+            total += count
+
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(raw, f, indent=2, ensure_ascii=False)
+    return total
