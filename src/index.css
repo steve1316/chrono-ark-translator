@@ -1193,3 +1193,38 @@ th {
     padding: 0.75rem;
     margin-bottom: 0.75rem;
 }
+
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* WH3 translation page toolbar + action row + search + mode column */
+.wh3-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+.wh3-action-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+.wh3-search {
+    width: 100%;
+    padding: 0.6rem 0.85rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-main);
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+}
+.wh3-search:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.wh3-mode-cell {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-transform: lowercase;
+}
