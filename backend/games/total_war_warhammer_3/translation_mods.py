@@ -30,6 +30,8 @@ class WH3TranslationMod:
         source_language: Source language of the parent mod's text.
             Currently always `"Chinese"`.
         target_language: Target language. Currently always `"English"`.
+        prefix: Load-order prefix used when creating brand-new `.loc.tsv`
+            files inside `<local_source_dir>/text/`. Defaults to `"@@"`.
     """
 
     workshop_id: str
@@ -38,6 +40,7 @@ class WH3TranslationMod:
     local_source_dir: Path
     source_language: str = "Chinese"
     target_language: str = "English"
+    prefix: str = "@@"
 
 
 _LOCAL_ROOT = Path(r"C:\Users\steve1316\Documents\GitHub\totalwar-modding\warhammer3_mods")
@@ -54,6 +57,7 @@ WH3_TRANSLATION_MODS: tuple[WH3TranslationMod, ...] = (
         display_name="Dragon General Fu Yuanshan Reforged Alternative English Translation",
         parent_workshop_ids=("3316985957",),
         local_source_dir=_LOCAL_ROOT / "zzz_cth_fuyuanshan_faction_Alternative_English_Translation",
+        prefix="!!!",
     ),
     WH3TranslationMod(
         workshop_id="3392058226",
