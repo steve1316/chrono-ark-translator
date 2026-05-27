@@ -214,6 +214,59 @@ export function publishStreamUrl(workshopId: string): string {
     return api.url(`/packs/${encodeURIComponent(workshopId)}/publish/stream`)
 }
 
+/** One mod entry sent in a batch publish request. */
+export interface BatchPublishItem {
+    /** Steam Workshop item id. Empty or non-numeric values are filtered server-side into the skipped list. */
+    workshop_id: string
+    /** Human-readable mod title carried through the SSE stream for UI display. */
+    title: string
+}
+
+/** Per-mod skip record returned alongside the batch handle when the backend filtered out an item up front. */
+export interface BatchPublishSkipped {
+    /** Original workshop_id value the caller submitted (may be empty or invalid). */
+    workshop_id: string
+    /** Original title value the caller submitted. */
+    title: string
+    /** Human-readable reason for the skip (e.g. `"no workshopId"`, `"invalid workshopId"`). */
+    reason: string
+}
+
+/** Handle returned by `publishAllPacks` describing the batch that was queued. */
+export interface BatchPublishHandle {
+    /** Server-generated id used to subscribe to the batch's SSE stream. */
+    batch_id: string
+    /** ISO-8601 UTC timestamp at which the orchestrator began the batch. */
+    started_at: string
+    /** Number of mods that passed the workshop_id filter and will run. */
+    queued: number
+    /** Per-mod skip records for items that did not pass the workshop_id filter. */
+    skipped: BatchPublishSkipped[]
+}
+
+/**
+ * Queue a batch that publishes every supplied mod to the Steam Workshop sharing one changelog.
+ *
+ * @param changenote Shared Steam Workshop changelog applied to every mod. Must be non-empty.
+ * @param items Per-mod entries in run order. Empty/invalid workshop_ids are filtered server-side.
+ * @returns The created batch handle (use `publishAllStreamUrl` with `batch_id` to subscribe to progress).
+ */
+export async function publishAllPacks(changenote: string, items: BatchPublishItem[]): Promise<BatchPublishHandle> {
+    const res = await api.post("/packs/publish-all", { changenote, items })
+    if (!res.ok) throw await registryError(res)
+    return res.json()
+}
+
+/**
+ * Build the SSE URL for the batch publish stream.
+ *
+ * @param batchId The `batch_id` returned by `publishAllPacks`.
+ * @returns Fully-qualified URL suitable for `new EventSource(...)`.
+ */
+export function publishAllStreamUrl(batchId: string): string {
+    return api.url(`/packs/publish-all/stream/${encodeURIComponent(batchId)}`)
+}
+
 /** Surfaces backend registry/runner errors with status, detail, and optional missing-list. */
 export class RegistryError extends Error {
     /** HTTP status code returned by the backend. */
