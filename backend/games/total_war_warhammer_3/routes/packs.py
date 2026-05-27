@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from backend import config
+from backend.games.total_war_warhammer_3 import workshop_batch_publisher as wbp
 from backend.games.total_war_warhammer_3 import workshop_publisher as wp
 from backend.games.total_war_warhammer_3.routes._paths import tw3_workshop_content_dir
 
@@ -211,5 +212,109 @@ async def get_pack_publish_stream(workshop_id: str):
                 }
                 yield f"event: done\ndata: {json.dumps(payload)}\n\n"
                 break
+
+    return StreamingResponse(event_source(), media_type="text/event-stream")
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# POST /packs/publish-all - sequential batch publish across many mods sharing one changelog
+
+
+class PublishAllItem(BaseModel):
+    """One mod entry in a batch publish request."""
+
+    workshop_id: str
+    """ Steam Workshop item id. Empty or non-numeric values are filtered into the skipped list. """
+    title: str = ""
+    """ Human-readable mod title carried through the SSE stream for UI display. """
+
+
+class PublishAllBody(BaseModel):
+    """Request body for POST /packs/publish-all."""
+
+    changenote: str
+    """ Shared Steam Workshop changelog applied to every mod in the batch. Must be non-empty. """
+    items: list[PublishAllItem]
+    """ Per-mod entries in run order. Empty/invalid workshop_ids are filtered into the skipped list. """
+
+
+@router.post("/packs/publish-all")
+async def post_publish_all(body: PublishAllBody):
+    """Start a serialized batch that publishes every eligible mod with the shared `changenote`.
+
+    Pre-filters items whose `workshop_id` is blank or non-numeric; those appear only in the response's `skipped` list and
+    in the SSE `mod_skipped` events. The batch runs as a detached background task so the modal can close and reconnect
+    via the stream endpoint.
+
+    Args:
+        body: Request body with `changenote` and `items`.
+
+    Returns:
+        `{"batch_id", "started_at", "queued", "skipped"}` on success.
+
+    Raises:
+        HTTPException(400): empty changenote, empty items list, or no items had a valid workshop_id.
+        HTTPException(409): another batch (or a single-mod publish) is already in progress.
+    """
+    if not body.changenote or not body.changenote.strip():
+        raise HTTPException(status_code=400, detail="changenote must not be empty")
+    if not body.items:
+        raise HTTPException(status_code=400, detail="items must not be empty")
+
+    eligible: list[dict] = []
+    skipped: list[dict] = []
+    for item in body.items:
+        wid = (item.workshop_id or "").strip()
+        if not wid:
+            skipped.append({"workshop_id": item.workshop_id, "title": item.title, "reason": "no workshopId"})
+            continue
+        if not _WORKSHOP_ID_RE.fullmatch(wid):
+            skipped.append({"workshop_id": item.workshop_id, "title": item.title, "reason": "invalid workshopId"})
+            continue
+        eligible.append({"workshop_id": wid, "title": item.title})
+
+    if not eligible:
+        raise HTTPException(status_code=400, detail="no items with a valid workshop_id")
+
+    try:
+        handle = wbp.start_batch(
+            eligible,
+            body.changenote,
+            steamcmd_path=config.STEAMCMD_PATH,
+            steam_username=config.STEAM_USERNAME,
+        )
+    except wbp.BatchInProgressError:
+        raise HTTPException(status_code=409, detail="a batch or single-mod publish is already in progress")
+
+    return {
+        "batch_id": handle.batch_id,
+        "started_at": handle.started_at.isoformat(),
+        "queued": len(eligible),
+        "skipped": skipped,
+    }
+
+
+@router.get("/packs/publish-all/stream/{batch_id}")
+async def get_publish_all_stream(batch_id: str):
+    """Server-sent events: replay every event a batch has emitted so far, then live-tail until it ends.
+
+    Args:
+        batch_id: id returned from POST `/packs/publish-all`.
+
+    Returns:
+        `StreamingResponse` with `text/event-stream` content type.
+
+    Raises:
+        HTTPException(404): when `batch_id` is unknown.
+    """
+    if wbp.get_batch(batch_id) is None:
+        raise HTTPException(status_code=404, detail="batch_id not found")
+
+    async def event_source():
+        async for event in wbp.stream_batch(batch_id):
+            event_type = event.get("event", "message")
+            data = json.dumps(event.get("data", {}))
+            yield f"event: {event_type}\ndata: {data}\n\n"
 
     return StreamingResponse(event_source(), media_type="text/event-stream")

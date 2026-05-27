@@ -274,3 +274,118 @@ def test_publish_returns_handle_on_success(monkeypatch, tmp_path):
 def test_publish_stream_returns_400_when_workshop_id_non_numeric():
     res = TestClient(app).get("/api/games/total_war_warhammer_3/packs/abc/publish/stream")
     assert res.status_code == 400
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# POST /packs/publish-all
+
+from backend.games.total_war_warhammer_3 import workshop_batch_publisher as wbp
+
+_PUBLISH_ALL = "/api/games/total_war_warhammer_3/packs/publish-all"
+
+
+def _stub_batch_publisher(monkeypatch, parent: Path, workshop_ids: list[str], exit_codes: dict[str, int] | None = None):
+    """Create real folders for `workshop_ids` and stub `wp.start_publish` + `wp.stream_lines`.
+
+    `exit_codes` maps a workshop_id to the SteamCMD exit code to inject (default 0 for all).
+    """
+    exit_codes = exit_codes or {}
+    for wid in workshop_ids:
+        (parent / wid).mkdir(exist_ok=True)
+
+    current_id: dict[str, str] = {"id": ""}
+
+    def fake_start_publish(workshop_id, content_folder, changenote, *, steamcmd_path, steam_username, **_kw):
+        current_id["id"] = workshop_id
+        return _make_handle(workshop_id)
+
+    async def fake_stream_lines():
+        wid = current_id["id"]
+        yield {"event": "data", "line": f"line for {wid}", "ts": "t"}
+        yield {"event": "done", "exit_code": exit_codes.get(wid, 0), "duration_seconds": 0.1}
+
+    monkeypatch.setattr(wp, "start_publish", fake_start_publish)
+    monkeypatch.setattr(wp, "stream_lines", fake_stream_lines)
+    monkeypatch.setattr(wp, "is_idle", lambda: True)
+
+
+def test_publish_all_returns_400_when_changenote_empty(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    wbp._reset_state()
+    _stub_batch_publisher(monkeypatch, parent, ["999"])
+    res = TestClient(app).post(_PUBLISH_ALL, json={"changenote": "", "items": [{"workshop_id": "999", "title": "Mod"}]})
+    assert res.status_code == 400
+
+
+def test_publish_all_returns_400_when_items_empty(monkeypatch):
+    wbp._reset_state()
+    monkeypatch.setattr(wp, "is_idle", lambda: True)
+    res = TestClient(app).post(_PUBLISH_ALL, json={"changenote": "notes", "items": []})
+    assert res.status_code == 400
+
+
+def test_publish_all_returns_400_when_no_valid_workshop_ids(monkeypatch):
+    wbp._reset_state()
+    monkeypatch.setattr(wp, "is_idle", lambda: True)
+    res = TestClient(app).post(
+        _PUBLISH_ALL,
+        json={"changenote": "notes", "items": [{"workshop_id": "", "title": "A"}, {"workshop_id": "abc", "title": "B"}]},
+    )
+    assert res.status_code == 400
+
+
+def test_publish_all_filters_invalid_workshop_ids_and_returns_skipped_list(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    wbp._reset_state()
+    _stub_batch_publisher(monkeypatch, parent, ["999"])
+    res = TestClient(app).post(
+        _PUBLISH_ALL,
+        json={
+            "changenote": "notes",
+            "items": [
+                {"workshop_id": "999", "title": "Valid"},
+                {"workshop_id": "", "title": "Empty"},
+                {"workshop_id": "abc", "title": "Bad"},
+            ],
+        },
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["queued"] == 1
+    skipped_ids = sorted(s["title"] for s in body["skipped"])
+    assert skipped_ids == ["Bad", "Empty"]
+    assert "batch_id" in body
+    assert "started_at" in body
+
+
+def test_publish_all_returns_409_when_single_publish_in_progress(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    wbp._reset_state()
+    (parent / "999").mkdir()
+    monkeypatch.setattr(wp, "is_idle", lambda: False)
+    res = TestClient(app).post(_PUBLISH_ALL, json={"changenote": "notes", "items": [{"workshop_id": "999", "title": "Mod"}]})
+    assert res.status_code == 409
+
+
+def test_publish_all_stream_returns_404_for_unknown_batch_id(monkeypatch):
+    wbp._reset_state()
+    res = TestClient(app).get(f"{_PUBLISH_ALL}/stream/does-not-exist")
+    assert res.status_code == 404
+
+
+def test_publish_all_stream_returns_event_stream_with_batch_started_first(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    wbp._reset_state()
+    _stub_batch_publisher(monkeypatch, parent, ["999"])
+    post = TestClient(app).post(_PUBLISH_ALL, json={"changenote": "notes", "items": [{"workshop_id": "999", "title": "Mod"}]})
+    assert post.status_code == 200
+    batch_id = post.json()["batch_id"]
+
+    with TestClient(app) as client:
+        res = client.get(f"{_PUBLISH_ALL}/stream/{batch_id}")
+        assert res.status_code == 200
+        assert res.headers["content-type"].startswith("text/event-stream")
+        text = res.text
+        assert "event: batch_started" in text
+        assert "event: batch_done" in text
