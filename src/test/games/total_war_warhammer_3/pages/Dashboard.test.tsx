@@ -43,6 +43,16 @@ describe("Dashboard page", () => {
         await waitFor(() => expect(screen.getAllByRole("button", { name: /rebuild/i }).length).toBeGreaterThanOrEqual(6))
     })
 
+    it("opens the PublishAllDialog when the Publish All button is clicked", async () => {
+        defaultHook()
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ status: "idle" }), { status: 200 }))
+        const { default: userEvent } = await import("@testing-library/user-event")
+        const user = userEvent.setup()
+        render(wrap(<DashboardPage />))
+        await user.click(screen.getByRole("button", { name: /^publish all$/i }))
+        expect(screen.getByRole("heading", { name: /publish all to workshop/i })).toBeInTheDocument()
+    })
+
     it("disables rebuild buttons when a run is already in progress", async () => {
         defaultHook()
         vi.spyOn(globalThis, "fetch").mockResolvedValue(

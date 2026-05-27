@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 
 import PackCard, { type PackEntry } from "../../components/PackCard"
+import PublishAllDialog from "../../components/PublishAllDialog"
 import ScriptRunButton from "../../components/ScriptRunButton"
 import TranslationModCard from "../../components/TranslationModCard"
 import UpdateWidget from "../../components/UpdateWidget"
@@ -31,6 +32,7 @@ export default function DashboardPage() {
     const [translationMods, setTranslationMods] = useState<WH3TranslationModSummary[]>([])
     const [progressByMod, setProgressByMod] = useState<Record<string, WH3RescanSummary | null>>({})
     const [translationLoadError, setTranslationLoadError] = useState<string | null>(null)
+    const [publishAllOpen, setPublishAllOpen] = useState(false)
 
     useEffect(() => {
         let cancelled = false
@@ -65,7 +67,12 @@ export default function DashboardPage() {
                     <h1>Warhammer III Workshop</h1>
                     <p>Manage and rebuild your compat packs.</p>
                 </div>
-                <ScriptRunButton scriptId="update" label="Rebuild All" />
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    <ScriptRunButton scriptId="update" label="Rebuild All" />
+                    <button className="btn btn-primary" style={{ padding: "0.55rem 1.1rem" }} onClick={() => setPublishAllOpen(true)}>
+                        Publish All
+                    </button>
+                </div>
             </div>
             <div className="glass-card" style={{ padding: "1rem", marginBottom: "1rem" }}>
                 <h3 style={{ marginTop: 0 }}>About the Compat Packs</h3>
@@ -101,6 +108,8 @@ export default function DashboardPage() {
                     </div>
                 )}
             </section>
+
+            {publishAllOpen && <PublishAllDialog packs={PACKS} onClose={() => setPublishAllOpen(false)} />}
         </>
     )
 }

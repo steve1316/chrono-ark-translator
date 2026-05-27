@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 
-import { BatchPublishHandle, BatchPublishItem, publishAllPacks, publishAllStreamUrl, RegistryError } from "../../api"
+import { publishAllPacks, publishAllStreamUrl, RegistryError, type BatchPublishHandle, type BatchPublishItem } from "../../api"
 
 /** One pack entry as the Dashboard hands them in. */
 interface PackEntry {
