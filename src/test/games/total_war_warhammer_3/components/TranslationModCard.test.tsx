@@ -46,6 +46,12 @@ describe("TranslationModCard", () => {
         expect(link).toHaveAttribute("target", "_blank")
     })
 
+    it("Open mod page button links to the translation mod itself, not the parent", () => {
+        render(wrap(<TranslationModCard mod={MOD} progress={null} onRescan={vi.fn()} />))
+        const steamButton = screen.getByTitle("Open mod page")
+        expect(steamButton).toHaveAttribute("href", `https://steamcommunity.com/sharedfiles/filedetails/?id=${MOD.workshop_id}`)
+    })
+
     it("collapses parent links when there are multiple", () => {
         const collection: WH3TranslationModSummary = { ...MOD, parent_workshop_ids: ["a", "b", "c", "d", "e"] }
         render(wrap(<TranslationModCard mod={collection} progress={null} onRescan={vi.fn()} />))

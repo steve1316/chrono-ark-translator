@@ -40,7 +40,8 @@ const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, 
     const percent = total > 0 ? Math.round((done / total) * 100) : 0
 
     const singleParent = parents.length === 1 ? parents[0] : null
-    const steamUrl = singleParent ? `https://steamcommunity.com/sharedfiles/filedetails/?id=${singleParent}` : null
+    const parentSteamUrl = singleParent ? `https://steamcommunity.com/sharedfiles/filedetails/?id=${singleParent}` : null
+    const steamUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${mod.workshop_id}`
 
     const segments: ModCardProgressSegment[] = []
     if (counts && total > 0) {
@@ -72,7 +73,7 @@ const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, 
             idBadge={mod.workshop_id}
             subtitle={
                 singleParent ? (
-                    <a href={steamUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="translation-parent-link" aria-label={`parent mod ${singleParent}`}>
+                    <a href={parentSteamUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="translation-parent-link" aria-label={`parent mod ${singleParent}`}>
                         Parent mod
                     </a>
                 ) : parents.length > 1 ? (
