@@ -185,6 +185,8 @@ export interface WH3TranslationModSummary {
     source_language: string
     /** Target language of the translation (e.g. `"English"`). */
     target_language: string
+    /** Relative URL serving the parent mod's preview `.png`. `null` when no preview file is reachable. */
+    preview_image_url: string | null
 }
 
 /** Status of one row in the drift report. */
@@ -216,6 +218,8 @@ export interface WH3RescanSummary {
     counts: Record<WH3DriftStatus, number>
     /** ISO timestamp of when the rescan completed. */
     scanned_at: string
+    /** True when translations.json holds entries whose text differs from the user's `.loc.tsv` files. */
+    has_unsynced_changes: boolean
 }
 
 /** Body of `GET/PUT /api/games/total_war_warhammer_3/translation/mods/{id}/mod-context`. */

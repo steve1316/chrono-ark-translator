@@ -12,12 +12,14 @@ const MOD: WH3TranslationModSummary = {
     local_source_dir: "C:\\nope",
     source_language: "Chinese",
     target_language: "English",
+    preview_image_url: null,
 }
 
 const SUMMARY: WH3RescanSummary = {
     mod_id: MOD.workshop_id,
     counts: { translated: 5, untranslated: 3, stale: 1, orphan: 0 },
     scanned_at: "2026-05-25T00:00:00Z",
+    has_unsynced_changes: false,
 }
 
 const STRINGS: WH3DriftRow[] = [

@@ -1,6 +1,8 @@
 import React from "react"
+import { useNavigate } from "react-router-dom"
 
-import ModCard, { type ModCardProgressSegment, type ModCardStat } from "../../../../components/ModCard"
+import ModCard, { NeedsSyncBadge, type ModCardProgressSegment, type ModCardStat } from "../../../../components/ModCard"
+import { API_BASE } from "../../../../config"
 import type { WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
 
 /** Props for TranslationModCard. */
@@ -9,20 +11,25 @@ export interface TranslationModCardProps {
     mod: WH3TranslationModSummary
     /** Latest rescan result, or `null` when the mod has not been scanned this session. */
     progress: WH3RescanSummary | null
+    /** Called when the user clicks the rescan icon button. Receives the mod's workshop id. */
+    onRescan: (workshopId: string) => void
 }
 
 /**
- * Dashboard card for a single WH3 translation mod. Renders via the shared `ModCard`
- * shell so it matches the Chrono Ark mod card design: title + workshop-id badge,
- * source-to-target language pill + parent-mod link subtitle, segmented progress bar
- * (fresh + stale), stat boxes (Untranslated + optional Stale), and a `Translate ->`
- * link routing to the per-mod translation detail page.
+ * Dashboard card for a single WH3 translation mod. Renders via the shared `ModCard` shell so
+ * the layout matches Chrono Ark's mod card exactly: preview image, title + workshop-id badge,
+ * optional parent-mod-link subtitle, tri-color progress bar (translated gradient + stale amber),
+ * stat boxes (`Remaining` + `Format`), optional `Needs Sync` badge, and an action row with a
+ * `View Strings` button (warning color when untranslated rows remain), the parent mod's Steam
+ * link, and a rescan icon button.
  *
  * @param mod The translation mod registry summary.
  * @param progress Latest rescan result, or `null` when not yet scanned.
+ * @param onRescan Callback fired when the rescan icon is clicked.
  * @returns The rendered card.
  */
-const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress }) => {
+const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, onRescan }) => {
+    const navigate = useNavigate()
     const parents = mod.parent_workshop_ids
     const counts = progress?.counts ?? null
     const translated = counts?.translated ?? 0
@@ -53,7 +60,10 @@ const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress }
         }
     }
 
-    const stats: ModCardStat[] = counts ? [{ value: untranslated, label: "Untranslated" }, ...(stale > 0 ? [{ value: stale, label: "Stale" }] : [])] : []
+    const stats: ModCardStat[] = [
+        { value: untranslated, label: "Remaining" },
+        { value: "LOC", label: "Format" },
+    ]
 
     return (
         <ModCard
@@ -61,33 +71,31 @@ const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress }
             title={mod.display_name}
             idBadge={mod.workshop_id}
             subtitle={
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                    <span className="translation-lang-pill">
-                        {mod.source_language} -&gt; {mod.target_language}
+                singleParent ? (
+                    <a href={steamUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="translation-parent-link" aria-label={`parent mod ${singleParent}`}>
+                        Parent mod
+                    </a>
+                ) : parents.length > 1 ? (
+                    <span className="translation-parent-link" title={parents.join(", ")}>
+                        Translates {parents.length} mods
                     </span>
-                    {singleParent ? (
-                        <a href={steamUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="translation-parent-link" aria-label={`parent mod ${singleParent}`}>
-                            Parent mod
-                        </a>
-                    ) : (
-                        <span className="translation-parent-link" title={parents.join(", ")}>
-                            Translates {parents.length} mods
-                        </span>
-                    )}
-                </span>
+                ) : undefined
             }
+            previewImageUrl={mod.preview_image_url ? `${API_BASE}${mod.preview_image_url}` : null}
             progress={{
                 leftLabel: counts ? `${percent}% Translated` : "Not yet scanned",
                 rightLabel: counts ? `${done} / ${total} strings` : undefined,
                 segments,
             }}
             stats={stats}
+            badges={progress?.has_unsynced_changes ? <NeedsSyncBadge /> : undefined}
             primaryAction={{
-                label: <>Translate -&gt;</>,
+                label: "View Strings",
                 variant: untranslated > 0 ? "warning" : "primary",
-                to: `/translation-mods/${mod.workshop_id}`,
+                onClick: () => navigate(`/translation-mods/${mod.workshop_id}`),
             }}
             steamUrl={steamUrl}
+            onSync={() => onRescan(mod.workshop_id)}
         />
     )
 }

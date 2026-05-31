@@ -99,7 +99,19 @@ export default function DashboardPage() {
                 ) : (
                     <div className="mod-grid">
                         {translationMods.map((mod) => (
-                            <TranslationModCard key={mod.workshop_id} mod={mod} progress={progressByMod[mod.workshop_id] ?? null} />
+                            <TranslationModCard
+                                key={mod.workshop_id}
+                                mod={mod}
+                                progress={progressByMod[mod.workshop_id] ?? null}
+                                onRescan={async (workshopId) => {
+                                    try {
+                                        const summary = await rescanMod(workshopId)
+                                        setProgressByMod((prev) => ({ ...prev, [workshopId]: summary }))
+                                    } catch {
+                                        /* swallow - card stays on stale progress */
+                                    }
+                                }}
+                            />
                         ))}
                     </div>
                 )}

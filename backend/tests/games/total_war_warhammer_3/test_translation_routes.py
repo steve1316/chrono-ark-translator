@@ -31,6 +31,10 @@ def client(monkeypatch, tmp_path: Path) -> TestClient:
     monkeypatch.setattr(routes_module, "_extract_all_parent_strings", fake_parent)
     monkeypatch.setattr(routes_module, "_extract_translation_strings", fake_translation)
 
+    # Default to "no workshop folder on disk" so preview-image tests are deterministic and don't
+    # depend on whatever Steam content the dev machine happens to have installed.
+    monkeypatch.setattr(routes_module, "_find_parent_preview_image", lambda mod: None)
+
     app = FastAPI()
     app.include_router(routes_module.router, prefix="/api/games/total_war_warhammer_3")
     return TestClient(app)
@@ -180,3 +184,44 @@ def test_translate_batch_calls_claude_and_saves_results(client: TestClient, monk
     assert len(entries) == 1
     assert entries[0]["kind"] == "translate-batch"
     assert "k2" in entries[0]["keys_or_inputs"]
+
+
+def test_list_includes_preview_image_url_field(client: TestClient):
+    # Default fixture has no workshop folders on disk so preview URLs resolve to None.
+    resp = client.get("/api/games/total_war_warhammer_3/translation/mods")
+    assert resp.status_code == 200
+    data = resp.json()
+    for entry in data:
+        assert "preview_image_url" in entry
+        assert entry["preview_image_url"] is None
+
+
+def test_rescan_reports_has_unsynced_changes_false_when_translations_match(client: TestClient):
+    # Trigger rescan with no translations.json on disk - nothing unsynced.
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/rescan")
+    assert resp.status_code == 200
+    assert resp.json()["has_unsynced_changes"] is False
+
+
+def test_rescan_reports_has_unsynced_changes_true_when_translations_diverge(client: TestClient, tmp_path: Path):
+    import json
+
+    # Seed translations.json with text that does NOT match the fake .loc.tsv for k1.
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / "3315737452"
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    (mod_dir / "translations.json").write_text(json.dumps({"k1": {"text": "Different text", "provider": "manual"}}), encoding="utf-8")
+
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/rescan")
+    assert resp.status_code == 200
+    assert resp.json()["has_unsynced_changes"] is True
+
+
+def test_preview_route_404s_when_no_image_on_disk(client: TestClient):
+    # Fixture has no workshop folders on disk; preview lookup returns None.
+    resp = client.get("/api/games/total_war_warhammer_3/translation/mods/3315737452/preview")
+    assert resp.status_code == 404
+
+
+def test_preview_route_404s_for_unknown_mod(client: TestClient):
+    resp = client.get("/api/games/total_war_warhammer_3/translation/mods/9999999999/preview")
+    assert resp.status_code == 404

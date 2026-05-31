@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from backend.games.total_war_warhammer_3 import translation_store_helpers as store
@@ -144,6 +145,79 @@ def _serialize_drift_row(row: DriftRow) -> dict:
     }
 
 
+def _find_parent_preview_image(mod: WH3TranslationMod) -> Path | None:
+    """Resolve a preview `.png` for the translation mod by inspecting its parent workshop folder.
+
+    Each Steam Workshop mod includes a single preview `.png` in its content folder. For a
+    translation mod we surface the FIRST parent's preview so dashboard cards visually anchor
+    to the game content being translated.
+
+    Args:
+        mod: Translation mod whose parent folder(s) to scan.
+
+    Returns:
+        Filesystem `Path` to the first `.png` found in the first existing parent folder. `None`
+        when no parent folder is reachable on disk or no `.png` is present.
+    """
+    for parent_id in mod.parent_workshop_ids:
+        folder = tw3_workshop_content_dir(parent_id)
+        if folder is None or not folder.exists():
+            continue
+        for png in sorted(folder.glob("*.png")):
+            return png
+    return None
+
+
+def _preview_url_for(mod: WH3TranslationMod) -> str | None:
+    """Build the preview-image route URL for a mod, or `None` when no preview file is found.
+
+    Returns a path relative to `API_BASE` so the frontend can concatenate `${API_BASE}${url}`
+    the same way it does for Chrono Ark mod previews.
+
+    Args:
+        mod: Translation mod to check.
+
+    Returns:
+        Relative path `/games/total_war_warhammer_3/translation/mods/{id}/preview` when a preview
+        file exists, otherwise `None`.
+    """
+    if _find_parent_preview_image(mod) is None:
+        return None
+    return f"/games/total_war_warhammer_3/translation/mods/{mod.workshop_id}/preview"
+
+
+def _has_unsynced_changes(mod_id: str, mod: WH3TranslationMod) -> bool:
+    """Return `True` when translations.json holds entries whose text differs from the user's `.loc.tsv`.
+
+    Compares each `translations.json` entry against the current `.loc.tsv` content for the same key.
+    A key present in `translations.json` with text that does not match (or has no matching `.loc.tsv`
+    row) counts as unsynced. Mirrors Chrono Ark's `has_changes` semantics.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+        mod: The registered mod.
+
+    Returns:
+        `True` when any translations.json entry text differs from on-disk `.loc.tsv` text. `False` otherwise.
+    """
+    raw = store.load_translations_raw(mod_id)
+    if not raw:
+        return False
+    loc_by_key: dict[str, str] = {}
+    for rows in _extract_translation_strings(mod).values():
+        for key, row in rows.items():
+            loc_by_key[key] = row.text
+    for key, entry in raw.items():
+        if not isinstance(entry, dict):
+            continue
+        text = entry.get("text")
+        if not text:
+            continue
+        if loc_by_key.get(key) != text:
+            return True
+    return False
+
+
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # Route models
@@ -158,6 +232,8 @@ class TranslationModSummary(BaseModel):
     local_source_dir: str
     source_language: str
     target_language: str
+    # Relative URL to the parent mod's preview image. `None` when no preview file is reachable on disk.
+    preview_image_url: str | None = None
 
 
 class RescanSummary(BaseModel):
@@ -166,6 +242,8 @@ class RescanSummary(BaseModel):
     mod_id: str
     counts: dict[str, int]
     scanned_at: str
+    # True when translations.json holds entries whose text does not match the user's `.loc.tsv` files.
+    has_unsynced_changes: bool = False
 
 
 class TranslationEdit(BaseModel):
@@ -202,9 +280,30 @@ def list_translation_mods() -> list[TranslationModSummary]:
             local_source_dir=str(m.local_source_dir),
             source_language=m.source_language,
             target_language=m.target_language,
+            preview_image_url=_preview_url_for(m),
         )
         for m in WH3_TRANSLATION_MODS
     ]
+
+
+@router.get("/mods/{mod_id}/preview")
+def get_preview(mod_id: str) -> FileResponse:
+    """Stream the parent mod's preview `.png` image for the given translation mod.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+
+    Returns:
+        `FileResponse` serving the first `.png` found in the first existing parent workshop folder.
+
+    Raises:
+        HTTPException: 404 when the mod is not registered or no preview file is reachable on disk.
+    """
+    mod = _require_mod(mod_id)
+    png = _find_parent_preview_image(mod)
+    if png is None:
+        raise HTTPException(404, f"no preview image found for {mod_id}")
+    return FileResponse(png, media_type="image/png")
 
 
 @router.post("/mods/{mod_id}/rescan", response_model=RescanSummary)
@@ -246,6 +345,7 @@ def rescan(mod_id: str) -> RescanSummary:
         mod_id=mod_id,
         counts=counts,
         scanned_at=datetime.now(timezone.utc).isoformat(),
+        has_unsynced_changes=_has_unsynced_changes(mod_id, mod),
     )
 
 
@@ -737,17 +837,20 @@ def post_glossary_suggest_edits(mod_id: str) -> list[dict]:
         target_lang=mod.target_language,
     )
 
-    api_responses_store.append(mod_id, {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "kind": "suggest-edits",
-        "provider": "claude",
-        "model": "claude",
-        "input_tokens": None,
-        "output_tokens": None,
-        "cost_usd": None,
-        "keys_or_inputs": list(sample.keys()),
-        "raw_response": json.dumps(suggestions, ensure_ascii=False),
-    })
+    api_responses_store.append(
+        mod_id,
+        {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "kind": "suggest-edits",
+            "provider": "claude",
+            "model": "claude",
+            "input_tokens": None,
+            "output_tokens": None,
+            "cost_usd": None,
+            "keys_or_inputs": list(sample.keys()),
+            "raw_response": json.dumps(suggestions, ensure_ascii=False),
+        },
+    )
     return suggestions
 
 
@@ -789,17 +892,20 @@ def post_scan_terms(mod_id: str) -> list[dict]:
         target_lang=mod.target_language,
     )
 
-    api_responses_store.append(mod_id, {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "kind": "scan-terms",
-        "provider": "claude",
-        "model": "claude",
-        "input_tokens": None,
-        "output_tokens": None,
-        "cost_usd": None,
-        "keys_or_inputs": [k for k, _ in entries],
-        "raw_response": json.dumps(suggestions, ensure_ascii=False),
-    })
+    api_responses_store.append(
+        mod_id,
+        {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "kind": "scan-terms",
+            "provider": "claude",
+            "model": "claude",
+            "input_tokens": None,
+            "output_tokens": None,
+            "cost_usd": None,
+            "keys_or_inputs": [k for k, _ in entries],
+            "raw_response": json.dumps(suggestions, ensure_ascii=False),
+        },
+    )
     return suggestions
 
 
