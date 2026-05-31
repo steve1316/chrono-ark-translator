@@ -4,7 +4,6 @@ import PackCard, { type PackEntry } from "../../components/PackCard"
 import PublishAllDialog from "../../components/PublishAllDialog"
 import ScriptRunButton from "../../components/ScriptRunButton"
 import TranslationModCard from "../../components/TranslationModCard"
-import UpdateWidget from "../../components/UpdateWidget"
 import type { WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
 import { listTranslationMods, rescanMod } from "../../translationApi"
 
@@ -80,9 +79,6 @@ export default function DashboardPage() {
                     Each card below is one compat pack you maintain on the Steam Workshop. The <strong>Rebuild</strong>
                     button regenerates that pack by running the matching helper script against your local mod files. Use <strong>Rebuild All</strong> to run every pipeline in sequence.
                 </p>
-            </div>
-            <div style={{ marginBottom: "1.5rem" }}>
-                <UpdateWidget />
             </div>
 
             <section>

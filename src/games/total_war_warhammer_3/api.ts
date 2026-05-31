@@ -72,56 +72,6 @@ export async function fetchValidation(): Promise<ValidationIssue[]> {
     return body.issues as ValidationIssue[]
 }
 
-export interface StaleMod {
-    /** Stable identity of the mod. */
-    package_name: string
-    /** Display name of the mod. */
-    mod_name: string
-    /** Filesystem path of the `.pack` file. */
-    path: string
-    /** Current mtime of the pack file (Unix epoch seconds). */
-    current_mtime: number
-    /** Stored baseline mtime from the last sync. */
-    baseline_mtime: number
-    /** `current_mtime - baseline_mtime`, in seconds. */
-    delta_seconds: number
-}
-
-export interface UpdateReport {
-    /** Mods whose pack mtime is newer than the baseline. Sorted by `delta_seconds` descending. */
-    stale: StaleMod[]
-    /** False on the very first run before the baseline file was created. */
-    baseline_exists: boolean
-    /** Absolute path of the baseline file on disk (debug only). */
-    baseline_path: string
-    /** Count of mods in `SUPPORTED_MODS`. */
-    total_known: number
-}
-
-/**
- * Fetch the mod update report from the TW3 backend.
- *
- * @returns Report shape with `stale`, `baseline_exists`, `baseline_path`, `total_known`.
- * @throws `RegistryError` On 5xx (typically helper_scripts misconfigured).
- */
-export async function fetchUpdates(): Promise<UpdateReport> {
-    const res = await api.get("/updates")
-    if (!res.ok) throw await registryError(res)
-    return res.json()
-}
-
-/**
- * Capture current mtimes as the new baseline.
- *
- * @returns `{synced_at, count, baseline_path}` on success.
- * @throws `RegistryError` On 5xx.
- */
-export async function syncUpdates(): Promise<{ synced_at: string; count: number; baseline_path: string }> {
-    const res = await api.post("/updates/sync")
-    if (!res.ok) throw await registryError(res)
-    return res.json()
-}
-
 /**
  * Fetch the read-only `SUPPORTED_MODS` registry from the TW3 backend.
  *
