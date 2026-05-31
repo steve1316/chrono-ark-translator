@@ -1,74 +1,111 @@
 import { render, screen } from "@testing-library/react"
+import { MemoryRouter } from "react-router-dom"
 import userEvent from "@testing-library/user-event"
-import ModCard from "../../components/ModCard"
-import type { ModStatus } from "../../shared_types"
+import ModCard, { NeedsSyncBadge } from "../../components/ModCard"
 
-function makeMod(overrides: Partial<ModStatus> = {}): ModStatus {
+/**
+ * Build a baseline ModCard props object representing a Chrono-Ark-style mod.
+ * Individual tests override only the fields they care about.
+ */
+function baseProps(overrides: Partial<React.ComponentProps<typeof ModCard>> = {}): React.ComponentProps<typeof ModCard> {
     return {
         id: "12345",
-        name: "Test Mod",
-        author: "TestAuthor",
-        has_csv: true,
-        has_dll: false,
-        total: 100,
-        translated: 75,
-        untranslated: 25,
-        user_translated: 50,
-        untouched: 25,
-        percentage: 75,
-        last_updated: "",
-        has_changes: false,
+        title: "Test Mod",
+        idBadge: "12345",
+        subtitle: <>by TestAuthor</>,
+        previewImageUrl: null,
+        progress: {
+            leftLabel: "75% Translated",
+            rightLabel: "75 / 100 strings",
+            segments: [
+                { widthPercent: 50, background: "var(--accent-gradient)", title: "50 translated by you" },
+                { widthPercent: 25, background: "rgba(148, 163, 184, 0.5)", title: "25 untouched" },
+            ],
+        },
+        stats: [
+            { value: 25, label: "Remaining" },
+            { value: "CSV", label: "Format" },
+        ],
+        primaryAction: { label: "View Strings", variant: "warning", onClick: () => undefined },
         ...overrides,
     }
 }
 
+const wrap = (ui: React.ReactNode) => <MemoryRouter>{ui}</MemoryRouter>
+
 describe("ModCard", () => {
-    it("renders mod name, author, and progress percentage", () => {
-        render(<ModCard mod={makeMod()} onClick={vi.fn()} onSync={vi.fn()} />)
+    it("renders title, subtitle, and the left progress label", () => {
+        render(wrap(<ModCard {...baseProps()} />))
         expect(screen.getByText("Test Mod")).toBeInTheDocument()
         expect(screen.getByText(/TestAuthor/)).toBeInTheDocument()
         expect(screen.getByText("75% Translated")).toBeInTheDocument()
     })
 
-    it("renders progress bar segments", () => {
-        const { container } = render(<ModCard mod={makeMod({ total: 100, user_translated: 50, untouched: 25 })} onClick={vi.fn()} onSync={vi.fn()} />)
+    it("renders progress bar segments with the correct widths", () => {
+        const { container } = render(wrap(<ModCard {...baseProps()} />))
         const segments = container.querySelectorAll(".progress-bar-bg > div")
         expect(segments).toHaveLength(2)
         expect((segments[0] as HTMLElement).style.width).toBe("50%")
         expect((segments[1] as HTMLElement).style.width).toBe("25%")
     })
 
-    it("renders DLL format when has_dll is true", () => {
-        render(<ModCard mod={makeMod({ has_dll: true })} onClick={vi.fn()} onSync={vi.fn()} />)
+    it("renders each stat box value and label", () => {
+        render(
+            wrap(
+                <ModCard
+                    {...baseProps({
+                        stats: [
+                            { value: 25, label: "Remaining" },
+                            { value: "DLL", label: "Format" },
+                        ],
+                    })}
+                />
+            )
+        )
         expect(screen.getByText("DLL")).toBeInTheDocument()
+        expect(screen.getByText("Remaining")).toBeInTheDocument()
     })
 
-    it("renders CSV format when has_dll is false", () => {
-        render(<ModCard mod={makeMod({ has_dll: false })} onClick={vi.fn()} onSync={vi.fn()} />)
-        expect(screen.getByText("CSV")).toBeInTheDocument()
-    })
-
-    it("shows Needs Sync badge when has_changes is true", () => {
-        render(<ModCard mod={makeMod({ has_changes: true })} onClick={vi.fn()} onSync={vi.fn()} />)
+    it("renders the NeedsSyncBadge when passed via badges", () => {
+        render(wrap(<ModCard {...baseProps({ badges: <NeedsSyncBadge /> })} />))
         expect(screen.getByText("Needs Sync")).toBeInTheDocument()
     })
 
-    it("does not show Needs Sync badge when has_changes is false", () => {
-        render(<ModCard mod={makeMod({ has_changes: false })} onClick={vi.fn()} onSync={vi.fn()} />)
+    it("omits the NeedsSyncBadge when badges is undefined", () => {
+        render(wrap(<ModCard {...baseProps()} />))
         expect(screen.queryByText("Needs Sync")).not.toBeInTheDocument()
     })
 
-    it("calls onClick with mod id when View Strings is clicked", async () => {
+    it("calls primaryAction.onClick when the button is clicked", async () => {
         const user = userEvent.setup()
         const onClick = vi.fn()
-        render(<ModCard mod={makeMod()} onClick={onClick} onSync={vi.fn()} />)
+        render(wrap(<ModCard {...baseProps({ primaryAction: { label: "View Strings", variant: "warning", onClick } })} />))
         await user.click(screen.getByText("View Strings"))
-        expect(onClick).toHaveBeenCalledWith("12345")
+        expect(onClick).toHaveBeenCalled()
     })
 
-    it("renders Steam link when url is provided", () => {
-        render(<ModCard mod={makeMod({ url: "https://steam.example" })} onClick={vi.fn()} onSync={vi.fn()} />)
+    it("renders the primary action as a Link when primaryAction.to is set", () => {
+        render(wrap(<ModCard {...baseProps({ primaryAction: { label: "Translate ->", variant: "primary", to: "/translation-mods/3315737452" } })} />))
+        const link = screen.getByRole("link", { name: /Translate/i })
+        expect(link).toHaveAttribute("href", "/translation-mods/3315737452")
+    })
+
+    it("renders the Steam link when steamUrl is provided", () => {
+        render(wrap(<ModCard {...baseProps({ steamUrl: "https://steam.example" })} />))
         const link = screen.getByTitle("Open mod page")
         expect(link).toHaveAttribute("href", "https://steam.example")
+    })
+
+    it("hides the sync button when onSync is undefined", () => {
+        render(wrap(<ModCard {...baseProps()} />))
+        expect(screen.queryByTitle("Rescan workshop folder")).not.toBeInTheDocument()
+    })
+
+    it("renders the sync button and fires onSync when clicked", async () => {
+        const user = userEvent.setup()
+        const onSync = vi.fn()
+        render(wrap(<ModCard {...baseProps({ onSync })} />))
+        await user.click(screen.getByTitle("Rescan workshop folder"))
+        expect(onSync).toHaveBeenCalled()
     })
 })

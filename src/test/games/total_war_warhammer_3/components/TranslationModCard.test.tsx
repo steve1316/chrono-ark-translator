@@ -61,9 +61,16 @@ describe("TranslationModCard", () => {
             scanned_at: "2026-05-24T00:00:00Z",
         }
         render(wrap(<TranslationModCard mod={MOD} progress={progress} />))
-        // total = translated + untranslated + stale = 20 (orphan excluded)
+        // total = translated + untranslated + stale = 20 (orphan excluded).
         expect(screen.getByText(/15\s*\/\s*20\s*strings/)).toBeInTheDocument()
-        expect(screen.getByText(/3 stale/)).toBeInTheDocument()
+        // Stale count surfaces as a Chrono-Ark-style stat box in the new layout.
+        expect(screen.getByText("Stale")).toBeInTheDocument()
+        const staleStat = screen.getByText("Stale").previousElementSibling
+        expect(staleStat).toHaveTextContent("3")
+        // Untranslated count surfaces as the primary stat box.
+        expect(screen.getByText("Untranslated")).toBeInTheDocument()
+        const untranslatedStat = screen.getByText("Untranslated").previousElementSibling
+        expect(untranslatedStat).toHaveTextContent("5")
     })
 
     it("renders a Translate link to the detail page", () => {
