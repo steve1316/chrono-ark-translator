@@ -37,6 +37,8 @@ interface ModRow {
     error: string | null
     durationSeconds: number | null
     reason: string | null
+    /** Whether the user has this row checked for inclusion in the batch. Ignored for pre-skipped rows. */
+    selected: boolean
 }
 
 /** One line of streamed SteamCMD output, scoped to the mod that emitted it. */
@@ -67,6 +69,7 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
             error: null,
             durationSeconds: null,
             reason: p.workshopId ? null : "no workshopId",
+            selected: Boolean(p.workshopId),
         }))
     )
     const [currentId, setCurrentId] = useState<string | null>(null)
@@ -77,6 +80,7 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
     const scrollRef = useRef<HTMLPreElement | null>(null)
 
     const eligible = useMemo(() => rows.filter((r) => r.status !== "skipped"), [rows])
+    const selectedEligible = useMemo(() => eligible.filter((r) => r.selected), [eligible])
     const isRunning = phase === "running"
     const isDone = phase === "done"
 
@@ -94,6 +98,10 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
 
     const updateRow = (workshopId: string, patch: Partial<ModRow>) => {
         setRows((prev) => prev.map((r) => (r.workshopId === workshopId ? { ...r, ...patch } : r)))
+    }
+
+    const toggleSelected = (workshopId: string) => {
+        setRows((prev) => prev.map((r) => (r.workshopId === workshopId ? { ...r, selected: !r.selected } : r)))
     }
 
     const subscribeToBatch = (batchId: string) => {
@@ -167,10 +175,16 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
     }
 
     const handlePublishAll = async () => {
-        if (changenote.trim().length === 0 || eligible.length === 0) return
+        if (changenote.trim().length === 0 || selectedEligible.length === 0) return
         setErrorMessage(null)
 
-        const items: BatchPublishItem[] = eligible.map((r) => ({ workshop_id: r.workshopId, title: r.title }))
+        // Mark every eligible row the user unchecked as skipped before kicking off so the running view shows them.
+        const deselectedIds = new Set(eligible.filter((r) => !r.selected).map((r) => r.workshopId))
+        if (deselectedIds.size > 0) {
+            setRows((prev) => prev.map((r) => (deselectedIds.has(r.workshopId) ? { ...r, status: "skipped", reason: "not selected" } : r)))
+        }
+
+        const items: BatchPublishItem[] = selectedEligible.map((r) => ({ workshop_id: r.workshopId, title: r.title }))
 
         let handle: BatchPublishHandle
         try {
@@ -268,7 +282,7 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
                 </label>
 
                 <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "var(--text-dim)" }}>
-                    This will publish {eligible.length} {eligible.length === 1 ? "mod" : "mods"} to the Steam Workshop sharing this changelog:
+                    This will publish {selectedEligible.length} {selectedEligible.length === 1 ? "mod" : "mods"} to the Steam Workshop sharing this changelog:
                 </p>
                 <ul style={{ listStyle: "none", padding: 0, margin: "0 0 1rem 0", borderRadius: 6, border: "1px solid var(--border-dim, rgba(255,255,255,0.12))" }}>
                     {rows.map((row) => (
@@ -284,6 +298,15 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
                                 opacity: row.status === "skipped" ? 0.55 : 1,
                             }}
                         >
+                            {phase === "confirming" && row.workshopId && row.status !== "skipped" && (
+                                <input
+                                    type="checkbox"
+                                    checked={row.selected}
+                                    onChange={() => toggleSelected(row.workshopId)}
+                                    aria-label={`Include ${row.title} in the batch`}
+                                    style={{ cursor: "pointer", flexShrink: 0 }}
+                                />
+                            )}
                             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                 {row.title}
                                 {row.workshopId && <code style={{ marginLeft: "0.5rem", color: "var(--text-dim)" }}>{row.workshopId}</code>}
@@ -343,7 +366,12 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
                             <button onClick={handleClose} className="btn" style={{ padding: "0.55rem 1.1rem" }}>
                                 Cancel
                             </button>
-                            <button onClick={handlePublishAll} disabled={changenote.trim().length === 0 || eligible.length === 0} className="btn btn-primary" style={{ padding: "0.55rem 1.1rem" }}>
+                            <button
+                                onClick={handlePublishAll}
+                                disabled={changenote.trim().length === 0 || selectedEligible.length === 0}
+                                className="btn btn-primary"
+                                style={{ padding: "0.55rem 1.1rem" }}
+                            >
                                 Publish All
                             </button>
                         </>

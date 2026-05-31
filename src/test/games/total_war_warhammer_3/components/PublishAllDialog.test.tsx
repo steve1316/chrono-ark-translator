@@ -167,6 +167,51 @@ describe("PublishAllDialog", () => {
         expect(screen.getByText(/publishing/i)).toBeInTheDocument()
     })
 
+    it("renders a checked checkbox for every eligible mod and no checkbox for pre-skipped rows", () => {
+        render(<PublishAllDialog packs={PACKS_WITH_SKIPPED} onClose={() => {}} />)
+        const checkboxes = screen.getAllByRole("checkbox")
+        // One eligible mod (Alpha) -> one checkbox; the empty-workshopId Beta row has no checkbox.
+        expect(checkboxes).toHaveLength(1)
+        expect(checkboxes[0]).toBeChecked()
+    })
+
+    it("excludes deselected mods from the POST body and the count text", async () => {
+        render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
+        const checkboxes = screen.getAllByRole("checkbox")
+        expect(checkboxes).toHaveLength(2)
+        fireEvent.click(checkboxes[1])
+        // After unchecking Beta the count drops to 1.
+        expect(screen.getByText(/1 mod/i)).toBeInTheDocument()
+
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "notes" } })
+        fireEvent.click(screen.getByRole("button", { name: /publish all/i }))
+        await waitFor(() => {
+            const [, init] = (globalThis.fetch as ReturnType<typeof vi.spyOn>).mock.calls[0] as [string, RequestInit]
+            const body = JSON.parse(String(init.body))
+            expect(body.items).toEqual([{ workshop_id: "111", title: "Mod Alpha" }])
+        })
+    })
+
+    it("disables Publish All when every eligible row is deselected", () => {
+        render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "notes" } })
+        const checkboxes = screen.getAllByRole("checkbox")
+        fireEvent.click(checkboxes[0])
+        fireEvent.click(checkboxes[1])
+        expect(screen.getByRole("button", { name: /publish all/i })).toBeDisabled()
+    })
+
+    it("marks deselected eligible rows as skipped once the batch starts", async () => {
+        render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
+        const checkboxes = screen.getAllByRole("checkbox")
+        fireEvent.click(checkboxes[1])
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "notes" } })
+        fireEvent.click(screen.getByRole("button", { name: /publish all/i }))
+        await waitFor(() => expect(MockEventSource.instances.length).toBe(1))
+        // Beta should now show a skipped badge with the "not selected" reason.
+        expect(screen.getByText(/not selected/i)).toBeInTheDocument()
+    })
+
     it("enables Close once batch_done arrives", async () => {
         render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
         fireEvent.change(screen.getByRole("textbox"), { target: { value: "notes" } })
