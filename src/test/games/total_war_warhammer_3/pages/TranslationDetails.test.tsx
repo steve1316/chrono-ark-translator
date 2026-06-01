@@ -331,4 +331,60 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         fireEvent.click(untranslated)
         await waitFor(() => expect(screen.getByRole("button", { name: /Untranslated/i })).toHaveClass("btn-primary"))
     })
+
+    it("renders the translate-in-progress banner while runTranslateBatch is executing", async () => {
+        // Mock /translate to never resolve so we can observe the banner mid-flight.
+        let resolveTranslate: (v: Response) => void = () => undefined
+        const translatePromise = new Promise<Response>((r) => {
+            resolveTranslate = r
+        })
+        const spy = vi.spyOn(globalThis, "fetch")
+        spy.mockImplementation(async (input: RequestInfo | URL) => {
+            const url = typeof input === "string" ? input : input.toString()
+            if (url.endsWith("/translate")) {
+                return translatePromise
+            }
+            if (url.endsWith("/translation/mods")) return mockJson([MOD])
+            if (url.endsWith("/rescan")) return mockJson(SUMMARY)
+            if (url.includes("/strings?status=")) return mockJson(STRINGS.filter((r) => url.includes(r.status)))
+            if (url.endsWith("/strings")) return mockJson(STRINGS)
+            if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
+            return mockJson({ status: "ok" })
+        })
+
+        render(wrap())
+        const translateBtn = await screen.findByRole("button", { name: /^Translate \(Claude\)/i })
+        fireEvent.click(translateBtn)
+        await waitFor(() => expect(screen.getByText(/Translating batch/i)).toBeInTheDocument())
+        expect(screen.getByRole("button", { name: /^Cancel$/i })).toBeInTheDocument()
+        resolveTranslate(mockJson({ translated: 1, suggested_terms: [] }))
+    })
+
+    it("Cancel button stops the batch loop and hides the banner", async () => {
+        let resolveTranslate: (v: Response) => void = () => undefined
+        const spy = vi.spyOn(globalThis, "fetch")
+        spy.mockImplementation(async (input: RequestInfo | URL) => {
+            const url = typeof input === "string" ? input : input.toString()
+            if (url.endsWith("/translate")) {
+                return new Promise<Response>((r) => {
+                    resolveTranslate = r
+                })
+            }
+            if (url.endsWith("/translation/mods")) return mockJson([MOD])
+            if (url.endsWith("/rescan")) return mockJson(SUMMARY)
+            if (url.includes("/strings?status=")) return mockJson(STRINGS.filter((r) => url.includes(r.status)))
+            if (url.endsWith("/strings")) return mockJson(STRINGS)
+            if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
+            return mockJson({ status: "ok" })
+        })
+
+        render(wrap())
+        const translateBtn = await screen.findByRole("button", { name: /^Translate \(Claude\)/i })
+        fireEvent.click(translateBtn)
+        await waitFor(() => expect(screen.getByText(/Translating batch/i)).toBeInTheDocument())
+        fireEvent.click(screen.getByRole("button", { name: /^Cancel$/i }))
+        // Resolve the in-flight call so the loop reaches its cancel check.
+        resolveTranslate(mockJson({ translated: 1, suggested_terms: [] }))
+        await waitFor(() => expect(screen.queryByText(/Translating batch/i)).not.toBeInTheDocument())
+    })
 })

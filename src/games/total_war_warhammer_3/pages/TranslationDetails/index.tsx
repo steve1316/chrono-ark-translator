@@ -59,6 +59,8 @@ const TranslationDetailsPage: React.FC = () => {
     const [glossaryCount, setGlossaryCount] = useState<number>(0)
     const [activeProvider, setActiveProvider] = useState<string>("claude")
     const [showTranslateDropdown, setShowTranslateDropdown] = useState<boolean>(false)
+    const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null)
+    const cancelRequestedRef = useRef<boolean>(false)
 
     const skipInitialFilterEffect = useRef(true)
 
@@ -132,6 +134,7 @@ const TranslationDetailsPage: React.FC = () => {
 
     const runTranslateBatch = useCallback(async () => {
         setTranslating(true)
+        cancelRequestedRef.current = false
         setStatusText("Loading candidates...")
         try {
             const targetStatus: WH3DriftStatus = filter === "stale" ? "stale" : "untranslated"
@@ -148,8 +151,14 @@ const TranslationDetailsPage: React.FC = () => {
                     return
                 }
             }
-            setStatusText(`Translating ${candidates.length} rows...`)
+            const totalBatches = Math.ceil(candidates.length / BATCH_LIMIT)
             for (let i = 0; i < candidates.length; i += BATCH_LIMIT) {
+                if (cancelRequestedRef.current) {
+                    setStatusText(`Translation cancelled after ${i} of ${candidates.length} rows`)
+                    return
+                }
+                const batchIdx = Math.floor(i / BATCH_LIMIT) + 1
+                setBatchProgress({ current: batchIdx, total: totalBatches })
                 const batch = candidates.slice(i, i + BATCH_LIMIT)
                 await translateBatch(workshopId, batch)
             }
@@ -161,6 +170,8 @@ const TranslationDetailsPage: React.FC = () => {
             setStatusText(`Translate failed: ${(e as Error).message}`)
         } finally {
             setTranslating(false)
+            setBatchProgress(null)
+            cancelRequestedRef.current = false
         }
     }, [workshopId, filter, loadStrings])
 
@@ -447,6 +458,25 @@ const TranslationDetailsPage: React.FC = () => {
                     </button>
                 </div>
             </div>
+
+            {batchProgress && (
+                <div className="glass-card translate-banner">
+                    <div className="translate-banner-spinner" />
+                    <span style={{ color: "var(--text-main)" }}>
+                        Translating batch {batchProgress.current} of {batchProgress.total}...
+                    </span>
+                    <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => {
+                            cancelRequestedRef.current = true
+                        }}
+                        style={{ marginLeft: "auto", padding: "0.25rem 0.75rem" }}
+                    >
+                        Cancel
+                    </button>
+                </div>
+            )}
 
             <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
                 <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
