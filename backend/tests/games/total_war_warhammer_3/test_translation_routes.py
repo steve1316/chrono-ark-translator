@@ -225,3 +225,90 @@ def test_preview_route_404s_when_no_image_on_disk(client: TestClient):
 def test_preview_route_404s_for_unknown_mod(client: TestClient):
     resp = client.get("/api/games/total_war_warhammer_3/translation/mods/9999999999/preview")
     assert resp.status_code == 404
+
+
+def test_open_folder_calls_subprocess(client: TestClient, monkeypatch, tmp_path: Path):
+    from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
+
+    fake_source = tmp_path / "translation_mod_source"
+    fake_source.mkdir(parents=True, exist_ok=True)
+    fake_mod = WH3TranslationMod(
+        workshop_id="3315737452",
+        display_name="Test Mod",
+        parent_workshop_ids=("p",),
+        local_source_dir=fake_source,
+    )
+    monkeypatch.setattr(
+        "backend.games.total_war_warhammer_3.routes.translation.get_translation_mod",
+        lambda mid: fake_mod if mid == "3315737452" else None,
+    )
+
+    calls: list[list[str]] = []
+
+    def fake_popen(args, *a, **kw):
+        calls.append(list(args))
+
+        class Dummy:
+            pass
+
+        return Dummy()
+
+    monkeypatch.setattr("subprocess.Popen", fake_popen)
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/open-folder")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
+    assert len(calls) == 1
+    assert any(str(fake_source) in arg for arg in calls[0])
+
+
+def test_open_folder_404s_when_source_dir_missing(client: TestClient, monkeypatch, tmp_path: Path):
+    from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
+
+    fake_mod = WH3TranslationMod(
+        workshop_id="3315737452",
+        display_name="x",
+        parent_workshop_ids=("p",),
+        local_source_dir=tmp_path / "does_not_exist",
+    )
+    monkeypatch.setattr(
+        "backend.games.total_war_warhammer_3.routes.translation.get_translation_mod",
+        lambda mid: fake_mod if mid == "3315737452" else None,
+    )
+
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/open-folder")
+    assert resp.status_code == 404
+
+
+def test_rescan_reports_has_mod_context(client: TestClient, tmp_path: Path):
+    # Empty mod-context -> has_mod_context: False.
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/rescan")
+    assert resp.status_code == 200
+    assert resp.json()["has_mod_context"] is False
+
+    # Save a non-empty mod-context, rescan again -> True.
+    client.put(
+        "/api/games/total_war_warhammer_3/translation/mods/3315737452/mod-context",
+        json={"source_game": "", "character_name": "Zerooz", "background": ""},
+    )
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/rescan")
+    assert resp.status_code == 200
+    assert resp.json()["has_mod_context"] is True
+
+
+def test_mod_context_round_trips_language_overrides(client: TestClient):
+    # PUT with both overrides set, then GET round-trips them.
+    client.put(
+        "/api/games/total_war_warhammer_3/translation/mods/3315737452/mod-context",
+        json={
+            "source_game": "",
+            "character_name": "",
+            "background": "",
+            "source_language_override": "Japanese",
+            "target_language_override": "English",
+        },
+    )
+    resp = client.get("/api/games/total_war_warhammer_3/translation/mods/3315737452/mod-context")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["source_language_override"] == "Japanese"
+    assert body["target_language_override"] == "English"

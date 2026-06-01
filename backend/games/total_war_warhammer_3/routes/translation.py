@@ -8,6 +8,8 @@ tests can monkeypatch them in isolation.
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -244,6 +246,8 @@ class RescanSummary(BaseModel):
     scanned_at: str
     # True when translations.json holds entries whose text does not match the user's `.loc.tsv` files.
     has_unsynced_changes: bool = False
+    # True when any of `source_game / character_name / background` in mod-context is non-empty.
+    has_mod_context: bool = False
 
 
 class TranslationEdit(BaseModel):
@@ -253,11 +257,15 @@ class TranslationEdit(BaseModel):
 
 
 class ModContext(BaseModel):
-    """Request body for `PUT /mod-context`."""
+    """Body of `GET/PUT /mod-context`."""
 
     source_game: str = ""
     character_name: str = ""
     background: str = ""
+    # Per-mod override for source language. None falls back to the registry default.
+    source_language_override: str | None = None
+    # Per-mod override for target language. None falls back to the registry default.
+    target_language_override: str | None = None
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -341,11 +349,19 @@ def rescan(mod_id: str) -> RescanSummary:
     for row in drift:
         counts[row.status] += 1
 
+    ctx = store.load_character_context(mod_id)
+    has_mod_context = bool(
+        (ctx.get("source_game") or "").strip()
+        or (ctx.get("character_name") or "").strip()
+        or (ctx.get("background") or "").strip()
+    )
+
     return RescanSummary(
         mod_id=mod_id,
         counts=counts,
         scanned_at=datetime.now(timezone.utc).isoformat(),
         has_unsynced_changes=_has_unsynced_changes(mod_id, mod),
+        has_mod_context=has_mod_context,
     )
 
 
@@ -453,13 +469,21 @@ def get_mod_context(mod_id: str) -> dict:
         mod_id: Steam Workshop ID of the translation mod.
 
     Returns:
-        Dict with mod context fields (`source_game`, `character_name`, `background`).
+        Dict with mod context fields (`source_game`, `character_name`, `background`) plus the
+        per-mod language overrides (`source_language_override`, `target_language_override`).
 
     Raises:
         HTTPException: 404 if `mod_id` is not registered.
     """
+    from backend.data.mod_settings import load_source_language_override, load_target_language_override
+    from backend.games.storage_paths import game_storage_path
+
     _require_mod(mod_id)
-    return store.load_character_context(mod_id)
+    ctx = store.load_character_context(mod_id)
+    wh3_root = game_storage_path(store.GAME_ID)
+    ctx["source_language_override"] = load_source_language_override(mod_id, storage_path=wh3_root)
+    ctx["target_language_override"] = load_target_language_override(mod_id, storage_path=wh3_root)
+    return ctx
 
 
 class TranslateBatchRequest(BaseModel):
@@ -553,7 +577,7 @@ def put_mod_context(mod_id: str, ctx: ModContext) -> dict:
 
     Args:
         mod_id: Steam Workshop ID of the translation mod.
-        ctx: Request body containing the context fields.
+        ctx: Request body containing the context fields plus optional language overrides.
 
     Returns:
         `{"status": "ok"}` on success.
@@ -561,8 +585,14 @@ def put_mod_context(mod_id: str, ctx: ModContext) -> dict:
     Raises:
         HTTPException: 404 if `mod_id` is not registered.
     """
+    from backend.data.mod_settings import save_source_language_override, save_target_language_override
+    from backend.games.storage_paths import game_storage_path
+
     _require_mod(mod_id)
     store.save_character_context(mod_id, ctx.model_dump())
+    wh3_root = game_storage_path(store.GAME_ID)
+    save_source_language_override(mod_id, ctx.source_language_override, storage_path=wh3_root)
+    save_target_language_override(mod_id, ctx.target_language_override, storage_path=wh3_root)
     return {"status": "ok"}
 
 
@@ -923,3 +953,34 @@ def get_api_responses(mod_id: str) -> list[dict]:
 
     _require_mod(mod_id)
     return api_responses_store.list_entries(mod_id)
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# Mod folder open helper
+
+
+@router.post("/mods/{mod_id}/open-folder")
+def open_mod_folder(mod_id: str) -> dict:
+    """Open the mod's local source directory in the OS file explorer.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+
+    Returns:
+        `{"status": "ok"}` when the explorer launches successfully.
+
+    Raises:
+        HTTPException: 404 when the mod is not registered or the local source dir does not exist.
+    """
+    mod = _require_mod(mod_id)
+    folder = mod.local_source_dir
+    if not folder.exists():
+        raise HTTPException(404, f"local source dir not found: {folder}")
+    if sys.platform == "win32":
+        subprocess.Popen(["explorer", str(folder)])
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(folder)])
+    else:
+        subprocess.Popen(["xdg-open", str(folder)])
+    return {"status": "ok"}
