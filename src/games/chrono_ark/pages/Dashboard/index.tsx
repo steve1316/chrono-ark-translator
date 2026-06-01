@@ -248,7 +248,7 @@ const DashboardPage: React.FC = () => {
      */
     const handleModSelect = (modId: string) => {
         sessionStorage.setItem("lastViewedMod", modId)
-        navigate(`/mods/${modId}`)
+        navigate(`/translation/${modId}`)
     }
 
     return (

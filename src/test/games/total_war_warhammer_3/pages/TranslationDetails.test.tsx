@@ -51,9 +51,9 @@ function mockRouteFlow() {
 }
 
 const wrap = () => (
-    <MemoryRouter initialEntries={[`/translation-mods/${MOD.workshop_id}`]}>
+    <MemoryRouter initialEntries={[`/translation/${MOD.workshop_id}`]}>
         <Routes>
-            <Route path="/translation-mods/:workshopId" element={<TranslationDetailsPage />} />
+            <Route path="/translation/:workshopId" element={<TranslationDetailsPage />} />
         </Routes>
     </MemoryRouter>
 )

@@ -19,7 +19,7 @@ export function TotalWarWarhammer3Routes() {
             <Route path="/supported-mods" element={<SupportedModsPage />} />
             <Route path="/supported-mods/new" element={<SupportedModFormPage />} />
             <Route path="/supported-mods/edit/:packageName" element={<SupportedModFormPage />} />
-            <Route path="/translation-mods/:workshopId" element={<TranslationDetailsPage />} />
+            <Route path="/translation/:workshopId" element={<TranslationDetailsPage />} />
             <Route path="/validate" element={<ValidatePage />} />
             <Route path="/runner" element={<RunnerPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

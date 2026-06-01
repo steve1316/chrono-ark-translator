@@ -85,9 +85,9 @@ describe("ModCard", () => {
     })
 
     it("renders the primary action as a Link when primaryAction.to is set", () => {
-        render(wrap(<ModCard {...baseProps({ primaryAction: { label: "Translate ->", variant: "primary", to: "/translation-mods/3315737452" } })} />))
+        render(wrap(<ModCard {...baseProps({ primaryAction: { label: "Translate ->", variant: "primary", to: "/translation/3315737452" } })} />))
         const link = screen.getByRole("link", { name: /Translate/i })
-        expect(link).toHaveAttribute("href", "/translation-mods/3315737452")
+        expect(link).toHaveAttribute("href", "/translation/3315737452")
     })
 
     it("renders the Steam link when steamUrl is provided", () => {

@@ -15,7 +15,7 @@ function App() {
     const location = useLocation()
     // Detail pages use a wider `container-fluid` layout to give the string
     // table more horizontal space, while other pages use the narrower `container`.
-    const isDetailPage = location.pathname.startsWith("/mods/") || location.pathname.startsWith("/translation-mods/")
+    const isDetailPage = location.pathname.startsWith("/translation/")
 
     // Load the active game id from the backend on first mount. The active
     // game's subtree only renders once this resolves so the initial route

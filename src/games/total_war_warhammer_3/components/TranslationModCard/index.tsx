@@ -93,7 +93,7 @@ const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, 
             primaryAction={{
                 label: "View Strings",
                 variant: untranslated > 0 ? "warning" : "primary",
-                onClick: () => navigate(`/translation-mods/${mod.workshop_id}`),
+                onClick: () => navigate(`/translation/${mod.workshop_id}`),
             }}
             steamUrl={steamUrl}
             onSync={() => onRescan(mod.workshop_id)}
