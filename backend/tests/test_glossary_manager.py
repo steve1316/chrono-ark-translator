@@ -232,3 +232,21 @@ def test_combined_glossary_prompt_empty_mod():
     mod = {"terms": {}}
     prompt = get_combined_glossary_prompt(base, mod, source_lang="Korean")
     assert "**Shield Up**" in prompt
+
+
+def test_get_combined_glossary_prompt_respects_allowed_categories():
+    """An explicit allowed_categories overrides config.GLOSSARY_CATEGORIES for the base glossary."""
+    from backend.data.glossary_manager import get_combined_glossary_prompt
+
+    base = {
+        "terms": {
+            "Armour": {"english": "Armour", "category": "stats", "key": "k1", "source_mappings": {"Chinese": "护甲"}},
+            "The Black Pit": {"english": "The Black Pit", "category": "regions", "key": "k2", "source_mappings": {"Chinese": "黑暗深渊"}},
+        }
+    }
+    mod = {"terms": {}}
+
+    prompt = get_combined_glossary_prompt(base, mod, source_lang="Chinese", allowed_categories=["stats"])
+
+    assert "Armour" in prompt
+    assert "Black Pit" not in prompt

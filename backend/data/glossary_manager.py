@@ -577,6 +577,7 @@ def get_combined_glossary_prompt(
     mod: dict,
     source_lang: str | None = None,
     target_lang: str = "English",
+    allowed_categories: list[str] | None = None,
 ) -> str:
     """
     Build a glossary prompt from base and mod glossaries.
@@ -590,6 +591,7 @@ def get_combined_glossary_prompt(
         mod: The mod-specific glossary.
         source_lang: If provided, only include mappings for this language.
         target_lang: The language being translated into. Defaults to `"English"`.
+        allowed_categories: Base-glossary categories to include. Defaults to config.GLOSSARY_CATEGORIES when None.
 
     Returns:
         Combined formatted glossary prompt string.
@@ -598,7 +600,7 @@ def get_combined_glossary_prompt(
 
     base_prompt = get_glossary_prompt(
         base,
-        allowed_categories=config.GLOSSARY_CATEGORIES,
+        allowed_categories=allowed_categories if allowed_categories is not None else config.GLOSSARY_CATEGORIES,
         source_lang=source_lang,
         exclude_terms=mod_term_keys,
         target_lang=target_lang,
