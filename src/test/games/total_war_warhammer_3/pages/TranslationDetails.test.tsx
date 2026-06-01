@@ -397,6 +397,26 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         expect(claudeRow?.textContent).toContain("Stale text")
     })
 
+    it("renders a .resizer handle on each sortable column header", async () => {
+        const { container } = render(wrap())
+        await screen.findByRole("button", { name: /Back to Dashboard/i })
+        const resizers = container.querySelectorAll(".sortable-th .resizer")
+        // 6 columns -> 6 resizers.
+        expect(resizers.length).toBe(6)
+    })
+
+    it("reads initial column widths from localStorage when present", async () => {
+        window.localStorage.setItem("wh3-translation-column-widths", JSON.stringify({ status: 200, provider: 110, source_filename: 220, key: 250, parent_text: 300, translation_text: 320 }))
+        try {
+            const { container } = render(wrap())
+            await screen.findByRole("button", { name: /Back to Dashboard/i })
+            const statusHeader = container.querySelector('th[data-field="status"]') as HTMLElement
+            expect(statusHeader.style.width).toBe("200px")
+        } finally {
+            window.localStorage.removeItem("wh3-translation-column-widths")
+        }
+    })
+
     it("Cancel button stops the batch loop and hides the banner", async () => {
         let resolveTranslate: (v: Response) => void = () => undefined
         const spy = vi.spyOn(globalThis, "fetch")

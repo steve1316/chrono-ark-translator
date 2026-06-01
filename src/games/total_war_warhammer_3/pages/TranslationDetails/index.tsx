@@ -40,6 +40,17 @@ const SORT_LABELS: Record<SortField, string> = {
     translation_text: "English",
 }
 
+const COLUMN_WIDTH_KEY = "wh3-translation-column-widths"
+
+const DEFAULT_COLUMN_WIDTHS: Record<SortField, number> = {
+    status: 120,
+    provider: 90,
+    source_filename: 200,
+    key: 220,
+    parent_text: 280,
+    translation_text: 300,
+}
+
 /**
  * Per-mod translation review page with full Chrono Ark UI parity.
  * Toolbar opens 5 modals; action row covers Reset / Clear English / Translate (N) / Sync Changes.
@@ -73,6 +84,52 @@ const TranslationDetailsPage: React.FC = () => {
     const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null)
     const cancelRequestedRef = useRef<boolean>(false)
     const [sortConfig, setSortConfig] = useState<{ key: SortField; direction: "asc" | "desc" | null }>({ key: "key", direction: null })
+    const [columnWidths, setColumnWidths] = useState<Record<SortField, number>>(() => {
+        try {
+            const raw = window.localStorage.getItem(COLUMN_WIDTH_KEY)
+            if (raw) {
+                const parsed = JSON.parse(raw) as Partial<Record<SortField, number>>
+                return { ...DEFAULT_COLUMN_WIDTHS, ...parsed }
+            }
+        } catch {
+            /* fall through */
+        }
+        return DEFAULT_COLUMN_WIDTHS
+    })
+
+    const resizeStateRef = useRef<{ field: SortField; startX: number; startWidth: number } | null>(null)
+
+    const onResizeStart = useCallback(
+        (e: React.PointerEvent<HTMLDivElement>, field: SortField) => {
+            e.preventDefault()
+            e.stopPropagation()
+            resizeStateRef.current = { field, startX: e.clientX, startWidth: columnWidths[field] }
+            ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+        },
+        [columnWidths]
+    )
+
+    const onResizeMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        const st = resizeStateRef.current
+        if (!st) return
+        const delta = e.clientX - st.startX
+        const next = Math.max(60, st.startWidth + delta)
+        setColumnWidths((prev) => ({ ...prev, [st.field]: next }))
+    }, [])
+
+    const onResizeEnd = useCallback(
+        (e: React.PointerEvent<HTMLDivElement>) => {
+            if (!resizeStateRef.current) return
+            ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+            resizeStateRef.current = null
+            try {
+                window.localStorage.setItem(COLUMN_WIDTH_KEY, JSON.stringify(columnWidths))
+            } catch {
+                /* ignore quota errors */
+            }
+        },
+        [columnWidths]
+    )
 
     const skipInitialFilterEffect = useRef(true)
 
@@ -577,8 +634,15 @@ const TranslationDetailsPage: React.FC = () => {
                     <thead style={{ background: "var(--bg-color)", position: "sticky", top: 0, zIndex: 10 }}>
                         <tr>
                             {(Object.keys(SORT_LABELS) as SortField[]).map((field) => (
-                                <th key={field} className="sortable-th" onClick={() => handleSort(field)}>
+                                <th key={field} data-field={field} className="sortable-th" onClick={() => handleSort(field)} style={{ width: `${columnWidths[field]}px`, position: "relative" }}>
                                     {SORT_LABELS[field]} {getSortIcon(field)}
+                                    <div
+                                        className="resizer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        onPointerDown={(e) => onResizeStart(e, field)}
+                                        onPointerMove={onResizeMove}
+                                        onPointerUp={onResizeEnd}
+                                    />
                                 </th>
                             ))}
                         </tr>
