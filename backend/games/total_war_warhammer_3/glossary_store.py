@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 from backend.data import glossary_manager as gm
-from backend.games.storage_paths import game_storage_path
+from backend.games.storage_paths import game_storage_path, glossary_path
 
 GAME_ID = "total_war_warhammer_3"
 
@@ -122,3 +122,35 @@ def apply_term_rename(mod_id: str, old_english: str, new_english: str) -> int:
     with path.open("w", encoding="utf-8") as f:
         json.dump(raw, f, indent=2, ensure_ascii=False)
     return total
+
+
+def load_base_glossary() -> dict:
+    """Load the WH3 base-game glossary as `{"terms": {...}}`.
+
+    Returns:
+        The base glossary dict; `{"terms": {}}` when it has not been built yet.
+    """
+    return gm.load_glossary(glossary_path(GAME_ID))
+
+
+def mod_glossary_as_terms(mod_id: str, source_language: str) -> dict:
+    """Adapt the flat per-mod glossary into the `{"terms": {...}}` shape used by the prompt builder.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        source_language: The mod's source language name, used as the `source_mappings` key.
+
+    Returns:
+        A glossary dict `{"terms": {english: {english, category, key, source_mappings}}}`.
+    """
+    flat = load_glossary(mod_id)
+    terms: dict[str, dict] = {}
+    for english, info in flat.items():
+        source = info.get("source", "")
+        terms[english] = {
+            "english": english,
+            "category": info.get("category", ""),
+            "key": "",
+            "source_mappings": {source_language: source} if source else {},
+        }
+    return {"terms": terms}

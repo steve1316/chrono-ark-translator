@@ -19,6 +19,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from backend import config
+from backend.data.glossary_manager import get_combined_glossary_prompt
+from backend.games.total_war_warhammer_3 import translation_context as tc
 from backend.data.mod_settings import (
     load_source_language_override,
     load_target_language_override,
@@ -533,11 +535,23 @@ def translate_batch(mod_id: str, req: TranslateBatchRequest) -> dict:
     adapter = TotalWarWarhammer3Adapter()
     entries = list(src.items())
 
+    base_glossary = glossary_store.load_base_glossary()
+    mod_terms = glossary_store.mod_glossary_as_terms(mod_id, mod.source_language)
+    glossary_prompt = get_combined_glossary_prompt(
+        base_glossary,
+        mod_terms,
+        source_lang=mod.source_language,
+        target_lang=mod.target_language,
+        allowed_categories=tc.BASE_GLOSSARY_PROMPT_CATEGORIES,
+    )
+    if not glossary_prompt:
+        glossary_prompt = "No glossary available."
+
     provider = ClaudeProvider()
     translations, suggested_terms = provider.translate_batch(
         entries,
         mod.source_language,
-        "No glossary available.",  # per-mod glossary wiring deferred to Plan 2
+        glossary_prompt,
         game_context=adapter.get_translation_context(),
         format_rules=adapter.get_format_preservation_rules(),
         style_examples=adapter.get_style_examples(mod.source_language),
@@ -724,6 +738,16 @@ def delete_snapshot_route(mod_id: str, sid: str) -> dict:
     _require_mod(mod_id)
     snapshot_store.delete_snapshot(mod_id, sid)
     return {"status": "ok"}
+
+
+@router.get("/glossary")
+def get_base_glossary() -> dict:
+    """Return the WH3 base-game terminology glossary.
+
+    Returns:
+        `{"terms": {...}}`; empty when the glossary has not been built yet.
+    """
+    return glossary_store.load_base_glossary()
 
 
 @router.get("/mods/{mod_id}/glossary")

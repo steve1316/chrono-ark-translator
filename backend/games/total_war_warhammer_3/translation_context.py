@@ -41,3 +41,8 @@ GLOSSARY_CATEGORIES: dict[str, str | list[str]] = {
     "technologies": "Technology and rite names.",
     "items": "Item, weapon, and armor names.",
 }
+
+# Base-glossary categories injected into the translation prompt. `regions` is intentionally
+# excluded - it holds ~900 proper nouns that would bloat every prompt. They remain available
+# in the glossary file and the Glossary page.
+BASE_GLOSSARY_PROMPT_CATEGORIES: list[str] = ["stats", "attributes", "ui_terms"]

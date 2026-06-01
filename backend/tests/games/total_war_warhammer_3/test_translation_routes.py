@@ -301,3 +301,54 @@ def test_mod_context_round_trips_language_overrides(client: TestClient):
     body = resp.json()
     assert body["source_language_override"] == "Japanese"
     assert body["target_language_override"] == "English"
+
+
+def test_get_base_glossary_returns_terms(client: TestClient, tmp_path: Path, monkeypatch):
+    """GET /glossary returns the base glossary written to storage."""
+    import json
+
+    gpath = tmp_path / "games" / "total_war_warhammer_3" / "glossary.json"
+    gpath.parent.mkdir(parents=True, exist_ok=True)
+    gpath.write_text(json.dumps({"terms": {"Armour": {"english": "Armour", "category": "stats", "key": "k", "source_mappings": {"Chinese": "护甲"}}}}), encoding="utf-8")
+
+    resp = client.get("/api/games/total_war_warhammer_3/translation/glossary")
+    assert resp.status_code == 200
+    assert resp.json()["terms"]["Armour"]["category"] == "stats"
+
+
+def test_get_base_glossary_empty_when_unbuilt(client: TestClient):
+    resp = client.get("/api/games/total_war_warhammer_3/translation/glossary")
+    assert resp.status_code == 200
+    assert resp.json() == {"terms": {}}
+
+
+def test_translate_injects_base_glossary_and_excludes_regions(client: TestClient, tmp_path: Path, monkeypatch):
+    """The translate route builds a prompt from the base glossary, including stats but not regions."""
+    import json
+
+    gpath = tmp_path / "games" / "total_war_warhammer_3" / "glossary.json"
+    gpath.parent.mkdir(parents=True, exist_ok=True)
+    gpath.write_text(
+        json.dumps(
+            {
+                "terms": {
+                    "Armour": {"english": "Armour", "category": "stats", "key": "k1", "source_mappings": {"Chinese": "护甲"}},
+                    "The Black Pit": {"english": "The Black Pit", "category": "regions", "key": "k2", "source_mappings": {"Chinese": "黑暗深渊"}},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured = {}
+
+    def fake_translate_batch(self, entries, source_lang, glossary_prompt, **kwargs):
+        captured["prompt"] = glossary_prompt
+        return ({k: "X" for k, _ in entries}, [])
+
+    monkeypatch.setattr("backend.translator.claude_provider.ClaudeProvider.translate_batch", fake_translate_batch)
+
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/translate", json={"keys": ["k2"]})
+    assert resp.status_code == 200
+    assert "Armour" in captured["prompt"]
+    assert "Black Pit" not in captured["prompt"]
