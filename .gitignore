@@ -30,3 +30,8 @@ __pycache__
 
 backend/storage/
 .env
+
+# Extracted vanilla WH3 loc files used only as glossary build inputs (large, local-only).
+vanilla_text_en/
+vanilla_text_cn/
+vanilla_text_kr/
