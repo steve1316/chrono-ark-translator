@@ -302,11 +302,13 @@ body {
     flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
+    margin-bottom: 1.5rem;
 }
 
 /* Pin the action row to the bottom of the card body so cards in the same grid row align consistently regardless of header / note length. */
 .mod-card-content > .mod-actions:last-child {
     margin-top: auto;
+    margin-bottom: 0;
 }
 
 .mod-actions-group {

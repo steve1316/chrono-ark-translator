@@ -363,7 +363,7 @@ const TranslationDetailsPage: React.FC = () => {
                     <button className="btn btn-outline" onClick={() => navigate("/dashboard")} style={{ marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         <FaArrowLeft /> Back to Dashboard
                     </button>
-                    <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", flexWrap: "wrap" }}>
                         {mod?.preview_image_url && (
                             <img
                                 src={`${API_BASE}${mod.preview_image_url}`}
@@ -578,7 +578,7 @@ const TranslationDetailsPage: React.FC = () => {
             )}
 
             <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
-                <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
                     <div style={{ flex: 1, position: "relative" }}>
                         <input
                             type="text"
@@ -619,7 +619,7 @@ const TranslationDetailsPage: React.FC = () => {
                             </button>
                         )}
                     </div>
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                         {STATUS_FILTERS.map((s) => (
                             <button key={s} type="button" className={`btn ${filter === s ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter(s)}>
                                 {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -668,10 +668,12 @@ const TranslationDetailsPage: React.FC = () => {
                                     </span>
                                 </td>
                                 <td className="wh3-mode-cell">{row.provider ?? ""}</td>
-                                <td style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{row.source_filename}</td>
-                                <td style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>{row.key}</td>
-                                <td>{row.parent_text ?? <em style={{ color: "var(--text-dim)" }}>orphan</em>}</td>
-                                <td>
+                                <td className="key-cell" style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
+                                    {row.source_filename}
+                                </td>
+                                <td className="key-cell">{row.key}</td>
+                                <td className="source-cell">{row.parent_text ?? <em style={{ color: "var(--text-dim)" }}>orphan</em>}</td>
+                                <td className="english-cell">
                                     <EditableCell value={row.translation_text ?? ""} onSave={(text) => onRowSave(row.key, text)} placeholder="(untranslated)" />
                                 </td>
                             </tr>
