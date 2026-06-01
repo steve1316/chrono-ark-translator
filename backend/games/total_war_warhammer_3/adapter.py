@@ -15,7 +15,8 @@ from fastapi import APIRouter
 
 from backend.games.base import GameAdapter, ModInfo
 from backend.games.capabilities.translation import TranslationCapability
-from backend.games.total_war_warhammer_3 import translation_context as tc
+from backend.data import glossary_manager as gm
+from backend.games.total_war_warhammer_3 import glossary_store, translation_context as tc
 from backend.games.total_war_warhammer_3.loc_extractor import (
     normalize_loc_filename,
     read_translation_loc_tsv,
@@ -99,6 +100,21 @@ class TotalWarWarhammer3Adapter(GameAdapter, TranslationCapability):
 
     def get_glossary_categories(self) -> dict[str, str | list[str]]:
         return dict(tc.GLOSSARY_CATEGORIES)
+
+    def get_base_glossary_prompt(self, source_lang: str, target_lang: str = "English") -> str:
+        """Build the base-game glossary section from the WH3 base glossary.
+
+        Filters the base glossary to tc.BASE_GLOSSARY_PROMPT_CATEGORIES, matching what
+        the WH3 translation pipeline sends (excludes the large regions category).
+
+        Args:
+            source_lang: Source language whose mappings to include (e.g. `"Chinese"`).
+            target_lang: Language being translated into. Defaults to `"English"`.
+
+        Returns:
+            Formatted glossary section string, or an empty string when no terms match.
+        """
+        return gm.get_glossary_prompt(glossary_store.load_base_glossary(), allowed_categories=tc.BASE_GLOSSARY_PROMPT_CATEGORIES, source_lang=source_lang, target_lang=target_lang)
 
     @property
     def base_game_path(self) -> Optional[Path]:

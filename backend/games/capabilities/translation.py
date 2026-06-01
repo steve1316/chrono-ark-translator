@@ -48,6 +48,21 @@ class TranslationCapability(ABC):
         """Return source-language to list of (input, output) example pairs."""
 
     @abstractmethod
+    def get_base_glossary_prompt(self, source_lang: str, target_lang: str = "English") -> str:
+        """Return the base-game glossary section for translation prompts.
+
+        Each adapter loads its own base glossary and filters to its own prompt categories.
+        This keeps the system-prompt preview faithful to what the game actually sends.
+
+        Args:
+            source_lang: Source language whose mappings to include (e.g. `"Chinese"`).
+            target_lang: Language being translated into. Defaults to `"English"`.
+
+        Returns:
+            Formatted glossary section string, or an empty string when no terms match.
+        """
+
+    @abstractmethod
     def scan_mods(self, search_path: Optional[Path] = None) -> list["ModInfo"]:
         """Return discovered mods at `search_path` (or default workshop path)."""
 

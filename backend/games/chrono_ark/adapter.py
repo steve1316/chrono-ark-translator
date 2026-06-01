@@ -14,6 +14,7 @@ from backend.models import LocString
 from backend.games.base import GameAdapter, ModInfo
 from backend.games.capabilities.translation import TranslationCapability
 from backend import config
+from backend.data import glossary_manager as gm
 from backend.games.chrono_ark import csv_extractor, dll_extractor, gdata_extractor, mod_scanner
 
 
@@ -517,6 +518,21 @@ class ChronoArkAdapter(GameAdapter, TranslationCapability):
             (e.g. `"Character/"`, `["Skill/", "SkillExtended/"]`).
         """
         return self._GLOSSARY_CATEGORIES
+
+    def get_base_glossary_prompt(self, source_lang: str, target_lang: str = "English") -> str:
+        """Build the base-game glossary section from the Chrono Ark glossary.
+
+        Filters the base glossary to config.GLOSSARY_CATEGORIES, matching what the
+        Chrono Ark translation pipeline sends.
+
+        Args:
+            source_lang: Source language whose mappings to include (e.g. `"Chinese"`).
+            target_lang: Language being translated into. Defaults to `"English"`.
+
+        Returns:
+            Formatted glossary section string, or an empty string when no terms match.
+        """
+        return gm.get_glossary_prompt(gm.load_glossary(), allowed_categories=config.GLOSSARY_CATEGORIES, source_lang=source_lang, target_lang=target_lang)
 
     def export_strings(self, output_path: Path, entries: list[LocString]) -> None:
         """Write localization entries to a Chrono Ark CSV file.

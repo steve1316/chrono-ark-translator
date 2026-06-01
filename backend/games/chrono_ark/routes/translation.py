@@ -11,7 +11,6 @@ from backend import config
 from backend.data.character_context import load_character_context
 from backend.data.glossary_manager import (
     get_combined_glossary_prompt,
-    get_glossary_prompt,
     extract_name_key_suggestions,
     load_glossary,
     load_mod_glossary,
@@ -337,13 +336,7 @@ async def get_system_prompt(source_lang: str = "Korean", target_lang: str = "Eng
     provider_name = config.TRANSLATION_PROVIDER
     provider = get_provider(provider_name)
 
-    base_glossary = load_glossary()
-    glossary_prompt = get_glossary_prompt(
-        base_glossary,
-        allowed_categories=config.GLOSSARY_CATEGORIES,
-        source_lang=source_lang,
-        target_lang=target_lang,
-    )
+    glossary_prompt = current_adapter().get_base_glossary_prompt(source_lang=source_lang, target_lang=target_lang)
     game_context = current_adapter().get_translation_context()
     format_rules = current_adapter().get_format_preservation_rules()
 
