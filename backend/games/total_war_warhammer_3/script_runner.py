@@ -39,6 +39,7 @@ SCRIPT_REGISTRY: dict[str, ScriptDef] = {
     "update_double_unit_size": ScriptDef("update_double_unit_size.py", ["--reset"]),
     "update_modified_attribute_mods": ScriptDef("update_modified_attribute_mods.py", ["--reset"]),
     "process_main_units_tables": ScriptDef("process_main_units_tables.py", []),
+    "glf_inner_join": ScriptDef("glf_inner_join.py", []),
     "update": ScriptDef("update.py", []),
 }
 

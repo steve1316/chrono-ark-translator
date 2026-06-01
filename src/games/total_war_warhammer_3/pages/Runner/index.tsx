@@ -33,6 +33,11 @@ const SCRIPTS: ScriptEntry[] = [
         description: "Pre-process main_units and land_units tables for the Land Encounters workflow.",
     },
     {
+        id: "glf_inner_join",
+        label: "GLF Battle Mage",
+        description: "Run the one-off TSV inner-join helper that copies combat attributes for the [GLF] Battle Mage mod.",
+    },
+    {
         id: "update",
         label: "Update",
         description: "Top-level pipeline that runs every other update script in sequence.",
