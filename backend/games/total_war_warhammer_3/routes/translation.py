@@ -18,13 +18,28 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from backend.games.total_war_warhammer_3 import translation_store_helpers as store
+from backend import config
+from backend.data.mod_settings import (
+    load_source_language_override,
+    load_target_language_override,
+    save_source_language_override,
+    save_target_language_override,
+)
+from backend.games.storage_paths import game_storage_path
+from backend.games.total_war_warhammer_3 import (
+    api_responses_store,
+    glossary_store,
+    snapshot_store,
+    translation_store_helpers as store,
+)
+from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
 from backend.games.total_war_warhammer_3.loc_extractor import (
     LocRow,
     extract_parent_pack_strings,
     normalize_loc_filename,
     read_translation_loc_tsv,
 )
+from backend.games.total_war_warhammer_3.loc_tsv_writeback import sync_translations_to_loc_tsv
 from backend.games.total_war_warhammer_3.routes._paths import tw3_workshop_content_dir
 from backend.games.total_war_warhammer_3.translation_drift import (
     DriftRow,
@@ -36,6 +51,7 @@ from backend.games.total_war_warhammer_3.translation_mods import (
     WH3TranslationMod,
     get_translation_mod,
 )
+from backend.translator.claude_provider import ClaudeProvider
 
 router = APIRouter(prefix="/translation", tags=["translation"])
 
@@ -81,8 +97,6 @@ def _extract_all_parent_strings(mod: WH3TranslationMod) -> dict[str, dict[str, L
         HTTPException: If neither `TW3_RPFM_CLI_PATH` nor `<TW3_HELPER_PATH>/rpfm_cli.exe`
             resolves to a file on disk, or the Steam library drive is not configured.
     """
-    from backend import config
-
     rpfm_str = config.TW3_RPFM_CLI_PATH or ""
     if rpfm_str:
         rpfm: Path | None = Path(rpfm_str)
@@ -475,9 +489,6 @@ def get_mod_context(mod_id: str) -> dict:
     Raises:
         HTTPException: 404 if `mod_id` is not registered.
     """
-    from backend.data.mod_settings import load_source_language_override, load_target_language_override
-    from backend.games.storage_paths import game_storage_path
-
     _require_mod(mod_id)
     ctx = store.load_character_context(mod_id)
     wh3_root = game_storage_path(store.GAME_ID)
@@ -509,9 +520,6 @@ def translate_batch(mod_id: str, req: TranslateBatchRequest) -> dict:
     Returns:
         `{"translated": N, "suggested_terms": [...]}`.
     """
-    from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
-    from backend.translator.claude_provider import ClaudeProvider
-
     mod = _require_mod(mod_id)
     parent = _extract_all_parent_strings(mod)
 
@@ -551,8 +559,6 @@ def translate_batch(mod_id: str, req: TranslateBatchRequest) -> dict:
         }
     store.save_translations_raw(mod_id, raw)
 
-    from backend.games.total_war_warhammer_3 import api_responses_store
-
     api_responses_store.append(
         mod_id,
         {
@@ -585,9 +591,6 @@ def put_mod_context(mod_id: str, ctx: ModContext) -> dict:
     Raises:
         HTTPException: 404 if `mod_id` is not registered.
     """
-    from backend.data.mod_settings import save_source_language_override, save_target_language_override
-    from backend.games.storage_paths import game_storage_path
-
     _require_mod(mod_id)
     store.save_character_context(mod_id, ctx.model_dump())
     wh3_root = game_storage_path(store.GAME_ID)
@@ -632,8 +635,6 @@ def clear_translations(mod_id: str) -> dict:
     Returns:
         `{"cleared": N}` - number of rows that had text cleared.
     """
-    from backend.games.total_war_warhammer_3 import snapshot_store
-
     mod = _require_mod(mod_id)
     snapshot_store.create_snapshot(mod_id, label="pre-clear-translations", kind="auto", local_source_dir=mod.local_source_dir)
     raw = store.load_translations_raw(mod_id)
@@ -652,9 +653,6 @@ def sync_changes(mod_id: str) -> dict:
     Returns:
         `{"per_file": {absolute_path: count}}` describing the writeback.
     """
-    from backend.games.total_war_warhammer_3 import snapshot_store
-    from backend.games.total_war_warhammer_3.loc_tsv_writeback import sync_translations_to_loc_tsv
-
     mod = _require_mod(mod_id)
     snapshot_store.create_snapshot(mod_id, label="pre-sync", kind="auto", local_source_dir=mod.local_source_dir)
     drift = get_strings(mod_id)
@@ -672,8 +670,6 @@ def get_snapshots(mod_id: str) -> list[dict]:
     Returns:
         List of `{ulid, created_at, label, kind}` entries; empty when no snapshots exist.
     """
-    from backend.games.total_war_warhammer_3 import snapshot_store
-
     _require_mod(mod_id)
     return snapshot_store.list_snapshots(mod_id)
 
@@ -689,8 +685,6 @@ def post_snapshot(mod_id: str, req: SnapshotCreateRequest) -> dict:
     Returns:
         `{"ulid": str, "label": str, "kind": "manual"}` for the new snapshot.
     """
-    from backend.games.total_war_warhammer_3 import snapshot_store
-
     mod = _require_mod(mod_id)
     sid = snapshot_store.create_snapshot(mod_id, label=req.label, kind="manual", local_source_dir=mod.local_source_dir)
     return {"ulid": sid, "label": req.label, "kind": "manual"}
@@ -710,8 +704,6 @@ def post_restore_snapshot(mod_id: str, sid: str) -> dict:
     Raises:
         HTTPException: 404 when the snapshot does not exist.
     """
-    from backend.games.total_war_warhammer_3 import snapshot_store
-
     mod = _require_mod(mod_id)
     try:
         snapshot_store.restore_snapshot(mod_id, sid, local_source_dir=mod.local_source_dir)
@@ -731,8 +723,6 @@ def delete_snapshot_route(mod_id: str, sid: str) -> dict:
     Returns:
         `{"status": "ok"}` on success.
     """
-    from backend.games.total_war_warhammer_3 import snapshot_store
-
     _require_mod(mod_id)
     snapshot_store.delete_snapshot(mod_id, sid)
     return {"status": "ok"}
@@ -748,8 +738,6 @@ def get_glossary(mod_id: str) -> dict:
     Returns:
         Glossary dict keyed by English term.
     """
-    from backend.games.total_war_warhammer_3 import glossary_store
-
     _require_mod(mod_id)
     return glossary_store.load_glossary(mod_id)
 
@@ -765,8 +753,6 @@ def post_glossary_term(mod_id: str, entry: GlossaryEntry) -> dict:
     Returns:
         `{"status": "ok"}` on success.
     """
-    from backend.games.total_war_warhammer_3 import glossary_store
-
     _require_mod(mod_id)
     glossary_store.add_term(mod_id, entry.model_dump())
     return {"status": "ok"}
@@ -784,8 +770,6 @@ def put_glossary_term(mod_id: str, english: str, entry: GlossaryEntry) -> dict:
     Returns:
         `{"status": "ok"}` on success.
     """
-    from backend.games.total_war_warhammer_3 import glossary_store
-
     _require_mod(mod_id)
     glossary_store.update_term(mod_id, english, entry.model_dump())
     return {"status": "ok"}
@@ -802,8 +786,6 @@ def delete_glossary_term(mod_id: str, english: str) -> dict:
     Returns:
         `{"status": "ok"}` on success.
     """
-    from backend.games.total_war_warhammer_3 import glossary_store
-
     _require_mod(mod_id)
     glossary_store.delete_term(mod_id, english)
     return {"status": "ok"}
@@ -820,8 +802,6 @@ def post_glossary_apply_all(mod_id: str, req: GlossaryApplyAllRequest) -> dict:
     Returns:
         `{"replaced": N}` - total count of substitutions performed.
     """
-    from backend.games.total_war_warhammer_3 import glossary_store, snapshot_store
-
     mod = _require_mod(mod_id)
     snapshot_store.create_snapshot(mod_id, label=f"pre-apply-all rename {req.old_english}", kind="auto", local_source_dir=mod.local_source_dir)
     count = glossary_store.apply_term_rename(mod_id, req.old_english, req.new_english)
@@ -838,10 +818,6 @@ def post_glossary_suggest_edits(mod_id: str) -> list[dict]:
     Returns:
         List of suggested glossary edits from Claude.
     """
-    from backend.games.total_war_warhammer_3 import api_responses_store, glossary_store
-    from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
-    from backend.translator.claude_provider import ClaudeProvider
-
     mod = _require_mod(mod_id)
     adapter = TotalWarWarhammer3Adapter()
 
@@ -894,10 +870,6 @@ def post_scan_terms(mod_id: str) -> list[dict]:
     Returns:
         List of suggested terms from Claude.
     """
-    from backend.games.total_war_warhammer_3 import api_responses_store
-    from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
-    from backend.translator.claude_provider import ClaudeProvider
-
     mod = _require_mod(mod_id)
     adapter = TotalWarWarhammer3Adapter()
 
@@ -949,8 +921,6 @@ def get_api_responses(mod_id: str) -> list[dict]:
     Returns:
         List of audit entries (newest first); empty when no log exists.
     """
-    from backend.games.total_war_warhammer_3 import api_responses_store
-
     _require_mod(mod_id)
     return api_responses_store.list_entries(mod_id)
 

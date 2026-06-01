@@ -4,14 +4,23 @@ These tests use FastAPI's `TestClient` and a monkeypatched extractor so they
 do not require RPFM CLI or local workshop directories.
 """
 
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from backend.games.total_war_warhammer_3.api_responses_store import list_entries
 from backend.games.total_war_warhammer_3.loc_extractor import LocRow
 from backend.games.total_war_warhammer_3.routes import translation as routes_module
+from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
+from backend.games.total_war_warhammer_3.translation_store_helpers import (
+    load_translations,
+    load_translations_raw,
+    save_translations_raw,
+)
 
 
 @pytest.fixture
@@ -82,10 +91,6 @@ def test_get_strings_overlay_from_translations_json(client: TestClient):
 
     A key with no `.loc.tsv` translation but a seeded `translations.json` entry should appear as translated with the seeded text and provider.
     """
-    from datetime import datetime, timezone
-
-    from backend.games.total_war_warhammer_3.translation_store_helpers import save_translations_raw
-
     now = datetime.now(timezone.utc).isoformat()
     save_translations_raw(
         "3315737452",
@@ -112,11 +117,7 @@ def test_put_string_persists_translation(client: TestClient):
     client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/rescan").json()
     # k2 still untranslated because we save into translations.json which is read by
     # _extract_translation_strings, but the stub ignores that. So just check persistence:
-    from backend.games.total_war_warhammer_3.translation_store_helpers import load_translations
-
     assert load_translations("3315737452")["k2"] == "New translation"
-    from backend.games.total_war_warhammer_3.translation_store_helpers import load_translations_raw
-
     raw = load_translations_raw("3315737452")
     assert raw["k2"]["provider"] == "manual"
 
@@ -170,15 +171,9 @@ def test_translate_batch_calls_claude_and_saves_results(client: TestClient, monk
     assert "Warhammer III" in calls["game_context"]
     assert calls["keys"] == ["k2"]
 
-    from backend.games.total_war_warhammer_3.translation_store_helpers import load_translations
-
     assert load_translations("3315737452")["k2"] == "EN(新文本)"
-    from backend.games.total_war_warhammer_3.translation_store_helpers import load_translations_raw
-
     raw = load_translations_raw("3315737452")
     assert raw["k2"]["provider"] == "claude"
-
-    from backend.games.total_war_warhammer_3.api_responses_store import list_entries
 
     entries = list_entries("3315737452")
     assert len(entries) == 1
@@ -204,8 +199,6 @@ def test_rescan_reports_has_unsynced_changes_false_when_translations_match(clien
 
 
 def test_rescan_reports_has_unsynced_changes_true_when_translations_diverge(client: TestClient, tmp_path: Path):
-    import json
-
     # Seed translations.json with text that does NOT match the fake .loc.tsv for k1.
     mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / "3315737452"
     mod_dir.mkdir(parents=True, exist_ok=True)
@@ -228,8 +221,6 @@ def test_preview_route_404s_for_unknown_mod(client: TestClient):
 
 
 def test_open_folder_calls_subprocess(client: TestClient, monkeypatch, tmp_path: Path):
-    from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
-
     fake_source = tmp_path / "translation_mod_source"
     fake_source.mkdir(parents=True, exist_ok=True)
     fake_mod = WH3TranslationMod(
@@ -262,8 +253,6 @@ def test_open_folder_calls_subprocess(client: TestClient, monkeypatch, tmp_path:
 
 
 def test_open_folder_404s_when_source_dir_missing(client: TestClient, monkeypatch, tmp_path: Path):
-    from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
-
     fake_mod = WH3TranslationMod(
         workshop_id="3315737452",
         display_name="x",
