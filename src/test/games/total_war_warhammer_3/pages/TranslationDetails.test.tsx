@@ -293,4 +293,42 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         render(wrap())
         await waitFor(() => expect(screen.getByRole("button", { name: /Re-sync Changes/i })).toBeInTheDocument())
     })
+
+    it("wraps the search input and filter pills in a single glass-card", async () => {
+        const { container } = render(wrap())
+        await screen.findByRole("button", { name: /Back to Dashboard/i })
+        const searchInput = screen.getByPlaceholderText(/search keys or text/i)
+        const allFilterPill = screen.getByRole("button", { name: /^All$/i })
+        // Walk up from each element to find the nearest .glass-card ancestor; they must be the same node.
+        const searchCard = searchInput.closest(".glass-card")
+        const filterCard = allFilterPill.closest(".glass-card")
+        expect(searchCard).not.toBeNull()
+        expect(filterCard).not.toBeNull()
+        expect(searchCard).toBe(filterCard)
+    })
+
+    it("renders a x clear button inside the search input when text is present", async () => {
+        render(wrap())
+        const input = await screen.findByPlaceholderText(/search keys or text/i)
+        fireEvent.change(input, { target: { value: "abc" } })
+        expect(screen.getByTitle("Clear search")).toBeInTheDocument()
+    })
+
+    it("clears the search input when the x is clicked", async () => {
+        render(wrap())
+        const input = (await screen.findByPlaceholderText(/search keys or text/i)) as HTMLInputElement
+        fireEvent.change(input, { target: { value: "abc" } })
+        fireEvent.click(screen.getByTitle("Clear search"))
+        expect(input.value).toBe("")
+    })
+
+    it("active filter pill renders as btn-primary; inactive as btn-outline", async () => {
+        render(wrap())
+        const allPill = await screen.findByRole("button", { name: /^All$/i })
+        const untranslated = screen.getByRole("button", { name: /Untranslated/i })
+        expect(allPill).toHaveClass("btn-primary")
+        expect(untranslated).toHaveClass("btn-outline")
+        fireEvent.click(untranslated)
+        await waitFor(() => expect(screen.getByRole("button", { name: /Untranslated/i })).toHaveClass("btn-primary"))
+    })
 })

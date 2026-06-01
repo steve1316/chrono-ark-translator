@@ -448,15 +448,55 @@ const TranslationDetailsPage: React.FC = () => {
                 </div>
             </div>
 
-            <input type="text" className="wh3-search" placeholder="search keys or text..." value={search} onChange={(e) => setSearch(e.target.value)} />
-
-            <div className="translation-toolbar">
-                <div className="translation-filter-pills">
-                    {STATUS_FILTERS.map((s) => (
-                        <button key={s} type="button" className={`translation-filter-pill${filter === s ? " active" : ""}`} onClick={() => setFilter(s)}>
-                            {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
-                        </button>
-                    ))}
+            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
+                <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                    <div style={{ flex: 1, position: "relative" }}>
+                        <input
+                            type="text"
+                            placeholder="Search keys or text..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            style={{
+                                width: "100%",
+                                padding: "0.75rem",
+                                paddingRight: "2.5rem",
+                                borderRadius: "8px",
+                                background: "rgba(0,0,0,0.2)",
+                                border: "1px solid var(--glass-border)",
+                                color: "var(--text-main)",
+                                boxSizing: "border-box",
+                            }}
+                        />
+                        {search && (
+                            <button
+                                type="button"
+                                onClick={() => setSearch("")}
+                                title="Clear search"
+                                style={{
+                                    position: "absolute",
+                                    right: "0.5rem",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    background: "none",
+                                    border: "none",
+                                    color: "var(--text-dim)",
+                                    cursor: "pointer",
+                                    fontSize: "1.1rem",
+                                    padding: "0.25rem",
+                                    lineHeight: 1,
+                                }}
+                            >
+                                &times;
+                            </button>
+                        )}
+                    </div>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                        {STATUS_FILTERS.map((s) => (
+                            <button key={s} type="button" className={`btn ${filter === s ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter(s)}>
+                                {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
