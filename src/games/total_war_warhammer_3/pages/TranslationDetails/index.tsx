@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { FaArrowLeft, FaExclamationCircle, FaFolderOpen, FaSteam } from "react-icons/fa"
+import { FaArrowLeft, FaExclamationCircle, FaFolderOpen, FaSort, FaSortDown, FaSortUp, FaSteam } from "react-icons/fa"
 
 import EditableCell from "../../../../components/EditableCell"
 import { API_BASE } from "../../../../config"
@@ -28,6 +28,17 @@ const STATUS_FILTERS: Array<WH3DriftStatus | "all"> = ["all", "untranslated", "s
 const BATCH_LIMIT = 50
 
 type ModalKey = "glossary" | "scan" | "responses" | "context" | "history" | "reset" | null
+
+type SortField = "status" | "provider" | "source_filename" | "key" | "parent_text" | "translation_text"
+
+const SORT_LABELS: Record<SortField, string> = {
+    status: "Status",
+    provider: "Mode",
+    source_filename: "Source",
+    key: "Key",
+    parent_text: "Original",
+    translation_text: "English",
+}
 
 /**
  * Per-mod translation review page with full Chrono Ark UI parity.
@@ -61,6 +72,7 @@ const TranslationDetailsPage: React.FC = () => {
     const [showTranslateDropdown, setShowTranslateDropdown] = useState<boolean>(false)
     const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null)
     const cancelRequestedRef = useRef<boolean>(false)
+    const [sortConfig, setSortConfig] = useState<{ key: SortField; direction: "asc" | "desc" | null }>({ key: "key", direction: null })
 
     const skipInitialFilterEffect = useRef(true)
 
@@ -246,6 +258,34 @@ const TranslationDetailsPage: React.FC = () => {
         const needle = search.trim().toLowerCase()
         return strings.filter((r) => r.key.toLowerCase().includes(needle) || (r.parent_text ?? "").toLowerCase().includes(needle) || (r.translation_text ?? "").toLowerCase().includes(needle))
     }, [strings, search])
+
+    const handleSort = useCallback((field: SortField) => {
+        setSortConfig((prev) => {
+            if (prev.key !== field) return { key: field, direction: "asc" }
+            if (prev.direction === "asc") return { key: field, direction: "desc" }
+            if (prev.direction === "desc") return { key: field, direction: null }
+            return { key: field, direction: "asc" }
+        })
+    }, [])
+
+    const getSortIcon = useCallback(
+        (field: SortField) => {
+            if (sortConfig.key !== field || sortConfig.direction === null) return <FaSort className="sort-icon" />
+            return sortConfig.direction === "asc" ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
+        },
+        [sortConfig]
+    )
+
+    const sortedRows = useMemo(() => {
+        if (sortConfig.direction === null) return filteredRows
+        const dir = sortConfig.direction === "asc" ? 1 : -1
+        const key = sortConfig.key
+        return [...filteredRows].sort((a, b) => {
+            const av = String(a[key] ?? "")
+            const bv = String(b[key] ?? "")
+            return av.localeCompare(bv) * dir
+        })
+    }, [filteredRows, sortConfig])
 
     const translateCount = useMemo(() => {
         const target: WH3DriftStatus = filter === "stale" ? "stale" : "untranslated"
@@ -532,23 +572,34 @@ const TranslationDetailsPage: React.FC = () => {
 
             {statusText && <p style={{ color: "var(--text-dim)", margin: "0.5rem 0" }}>{statusText}</p>}
 
-            <div className="glass-card" style={{ padding: 0, overflow: "auto" }}>
-                <table className="translation-table">
-                    <thead>
+            <div className="glass-card string-table-container" style={{ height: "calc(100vh - 480px)", minHeight: "500px", overflow: "auto" }}>
+                <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                    <thead style={{ background: "var(--bg-color)", position: "sticky", top: 0, zIndex: 10 }}>
                         <tr>
-                            <th>Status</th>
-                            <th>Mode</th>
-                            <th>Source</th>
-                            <th>Key</th>
-                            <th>Original</th>
-                            <th>English</th>
+                            {(Object.keys(SORT_LABELS) as SortField[]).map((field) => (
+                                <th key={field} className="sortable-th" onClick={() => handleSort(field)}>
+                                    {SORT_LABELS[field]} {getSortIcon(field)}
+                                </th>
+                            ))}
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredRows.map((row) => (
-                            <tr key={`${row.source_filename}::${row.key}`}>
+                        {sortedRows.map((row) => (
+                            <tr key={`${row.source_filename}::${row.key}`} className={row.provider === "claude" ? "wh3-translation-row-claude" : undefined}>
                                 <td>
-                                    <span className={`translation-status-pill ${row.status}`}>{row.status}</span>
+                                    <span
+                                        className={`status-badge ${
+                                            row.status === "translated"
+                                                ? "status-synced"
+                                                : row.status === "stale"
+                                                  ? "status-translated"
+                                                  : row.status === "orphan"
+                                                    ? "status-untouched"
+                                                    : "status-missing"
+                                        }`}
+                                    >
+                                        {row.status.toUpperCase()}
+                                    </span>
                                 </td>
                                 <td className="wh3-mode-cell">{row.provider ?? ""}</td>
                                 <td style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{row.source_filename}</td>
@@ -559,7 +610,7 @@ const TranslationDetailsPage: React.FC = () => {
                                 </td>
                             </tr>
                         ))}
-                        {filteredRows.length === 0 && (
+                        {sortedRows.length === 0 && (
                             <tr>
                                 <td colSpan={6} style={{ textAlign: "center", color: "var(--text-dim)", padding: "2rem" }}>
                                     No rows match the current filter.

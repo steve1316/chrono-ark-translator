@@ -360,6 +360,43 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         resolveTranslate(mockJson({ translated: 1, suggested_terms: [] }))
     })
 
+    it("wraps the table inside .string-table-container glass-card", async () => {
+        const { container } = render(wrap())
+        await screen.findByRole("button", { name: /Back to Dashboard/i })
+        expect(container.querySelector(".string-table-container")).not.toBeNull()
+        expect(container.querySelector(".string-table-container table")).not.toBeNull()
+    })
+
+    it("renders Status column with TRANSLATED / UNTRANSLATED / STALE badge text", async () => {
+        render(wrap())
+        await screen.findByText("Original 1")
+        expect(screen.getByText("TRANSLATED")).toBeInTheDocument()
+        expect(screen.getByText("UNTRANSLATED")).toBeInTheDocument()
+        expect(screen.getByText("STALE")).toBeInTheDocument()
+    })
+
+    it("clicking a column header cycles sort direction null -> asc -> desc -> null", async () => {
+        render(wrap())
+        await screen.findByText("Original 1")
+        const keyHeader = screen.getByRole("columnheader", { name: /^Key/i })
+        // Initial: no sort indicator on Key.
+        expect(keyHeader.querySelector(".sort-icon.active")).toBeNull()
+        fireEvent.click(keyHeader)
+        expect(keyHeader.querySelector(".sort-icon.active")).not.toBeNull()
+        fireEvent.click(keyHeader)
+        expect(keyHeader.querySelector(".sort-icon.active")).not.toBeNull()
+        fireEvent.click(keyHeader)
+        expect(keyHeader.querySelector(".sort-icon.active")).toBeNull()
+    })
+
+    it("highlights rows where provider === 'claude' with the wh3-translation-row-claude class", async () => {
+        const { container } = render(wrap())
+        await screen.findByText("Stale text")
+        const claudeRow = container.querySelector(".wh3-translation-row-claude")
+        expect(claudeRow).not.toBeNull()
+        expect(claudeRow?.textContent).toContain("Stale text")
+    })
+
     it("Cancel button stops the batch loop and hides the banner", async () => {
         let resolveTranslate: (v: Response) => void = () => undefined
         const spy = vi.spyOn(globalThis, "fetch")

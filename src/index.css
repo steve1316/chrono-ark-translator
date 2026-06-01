@@ -1291,3 +1291,10 @@ th {
         transform: rotate(360deg);
     }
 }
+
+.wh3-translation-row-claude {
+    background: rgba(125, 211, 252, 0.04);
+}
+.wh3-translation-row-claude:hover {
+    background: rgba(125, 211, 252, 0.08);
+}
