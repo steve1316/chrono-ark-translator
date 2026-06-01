@@ -170,19 +170,12 @@ class TotalWarWarhammer3Adapter(GameAdapter, TranslationCapability):
         return "Chinese"
 
     def get_untranslated(self, strings: dict[str, LocString]) -> dict[str, LocString]:
-        return {
-            sid: s
-            for sid, s in strings.items()
-            if not s.translations.get("English", "").strip()
-        }
+        return {sid: s for sid, s in strings.items() if not s.translations.get("English", "").strip()}
 
     def export_strings(self, output_path: Path, entries: list[LocString]) -> None:
         """Not implemented: WH3 translation export is handled by the existing
         pack rebuild + publish workflow, not by this method."""
-        raise NotImplementedError(
-            "WH3 translation export uses the existing pack rebuild flow; "
-            "see backend/games/total_war_warhammer_3/routes/packs.py."
-        )
+        raise NotImplementedError("WH3 translation export uses the existing pack rebuild flow; " "see backend/games/total_war_warhammer_3/routes/packs.py.")
 
     def get_mod_url(self, mod_id: str) -> Optional[str]:
         if get_translation_mod(mod_id) is None:
