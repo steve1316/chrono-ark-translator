@@ -773,40 +773,6 @@ th {
     text-decoration: underline;
 }
 
-.translation-progress {
-    margin-bottom: 0.75rem;
-}
-
-.translation-progress-bar {
-    height: 6px;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.translation-progress-fill {
-    height: 100%;
-    background: var(--accent-gradient);
-    transition: width 0.3s ease;
-}
-
-.translation-progress-label {
-    margin-top: 0.35rem;
-    font-size: 0.8rem;
-    color: var(--text-dim);
-}
-
-.translation-stale-count {
-    color: var(--warning);
-}
-
-.translation-progress-placeholder {
-    margin-bottom: 0.75rem;
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    font-style: italic;
-}
-
 .translation-mods-section {
     margin-top: 2.5rem;
 }
@@ -872,23 +838,6 @@ th {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
-}
-
-.translation-filter-pill {
-    padding: 0.35rem 0.75rem;
-    border-radius: 999px;
-    border: 1px solid var(--glass-border);
-    background: transparent;
-    color: var(--text-dim);
-    cursor: pointer;
-    font-size: 0.85rem;
-    transition: var(--transition);
-}
-
-.translation-filter-pill.active {
-    background: var(--accent-primary);
-    color: var(--bg-color);
-    border-color: var(--accent-primary);
 }
 
 .translation-toolbar {
@@ -1213,33 +1162,7 @@ th {
 
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
-/* WH3 translation page toolbar + action row + search + mode column */
-.wh3-toolbar {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.75rem;
-}
-.wh3-action-row {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.75rem;
-}
-.wh3-search {
-    width: 100%;
-    padding: 0.6rem 0.85rem;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-main);
-    margin-bottom: 0.75rem;
-    font-size: 0.95rem;
-}
-.wh3-search:focus {
-    outline: none;
-    border-color: var(--accent);
-}
+/* WH3 translation page mode column */
 .wh3-mode-cell {
     font-size: 0.8rem;
     color: var(--text-dim);
