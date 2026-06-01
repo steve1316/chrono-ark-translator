@@ -81,7 +81,7 @@ def apply_row_patches(path: Path, patches: dict[str, str]) -> None:
         key = line[:first_tab]
         if key in remaining:
             second_tab = line.find("\t", first_tab + 1)
-            tooltip = line[second_tab + 1:] if second_tab >= 0 else "true"
+            tooltip = line[second_tab + 1 :] if second_tab >= 0 else "true"
             lines[i] = f"{key}\t{remaining[key]}\t{tooltip}"
             remaining.pop(key)
 

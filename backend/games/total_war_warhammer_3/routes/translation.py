@@ -366,11 +366,7 @@ def rescan(mod_id: str) -> RescanSummary:
         counts[row.status] += 1
 
     ctx = store.load_character_context(mod_id)
-    has_mod_context = bool(
-        (ctx.get("source_game") or "").strip()
-        or (ctx.get("character_name") or "").strip()
-        or (ctx.get("background") or "").strip()
-    )
+    has_mod_context = bool((ctx.get("source_game") or "").strip() or (ctx.get("character_name") or "").strip() or (ctx.get("background") or "").strip())
 
     return RescanSummary(
         mod_id=mod_id,
