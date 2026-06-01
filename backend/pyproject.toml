@@ -1,3 +1,5 @@
 [tool.black]
 line-length = 200
 target-version = ["py312"]
+# Intentionally-unparseable fixture used to test the loader's SyntaxError handling. Black cannot format it.
+extend-exclude = '/_test_syntax_error\.py'
