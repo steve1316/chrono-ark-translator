@@ -6,7 +6,7 @@ vi.mock("../../../../games/total_war_warhammer_3/components/ScriptRunButton", ()
     default: ({ label }: { label: string }) => <button>{label}</button>,
 }))
 
-import PackCard, { formatHoursAgo } from "../../../../games/total_war_warhammer_3/components/PackCard"
+import PackCard, { formatUpdatedAgo } from "../../../../games/total_war_warhammer_3/components/PackCard"
 
 const BASE_PACK = {
     title: "Nanu's Dynamic RoR Compat",
@@ -80,20 +80,28 @@ describe("PackCard", () => {
     })
 })
 
-describe("formatHoursAgo", () => {
+describe("formatUpdatedAgo", () => {
     it("formats a delta of multiple hours as 'Updated Nh ago'", () => {
         const now = 1_750_000_000_000
-        expect(formatHoursAgo(now / 1000 - 5 * 3600, now)).toBe("Updated 5h ago")
-        expect(formatHoursAgo(now / 1000 - 72 * 3600, now)).toBe("Updated 72h ago")
+        expect(formatUpdatedAgo(now / 1000 - 5 * 3600, now)).toBe("Updated 5h ago")
+        expect(formatUpdatedAgo(now / 1000 - 23 * 3600, now)).toBe("Updated 23h ago")
+    })
+
+    it("switches to day format once the delta hits 24 hours", () => {
+        const now = 1_750_000_000_000
+        expect(formatUpdatedAgo(now / 1000 - 24 * 3600, now)).toBe("Updated 1 days ago")
+        expect(formatUpdatedAgo(now / 1000 - Math.round(1.2 * 86400), now)).toBe("Updated 1.2 days ago")
+        expect(formatUpdatedAgo(now / 1000 - 25 * 86400, now)).toBe("Updated 25 days ago")
+        expect(formatUpdatedAgo(now / 1000 - 3021 * 86400, now)).toBe("Updated 3021 days ago")
     })
 
     it("renders sub-hour deltas as 'Updated <1h ago'", () => {
         const now = 1_750_000_000_000
-        expect(formatHoursAgo(now / 1000 - 60, now)).toBe("Updated <1h ago")
+        expect(formatUpdatedAgo(now / 1000 - 60, now)).toBe("Updated <1h ago")
     })
 
     it("clamps negative deltas (clock skew) to '<1h ago'", () => {
         const now = 1_750_000_000_000
-        expect(formatHoursAgo(now / 1000 + 3600, now)).toBe("Updated <1h ago")
+        expect(formatUpdatedAgo(now / 1000 + 3600, now)).toBe("Updated <1h ago")
     })
 })

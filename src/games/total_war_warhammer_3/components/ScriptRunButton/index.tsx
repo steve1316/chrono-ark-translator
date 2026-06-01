@@ -8,6 +8,8 @@ interface Props {
     scriptId: string
     /** Display label. */
     label: string
+    /** Optional inline style overrides applied to the rendered button. */
+    style?: React.CSSProperties
 }
 
 /**
@@ -16,9 +18,10 @@ interface Props {
  *
  * @param scriptId Backend script id to run.
  * @param label Button label shown when idle.
+ * @param style Optional inline style overrides for the button element.
  * @returns A `button` element wired up to start a TW3 script run.
  */
-export default function ScriptRunButton({ scriptId, label }: Props) {
+export default function ScriptRunButton({ scriptId, label, style }: Props) {
     const run = useCurrentRun()
     const navigate = useNavigate()
     const disabled = run.status === "running"
@@ -35,7 +38,7 @@ export default function ScriptRunButton({ scriptId, label }: Props) {
     }
 
     return (
-        <button className="btn btn-primary" disabled={disabled} onClick={handleClick}>
+        <button className="btn btn-primary" disabled={disabled} onClick={handleClick} style={style}>
             {disabled ? "Run in progress..." : label}
         </button>
     )
