@@ -1,4 +1,5 @@
 import type {
+    Glossary,
     TermSuggestion,
     WH3ApiResponseEntry,
     WH3DriftRow,
@@ -195,6 +196,18 @@ export async function deleteSnapshot(workshopId: string, ulid: string): Promise<
  */
 export async function loadGlossary(workshopId: string): Promise<Record<string, { source: string; category: string }>> {
     const res = await api.get(`/translation/mods/${encodeURIComponent(workshopId)}/glossary`)
+    if (!res.ok) throw await registryError(res)
+    return res.json()
+}
+
+/**
+ * Fetch the WH3 base-game terminology glossary.
+ *
+ * @returns The base glossary as `{ terms: Record<string, GlossaryTerm> }`.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function fetchBaseGlossary(): Promise<Glossary> {
+    const res = await api.get("/translation/glossary")
     if (!res.ok) throw await registryError(res)
     return res.json()
 }

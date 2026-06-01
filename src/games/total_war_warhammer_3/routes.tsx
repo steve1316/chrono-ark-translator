@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom"
 import DashboardPage from "./pages/Dashboard"
+import GlossaryPage from "./pages/Glossary"
 import RunnerPage from "./pages/Runner"
 import SupportedModFormPage from "./pages/SupportedModForm"
 import SupportedModsPage from "./pages/SupportedMods"
@@ -21,6 +22,7 @@ export function TotalWarWarhammer3Routes() {
             <Route path="/supported-mods/edit/:packageName" element={<SupportedModFormPage />} />
             <Route path="/translation/:workshopId" element={<TranslationDetailsPage />} />
             <Route path="/validate" element={<ValidatePage />} />
+            <Route path="/glossary" element={<GlossaryPage />} />
             <Route path="/runner" element={<RunnerPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

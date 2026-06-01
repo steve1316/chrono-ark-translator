@@ -6,6 +6,7 @@ import {
     createSnapshot,
     deleteGlossaryTerm,
     deleteSnapshot,
+    fetchBaseGlossary,
     fetchModContext,
     fetchStrings,
     glossaryApplyAll,
@@ -226,5 +227,12 @@ describe("plan3 routes", () => {
         const spy = mockFetchOk({ status: "ok" })
         await openModFolder("123")
         expect(spy).toHaveBeenCalledWith(expect.stringContaining("/translation/mods/123/open-folder"), expect.objectContaining({ method: "POST" }))
+    })
+
+    it("fetchBaseGlossary GETs /glossary", async () => {
+        const spy = mockFetchOk({ terms: { Armour: { english: "Armour", category: "stats", key: "k", source_mappings: { Chinese: "护甲" } } } })
+        const result = await fetchBaseGlossary()
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining(`${PREFIX}/glossary`), undefined)
+        expect(result.terms.Armour.category).toBe("stats")
     })
 })
