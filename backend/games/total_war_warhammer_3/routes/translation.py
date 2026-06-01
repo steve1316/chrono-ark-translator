@@ -202,7 +202,7 @@ def _preview_url_for(mod: WH3TranslationMod) -> str | None:
     return f"/games/total_war_warhammer_3/translation/mods/{mod.workshop_id}/preview"
 
 
-def _has_unsynced_changes(mod_id: str, mod: WH3TranslationMod) -> bool:
+def _has_unsynced_changes(mod_id: str, translation: dict[str, dict[str, LocRow]]) -> bool:
     """Return `True` when translations.json holds entries whose text differs from the user's `.loc.tsv`.
 
     Compares each `translations.json` entry against the current `.loc.tsv` content for the same key.
@@ -211,7 +211,9 @@ def _has_unsynced_changes(mod_id: str, mod: WH3TranslationMod) -> bool:
 
     Args:
         mod_id: Steam Workshop ID of the translation mod.
-        mod: The registered mod.
+        translation: Already-extracted translation map (`source_filename -> {key: LocRow}`). The caller
+            passes the same value returned by `_extract_translation_strings(mod)` to avoid a second
+            filesystem scan on the rescan hot path.
 
     Returns:
         `True` when any translations.json entry text differs from on-disk `.loc.tsv` text. `False` otherwise.
@@ -220,7 +222,7 @@ def _has_unsynced_changes(mod_id: str, mod: WH3TranslationMod) -> bool:
     if not raw:
         return False
     loc_by_key: dict[str, str] = {}
-    for rows in _extract_translation_strings(mod).values():
+    for rows in translation.values():
         for key, row in rows.items():
             loc_by_key[key] = row.text
     for key, entry in raw.items():
@@ -336,7 +338,7 @@ def rescan(mod_id: str) -> RescanSummary:
         mod_id: Steam Workshop ID of the translation mod.
 
     Returns:
-        `RescanSummary` with per-status counts and scan timestamp.
+        `RescanSummary` with per-status counts, scan timestamp, `has_unsynced_changes`, and `has_mod_context`.
 
     Raises:
         HTTPException: 404 if `mod_id` is not registered.
@@ -374,7 +376,7 @@ def rescan(mod_id: str) -> RescanSummary:
         mod_id=mod_id,
         counts=counts,
         scanned_at=datetime.now(timezone.utc).isoformat(),
-        has_unsynced_changes=_has_unsynced_changes(mod_id, mod),
+        has_unsynced_changes=_has_unsynced_changes(mod_id, translation),
         has_mod_context=has_mod_context,
     )
 
