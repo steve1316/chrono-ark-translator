@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import ModContextModal from "../../../../games/total_war_warhammer_3/components/ModContextModal"
 import type { WH3ModContext } from "../../../../shared_types"
 
-const CTX: WH3ModContext = { source_game: "WH3", character_name: "Zerooz", background: "blue fire" }
+const CTX: WH3ModContext = { source_game: "WH3", character_name: "Zerooz", background: "blue fire", source_language_override: null, target_language_override: null }
 
 beforeEach(() => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(CTX), { status: 200 }))

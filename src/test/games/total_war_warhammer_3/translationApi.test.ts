@@ -14,6 +14,7 @@ import {
     listSnapshots,
     listTranslationMods,
     loadGlossary,
+    openModFolder,
     rescanMod,
     restoreSnapshot,
     saveModContext,
@@ -92,10 +93,10 @@ describe("translationApi", () => {
 
     it("saveModContext PUTs /mods/{id}/mod-context with the ctx body", async () => {
         const spy = mockFetchOk({ status: "ok" })
-        await saveModContext("abc", { source_game: "WH3", character_name: "y", background: "z" })
+        await saveModContext("abc", { source_game: "WH3", character_name: "y", background: "z", source_language_override: null, target_language_override: null })
         const [, init] = spy.mock.calls[0] as [string, RequestInit]
         expect(init.method).toBe("PUT")
-        expect(JSON.parse(init.body as string)).toEqual({ source_game: "WH3", character_name: "y", background: "z" })
+        expect(JSON.parse(init.body as string)).toEqual({ source_game: "WH3", character_name: "y", background: "z", source_language_override: null, target_language_override: null })
     })
 
     it("translateBatch POSTs /mods/{id}/translate with keys array", async () => {
@@ -219,5 +220,11 @@ describe("plan3 routes", () => {
         ])
         const result = await listApiResponses("123")
         expect(result[0].kind).toBe("translate-batch")
+    })
+
+    it("openModFolder POSTs to /open-folder", async () => {
+        const spy = mockFetchOk({ status: "ok" })
+        await openModFolder("123")
+        expect(spy).toHaveBeenCalledWith(expect.stringContaining("/translation/mods/123/open-folder"), expect.objectContaining({ method: "POST" }))
     })
 })

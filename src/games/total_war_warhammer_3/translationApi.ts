@@ -290,6 +290,17 @@ export async function listApiResponses(workshopId: string): Promise<WH3ApiRespon
     return res.json()
 }
 
+/**
+ * Open the mod's local source directory in the OS file explorer.
+ *
+ * @param workshopId Steam Workshop ID of the translation mod.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function openModFolder(workshopId: string): Promise<void> {
+    const res = await api.post(`/translation/mods/${encodeURIComponent(workshopId)}/open-folder`)
+    if (!res.ok) throw await registryError(res)
+}
+
 async function registryError(res: Response): Promise<RegistryError> {
     let detail = res.statusText
     try {

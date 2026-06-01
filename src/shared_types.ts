@@ -220,6 +220,8 @@ export interface WH3RescanSummary {
     scanned_at: string
     /** True when translations.json holds entries whose text differs from the user's `.loc.tsv` files. */
     has_unsynced_changes: boolean
+    /** True when any of `source_game / character_name / background` in mod-context is non-empty. */
+    has_mod_context: boolean
 }
 
 /** Body of `GET/PUT /api/games/total_war_warhammer_3/translation/mods/{id}/mod-context`. */
@@ -230,6 +232,10 @@ export interface WH3ModContext {
     character_name: string
     /** Multi-line background / lore that gets injected into the LLM prompt. */
     background: string
+    /** Per-mod override for source language. `null` falls back to the registry default. */
+    source_language_override: string | null
+    /** Per-mod override for target language. `null` falls back to the registry default. */
+    target_language_override: string | null
 }
 
 /** One row in `GET /translation/mods/{id}/glossary` response (also used in POST/PUT bodies). */

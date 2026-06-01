@@ -20,6 +20,7 @@ const SUMMARY: WH3RescanSummary = {
     counts: { translated: 5, untranslated: 3, stale: 1, orphan: 0 },
     scanned_at: "2026-05-25T00:00:00Z",
     has_unsynced_changes: false,
+    has_mod_context: false,
 }
 
 const STRINGS: WH3DriftRow[] = [
@@ -40,7 +41,7 @@ function mockRouteFlow() {
         if (url.endsWith("/rescan")) return mockJson(SUMMARY)
         if (url.includes("/strings?status=")) return mockJson(STRINGS.filter((r) => url.includes(r.status)))
         if (url.endsWith("/strings")) return mockJson(STRINGS)
-        if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "" })
+        if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
         if (url.endsWith("/api-responses")) return mockJson([])
         if (url.endsWith("/snapshots")) return mockJson([])
         if (url.endsWith("/glossary")) return mockJson({})

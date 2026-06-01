@@ -69,6 +69,7 @@ describe("TranslationModCard", () => {
             counts: { translated: 12, untranslated: 5, stale: 3, orphan: 1 },
             scanned_at: "2026-05-24T00:00:00Z",
             has_unsynced_changes: false,
+            has_mod_context: false,
         }
         render(wrap(<TranslationModCard mod={MOD} progress={progress} onRescan={vi.fn()} />))
         // total = translated + untranslated + stale = 20 (orphan excluded).
@@ -102,6 +103,7 @@ describe("TranslationModCard", () => {
             counts: { translated: 5, untranslated: 0, stale: 0, orphan: 0 },
             scanned_at: "2026-05-24T00:00:00Z",
             has_unsynced_changes: true,
+            has_mod_context: false,
         }
         render(wrap(<TranslationModCard mod={MOD} progress={progress} onRescan={vi.fn()} />))
         expect(screen.getByText("Needs Sync")).toBeInTheDocument()
@@ -113,6 +115,7 @@ describe("TranslationModCard", () => {
             counts: { translated: 5, untranslated: 0, stale: 0, orphan: 0 },
             scanned_at: "2026-05-24T00:00:00Z",
             has_unsynced_changes: false,
+            has_mod_context: false,
         }
         render(wrap(<TranslationModCard mod={MOD} progress={progress} onRescan={vi.fn()} />))
         expect(screen.queryByText("Needs Sync")).not.toBeInTheDocument()

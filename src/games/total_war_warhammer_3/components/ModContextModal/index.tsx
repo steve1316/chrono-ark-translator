@@ -19,7 +19,7 @@ interface ModContextModalProps {
  * @returns The rendered modal.
  */
 const ModContextModal: React.FC<ModContextModalProps> = ({ workshopId, onClose }) => {
-    const [ctx, setCtx] = useState<WH3ModContext>({ source_game: "", character_name: "", background: "" })
+    const [ctx, setCtx] = useState<WH3ModContext>({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
     const [loaded, setLoaded] = useState(false)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string>("")
