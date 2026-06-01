@@ -12,7 +12,7 @@ const MOD: WH3TranslationModSummary = {
     local_source_dir: "C:\\nope",
     source_language: "Chinese",
     target_language: "English",
-    preview_image_url: null,
+    preview_image_url: "/games/total_war_warhammer_3/translation/mods/3315737452/preview",
 }
 
 const SUMMARY: WH3RescanSummary = {
@@ -145,5 +145,85 @@ describe("TranslationDetails (Plan 3 layout)", () => {
             const calls = fetchSpy.mock.calls.map((c) => (typeof c[0] === "string" ? c[0] : (c[0] as URL).toString()))
             expect(calls.some((u) => u.includes("/sync"))).toBe(true)
         })
+    })
+
+    it("renders the back-to-dashboard button styled as btn-outline", async () => {
+        render(wrap())
+        const back = await screen.findByRole("button", { name: /Back to Dashboard/i })
+        expect(back).toHaveClass("btn", "btn-outline")
+    })
+
+    it("renders the 80x80 preview image when preview_image_url is set", async () => {
+        render(wrap())
+        const img = await screen.findByAltText(MOD.display_name)
+        expect(img).toHaveAttribute("src", expect.stringContaining(MOD.preview_image_url!))
+    })
+
+    it("renders a Steam icon link pointing at the translation mod's workshop page", async () => {
+        render(wrap())
+        const link = await screen.findByTitle("Open on Steam Workshop")
+        expect(link).toHaveAttribute("href", `https://steamcommunity.com/sharedfiles/filedetails/?id=${MOD.workshop_id}`)
+        expect(link).toHaveAttribute("target", "_blank")
+    })
+
+    it("renders an Open Folder button that POSTs to /open-folder when clicked", async () => {
+        const fetchSpy = mockRouteFlow()
+        render(wrap())
+        const folder = await screen.findByTitle("Open local folder")
+        await act(async () => {
+            fireEvent.click(folder)
+        })
+        await waitFor(() => {
+            const calls = fetchSpy.mock.calls.map((c) => (typeof c[0] === "string" ? c[0] : (c[0] as URL).toString()))
+            expect(calls.some((u) => u.includes("/open-folder"))).toBe(true)
+        })
+    })
+
+    it("renders the Changes pending sync badge when has_unsynced_changes is true", async () => {
+        const spy = vi.spyOn(globalThis, "fetch")
+        spy.mockImplementation(async (input: RequestInfo | URL) => {
+            const url = typeof input === "string" ? input : input.toString()
+            if (url.endsWith("/translation/mods")) return mockJson([MOD])
+            if (url.endsWith("/rescan")) return mockJson({ ...SUMMARY, has_unsynced_changes: true })
+            if (url.endsWith("/strings")) return mockJson(STRINGS)
+            if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
+            return mockJson({ status: "ok" })
+        })
+        render(wrap())
+        await waitFor(() => expect(screen.getByText(/Changes pending sync/i)).toBeInTheDocument())
+    })
+
+    it("renders the Source Language dropdown with the registry default selected", async () => {
+        render(wrap())
+        const select = (await screen.findByLabelText(/Source Language/i)) as HTMLSelectElement
+        expect(select.value).toBe("Chinese")
+    })
+
+    it("PUTs to /mod-context when the Source Language dropdown changes", async () => {
+        const fetchSpy = mockRouteFlow()
+        render(wrap())
+        const select = await screen.findByLabelText(/Source Language/i)
+        await act(async () => {
+            fireEvent.change(select, { target: { value: "Japanese" } })
+        })
+        await waitFor(() => {
+            const putCalls = fetchSpy.mock.calls.filter((c) => (c[1] as RequestInit | undefined)?.method === "PUT")
+            const modContextPut = putCalls.find((c) => (typeof c[0] === "string" ? c[0] : (c[0] as URL).toString()).includes("/mod-context"))
+            expect(modContextPut).toBeDefined()
+            const body = JSON.parse((modContextPut![1] as RequestInit).body as string)
+            expect(body.source_language_override).toBe("Japanese")
+        })
+    })
+
+    it("renders the inline 'X / Y total strings translated' counter", async () => {
+        render(wrap())
+        // SUMMARY has translated=5, stale=1, untranslated=3; done=6, total=9.
+        await waitFor(() => expect(screen.getByText(/6\s*\/\s*9\s*total strings translated/i)).toBeInTheDocument())
+    })
+
+    it("no longer renders the standalone progress-bar glass-card", async () => {
+        const { container } = render(wrap())
+        await screen.findByText(/Back to Dashboard/i)
+        expect(container.querySelector(".translation-progress-bar")).toBeNull()
     })
 })

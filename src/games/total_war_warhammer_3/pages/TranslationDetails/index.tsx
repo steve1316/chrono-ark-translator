@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
+import { FaArrowLeft, FaExclamationCircle, FaFolderOpen, FaSteam } from "react-icons/fa"
 
 import EditableCell from "../../../../components/EditableCell"
-import type { WH3DriftRow, WH3DriftStatus, WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
+import { API_BASE } from "../../../../config"
+import type { WH3DriftRow, WH3DriftStatus, WH3ModContext, WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
 import ApiResponsesModal from "../../components/ApiResponsesModal"
 import HistoryModal from "../../components/HistoryModal"
 import ModContextModal from "../../components/ModContextModal"
 import ModGlossaryModal from "../../components/ModGlossaryModal"
 import ScanForTermsModal from "../../components/ScanForTermsModal"
-import { clearTranslations, fetchStrings, listTranslationMods, rescanMod, saveString, syncChanges, translateBatch } from "../../translationApi"
+import { clearTranslations, fetchModContext, fetchStrings, listTranslationMods, openModFolder, rescanMod, saveModContext, saveString, syncChanges, translateBatch } from "../../translationApi"
 
 const STATUS_FILTERS: Array<WH3DriftStatus | "all"> = ["all", "untranslated", "stale", "translated", "orphan"]
 const BATCH_LIMIT = 50
@@ -34,6 +36,14 @@ const TranslationDetailsPage: React.FC = () => {
     const [statusText, setStatusText] = useState("")
     const [translating, setTranslating] = useState(false)
     const [openModal, setOpenModal] = useState<ModalKey>(null)
+    const navigate = useNavigate()
+    const [modContext, setModContext] = useState<WH3ModContext>({
+        source_game: "",
+        character_name: "",
+        background: "",
+        source_language_override: null,
+        target_language_override: null,
+    })
 
     const skipInitialFilterEffect = useRef(true)
 
@@ -50,10 +60,11 @@ const TranslationDetailsPage: React.FC = () => {
         let cancelled = false
         ;(async () => {
             try {
-                const [allMods, summary] = await Promise.all([listTranslationMods(), rescanMod(workshopId)])
+                const [allMods, summary, ctx] = await Promise.all([listTranslationMods(), rescanMod(workshopId), fetchModContext(workshopId)])
                 if (cancelled) return
                 setMod(allMods.find((m) => m.workshop_id === workshopId) ?? null)
                 setProgress(summary)
+                setModContext(ctx)
                 await loadStrings("all")
             } catch (e) {
                 setStatusText(`Failed to load: ${(e as Error).message}`)
@@ -155,6 +166,40 @@ const TranslationDetailsPage: React.FC = () => {
         setStatusText("Restored from snapshot")
     }, [workshopId, filter, loadStrings])
 
+    const saveSourceLanguage = useCallback(
+        async (value: string) => {
+            const next: WH3ModContext = { ...modContext, source_language_override: value === "" ? null : value }
+            setModContext(next)
+            try {
+                await saveModContext(workshopId, next)
+            } catch (e) {
+                setStatusText(`Language save failed: ${(e as Error).message}`)
+            }
+        },
+        [workshopId, modContext]
+    )
+
+    const saveTargetLanguage = useCallback(
+        async (value: string) => {
+            const next: WH3ModContext = { ...modContext, target_language_override: value === "" ? null : value }
+            setModContext(next)
+            try {
+                await saveModContext(workshopId, next)
+            } catch (e) {
+                setStatusText(`Language save failed: ${(e as Error).message}`)
+            }
+        },
+        [workshopId, modContext]
+    )
+
+    const onOpenFolder = useCallback(async () => {
+        try {
+            await openModFolder(workshopId)
+        } catch (e) {
+            setStatusText(`Open folder failed: ${(e as Error).message}`)
+        }
+    }, [workshopId])
+
     const filteredRows = useMemo(() => {
         if (!search.trim()) return strings
         const needle = search.trim().toLowerCase()
@@ -168,7 +213,6 @@ const TranslationDetailsPage: React.FC = () => {
 
     const total = useMemo(() => (progress ? progress.counts.translated + progress.counts.untranslated + progress.counts.stale : 0), [progress])
     const done = useMemo(() => (progress ? progress.counts.translated + progress.counts.stale : 0), [progress])
-    const percent = total > 0 ? Math.round((done / total) * 100) : 0
 
     if (loading) return <p>Loading...</p>
 
@@ -176,37 +220,110 @@ const TranslationDetailsPage: React.FC = () => {
         <>
             <div className="dashboard-header">
                 <div className="title-group">
-                    <Link to="/dashboard" className="translation-parent-link">
-                        &lt;- Back to Dashboard
-                    </Link>
-                    <h1>{mod?.display_name ?? workshopId}</h1>
-                    <p>
-                        <span className="translation-lang-pill">
-                            {mod?.source_language ?? "?"} -&gt; {mod?.target_language ?? "?"}
-                        </span>{" "}
-                        {mod?.parent_workshop_ids.map((p) => (
-                            <a
-                                key={p}
-                                href={`https://steamcommunity.com/sharedfiles/filedetails/?id=${p}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="translation-parent-link"
-                                style={{ marginRight: "0.5rem" }}
-                            >
-                                Parent {p}
-                            </a>
-                        ))}
-                    </p>
-                </div>
-            </div>
-
-            <div className="glass-card" style={{ padding: "1rem", marginBottom: "1rem" }}>
-                <div className="translation-progress">
-                    <div className="translation-progress-bar" aria-label={`${done} of ${total} strings translated`}>
-                        <div className="translation-progress-fill" style={{ width: `${percent}%` }} />
-                    </div>
-                    <div className="translation-progress-label">
-                        {done} / {total} strings ({percent}%)
+                    <button className="btn btn-outline" onClick={() => navigate("/dashboard")} style={{ marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <FaArrowLeft /> Back to Dashboard
+                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
+                        {mod?.preview_image_url && (
+                            <img
+                                src={`${API_BASE}${mod.preview_image_url}`}
+                                alt={mod.display_name}
+                                style={{
+                                    width: "80px",
+                                    height: "80px",
+                                    borderRadius: "12px",
+                                    objectFit: "cover",
+                                    border: "1px solid var(--glass-border)",
+                                    flexShrink: 0,
+                                }}
+                            />
+                        )}
+                        <div>
+                            <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem" }}>
+                                <h1>{mod?.display_name ?? workshopId}</h1>
+                                <a
+                                    href={`https://steamcommunity.com/sharedfiles/filedetails/?id=${workshopId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Open on Steam Workshop"
+                                    style={{ color: "var(--text-dim)", fontSize: "1.3rem", display: "flex" }}
+                                >
+                                    <FaSteam />
+                                </a>
+                                <button
+                                    type="button"
+                                    onClick={onOpenFolder}
+                                    title="Open local folder"
+                                    style={{
+                                        background: "none",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        color: "var(--text-dim)",
+                                        fontSize: "1.3rem",
+                                        display: "flex",
+                                        padding: 0,
+                                    }}
+                                >
+                                    <FaFolderOpen />
+                                </button>
+                                {progress?.has_unsynced_changes && (
+                                    <span className="wh3-pending-sync-badge">
+                                        <FaExclamationCircle size={12} />
+                                        Changes pending sync
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+                                <label htmlFor="source-lang-select" style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
+                                    Source Language:
+                                </label>
+                                <select
+                                    id="source-lang-select"
+                                    value={modContext.source_language_override ?? mod?.source_language ?? "Chinese"}
+                                    onChange={(e) => saveSourceLanguage(e.target.value)}
+                                    style={{
+                                        padding: "0.3rem 0.5rem",
+                                        borderRadius: "6px",
+                                        background: "rgba(0,0,0,0.2)",
+                                        border: "1px solid var(--glass-border)",
+                                        color: "var(--text-main)",
+                                        fontSize: "0.85rem",
+                                    }}
+                                >
+                                    <option value="Chinese">Chinese</option>
+                                    <option value="Korean">Korean</option>
+                                    <option value="Japanese">Japanese</option>
+                                    <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
+                                    <option value="English">English</option>
+                                </select>
+                                {(modContext.source_language_override ?? mod?.source_language) === "English" && (
+                                    <>
+                                        <span style={{ margin: "0 0.3rem", color: "var(--text-dim)" }}>&rarr;</span>
+                                        <select
+                                            aria-label="Target Language"
+                                            value={modContext.target_language_override ?? mod?.target_language ?? "Chinese"}
+                                            onChange={(e) => saveTargetLanguage(e.target.value)}
+                                            style={{
+                                                padding: "0.3rem 0.5rem",
+                                                borderRadius: "6px",
+                                                background: "rgba(0,0,0,0.2)",
+                                                border: "1px solid var(--glass-border)",
+                                                color: "var(--text-main)",
+                                                fontSize: "0.85rem",
+                                            }}
+                                        >
+                                            <option value="Chinese">Chinese</option>
+                                            <option value="Korean">Korean</option>
+                                            <option value="Japanese">Japanese</option>
+                                            <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
+                                        </select>
+                                    </>
+                                )}
+                            </div>
+                            <p style={{ marginTop: "0.25rem" }}>
+                                {done} / {total} total strings translated
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
