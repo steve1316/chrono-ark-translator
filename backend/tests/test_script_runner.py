@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from backend.games.total_war_warhammer_3 import script_runner as sr
 from backend.games.total_war_warhammer_3.script_runner import (
     SCRIPT_REGISTRY,
     PreflightError,
@@ -12,6 +13,7 @@ from backend.games.total_war_warhammer_3.script_runner import (
     ScriptDef,
     UnknownScriptError,
     _TEST_SCRIPT_REGISTRY,
+    _log,
     _preflight,
     cancel_run,
     current_run,
@@ -21,13 +23,14 @@ from backend.games.total_war_warhammer_3.script_runner import (
 FIXTURES = Path(__file__).parent / "fixtures" / "helper_scripts"
 
 
-def test_script_registry_has_six_entries():
+def test_script_registry_has_expected_entries():
     assert set(SCRIPT_REGISTRY.keys()) == {
         "update_dynamic_rors",
         "update_dynamic_rors_vanilla",
         "update_double_unit_size",
         "update_modified_attribute_mods",
         "process_main_units_tables",
+        "glf_inner_join",
         "update",
     }
 
@@ -81,8 +84,6 @@ def test_preflight_fails_when_steam_drive_unset():
 @pytest.fixture(autouse=True)
 def _reset_runner_state():
     """Clear runner state between tests so they cannot bleed into each other."""
-    from backend.games.total_war_warhammer_3 import script_runner as sr
-
     if sr._proc is not None and sr._proc.poll() is None:
         try:
             sr._proc.terminate()
@@ -109,8 +110,6 @@ def test_start_run_executes_fixture_and_streams_lines():
     assert h is not None
     assert h.exit_code == 0
     # Buffer captured all 5 lines.
-    from backend.games.total_war_warhammer_3.script_runner import _log
-
     lines = [line.line for line in list(_log)]
     assert any("line 0" in l for l in lines)
     assert any("line 4" in l for l in lines)

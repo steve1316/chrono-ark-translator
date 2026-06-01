@@ -117,19 +117,19 @@ const TranslationDetailsPage: React.FC = () => {
         setColumnWidths((prev) => ({ ...prev, [st.field]: next }))
     }, [])
 
-    const onResizeEnd = useCallback(
-        (e: React.PointerEvent<HTMLDivElement>) => {
-            if (!resizeStateRef.current) return
-            ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-            resizeStateRef.current = null
+    const onResizeEnd = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        if (!resizeStateRef.current) return
+        ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+        resizeStateRef.current = null
+        setColumnWidths((current) => {
             try {
-                window.localStorage.setItem(COLUMN_WIDTH_KEY, JSON.stringify(columnWidths))
+                window.localStorage.setItem(COLUMN_WIDTH_KEY, JSON.stringify(current))
             } catch {
                 /* ignore quota errors */
             }
-        },
-        [columnWidths]
-    )
+            return current
+        })
+    }, [])
 
     const skipInitialFilterEffect = useRef(true)
 
@@ -250,6 +250,8 @@ const TranslationDetailsPage: React.FC = () => {
             const result = await syncChanges(workshopId)
             const fileCount = Object.keys(result.per_file).length
             const keyCount = Object.values(result.per_file).reduce((a, b) => a + b, 0)
+            const summary = await rescanMod(workshopId)
+            setProgress(summary)
             setStatusText(`Synced ${keyCount} keys across ${fileCount} files`)
         } catch (e) {
             setStatusText(`Sync failed: ${(e as Error).message}`)

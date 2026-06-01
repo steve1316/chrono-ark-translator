@@ -7,8 +7,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from backend.games.total_war_warhammer_3.api_responses_store import append, list_entries
 from backend.games.total_war_warhammer_3.loc_extractor import LocRow
 from backend.games.total_war_warhammer_3.routes import translation as routes_module
+from backend.games.total_war_warhammer_3.snapshot_store import list_snapshots
+from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
 
 
 @pytest.fixture
@@ -19,8 +22,6 @@ def client(monkeypatch, tmp_path: Path) -> TestClient:
     points at the user's hand-edited mod folder on the host machine - we MUST not touch that. Override `get_translation_mod` to return a synthetic mod
     whose `local_source_dir` lives under tmp_path.
     """
-    from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
-
     monkeypatch.setattr("backend.config.STORAGE_PATH", tmp_path, raising=True)
 
     fake_source = tmp_path / "translation_mod_source"
@@ -67,8 +68,6 @@ def test_clear_translations_wipes_text_and_auto_snapshots(client: TestClient, mo
     assert body["cleared"] == 1
     raw = json.loads((mod_dir / "translations.json").read_text(encoding="utf-8"))
     assert raw == {}
-    from backend.games.total_war_warhammer_3.snapshot_store import list_snapshots
-
     snaps = list_snapshots(mod_id)
     assert len(snaps) == 1
     assert "clear" in snaps[0]["label"].lower()
@@ -84,10 +83,12 @@ def test_sync_writes_loc_tsv_and_returns_per_file_counts(client: TestClient, mon
     mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
     mod_dir.mkdir(parents=True, exist_ok=True)
     (mod_dir / "translations.json").write_text(
-        json.dumps({
-            "k1": {"text": "Hello", "provider": "manual"},
-            "k2": {"text": "World", "provider": "claude"},
-        }),
+        json.dumps(
+            {
+                "k1": {"text": "Hello", "provider": "manual"},
+                "k2": {"text": "World", "provider": "claude"},
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -95,8 +96,6 @@ def test_sync_writes_loc_tsv_and_returns_per_file_counts(client: TestClient, mon
     assert resp.status_code == 200
     body = resp.json()
     assert "per_file" in body
-    from backend.games.total_war_warhammer_3.snapshot_store import list_snapshots
-
     snaps = list_snapshots(mod_id)
     assert any("pre-sync" in s["label"].lower() for s in snaps)
 
@@ -200,8 +199,6 @@ def test_glossary_suggest_edits_logs_to_api_responses(client: TestClient, monkey
     assert resp.status_code == 200
     body = resp.json()
     assert isinstance(body, list)
-    from backend.games.total_war_warhammer_3.api_responses_store import list_entries
-
     entries = list_entries(mod_id)
     assert any(e["kind"] == "suggest-edits" for e in entries)
 
@@ -225,8 +222,6 @@ def test_scan_terms_returns_suggestions_and_logs(client: TestClient, monkeypatch
     assert isinstance(suggestions, list)
     assert len(suggestions) >= 1
 
-    from backend.games.total_war_warhammer_3.api_responses_store import list_entries
-
     entries = list_entries(mod_id)
     assert any(e["kind"] == "scan-terms" for e in entries)
 
@@ -238,19 +233,20 @@ def test_scan_terms_returns_suggestions_and_logs(client: TestClient, monkeypatch
 
 def test_get_api_responses_returns_logged_entries(client: TestClient):
     mod_id = "3315737452"
-    from backend.games.total_war_warhammer_3.api_responses_store import append
-
-    append(mod_id, {
-        "timestamp": "2026-05-25T00:00:00Z",
-        "kind": "translate-batch",
-        "provider": "claude",
-        "model": "claude",
-        "input_tokens": None,
-        "output_tokens": None,
-        "cost_usd": None,
-        "keys_or_inputs": ["k1"],
-        "raw_response": "{}",
-    })
+    append(
+        mod_id,
+        {
+            "timestamp": "2026-05-25T00:00:00Z",
+            "kind": "translate-batch",
+            "provider": "claude",
+            "model": "claude",
+            "input_tokens": None,
+            "output_tokens": None,
+            "cost_usd": None,
+            "keys_or_inputs": ["k1"],
+            "raw_response": "{}",
+        },
+    )
 
     resp = client.get(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/api-responses")
     assert resp.status_code == 200

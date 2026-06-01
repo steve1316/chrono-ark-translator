@@ -1,5 +1,6 @@
 """Tests for the WH3 per-mod glossary store wrappers."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -43,25 +44,23 @@ def test_delete_term_removes_entry(monkeypatch, tmp_path: Path):
 
 
 def test_apply_term_rename_replaces_with_word_boundary(monkeypatch, tmp_path: Path):
-    import json
-
     _patch_root(monkeypatch, tmp_path)
     # Seed translations with two rows.
     mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / "abc"
     mod_dir.mkdir(parents=True, exist_ok=True)
     (mod_dir / "translations.json").write_text(
-        json.dumps({
-            "k1": {"text": "the Cathay Phoenix guards", "provider": "manual"},
-            "k2": {"text": "Cathay Phoenix-Lord", "provider": "manual"},
-            "k3": {"text": "Cathayan Phoenix", "provider": "manual"},  # already renamed
-            "k4": {"text": "MetaCathay Phoenix", "provider": "manual"},  # adjacent letters - should NOT replace
-        }),
+        json.dumps(
+            {
+                "k1": {"text": "the Cathay Phoenix guards", "provider": "manual"},
+                "k2": {"text": "Cathay Phoenix-Lord", "provider": "manual"},
+                "k3": {"text": "Cathayan Phoenix", "provider": "manual"},  # already renamed
+                "k4": {"text": "MetaCathay Phoenix", "provider": "manual"},  # adjacent letters - should NOT replace
+            }
+        ),
         encoding="utf-8",
     )
     count = apply_term_rename("abc", "Cathay Phoenix", "Cathayan Phoenix")
-    import json as _json
-
-    raw = _json.loads((mod_dir / "translations.json").read_text(encoding="utf-8"))
+    raw = json.loads((mod_dir / "translations.json").read_text(encoding="utf-8"))
     assert "Cathayan Phoenix guards" in raw["k1"]["text"]
     assert "Cathayan Phoenix-Lord" in raw["k2"]["text"]
     assert raw["k3"]["text"] == "Cathayan Phoenix"  # idempotent on already-renamed
