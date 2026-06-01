@@ -740,8 +740,8 @@ const SettingsPage: React.FC = () => {
                     <select
                         value={promptSourceLang}
                         onChange={(e) => setPromptSourceLang(e.target.value)}
-                        className="btn-outline"
-                        style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)" }}
+                        className="btn-outline app-select"
+                        style={{ padding: "0.4rem 2.25rem 0.4rem 0.75rem", borderRadius: "6px", backgroundColor: "rgba(0,0,0,0.2)" }}
                     >
                         <option value="Chinese">Chinese</option>
                         <option value="Korean">Korean</option>
@@ -807,10 +807,11 @@ const SettingsPage: React.FC = () => {
                     <select
                         value={provider === "claude" ? claudeModel : openaiModel}
                         onChange={(e) => (provider === "claude" ? setClaudeModel(e.target.value) : setOpenaiModel(e.target.value))}
+                        className="app-select"
                         style={{
                             width: "100%",
-                            padding: "0.75rem 1rem",
-                            background: "rgba(255, 255, 255, 0.05)",
+                            padding: "0.75rem 2.5rem 0.75rem 1rem",
+                            backgroundColor: "rgba(255, 255, 255, 0.05)",
                             border: "1px solid rgba(255, 255, 255, 0.1)",
                             borderRadius: "8px",
                             color: "var(--text-main)",
@@ -1027,6 +1028,7 @@ const SettingsPage: React.FC = () => {
                                         return overrideModels.length > 0 ? (
                                             <select
                                                 value={isModelOverride ? ollamaModel : ""}
+                                                className="app-select"
                                                 onChange={(e) => {
                                                     const val = e.target.value
                                                     if (val === "") {
@@ -1038,10 +1040,10 @@ const SettingsPage: React.FC = () => {
                                                     }
                                                 }}
                                                 style={{
-                                                    padding: "0.6rem 0.75rem",
+                                                    padding: "0.6rem 2.25rem 0.6rem 0.75rem",
                                                     borderRadius: "8px",
                                                     border: "1px solid var(--glass-border)",
-                                                    background: "rgba(0, 0, 0, 0.2)",
+                                                    backgroundColor: "rgba(0, 0, 0, 0.2)",
                                                     color: "var(--text-main)",
                                                     fontSize: "0.85rem",
                                                     width: "340px",
