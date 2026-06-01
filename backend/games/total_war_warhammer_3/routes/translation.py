@@ -207,9 +207,9 @@ def _preview_url_for(mod: WH3TranslationMod) -> str | None:
 def _has_unsynced_changes(mod_id: str, translation: dict[str, dict[str, LocRow]]) -> bool:
     """Return `True` when translations.json holds entries whose text differs from the user's `.loc.tsv`.
 
-    Compares each `translations.json` entry against the current `.loc.tsv` content for the same key.
-    A key present in `translations.json` with text that does not match (or has no matching `.loc.tsv`
-    row) counts as unsynced. Mirrors Chrono Ark's `has_changes` semantics.
+    Compares each `translations.json` entry against the current `.loc.tsv` content for the same key. A key present in `translations.json` with text
+    that does not match (or has no matching `.loc.tsv` row) counts as unsynced. An empty-string override against non-empty `.loc.tsv` text is a pending
+    clear and counts too. Mirrors Chrono Ark's `has_changes` semantics.
 
     Args:
         mod_id: Steam Workshop ID of the translation mod.
@@ -228,12 +228,11 @@ def _has_unsynced_changes(mod_id: str, translation: dict[str, dict[str, LocRow]]
         for key, row in rows.items():
             loc_by_key[key] = row.text
     for key, entry in raw.items():
-        if not isinstance(entry, dict):
+        if not isinstance(entry, dict) or "text" not in entry:
             continue
-        text = entry.get("text")
-        if not text:
-            continue
-        if loc_by_key.get(key) != text:
+        text = entry["text"] or ""
+        # An empty override that differs from non-empty .loc.tsv text is a pending clear, so it still counts as unsynced.
+        if (loc_by_key.get(key) or "") != text:
             return True
     return False
 
@@ -385,6 +384,7 @@ def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stal
 
     Overlays `translations.json` onto the drift rows so any in-flight edits (user PUTs, Claude batches) reflect immediately - their `translation_text`
     and `provider` come from translations.json when present, otherwise from the user's `.loc.tsv` content with `provider` defaulting to `"manual"`.
+    An empty-string override is treated as an explicit clear: the row shows empty text and `untranslated` status rather than the `.loc.tsv` content.
 
     Args:
         mod_id: Steam Workshop ID of the translation mod.
@@ -408,7 +408,8 @@ def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stal
     overlaid: list[DriftRow] = []
     for row in drift:
         entry = raw_translations.get(row.key)
-        if entry and entry.get("text"):
+        has_override = isinstance(entry, dict) and "text" in entry
+        if has_override and entry["text"]:
             override_text = entry["text"]
             override_provider = entry.get("provider") or "manual"
             # If the row was untranslated on the file system but translations.json has it, promote it to translated per the parent hash.
@@ -424,6 +425,19 @@ def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stal
                     translation_text=override_text,
                     status=new_status,
                     provider=override_provider,
+                )
+            )
+        elif has_override:
+            # Empty-string override = explicitly cleared. Show empty and mark untranslated so the .loc.tsv content does not show through.
+            cleared_status = "untranslated" if row.parent_text is not None else row.status
+            overlaid.append(
+                DriftRow(
+                    source_filename=row.source_filename,
+                    key=row.key,
+                    parent_text=row.parent_text,
+                    translation_text="",
+                    status=cleared_status,
+                    provider=None,
                 )
             )
         else:
@@ -639,20 +653,46 @@ class GlossaryApplyAllRequest(BaseModel):
 
 @router.post("/mods/{mod_id}/clear-translations")
 def clear_translations(mod_id: str) -> dict:
-    """Wipe all translation_text values for a mod. Takes a pre-clear auto-snapshot.
+    """Clear all English by writing empty-string overrides for every key that currently has text. Takes a pre-clear auto-snapshot.
+
+    The empty overrides mask the user's `.loc.tsv` content so cleared rows show as untranslated. The `.loc.tsv` files are not touched here - the blanks
+    are persisted to disk on the next Sync, mirroring how AI/manual translations land in translations.json first and sync later.
 
     Args:
         mod_id: Steam Workshop ID of the WH3 translation mod.
 
     Returns:
-        `{"cleared": N}` - number of rows that had text cleared.
+        `{"cleared": N}` - number of keys that had English and were overridden with an empty string.
     """
     mod = _require_mod(mod_id)
     snapshot_store.create_snapshot(mod_id, label="pre-clear-translations", kind="auto", local_source_dir=mod.local_source_dir)
+
     raw = store.load_translations_raw(mod_id)
-    count = sum(1 for entry in raw.values() if isinstance(entry, dict) and entry.get("text"))
-    store.save_translations_raw(mod_id, {})
-    return {"cleared": count}
+    translation = _extract_translation_strings(mod)
+
+    # Collect every key that currently shows English, from translations.json or the user's .loc.tsv files.
+    keys_with_english: set[str] = set()
+    for key, entry in raw.items():
+        if isinstance(entry, dict) and entry.get("text"):
+            keys_with_english.add(key)
+    for rows in translation.values():
+        for key, row in rows.items():
+            if row.text:
+                keys_with_english.add(key)
+
+    # Write empty-string overrides so the cleared state masks the .loc.tsv content and shows as untranslated until synced.
+    now = datetime.now(timezone.utc).isoformat()
+    cleared: dict[str, dict] = {}
+    for key in keys_with_english:
+        existing = raw.get(key) if isinstance(raw.get(key), dict) else {}
+        cleared[key] = {
+            "text": "",
+            "created_at": existing.get("created_at") or now,
+            "updated_at": now,
+            "provider": existing.get("provider") or "manual",
+        }
+    store.save_translations_raw(mod_id, cleared)
+    return {"cleared": len(cleared)}
 
 
 @router.post("/mods/{mod_id}/sync")

@@ -67,10 +67,46 @@ def test_clear_translations_wipes_text_and_auto_snapshots(client: TestClient, mo
     body = resp.json()
     assert body["cleared"] == 1
     raw = json.loads((mod_dir / "translations.json").read_text(encoding="utf-8"))
-    assert raw == {}
+    # Clearing writes empty-string overrides (not an empty dict) so the .loc.tsv English is masked, not shown through.
+    assert set(raw.keys()) == {"k1"}
+    assert raw["k1"]["text"] == ""
     snaps = list_snapshots(mod_id)
     assert len(snaps) == 1
     assert "clear" in snaps[0]["label"].lower()
+
+
+def test_clear_translations_blanks_english_in_strings_view(client: TestClient, tmp_path: Path):
+    """After clearing, the strings view shows empty English for a key whose text lives in the user's .loc.tsv."""
+    mod_id = "3315737452"
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    (mod_dir / "translations.json").write_text(
+        json.dumps({"k1": {"text": "Hello", "provider": "manual"}}),
+        encoding="utf-8",
+    )
+
+    client.post(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/clear-translations")
+
+    rows = client.get(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/strings").json()
+    k1 = next(r for r in rows if r["key"] == "k1")
+    assert k1["translation_text"] == ""
+    assert k1["status"] == "untranslated"
+
+
+def test_clear_translations_marks_unsynced_so_sync_is_offered(client: TestClient, tmp_path: Path):
+    """The empty overrides differ from the still-populated .loc.tsv, so a Sync remains pending."""
+    mod_id = "3315737452"
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    (mod_dir / "translations.json").write_text(
+        json.dumps({"k1": {"text": "Hello", "provider": "manual"}}),
+        encoding="utf-8",
+    )
+
+    client.post(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/clear-translations")
+
+    summary = client.post(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/rescan").json()
+    assert summary["has_unsynced_changes"] is True
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////
