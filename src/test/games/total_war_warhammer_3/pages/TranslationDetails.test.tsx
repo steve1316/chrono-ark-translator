@@ -76,11 +76,11 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         expect(screen.getByRole("button", { name: /History/i })).toBeInTheDocument()
     })
 
-    it("renders the action row buttons including Translate count", async () => {
+    it("renders the action row buttons including Translate provider label", async () => {
         render(wrap())
         await waitFor(() => screen.getByRole("button", { name: /Reset/i }))
         expect(screen.getByRole("button", { name: /Clear English/i })).toBeInTheDocument()
-        expect(screen.getByRole("button", { name: /Translate \(3\)/ })).toBeInTheDocument()
+        expect(screen.getByRole("button", { name: /^Translate \(Claude\)/i })).toBeInTheDocument()
         expect(screen.getByRole("button", { name: /Sync Changes/i })).toBeInTheDocument()
     })
 
@@ -225,5 +225,72 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         const { container } = render(wrap())
         await screen.findByText(/Back to Dashboard/i)
         expect(container.querySelector(".translation-progress-bar")).toBeNull()
+    })
+
+    it("renders the action row split into three .mod-actions-group blocks", async () => {
+        const { container } = render(wrap())
+        await screen.findByRole("button", { name: /Back to Dashboard/i })
+        const groups = container.querySelectorAll(".mod-actions .mod-actions-group")
+        expect(groups.length).toBe(3)
+    })
+
+    it("shows the glossary count on the Mod Glossary button", async () => {
+        const spy = vi.spyOn(globalThis, "fetch")
+        spy.mockImplementation(async (input: RequestInfo | URL) => {
+            const url = typeof input === "string" ? input : input.toString()
+            if (url.endsWith("/translation/mods")) return mockJson([MOD])
+            if (url.endsWith("/rescan")) return mockJson(SUMMARY)
+            if (url.endsWith("/strings")) return mockJson(STRINGS)
+            if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
+            if (url.endsWith("/glossary")) return mockJson({ Phoenix: { source: "x", category: "factions" }, Sky: { source: "y", category: "lore" } })
+            return mockJson({ status: "ok" })
+        })
+        render(wrap())
+        await waitFor(() => expect(screen.getByRole("button", { name: /Mod Glossary \(2\)/i })).toBeInTheDocument())
+    })
+
+    it("shows a green-dot indicator on Mod Context when has_mod_context is true", async () => {
+        const spy = vi.spyOn(globalThis, "fetch")
+        spy.mockImplementation(async (input: RequestInfo | URL) => {
+            const url = typeof input === "string" ? input : input.toString()
+            if (url.endsWith("/translation/mods")) return mockJson([MOD])
+            if (url.endsWith("/rescan")) return mockJson({ ...SUMMARY, has_mod_context: true })
+            if (url.endsWith("/strings")) return mockJson(STRINGS)
+            if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "Zerooz", background: "", source_language_override: null, target_language_override: null })
+            return mockJson({ status: "ok" })
+        })
+        const { container } = render(wrap())
+        await waitFor(() => expect(container.querySelector(".wh3-mod-context-dot")).not.toBeNull())
+    })
+
+    it("renders the Translate button as a split-dropdown with provider label", async () => {
+        render(wrap())
+        const main = await screen.findByRole("button", { name: /^Translate \(Claude\)/i })
+        expect(main).toBeInTheDocument()
+        // Chevron sibling exists.
+        const chevron = screen.getByRole("button", { name: /Translate provider menu/i })
+        expect(chevron).toBeInTheDocument()
+    })
+
+    it("opens the provider dropdown when the chevron is clicked", async () => {
+        render(wrap())
+        await screen.findByRole("button", { name: /^Translate \(Claude\)/i })
+        const chevron = screen.getByRole("button", { name: /Translate provider menu/i })
+        fireEvent.click(chevron)
+        await waitFor(() => expect(screen.getByRole("menuitem", { name: /Claude/i })).toBeInTheDocument())
+    })
+
+    it("renders 'Re-sync Changes' label when has_unsynced_changes is true", async () => {
+        const spy = vi.spyOn(globalThis, "fetch")
+        spy.mockImplementation(async (input: RequestInfo | URL) => {
+            const url = typeof input === "string" ? input : input.toString()
+            if (url.endsWith("/translation/mods")) return mockJson([MOD])
+            if (url.endsWith("/rescan")) return mockJson({ ...SUMMARY, has_unsynced_changes: true })
+            if (url.endsWith("/strings")) return mockJson(STRINGS)
+            if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
+            return mockJson({ status: "ok" })
+        })
+        render(wrap())
+        await waitFor(() => expect(screen.getByRole("button", { name: /Re-sync Changes/i })).toBeInTheDocument())
     })
 })

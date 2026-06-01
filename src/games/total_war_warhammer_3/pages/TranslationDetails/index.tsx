@@ -10,7 +10,19 @@ import HistoryModal from "../../components/HistoryModal"
 import ModContextModal from "../../components/ModContextModal"
 import ModGlossaryModal from "../../components/ModGlossaryModal"
 import ScanForTermsModal from "../../components/ScanForTermsModal"
-import { clearTranslations, fetchModContext, fetchStrings, listTranslationMods, openModFolder, rescanMod, saveModContext, saveString, syncChanges, translateBatch } from "../../translationApi"
+import {
+    clearTranslations,
+    fetchModContext,
+    fetchStrings,
+    listTranslationMods,
+    loadGlossary,
+    openModFolder,
+    rescanMod,
+    saveModContext,
+    saveString,
+    syncChanges,
+    translateBatch,
+} from "../../translationApi"
 
 const STATUS_FILTERS: Array<WH3DriftStatus | "all"> = ["all", "untranslated", "stale", "translated", "orphan"]
 const BATCH_LIMIT = 50
@@ -44,6 +56,9 @@ const TranslationDetailsPage: React.FC = () => {
         source_language_override: null,
         target_language_override: null,
     })
+    const [glossaryCount, setGlossaryCount] = useState<number>(0)
+    const [activeProvider, setActiveProvider] = useState<string>("claude")
+    const [showTranslateDropdown, setShowTranslateDropdown] = useState<boolean>(false)
 
     const skipInitialFilterEffect = useRef(true)
 
@@ -76,6 +91,21 @@ const TranslationDetailsPage: React.FC = () => {
             cancelled = true
         }
     }, [workshopId, loadStrings])
+
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            try {
+                const dict = await loadGlossary(workshopId)
+                if (!cancelled) setGlossaryCount(Object.keys(dict).length)
+            } catch {
+                /* leave at 0 */
+            }
+        })()
+        return () => {
+            cancelled = true
+        }
+    }, [workshopId, openModal])
 
     useEffect(() => {
         if (skipInitialFilterEffect.current) {
@@ -328,37 +358,94 @@ const TranslationDetailsPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="wh3-toolbar">
-                <button type="button" className="btn btn-outline" onClick={() => setOpenModal("glossary")}>
-                    Mod Glossary
-                </button>
-                <button type="button" className="btn btn-outline" onClick={() => setOpenModal("scan")}>
-                    Scan for Terms
-                </button>
-                <button type="button" className="btn btn-outline" onClick={() => setOpenModal("responses")}>
-                    API Responses
-                </button>
-                <button type="button" className="btn btn-outline" onClick={() => setOpenModal("context")}>
-                    Mod Context
-                </button>
-                <button type="button" className="btn btn-outline" onClick={() => setOpenModal("history")}>
-                    History
-                </button>
-            </div>
+            <div className="mod-actions">
+                <div className="mod-actions-group">
+                    <button type="button" className="btn btn-outline" onClick={() => setOpenModal("glossary")}>
+                        Mod Glossary ({glossaryCount})
+                    </button>
+                    <button type="button" className="btn btn-outline" onClick={() => setOpenModal("scan")}>
+                        Scan for Terms
+                    </button>
+                    <button type="button" className="btn btn-outline" onClick={() => setOpenModal("responses")}>
+                        API Responses
+                    </button>
+                    <button type="button" className="btn btn-outline" onClick={() => setOpenModal("context")} style={{ position: "relative" }}>
+                        Mod Context
+                        {progress?.has_mod_context && <span className="wh3-mod-context-dot" />}
+                    </button>
+                </div>
 
-            <div className="wh3-action-row">
-                <button type="button" className="btn btn-outline" onClick={() => setOpenModal("reset")}>
-                    Reset
-                </button>
-                <button type="button" className="btn btn-warning" onClick={onClearEnglish}>
-                    Clear English
-                </button>
-                <button type="button" className="btn btn-primary" onClick={runTranslateBatch} disabled={translating || translateCount === 0}>
-                    Translate ({translateCount})
-                </button>
-                <button type="button" className="btn btn-primary" onClick={onSyncChanges}>
-                    Sync Changes
-                </button>
+                <div className="mod-actions-group">
+                    <button type="button" className="btn btn-outline" onClick={() => setOpenModal("history")}>
+                        History
+                    </button>
+                    <button type="button" className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={() => setOpenModal("reset")}>
+                        Reset
+                    </button>
+                    <button type="button" className="btn btn-outline" style={{ color: "#ffaa44", borderColor: "rgba(255, 170, 68, 0.3)" }} onClick={onClearEnglish}>
+                        Clear English
+                    </button>
+                </div>
+
+                <div className="mod-actions-group">
+                    <div style={{ position: "relative", display: "inline-flex" }}>
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={runTranslateBatch}
+                            disabled={translating || translateCount === 0}
+                            style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+                        >
+                            Translate ({activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            aria-label="Translate provider menu"
+                            onClick={() => setShowTranslateDropdown((v) => !v)}
+                            disabled={translating}
+                            style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeft: "1px solid rgba(255,255,255,0.2)", padding: "0.5rem 0.4rem" }}
+                        >
+                            &#9662;
+                        </button>
+                        {showTranslateDropdown && (
+                            <div
+                                role="menu"
+                                style={{
+                                    position: "absolute",
+                                    top: "100%",
+                                    right: 0,
+                                    marginTop: "0.25rem",
+                                    background: "var(--bg-color)",
+                                    border: "1px solid var(--glass-border)",
+                                    borderRadius: "6px",
+                                    padding: "0.25rem",
+                                    zIndex: 20,
+                                    minWidth: "120px",
+                                }}
+                            >
+                                {["claude"].map((p) => (
+                                    <button
+                                        key={p}
+                                        type="button"
+                                        role="menuitem"
+                                        className="btn btn-outline"
+                                        onClick={() => {
+                                            setActiveProvider(p)
+                                            setShowTranslateDropdown(false)
+                                        }}
+                                        style={{ width: "100%", justifyContent: "flex-start" }}
+                                    >
+                                        {p.charAt(0).toUpperCase() + p.slice(1)}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <button type="button" className="btn btn-primary" onClick={onSyncChanges}>
+                        {progress?.has_unsynced_changes ? "Re-sync Changes" : "Sync Changes"}
+                    </button>
+                </div>
             </div>
 
             <input type="text" className="wh3-search" placeholder="search keys or text..." value={search} onChange={(e) => setSearch(e.target.value)} />
