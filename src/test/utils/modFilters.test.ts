@@ -11,6 +11,8 @@ function makeMod(overrides: Partial<ModStatus> = {}): ModStatus {
         total: 10,
         translated: 5,
         untranslated: 5,
+        user_translated: 5,
+        untouched: 0,
         percentage: 50,
         last_updated: "",
         has_changes: false,

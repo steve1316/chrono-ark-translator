@@ -295,7 +295,7 @@ describe("TranslationDetails (Plan 3 layout)", () => {
     })
 
     it("wraps the search input and filter pills in a single glass-card", async () => {
-        const { container } = render(wrap())
+        render(wrap())
         await screen.findByRole("button", { name: /Back to Dashboard/i })
         const searchInput = screen.getByPlaceholderText(/search keys or text/i)
         const allFilterPill = screen.getByRole("button", { name: /^All$/i })
