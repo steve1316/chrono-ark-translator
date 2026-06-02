@@ -187,7 +187,7 @@ export function useIterativeTranslation(
                 })
             }
         },
-        [modId, handleBatchResult],
+        [gameId, modId, handleBatchResult],
     )
 
     const translateBatch = useCallback(
@@ -241,7 +241,7 @@ export function useIterativeTranslation(
                 })
             }
         },
-        [modId, translateBatchStreaming, handleBatchResult],
+        [gameId, modId, translateBatchStreaming, handleBatchResult],
     )
 
     // Keep ref in sync so handleBatchResult can call translateBatch for auto-advance.
@@ -280,7 +280,7 @@ export function useIterativeTranslation(
         gameApi(gameId).post(`/translate/cancel?mod_id=${encodeURIComponent(modId)}`).catch(() => {})
         stopProviderIfNeeded()
         setState({ phase: "idle" })
-    }, [modId, stopProviderIfNeeded])
+    }, [gameId, modId, stopProviderIfNeeded])
 
     return {
         state,
