@@ -22,6 +22,7 @@ from fastapi import HTTPException
 
 from backend import config
 from backend.translation.game_storage import GameStorage
+from backend.translation.orchestrator import fill_duplicate_translations
 from backend.games.registry import get_adapter
 from backend.games.base import GameAdapter
 from backend.data.mod_settings import load_source_language_override, load_target_language_override
@@ -131,16 +132,7 @@ def _fill_duplicate_translations(
             Modified in-place to include any missing duplicate keys.
         entries: Original (key, source_text) tuples sent to the provider.
     """
-    source_to_translation: dict[str, str] = {}
-    for key, source_text in entries:
-        if key in translations:
-            source_to_translation[source_text] = translations[key]
-
-    for key, source_text in entries:
-        if key not in translations and source_text in source_to_translation:
-            translations[key] = source_to_translation[source_text]
-
-    return translations
+    return fill_duplicate_translations(translations, entries)
 
 
 def _filter_suggestions(
