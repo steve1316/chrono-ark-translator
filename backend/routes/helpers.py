@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 from fastapi import HTTPException
 
 from backend import config
+from backend.translation.game_storage import GameStorage
 from backend.games.registry import get_adapter
 from backend.games.base import GameAdapter
 from backend.data.mod_settings import load_source_language_override, load_target_language_override
@@ -236,7 +237,7 @@ def _merge_gdata_originals(
     """
     from backend.games.chrono_ark import gdata_extractor
 
-    backup_dir = config.STORAGE_PATH / "mods" / mod_id / "original_gdata"
+    backup_dir = GameStorage("chrono_ark").mod_dir(mod_id) / "original_gdata"
     if not backup_dir.exists():
         return
 
@@ -360,7 +361,7 @@ def _load_last_export_hash(mod_id: str) -> str:
         The hex-digest hash string, or an empty string if no export has
         been recorded yet.
     """
-    path = config.STORAGE_PATH / "mods" / mod_id / "last_export.json"
+    path = GameStorage("chrono_ark").mod_file(mod_id, "last_export.json")
     if not path.exists():
         return ""
     try:
@@ -377,7 +378,7 @@ def _save_last_export_hash(mod_id: str, snapshot_hash: str) -> None:
         mod_id: The workshop identifier of the mod.
         snapshot_hash: The hex-digest hash string to persist.
     """
-    path = config.STORAGE_PATH / "mods" / mod_id / "last_export.json"
+    path = GameStorage("chrono_ark").mod_file(mod_id, "last_export.json")
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump({"hash": snapshot_hash}, f)

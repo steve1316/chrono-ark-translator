@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from backend import config
+from backend.translation.game_storage import GameStorage
 from backend.data.character_context import load_character_context
 from backend.data.glossary_manager import (
     get_combined_glossary_prompt,
@@ -462,7 +463,7 @@ async def translate_mod(req: TranslationRequest):
     raw_responses = getattr(provider, "last_raw_responses", [])
     if raw_responses:
         _stamp_raw_responses(raw_responses)
-        responses_path = config.STORAGE_PATH / "mods" / req.mod_id / "last_api_responses.json"
+        responses_path = GameStorage("chrono_ark").mod_file(req.mod_id, "last_api_responses.json")
         responses_path.parent.mkdir(parents=True, exist_ok=True)
         with open(responses_path, "w", encoding="utf-8") as f:
             json.dump(raw_responses, f, indent=2, ensure_ascii=False)
@@ -613,7 +614,7 @@ async def translate_batch(req: BatchTranslationRequest):
     raw_responses = getattr(provider, "last_raw_responses", [])
     if raw_responses:
         _stamp_raw_responses(raw_responses)
-        responses_path = config.STORAGE_PATH / "mods" / req.mod_id / "last_api_responses.json"
+        responses_path = GameStorage("chrono_ark").mod_file(req.mod_id, "last_api_responses.json")
         responses_path.parent.mkdir(parents=True, exist_ok=True)
         existing_responses = []
         if not req.is_first_batch and responses_path.exists():
@@ -630,7 +631,7 @@ async def translate_batch(req: BatchTranslationRequest):
     save_translations_bulk(req.mod_id, translations)
 
     # Track which provider translated each key.
-    providers_path = config.STORAGE_PATH / "mods" / req.mod_id / "translation_providers.json"
+    providers_path = GameStorage("chrono_ark").mod_file(req.mod_id, "translation_providers.json")
     existing_providers: dict[str, str] = {}
     if providers_path.exists():
         try:
@@ -808,7 +809,7 @@ async def translate_batch_stream(req: BatchTranslationRequest, request: Request)
                 raw_responses = getattr(provider, "last_raw_responses", [])
                 if raw_responses:
                     _stamp_raw_responses(raw_responses)
-                    responses_path = config.STORAGE_PATH / "mods" / req.mod_id / "last_api_responses.json"
+                    responses_path = GameStorage("chrono_ark").mod_file(req.mod_id, "last_api_responses.json")
                     responses_path.parent.mkdir(parents=True, exist_ok=True)
                     existing_responses = []
                     if not req.is_first_batch and responses_path.exists():

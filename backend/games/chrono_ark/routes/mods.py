@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from backend import config
+from backend.translation.game_storage import GameStorage
 from backend.routes.helpers import (
     current_adapter,
     _find_mod,
@@ -192,7 +193,7 @@ async def get_mod_detail(mod_id: str):
     translations = load_translations(mod_id)
 
     # Load translation provider info per key.
-    providers_path = config.STORAGE_PATH / "mods" / mod_id / "translation_providers.json"
+    providers_path = GameStorage("chrono_ark").mod_file(mod_id, "translation_providers.json")
     translation_providers: dict[str, str] = {}
     if providers_path.exists():
         try:
@@ -205,7 +206,7 @@ async def get_mod_detail(mod_id: str):
     original_english_map = {key: loc_str.translations.get(target_lang, "") for key, loc_str in strings.items()}
 
     # Load synced keys to identify rows that have been exported to CSV.
-    synced_keys_path = config.STORAGE_PATH / "mods" / mod_id / "synced_keys.json"
+    synced_keys_path = GameStorage("chrono_ark").mod_file(mod_id, "synced_keys.json")
     synced_keys: set[str] = set()
     if synced_keys_path.exists():
         try:
@@ -219,7 +220,7 @@ async def get_mod_detail(mod_id: str):
     # ignore translation changes here so that adding new translations
     # does not invalidate previously synced rows.
     if synced_keys:
-        csv_hash_path = config.STORAGE_PATH / "mods" / mod_id / "last_csv_hash.json"
+        csv_hash_path = GameStorage("chrono_ark").mod_file(mod_id, "last_csv_hash.json")
         if csv_hash_path.exists():
             try:
                 with open(csv_hash_path, "r", encoding="utf-8") as f:
@@ -240,7 +241,7 @@ async def get_mod_detail(mod_id: str):
     # values, so we need the snapshot from before the export).
     pre_export_english: dict[str, str] = {}
     if synced_keys:
-        pre_export_path = config.STORAGE_PATH / "mods" / mod_id / "pre_export_english.json"
+        pre_export_path = GameStorage("chrono_ark").mod_file(mod_id, "pre_export_english.json")
         if pre_export_path.exists():
             try:
                 with open(pre_export_path, "r", encoding="utf-8") as f:
@@ -339,7 +340,7 @@ async def update_string(mod_id: str, update: TranslationUpdate):
     update_single_translation(mod_id, update.key, update.english)
 
     # Track that this key was manually edited.
-    providers_path = config.STORAGE_PATH / "mods" / mod_id / "translation_providers.json"
+    providers_path = GameStorage("chrono_ark").mod_file(mod_id, "translation_providers.json")
     providers: dict[str, str] = {}
     if providers_path.exists():
         try:
@@ -394,7 +395,7 @@ async def sync_mod(mod_id: str):
 
     strings, _ = current_adapter().extract_strings(mod_path)
     _merge_gdata_originals(mod_id, strings)
-    output_path = config.STORAGE_PATH / "mods" / mod_id / "source.json"
+    output_path = GameStorage("chrono_ark").mod_file(mod_id, "source.json")
     save_extracted_strings(strings, output_path)
 
     tracker = ProgressTracker()
@@ -444,7 +445,7 @@ async def clear_translations(mod_id: str):
 
     # Clear synced state since all translations have been wiped.
     for filename in ("synced_keys.json", "pre_export_english.json", "last_csv_hash.json"):
-        path = config.STORAGE_PATH / "mods" / mod_id / filename
+        path = GameStorage("chrono_ark").mod_file(mod_id, filename)
         if path.exists():
             path.unlink()
 
@@ -487,7 +488,7 @@ async def reset_mod(mod_id: str):
     Raises:
         HTTPException: 500 if the operation fails.
     """
-    mod_storage = config.STORAGE_PATH / "mods" / mod_id
+    mod_storage = GameStorage("chrono_ark").mod_dir(mod_id)
     if not mod_storage.exists():
         return {"status": "success", "csv_restored": False, "message": "No data to clear"}
 
@@ -659,8 +660,8 @@ async def export_mod(mod_id: str, resync: bool = False):
     reason = "Before re-sync export" if resync else "Before export"
     create_backup(mod_id, reason)
 
-    original_csv_dir = config.STORAGE_PATH / "mods" / mod_id / "original_csvs"
-    original_gdata_dir = config.STORAGE_PATH / "mods" / mod_id / "original_gdata"
+    original_csv_dir = GameStorage("chrono_ark").mod_dir(mod_id) / "original_csvs"
+    original_gdata_dir = GameStorage("chrono_ark").mod_dir(mod_id) / "original_gdata"
 
     if resync:
         # Restore original CSV files from backups so we re-apply on a
@@ -830,18 +831,18 @@ async def export_mod(mod_id: str, resync: bool = False):
 
     # Save CSV-only hash so synced-key invalidation only triggers on
     # mod-author CSV changes, not on new user translations.
-    csv_hash_path = config.STORAGE_PATH / "mods" / mod_id / "last_csv_hash.json"
+    csv_hash_path = GameStorage("chrono_ark").mod_file(mod_id, "last_csv_hash.json")
     with open(csv_hash_path, "w", encoding="utf-8") as f:
         json.dump({"hash": _compute_csv_snapshot(mod_path)}, f)
 
     # Save the set of synced keys so the UI can highlight them.
-    synced_keys_path = config.STORAGE_PATH / "mods" / mod_id / "synced_keys.json"
+    synced_keys_path = GameStorage("chrono_ark").mod_file(mod_id, "synced_keys.json")
     synced_keys_path.parent.mkdir(parents=True, exist_ok=True)
     with open(synced_keys_path, "w", encoding="utf-8") as f:
         json.dump([k for k, v in translations.items() if v], f, ensure_ascii=False)
 
     # Save pre-export English values so the UI can show a diff for synced rows.
-    pre_export_path = config.STORAGE_PATH / "mods" / mod_id / "pre_export_english.json"
+    pre_export_path = GameStorage("chrono_ark").mod_file(mod_id, "pre_export_english.json")
     with open(pre_export_path, "w", encoding="utf-8") as f:
         json.dump(pre_export_english, f, ensure_ascii=False)
 
@@ -1063,7 +1064,7 @@ async def get_api_responses(mod_id: str):
         A list of response dicts, each containing batch_index, model,
         input_tokens, output_tokens, and raw_text.
     """
-    responses_path = config.STORAGE_PATH / "mods" / mod_id / "last_api_responses.json"
+    responses_path = GameStorage("chrono_ark").mod_file(mod_id, "last_api_responses.json")
     if not responses_path.exists():
         return []
     with open(responses_path, "r", encoding="utf-8") as f:
