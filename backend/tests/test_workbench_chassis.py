@@ -47,7 +47,7 @@ def test_tw3_stub_adapter_registered():
     tw3 = next((m for m in metadata if m["game_id"] == "total_war_warhammer_3"), None)
     assert tw3 is not None
     assert tw3["display_name"] == "Warhammer III"
-    assert tw3["capabilities"] == []
+    assert tw3["capabilities"] == ["translation"]
     adapter = get_adapter("total_war_warhammer_3")
     assert adapter.game_id == "total_war_warhammer_3"
 
