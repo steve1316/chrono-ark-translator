@@ -35,6 +35,7 @@ from backend.games.total_war_warhammer_3 import (
     translation_store_helpers as store,
 )
 from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
+from backend.games.total_war_warhammer_3.canonical_status import to_status_rows
 from backend.games.total_war_warhammer_3.loc_extractor import (
     LocRow,
     extract_parent_pack_strings,
@@ -470,11 +471,12 @@ def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stal
 
     raw_translations = store.load_translations_raw(mod_id)
     overlaid = _overlay_translations(drift, raw_translations)
+    canonical = {(r.source_file, r.key): r.status for r in to_status_rows(drift, raw_translations)}
 
     if status:
         overlaid = [r for r in overlaid if r.status == status]
 
-    return [_serialize_drift_row(r) for r in overlaid]
+    return [{**_serialize_drift_row(r), "canonical_status": canonical.get((r.source_filename, r.key))} for r in overlaid]
 
 
 @router.put("/mods/{mod_id}/strings/{key}")

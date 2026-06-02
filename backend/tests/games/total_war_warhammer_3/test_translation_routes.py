@@ -103,6 +103,18 @@ def test_get_strings_overlay_from_translations_json(client: TestClient):
     assert rows["k2"]["translation_text"] == "Seeded"
     assert rows["k2"]["provider"] == "claude"
     assert rows["k2"]["status"] == "translated"
+    # Canonical: a seeded override not yet written to .loc.tsv is an unsynced edit -> pending.
+    assert rows["k2"]["canonical_status"] == "pending"
+
+
+def test_get_strings_includes_canonical_status(client: TestClient):
+    """Each row carries the canonical 5-state status alongside the drift status."""
+    client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/rescan")
+    rows = {r["key"]: r for r in client.get("/api/games/total_war_warhammer_3/translation/mods/3315737452/strings").json()}
+    # k1 has an on-disk .loc.tsv translation matching the snapshot -> synced.
+    assert rows["k1"]["canonical_status"] == "synced"
+    # k2 has parent text but no translation -> missing.
+    assert rows["k2"]["canonical_status"] == "missing"
 
 
 def test_put_string_persists_translation(client: TestClient):
