@@ -109,6 +109,29 @@ def test_clear_translations_marks_unsynced_so_sync_is_offered(client: TestClient
     assert summary["has_unsynced_changes"] is True
 
 
+def test_rescan_counts_cleared_keys_as_untranslated(client: TestClient, tmp_path: Path):
+    """Rescan's untranslated count honors empty-string overrides so the Translate button stays enabled after a clear.
+
+    The cleared `k1` (empty override masking its `.loc.tsv` text) plus the never-translated `k2` are both untranslated, and the rescan
+    count must match the strings view exactly. Without the overlay, rescan would see `k1`'s `.loc.tsv` text and miscount it as translated.
+    """
+    mod_id = "3315737452"
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    (mod_dir / "translations.json").write_text(
+        json.dumps({"k1": {"text": "Hello", "provider": "manual"}}),
+        encoding="utf-8",
+    )
+
+    client.post(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/clear-translations")
+
+    summary = client.post(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/rescan").json()
+    strings = client.get(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/strings?status=untranslated").json()
+
+    assert summary["counts"]["untranslated"] == len(strings)
+    assert summary["counts"]["untranslated"] == 2
+
+
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # Group B: POST /sync

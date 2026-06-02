@@ -163,6 +163,68 @@ def _serialize_drift_row(row: DriftRow) -> dict:
     }
 
 
+def _overlay_translations(drift: list[DriftRow], raw_translations: dict) -> list[DriftRow]:
+    """Overlay `translations.json` entries onto computed drift rows so in-flight edits and clears reflect immediately.
+
+    A non-empty override supplies its text/provider and promotes an untranslated row to `translated`. An empty-string override is an explicit clear: the row
+    shows empty text and is marked `untranslated` (when it has parent text) so the `.loc.tsv` content does not show through. Rows with no override keep their
+    `.loc.tsv` status, with `provider` defaulting to `manual` when text is present and `None` when absent. Both `get_strings` and `rescan` use this so the
+    table and the per-status counts never disagree.
+
+    Args:
+        drift: Rows produced by `compute_drift` from the parent and `.loc.tsv` sources.
+        raw_translations: The mod's `translations.json` mapping (`key -> {text, provider}`).
+
+    Returns:
+        A new list of `DriftRow` with overrides applied, preserving the input order.
+    """
+    overlaid: list[DriftRow] = []
+    for row in drift:
+        entry = raw_translations.get(row.key)
+        has_override = isinstance(entry, dict) and "text" in entry
+        if has_override and entry["text"]:
+            override_provider = entry.get("provider") or "manual"
+            # If the row was untranslated on the file system but translations.json has it, promote it to translated per the parent hash.
+            new_status = "translated" if row.status == "untranslated" else row.status
+            overlaid.append(
+                DriftRow(
+                    source_filename=row.source_filename,
+                    key=row.key,
+                    parent_text=row.parent_text,
+                    translation_text=entry["text"],
+                    status=new_status,
+                    provider=override_provider,
+                )
+            )
+        elif has_override:
+            # Empty-string override = explicitly cleared. Show empty and mark untranslated so the .loc.tsv content does not show through.
+            cleared_status = "untranslated" if row.parent_text is not None else row.status
+            overlaid.append(
+                DriftRow(
+                    source_filename=row.source_filename,
+                    key=row.key,
+                    parent_text=row.parent_text,
+                    translation_text="",
+                    status=cleared_status,
+                    provider=None,
+                )
+            )
+        else:
+            # Existing .loc.tsv translation (or untranslated). Default provider to "manual" when text is present, None when absent.
+            provider = "manual" if row.translation_text else None
+            overlaid.append(
+                DriftRow(
+                    source_filename=row.source_filename,
+                    key=row.key,
+                    parent_text=row.parent_text,
+                    translation_text=row.translation_text,
+                    status=row.status,
+                    provider=provider,
+                )
+            )
+    return overlaid
+
+
 def _find_parent_preview_image(mod: WH3TranslationMod) -> Path | None:
     """Resolve a preview `.png` for the translation mod by inspecting its parent workshop folder.
 
@@ -362,8 +424,11 @@ def rescan(mod_id: str) -> RescanSummary:
             next_snapshot[row.source_filename][row.key] = hash_text(row.parent_text)
     store.save_parent_snapshot(mod_id, next_snapshot)
 
+    # Count from the overlaid rows (not raw drift) so empty-string clears and in-flight overrides match the strings view exactly.
+    raw_translations = store.load_translations_raw(mod_id)
+    overlaid = _overlay_translations(drift, raw_translations)
     counts: dict[str, int] = {"translated": 0, "untranslated": 0, "stale": 0, "orphan": 0}
-    for row in drift:
+    for row in overlaid:
         counts[row.status] += 1
 
     ctx = store.load_character_context(mod_id)
@@ -404,55 +469,7 @@ def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stal
     drift = compute_drift(parent=parent, translation=translation, snapshot=snapshot)
 
     raw_translations = store.load_translations_raw(mod_id)
-
-    overlaid: list[DriftRow] = []
-    for row in drift:
-        entry = raw_translations.get(row.key)
-        has_override = isinstance(entry, dict) and "text" in entry
-        if has_override and entry["text"]:
-            override_text = entry["text"]
-            override_provider = entry.get("provider") or "manual"
-            # If the row was untranslated on the file system but translations.json has it, promote it to translated per the parent hash.
-            if row.status == "untranslated":
-                new_status = "translated"
-            else:
-                new_status = row.status
-            overlaid.append(
-                DriftRow(
-                    source_filename=row.source_filename,
-                    key=row.key,
-                    parent_text=row.parent_text,
-                    translation_text=override_text,
-                    status=new_status,
-                    provider=override_provider,
-                )
-            )
-        elif has_override:
-            # Empty-string override = explicitly cleared. Show empty and mark untranslated so the .loc.tsv content does not show through.
-            cleared_status = "untranslated" if row.parent_text is not None else row.status
-            overlaid.append(
-                DriftRow(
-                    source_filename=row.source_filename,
-                    key=row.key,
-                    parent_text=row.parent_text,
-                    translation_text="",
-                    status=cleared_status,
-                    provider=None,
-                )
-            )
-        else:
-            # Existing .loc.tsv translation (or untranslated). Default provider to "manual" when text is present, None when absent.
-            provider = "manual" if row.translation_text else None
-            overlaid.append(
-                DriftRow(
-                    source_filename=row.source_filename,
-                    key=row.key,
-                    parent_text=row.parent_text,
-                    translation_text=row.translation_text,
-                    status=row.status,
-                    provider=provider,
-                )
-            )
+    overlaid = _overlay_translations(drift, raw_translations)
 
     if status:
         overlaid = [r for r in overlaid if r.status == status]
