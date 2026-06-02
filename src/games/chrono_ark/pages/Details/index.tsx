@@ -1648,6 +1648,7 @@ const ModDetail: React.FC = () => {
                 are added to the mod glossary. */}
             {showSuggestionModal && (
                 <GlossarySuggestionModal
+                    gameId="chrono_ark"
                     modId={modId!}
                     suggestions={suggestions}
                     onClose={() => setShowSuggestionModal(false)}
@@ -2080,6 +2081,7 @@ const ModDetail: React.FC = () => {
                 process; the user can resume via the paused banner below. */}
             {batchState.phase === "reviewing" && showReviewModal && (
                 <GlossarySuggestionModal
+                    gameId="chrono_ark"
                     modId={modId!}
                     suggestions={batchState.suggestions}
                     onClose={() => setShowReviewModal(false)}

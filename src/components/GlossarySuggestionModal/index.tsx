@@ -7,6 +7,8 @@ import { gameApi } from "../../api/games"
  * Props for the {@link GlossarySuggestionModal} component.
  */
 interface GlossarySuggestionModalProps {
+    /** Backend game id used to route glossary API calls (e.g. "chrono_ark"). */
+    gameId: string
     /** Unique identifier of the mod whose glossary suggestions are being reviewed. */
     modId: string
     /** Initial list of term suggestions to present for review. */
@@ -36,13 +38,14 @@ interface GlossarySuggestionModalProps {
  * - After each action, the local `pending` list is pruned optimistically and the
  *   parent is notified via `onUpdated()`.
  *
+ * @param gameId - Backend game id used to route glossary API calls
  * @param modId - The mod ID used in API routes
  * @param suggestions - Suggestions to display initially
  * @param onClose - Close handler for the modal
  * @param onUpdated - Refresh callback for the parent component
  * @returns The rendered suggestion review modal
  */
-const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId, suggestions, onClose, onUpdated, batchProgress, onContinue }) => {
+const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ gameId, modId, suggestions, onClose, onUpdated, batchProgress, onContinue }) => {
     const isBatchMode = !!batchProgress
     const [pending, setPending] = useState<TermSuggestion[]>(suggestions)
     const [processing, setProcessing] = useState(false)
@@ -60,7 +63,7 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId
     const handleAccept = async (terms: string[]) => {
         setProcessing(true)
         try {
-            await gameApi("chrono_ark").post(`/mods/${modId}/glossary/suggestions/accept`, { terms })
+            await gameApi(gameId).post(`/mods/${modId}/glossary/suggestions/accept`, { terms })
             // Optimistically remove accepted terms from the local list.
             setPending((prev) => prev.filter((s) => !terms.includes(s.english)))
             onUpdated()
@@ -89,7 +92,7 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ modId
         setProcessing(true)
         try {
             // When dismissing all, send { all: true } so the backend clears everything.
-            await gameApi("chrono_ark").post(`/mods/${modId}/glossary/suggestions/dismiss`, all ? { all: true } : { terms })
+            await gameApi(gameId).post(`/mods/${modId}/glossary/suggestions/dismiss`, all ? { all: true } : { terms })
             if (all) {
                 setPending([])
             } else {
