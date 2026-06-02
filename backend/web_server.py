@@ -17,6 +17,7 @@ from backend.routes.helpers import _adapter
 from backend.routes import ollama, llamacpp, settings, steamcmd
 from backend.games.registry import list_games, get_adapter
 from backend.scripts.migrate_storage_v1_to_v2 import run_migration
+from backend.scripts.migrate_storage_v2_to_v3 import run_migration as run_migration_v2_to_v3
 
 
 @asynccontextmanager
@@ -26,6 +27,7 @@ async def lifespan(_app: FastAPI):
     Idempotent: the migration marker file makes subsequent migration runs a no-op.
     """
     run_migration()
+    run_migration_v2_to_v3()
     yield
 
 
