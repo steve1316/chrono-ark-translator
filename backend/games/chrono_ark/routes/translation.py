@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from backend import config
 from backend.translation.game_storage import GameStorage
+from backend.translation.orchestrator import run_batch
 from backend.data.character_context import load_character_context
 from backend.data.glossary_manager import (
     get_combined_glossary_prompt,
@@ -583,26 +584,20 @@ async def translate_batch(req: BatchTranslationRequest):
 
     tm = TranslationMemory()
 
-    loop = asyncio.get_running_loop()
     try:
-        translations, suggestions = await loop.run_in_executor(
-            None,
-            lambda: provider.translate_batch(
-                entries,
-                req.source_lang,
-                glossary_prompt,
-                game_context=game_context,
-                format_rules=format_rules,
-                style_examples=style_examples,
-                character_context=character_context,
-                target_lang=target_lang,
-            ),
+        translations, suggestions = await run_batch(
+            provider,
+            entries,
+            req.source_lang,
+            glossary_prompt,
+            game_context=game_context,
+            format_rules=format_rules,
+            style_examples=style_examples,
+            character_context=character_context,
+            target_lang=target_lang,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
-
-    # Fill in keys the LLM dropped due to duplicate source text.
-    _fill_duplicate_translations(translations, entries)
 
     # Store translation memory entries.
     for key, english in translations.items():
