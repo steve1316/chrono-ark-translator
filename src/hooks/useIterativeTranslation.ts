@@ -46,10 +46,12 @@ const STOP_AFTER_PROVIDERS = new Set(["llamacpp"])
  * 4. Call `continueAfterReview` to proceed to the next batch.
  * 5. Repeat until all batches are done or the user cancels.
  *
+ * @param gameId - Backend game id used to route translate API calls (e.g. "chrono_ark").
  * @param modId - The mod being translated.
  * @param onBatchTranslated - Callback fired after each batch with the new translations.
  */
 export function useIterativeTranslation(
+    gameId: string,
     modId: string,
     onBatchTranslated: (translations: Record<string, string>) => void,
 ) {
@@ -110,7 +112,7 @@ export function useIterativeTranslation(
                 const controller = new AbortController()
                 abortControllerRef.current = controller
 
-                const res = await gameApi("chrono_ark").post(
+                const res = await gameApi(gameId).post(
                     "/translate/batch/stream",
                     {
                         mod_id: modId,
@@ -204,7 +206,7 @@ export function useIterativeTranslation(
             }
 
             try {
-                const res = await gameApi("chrono_ark").post("/translate/batch", {
+                const res = await gameApi(gameId).post("/translate/batch", {
                     mod_id: modId,
                     provider: providerRef.current,
                     keys: batch.keys,
@@ -275,7 +277,7 @@ export function useIterativeTranslation(
         abortControllerRef.current?.abort()
         abortControllerRef.current = null
         // Tell the backend to cancel so it closes the active connection.
-        gameApi("chrono_ark").post(`/translate/cancel?mod_id=${encodeURIComponent(modId)}`).catch(() => {})
+        gameApi(gameId).post(`/translate/cancel?mod_id=${encodeURIComponent(modId)}`).catch(() => {})
         stopProviderIfNeeded()
         setState({ phase: "idle" })
     }, [modId, stopProviderIfNeeded])

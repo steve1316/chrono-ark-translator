@@ -242,7 +242,7 @@ const ModDetail: React.FC = () => {
         fetchExportStatus()
     }, [])
 
-    const { state: batchState, startTranslation, continueAfterReview, cancel: cancelTranslation } = useIterativeTranslation(modId ?? "", handleBatchTranslated)
+    const { state: batchState, startTranslation, continueAfterReview, cancel: cancelTranslation } = useIterativeTranslation("chrono_ark", modId ?? "", handleBatchTranslated)
 
     // React to batch translation phase changes.
     useEffect(() => {
