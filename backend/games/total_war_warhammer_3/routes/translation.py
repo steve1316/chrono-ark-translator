@@ -323,6 +323,8 @@ class RescanSummary(BaseModel):
 
     mod_id: str
     counts: dict[str, int]
+    # Zero-filled tally of the canonical five-state model (synced/untouched/pending/missing/untranslatable), mirroring the per-row `canonical_status`.
+    canonical_counts: dict[str, int]
     scanned_at: str
     # True when translations.json holds entries whose text does not match the user's `.loc.tsv` files.
     has_unsynced_changes: bool = False
@@ -432,12 +434,18 @@ def rescan(mod_id: str) -> RescanSummary:
     for row in overlaid:
         counts[row.status] += 1
 
+    # Canonical five-state tally for the shared status pills. Zero-filled so the dict always carries every state, matching Chrono Ark.
+    canonical_counts: dict[str, int] = {"synced": 0, "untouched": 0, "pending": 0, "missing": 0, "untranslatable": 0}
+    for srow in to_status_rows(drift, raw_translations):
+        canonical_counts[srow.status] += 1
+
     ctx = store.load_character_context(mod_id)
     has_mod_context = bool((ctx.get("source_game") or "").strip() or (ctx.get("character_name") or "").strip() or (ctx.get("background") or "").strip())
 
     return RescanSummary(
         mod_id=mod_id,
         counts=counts,
+        canonical_counts=canonical_counts,
         scanned_at=datetime.now(timezone.utc).isoformat(),
         has_unsynced_changes=_has_unsynced_changes(mod_id, translation),
         has_mod_context=has_mod_context,
