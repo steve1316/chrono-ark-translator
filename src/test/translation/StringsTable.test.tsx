@@ -33,4 +33,35 @@ describe("StringsTable", () => {
         render(<StringsTable rows={[]} columns={columns} getRowKey={(r) => r.id} sortField={null} sortDirection={null} onSort={vi.fn()} emptyMessage="No rows." />)
         expect(screen.getByText("No rows.")).toBeInTheDocument()
     })
+
+    it("uses columnWidths overrides over the column default width", () => {
+        const { container } = render(<StringsTable rows={rows} columns={columns} getRowKey={(r) => r.id} sortField={null} sortDirection={null} onSort={vi.fn()} columnWidths={{ name: 333 }} />)
+        const th = container.querySelector("th") as HTMLElement
+        expect(th.style.width).toBe("333px")
+    })
+
+    it("does not render resizer handles unless onResizeColumn is supplied", () => {
+        const { container, rerender } = render(<StringsTable rows={rows} columns={columns} getRowKey={(r) => r.id} sortField={null} sortDirection={null} onSort={vi.fn()} />)
+        expect(container.querySelector(".resizer")).toBeNull()
+        rerender(<StringsTable rows={rows} columns={columns} getRowKey={(r) => r.id} sortField={null} sortDirection={null} onSort={vi.fn()} onResizeColumn={vi.fn()} />)
+        expect(container.querySelector(".resizer")).not.toBeNull()
+    })
+
+    it("applies per-row class and style accessors", () => {
+        const { container } = render(
+            <StringsTable
+                rows={rows}
+                columns={columns}
+                getRowKey={(r) => r.id}
+                sortField={null}
+                sortDirection={null}
+                onSort={vi.fn()}
+                getRowClassName={(r) => (r.id === "1" ? "row-highlight" : undefined)}
+                getRowStyle={(r) => (r.id === "1" ? { background: "rgb(10, 20, 30)" } : undefined)}
+            />
+        )
+        const firstRow = container.querySelectorAll("tbody tr")[0] as HTMLElement
+        expect(firstRow.className).toBe("row-highlight")
+        expect(firstRow.style.background).toBe("rgb(10, 20, 30)")
+    })
 })

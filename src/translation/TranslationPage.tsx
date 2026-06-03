@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { FaArrowLeft } from "react-icons/fa"
 import { StringsTable } from "./StringsTable"
 import { FeedbackBanner } from "./FeedbackBanner"
 import { TranslatingBanner } from "./TranslatingBanner"
@@ -50,6 +51,10 @@ interface TranslationPageProps<Row> {
     sortDirection: "asc" | "desc" | null
     /** Header-click sort handler. */
     onSort: (field: string) => void
+    /** Optional per-field overrides for column widths (resizable columns). When omitted, each column's default `width` is used. */
+    columnWidths?: Record<string, number>
+    /** Called with a field id and new pixel width while the user drags a column resizer. When omitted, columns are not resizable. */
+    onResizeColumn?: (field: string, width: number) => void
     /** Optional dismissible feedback banner. */
     banner?: { type: "success" | "error"; message: string } | null
     /** Dismiss handler for the feedback banner. */
@@ -62,13 +67,26 @@ interface TranslationPageProps<Row> {
     toolbar?: ReactNode
     /** Empty-state message for the table. */
     emptyMessage?: string
+    /** Back-navigation handler. When provided, a "Back to Dashboard" button renders above the header. */
+    onBack?: () => void
+    /** Mod preview image URL. When provided, an 80x80 thumbnail renders left of the title. */
+    previewImage?: string | null
+    /** Inline elements rendered next to the title (e.g. steam link, open-folder button, pending-sync badge). */
+    titleBadges?: ReactNode
+    /** Secondary line under the title (e.g. "by author"). */
+    subtitle?: ReactNode
+    /** Source/target language controls rendered in the header identity block. */
+    languageControls?: ReactNode
+    /** Extra banners rendered below the built-in banners (e.g. a batch-paused / review banner). */
+    extraBanners?: ReactNode
+    /** Game-specific modals/panels rendered at the end of the page. */
+    modals?: ReactNode
 }
 
 /**
- * Shared translation page shell. Composes the header, action-toolbar slot,
- * feedback/in-progress banners, search + status-filter bar, and the strings
- * table. Presentational: the caller (each game's page) owns data + state and
- * supplies columns, rows, and handlers.
+ * Shared translation page shell. Composes the back button, header identity block (preview image, title + badges, subtitle, language controls, progress),
+ * action-toolbar slot, feedback/in-progress banners, search + status-filter bar, the strings table, and a game-specific modals slot. Presentational: the
+ * caller (each game's container) owns data + state and supplies columns, rows, slots, and handlers.
  * @returns The composed translation page.
  */
 export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
@@ -86,24 +104,49 @@ export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
         sortField,
         sortDirection,
         onSort,
+        columnWidths,
+        onResizeColumn,
         banner,
         onDismissBanner,
         translating,
         onCancelTranslate,
         toolbar,
         emptyMessage,
+        onBack,
+        previewImage,
+        titleBadges,
+        subtitle,
+        languageControls,
+        extraBanners,
+        modals,
     } = props
     return (
         <div className="mod-detail">
+            {onBack && (
+                <button className="btn-text" onClick={() => onBack()} style={{ marginBottom: "1rem", display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                    <FaArrowLeft /> Back to Dashboard
+                </button>
+            )}
+
             <div className="dashboard-header">
-                <div className="title-group">
-                    <h1>{title}</h1>
-                    <p style={{ marginTop: "0.25rem" }}>{progressLabel}</p>
+                <div className="title-group" style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+                    {previewImage && <img src={previewImage} alt="" style={{ width: "80px", height: "80px", borderRadius: "8px", objectFit: "cover", border: "1px solid var(--border-color)" }} />}
+                    <div>
+                        <h1 style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                            {title}
+                            {titleBadges}
+                        </h1>
+                        {subtitle && <p style={{ marginTop: "0.25rem", color: "var(--text-dim)" }}>{subtitle}</p>}
+                        {languageControls}
+                        <p style={{ marginTop: "0.25rem" }}>{progressLabel}</p>
+                    </div>
                 </div>
                 {toolbar && <div className="mod-actions">{toolbar}</div>}
             </div>
 
             {translating && <TranslatingBanner batchIndex={translating.batchIndex} totalBatches={translating.totalBatches} streaming={translating.streaming} onCancel={() => onCancelTranslate?.()} />}
+
+            {extraBanners}
 
             {banner && <FeedbackBanner type={banner.type} message={banner.message} onDismiss={() => onDismissBanner?.()} />}
 
@@ -128,7 +171,19 @@ export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
                 </div>
             </div>
 
-            <StringsTable rows={rows} columns={columns} getRowKey={getRowKey} sortField={sortField} sortDirection={sortDirection} onSort={onSort} emptyMessage={emptyMessage} />
+            <StringsTable
+                rows={rows}
+                columns={columns}
+                getRowKey={getRowKey}
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSort={onSort}
+                columnWidths={columnWidths}
+                onResizeColumn={onResizeColumn}
+                emptyMessage={emptyMessage}
+            />
+
+            {modals}
         </div>
     )
 }

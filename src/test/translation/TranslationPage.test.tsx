@@ -78,4 +78,39 @@ describe("TranslationPage", () => {
         render(<TranslationPage {...baseProps({ toolbar: <button>Translate</button> })} />)
         expect(screen.getByRole("button", { name: "Translate" })).toBeInTheDocument()
     })
+
+    it("renders a back button and calls onBack when clicked", () => {
+        const onBack = vi.fn()
+        render(<TranslationPage {...baseProps({ onBack })} />)
+        fireEvent.click(screen.getByRole("button", { name: /back to dashboard/i }))
+        expect(onBack).toHaveBeenCalled()
+    })
+
+    it("renders the header identity slots (preview image, title badges, subtitle, language controls)", () => {
+        const { container } = render(
+            <TranslationPage
+                {...baseProps({
+                    previewImage: "http://example.test/p.png",
+                    titleBadges: <span>pending-sync</span>,
+                    subtitle: "by Author",
+                    languageControls: <span>lang-controls</span>,
+                })}
+            />
+        )
+        expect(container.querySelector('img[src="http://example.test/p.png"]')).not.toBeNull()
+        expect(screen.getByText("pending-sync")).toBeInTheDocument()
+        expect(screen.getByText("by Author")).toBeInTheDocument()
+        expect(screen.getByText("lang-controls")).toBeInTheDocument()
+    })
+
+    it("renders the extraBanners and modals slots", () => {
+        render(<TranslationPage {...baseProps({ extraBanners: <div>paused-banner</div>, modals: <div>my-modal</div> })} />)
+        expect(screen.getByText("paused-banner")).toBeInTheDocument()
+        expect(screen.getByText("my-modal")).toBeInTheDocument()
+    })
+
+    it("forwards columnWidths and onResizeColumn to the table (resizer handles appear)", () => {
+        const { container } = render(<TranslationPage {...baseProps({ onResizeColumn: vi.fn(), columnWidths: { name: 250 } })} />)
+        expect(container.querySelector(".resizer")).not.toBeNull()
+    })
 })

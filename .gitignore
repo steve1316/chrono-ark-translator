@@ -25,6 +25,7 @@ dist-ssr
 
 .claude
 .playwright-mcp
+baseline-*.png
 docs
 __pycache__
 
