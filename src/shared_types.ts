@@ -6,6 +6,8 @@
  * Pydantic models defined in `backend/web_server.py`.
  */
 
+import type { RowStatus } from "./utils/stringFilters"
+
 /**
  * Summary status for a single mod, used in the dashboard listing.
  */
@@ -208,6 +210,8 @@ export interface WH3DriftRow {
     status: WH3DriftStatus
     /** Who/what produced the current translation. `null` when untranslated. */
     provider: string | null
+    /** Canonical five-state status (synced/untouched/pending/missing/untranslatable) for the shared status chips. `null` if the backend did not supply it. */
+    canonical_status: RowStatus | null
 }
 
 /** Summary returned by `POST /api/games/total_war_warhammer_3/translation/mods/{id}/rescan`. */
@@ -216,6 +220,8 @@ export interface WH3RescanSummary {
     mod_id: string
     /** Per-status row counts. */
     counts: Record<WH3DriftStatus, number>
+    /** Zero-filled tally of the canonical five-state model, mirroring each row's `canonical_status`. */
+    canonical_counts: Record<RowStatus, number>
     /** ISO timestamp of when the rescan completed. */
     scanned_at: string
     /** True when translations.json holds entries whose text differs from the user's `.loc.tsv` files. */

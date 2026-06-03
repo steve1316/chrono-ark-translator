@@ -18,15 +18,16 @@ const MOD: WH3TranslationModSummary = {
 const SUMMARY: WH3RescanSummary = {
     mod_id: MOD.workshop_id,
     counts: { translated: 5, untranslated: 3, stale: 1, orphan: 0 },
+    canonical_counts: { synced: 5, untouched: 0, pending: 1, missing: 3, untranslatable: 0 },
     scanned_at: "2026-05-25T00:00:00Z",
     has_unsynced_changes: false,
     has_mod_context: false,
 }
 
 const STRINGS: WH3DriftRow[] = [
-    { source_filename: "units.loc.tsv", key: "k1", parent_text: "原一", translation_text: "Original 1", status: "translated", provider: "manual" },
-    { source_filename: "units.loc.tsv", key: "k2", parent_text: "原二", translation_text: null, status: "untranslated", provider: null },
-    { source_filename: "units.loc.tsv", key: "k3", parent_text: "原三", translation_text: "Stale text", status: "stale", provider: "claude" },
+    { source_filename: "units.loc.tsv", key: "k1", parent_text: "原一", translation_text: "Original 1", status: "translated", provider: "manual", canonical_status: "synced" },
+    { source_filename: "units.loc.tsv", key: "k2", parent_text: "原二", translation_text: null, status: "untranslated", provider: null, canonical_status: "missing" },
+    { source_filename: "units.loc.tsv", key: "k3", parent_text: "原三", translation_text: "Stale text", status: "stale", provider: "claude", canonical_status: "pending" },
 ]
 
 function mockJson(body: unknown, status = 200) {
@@ -325,11 +326,19 @@ describe("TranslationDetails (Plan 3 layout)", () => {
     it("active filter pill renders as btn-primary; inactive as btn-outline", async () => {
         render(wrap())
         const allPill = await screen.findByRole("button", { name: /^All$/i })
-        const untranslated = screen.getByRole("button", { name: /Untranslated/i })
+        const missing = screen.getByRole("button", { name: /^Missing$/i })
         expect(allPill).toHaveClass("btn-primary")
-        expect(untranslated).toHaveClass("btn-outline")
-        fireEvent.click(untranslated)
-        await waitFor(() => expect(screen.getByRole("button", { name: /Untranslated/i })).toHaveClass("btn-primary"))
+        expect(missing).toHaveClass("btn-outline")
+        fireEvent.click(missing)
+        await waitFor(() => expect(screen.getByRole("button", { name: /^Missing$/i })).toHaveClass("btn-primary"))
+    })
+
+    it("renders the canonical status filter pills (All / Missing / Untouched / Pending / Synced)", async () => {
+        render(wrap())
+        await screen.findByRole("button", { name: /^All$/i })
+        for (const label of ["All", "Missing", "Untouched", "Pending", "Synced"]) {
+            expect(screen.getByRole("button", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument()
+        }
     })
 
     it("renders the translate-in-progress banner while runTranslateBatch is executing", async () => {
@@ -367,12 +376,12 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         expect(container.querySelector(".string-table-container table")).not.toBeNull()
     })
 
-    it("renders Status column with TRANSLATED / UNTRANSLATED / STALE badge text", async () => {
+    it("renders Status column with canonical SYNCED / MISSING / PENDING badge text", async () => {
         render(wrap())
         await screen.findByText("Original 1")
-        expect(screen.getByText("TRANSLATED")).toBeInTheDocument()
-        expect(screen.getByText("UNTRANSLATED")).toBeInTheDocument()
-        expect(screen.getByText("STALE")).toBeInTheDocument()
+        expect(screen.getByText("SYNCED")).toBeInTheDocument()
+        expect(screen.getByText("MISSING")).toBeInTheDocument()
+        expect(screen.getByText("PENDING")).toBeInTheDocument()
     })
 
     it("clicking a column header cycles sort direction null -> asc -> desc -> null", async () => {

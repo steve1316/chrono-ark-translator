@@ -83,12 +83,18 @@ export function StringsTable<Row>({
     }
 
     return (
-        <div className="glass-card string-table-container">
+        <div className="glass-card string-table-container" style={{ maxHeight: "calc(100vh - 420px)", minHeight: "400px", overflow: "auto" }}>
             <table>
                 <thead>
                     <tr>
                         {columns.map((col) => (
-                            <th key={col.field} className="sortable-th" style={{ width: widthOf(col), position: "relative" }} onClick={col.sortable ? () => onSort(col.field) : undefined}>
+                            <th
+                                key={col.field}
+                                data-field={col.field}
+                                className="sortable-th"
+                                style={{ width: widthOf(col), position: "sticky", top: 0, zIndex: 10, background: "var(--bg-color)" }}
+                                onClick={col.sortable ? () => onSort(col.field) : undefined}
+                            >
                                 {col.label}
                                 {col.sortable && sortIcon(col.field)}
                                 {onResizeColumn && <div className="resizer" onPointerDown={(e) => onResizeStart(e, col)} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />}
@@ -107,7 +113,9 @@ export function StringsTable<Row>({
                         rows.map((row) => (
                             <tr key={getRowKey(row)} className={getRowClassName?.(row)} style={getRowStyle?.(row)}>
                                 {columns.map((col) => (
-                                    <td key={col.field}>{col.render(row)}</td>
+                                    <td key={col.field} className={col.cellClassName}>
+                                        {col.render(row)}
+                                    </td>
                                 ))}
                             </tr>
                         ))

@@ -10,6 +10,8 @@ export interface ColumnDef<Row> {
     width: number
     /** Whether clicking the header sorts by this column. Defaults to false. */
     sortable?: boolean
+    /** Optional CSS class applied to the `<td>` for this column (e.g. "key-cell", "source-cell") so each game keeps its cell typography and wrapping. */
+    cellClassName?: string
     /** Render the cell contents for a given row. */
     render: (row: Row) => ReactNode
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import type { CSSProperties, ReactNode } from "react"
 import { FaArrowLeft } from "react-icons/fa"
 import { StringsTable } from "./StringsTable"
 import { FeedbackBanner } from "./FeedbackBanner"
@@ -55,6 +55,10 @@ interface TranslationPageProps<Row> {
     columnWidths?: Record<string, number>
     /** Called with a field id and new pixel width while the user drags a column resizer. When omitted, columns are not resizable. */
     onResizeColumn?: (field: string, width: number) => void
+    /** Optional per-row CSS class (e.g. to tint AI-translated rows). */
+    getRowClassName?: (row: Row) => string | undefined
+    /** Optional per-row inline style (e.g. status-based row background). */
+    getRowStyle?: (row: Row) => CSSProperties | undefined
     /** Optional dismissible feedback banner. */
     banner?: { type: "success" | "error"; message: string } | null
     /** Dismiss handler for the feedback banner. */
@@ -106,6 +110,8 @@ export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
         onSort,
         columnWidths,
         onResizeColumn,
+        getRowClassName,
+        getRowStyle,
         banner,
         onDismissBanner,
         translating,
@@ -123,14 +129,20 @@ export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
     return (
         <div className="mod-detail">
             {onBack && (
-                <button className="btn-text" onClick={() => onBack()} style={{ marginBottom: "1rem", display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                <button className="btn btn-outline" onClick={() => onBack()} style={{ marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <FaArrowLeft /> Back to Dashboard
                 </button>
             )}
 
             <div className="dashboard-header">
                 <div className="title-group" style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
-                    {previewImage && <img src={previewImage} alt="" style={{ width: "80px", height: "80px", borderRadius: "8px", objectFit: "cover", border: "1px solid var(--border-color)" }} />}
+                    {previewImage && (
+                        <img
+                            src={previewImage}
+                            alt={title}
+                            style={{ width: "80px", height: "80px", borderRadius: "12px", objectFit: "cover", border: "1px solid var(--glass-border)", flexShrink: 0 }}
+                        />
+                    )}
                     <div>
                         <h1 style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
                             {title}
@@ -154,12 +166,35 @@ export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
                 <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
                     <div style={{ flex: 1, position: "relative" }}>
                         <input
+                            type="text"
                             className="btn-outline"
                             placeholder="Search keys or text..."
                             value={search}
                             onChange={(e) => onSearchChange(e.target.value)}
                             style={{ width: "100%", padding: "0.75rem", paddingRight: "2.5rem", borderRadius: "8px", background: "rgba(0, 0, 0, 0.2)", boxSizing: "border-box" }}
                         />
+                        {search && (
+                            <button
+                                type="button"
+                                onClick={() => onSearchChange("")}
+                                title="Clear search"
+                                style={{
+                                    position: "absolute",
+                                    right: "0.5rem",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    background: "none",
+                                    border: "none",
+                                    color: "var(--text-dim)",
+                                    cursor: "pointer",
+                                    fontSize: "1.1rem",
+                                    padding: "0.25rem",
+                                    lineHeight: 1,
+                                }}
+                            >
+                                &times;
+                            </button>
+                        )}
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem" }}>
                         {statusFilters.map((f) => (
@@ -180,6 +215,8 @@ export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
                 onSort={onSort}
                 columnWidths={columnWidths}
                 onResizeColumn={onResizeColumn}
+                getRowClassName={getRowClassName}
+                getRowStyle={getRowStyle}
                 emptyMessage={emptyMessage}
             />
 

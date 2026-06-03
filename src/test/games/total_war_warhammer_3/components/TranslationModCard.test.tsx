@@ -67,6 +67,7 @@ describe("TranslationModCard", () => {
         const progress: WH3RescanSummary = {
             mod_id: MOD.workshop_id,
             counts: { translated: 12, untranslated: 5, stale: 3, orphan: 1 },
+            canonical_counts: { synced: 12, untouched: 0, pending: 3, missing: 6, untranslatable: 0 },
             scanned_at: "2026-05-24T00:00:00Z",
             has_unsynced_changes: false,
             has_mod_context: false,
@@ -101,6 +102,7 @@ describe("TranslationModCard", () => {
         const progress: WH3RescanSummary = {
             mod_id: MOD.workshop_id,
             counts: { translated: 5, untranslated: 0, stale: 0, orphan: 0 },
+            canonical_counts: { synced: 5, untouched: 0, pending: 0, missing: 0, untranslatable: 0 },
             scanned_at: "2026-05-24T00:00:00Z",
             has_unsynced_changes: true,
             has_mod_context: false,
@@ -113,6 +115,7 @@ describe("TranslationModCard", () => {
         const progress: WH3RescanSummary = {
             mod_id: MOD.workshop_id,
             counts: { translated: 5, untranslated: 0, stale: 0, orphan: 0 },
+            canonical_counts: { synced: 5, untouched: 0, pending: 0, missing: 0, untranslatable: 0 },
             scanned_at: "2026-05-24T00:00:00Z",
             has_unsynced_changes: false,
             has_mod_context: false,
