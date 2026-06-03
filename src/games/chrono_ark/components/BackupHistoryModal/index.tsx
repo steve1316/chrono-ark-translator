@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
+import type { ReactNode } from "react"
 import { gameApi } from "../../../../api/games"
+import SharedHistoryModal from "../../../../translation/HistoryModal"
 
 /** One backup history entry for a mod. */
 export interface HistoryEntry {
@@ -36,18 +38,43 @@ interface BackupHistoryModalProps {
 }
 
 /**
- * Modal listing a mod's automatic backups with restore/delete actions. Fetches the history on mount; restore/delete defer to the parent's shared confirm
- * dialog via callbacks. Extracted from the Chrono Ark details page so that page can compose the shared `<TranslationPage>` shell.
+ * Builds the Chrono Ark counts subtitle (translated/total strings + glossary terms), or `undefined` when the entry recorded no counts.
+ * @param entry - The backup entry whose counts to render.
+ * @returns The subtitle node, or `undefined` to omit the line.
+ */
+function renderCounts(entry: HistoryEntry): ReactNode {
+    const hasCounts = (entry.total_count ?? 0) > 0
+    const hasGlossary = (entry.glossary_count ?? 0) > 0
+    if (!hasCounts && !hasGlossary) return undefined
+    return (
+        <>
+            {hasCounts && (
+                <span>
+                    {entry.translated_count} / {entry.total_count} strings translated
+                </span>
+            )}
+            {hasCounts && hasGlossary && <span> &middot; </span>}
+            {hasGlossary && (
+                <span>
+                    {entry.glossary_count} glossary term{entry.glossary_count !== 1 ? "s" : ""}
+                </span>
+            )}
+        </>
+    )
+}
+
+/**
+ * Chrono Ark backup-history modal. A thin wrapper over the shared `HistoryModal`: it owns the REST fetch/save against the CA history API and maps each
+ * backup onto the shared entry shape, while restore/delete defer to the parent's shared confirm dialog via callbacks.
  * @param modId - Mod id whose backups to fetch.
  * @param onClose - Called when the user closes the modal.
  * @param onRestore - Called with the entry the user wants to restore.
  * @param onDelete - Called with the entry the user wants to delete.
+ * @param refreshKey - Bump to force a re-fetch.
  * @returns The modal element.
  */
 export default function BackupHistoryModal({ modId, onClose, onRestore, onDelete, refreshKey }: BackupHistoryModalProps) {
     const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
-    const [label, setLabel] = useState("")
-    const [saving, setSaving] = useState(false)
 
     const fetchHistory = useCallback(async () => {
         try {
@@ -62,107 +89,30 @@ export default function BackupHistoryModal({ modId, onClose, onRestore, onDelete
         fetchHistory()
     }, [fetchHistory, refreshKey])
 
-    const onSaveSnapshot = async () => {
-        setSaving(true)
-        try {
+    const onSave = useCallback(
+        async (label: string) => {
             await gameApi("chrono_ark").post(`/mods/${modId}/history`, { label })
-            setLabel("")
             await fetchHistory()
-        } catch (err) {
-            console.error("Failed to save snapshot:", err)
-        } finally {
-            setSaving(false)
-        }
-    }
+        },
+        [modId, fetchHistory]
+    )
+
+    const byId = new Map(historyEntries.map((e) => [e.id, e]))
 
     return (
-        <div
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose()
+        <SharedHistoryModal
+            entries={historyEntries.map((e) => ({ id: e.id, title: e.reason, kind: e.kind ?? "auto", createdAt: e.created_at, subtitle: renderCounts(e) }))}
+            onSave={onSave}
+            onRestore={(entry) => {
+                const orig = byId.get(entry.id)
+                if (orig) onRestore(orig)
             }}
-        >
-            <div className="glass-card" style={{ width: "700px", maxHeight: "80vh", overflow: "auto", padding: "2rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-                    <h2 style={{ margin: 0 }}>History Backups</h2>
-                    <button
-                        onClick={onClose}
-                        style={{ background: "none", border: "none", color: "var(--text-dim)", fontSize: "2rem", lineHeight: 1, cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px" }}
-                        title="Close"
-                    >
-                        &times;
-                    </button>
-                </div>
-                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
-                    <input
-                        type="text"
-                        placeholder="Snapshot label..."
-                        value={label}
-                        onChange={(e) => setLabel(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" && !saving) onSaveSnapshot()
-                        }}
-                        style={{ flex: 1, padding: "0.5rem 0.75rem", borderRadius: "4px", border: "1px solid var(--glass-border)", background: "rgba(0,0,0,0.2)", color: "var(--text-main)" }}
-                    />
-                    <button className="btn btn-primary" onClick={onSaveSnapshot} disabled={saving} style={{ padding: "0.5rem 1rem", whiteSpace: "nowrap" }}>
-                        {saving ? "Saving..." : "Save snapshot"}
-                    </button>
-                </div>
-                {historyEntries.length === 0 ? (
-                    <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>No backups available yet. Backups are created automatically before destructive operations.</p>
-                ) : (
-                    <div>
-                        {historyEntries.map((entry) => (
-                            <div
-                                key={entry.id}
-                                style={{
-                                    padding: "1rem",
-                                    marginBottom: "0.75rem",
-                                    background: "rgba(0,0,0,0.2)",
-                                    borderRadius: "8px",
-                                    border: "1px solid var(--glass-border)",
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                }}
-                            >
-                                <div>
-                                    <div style={{ fontWeight: 500, display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                                        <span className={`snapshot-kind ${entry.kind ?? "auto"}`}>{entry.kind ?? "auto"}</span>
-                                        {entry.reason}
-                                    </div>
-                                    <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem" }}>{new Date(entry.created_at).toLocaleString()}</div>
-                                    <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.15rem" }}>
-                                        {(entry.total_count ?? 0) > 0 && (
-                                            <span>
-                                                {entry.translated_count} / {entry.total_count} strings translated
-                                            </span>
-                                        )}
-                                        {(entry.total_count ?? 0) > 0 && (entry.glossary_count ?? 0) > 0 && <span> &middot; </span>}
-                                        {(entry.glossary_count ?? 0) > 0 && (
-                                            <span>
-                                                {entry.glossary_count} glossary term{entry.glossary_count !== 1 ? "s" : ""}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div style={{ display: "flex", gap: "0.35rem", flexShrink: 0 }}>
-                                    <button className="btn btn-primary" style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }} onClick={() => onRestore(entry)}>
-                                        Restore
-                                    </button>
-                                    <button
-                                        className="btn btn-outline"
-                                        style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
-                                        onClick={() => onDelete(entry)}
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </div>
+            onDelete={(entry) => {
+                const orig = byId.get(entry.id)
+                if (orig) onDelete(orig)
+            }}
+            onClose={onClose}
+            emptyMessage="No backups available yet. Backups are created automatically before destructive operations."
+        />
     )
 }

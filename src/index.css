@@ -932,33 +932,7 @@ th {
 
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
-/* WH3 history modal snapshot rows */
-.snapshot-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-.snapshot-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
-}
-.snapshot-meta {
-    display: flex;
-    flex-direction: column;
-}
-.snapshot-label {
-    font-weight: 500;
-    color: var(--text-main);
-}
-.snapshot-sub {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-}
+/* History modal auto/manual kind pill (shared by both games) */
 .snapshot-kind {
     display: inline-block;
     font-size: 0.75rem;
@@ -975,10 +949,6 @@ th {
 .snapshot-kind.manual {
     background: rgba(167, 139, 250, 0.2);
     color: #c4b5fd;
-}
-.snapshot-actions {
-    display: flex;
-    gap: 0.5rem;
 }
 
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
