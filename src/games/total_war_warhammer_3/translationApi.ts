@@ -12,7 +12,19 @@ import type {
     WH3TranslationModSummary,
 } from "../../shared_types"
 import { gameApi } from "../../api/games"
+import type { TranslationPreview } from "../../components/TranslationConfirmModal"
+import type { BatchDescriptor } from "../../hooks/useIterativeTranslation"
 import { RegistryError } from "./api"
+
+/** Preview response for a WH3 translation run: the `TranslationConfirmModal` data plus the flat `batch_plan` the iterative hook consumes. */
+export type WH3TranslationPreview = TranslationPreview & {
+    /** Total untranslated strings the run would cover. */
+    total_strings: number
+    /** Flat per-batch plan the `useIterativeTranslation` hook iterates over. */
+    batch_plan: BatchDescriptor[]
+    /** Present only when `total_strings` is 0 (e.g. "All strings already translated"). */
+    message?: string
+}
 
 const api = gameApi("total_war_warhammer_3")
 
@@ -106,6 +118,21 @@ export async function saveModContext(workshopId: string, ctx: WH3ModContext): Pr
  */
 export async function translateBatch(workshopId: string, keys: string[]): Promise<{ translated: number; suggested_terms: TermSuggestion[] }> {
     const res = await api.post(`/translation/mods/${encodeURIComponent(workshopId)}/translate`, { keys })
+    if (!res.ok) throw await registryError(res)
+    return res.json()
+}
+
+/**
+ * Preview a translation run: the prompts, cost estimate, and batch plan for every untranslated row. Mirrors Chrono Ark's `/translate/preview` so the
+ * shared `TranslationConfirmModal` and `useIterativeTranslation` hook drive WH3 identically.
+ *
+ * @param workshopId Steam Workshop ID of the translation mod.
+ * @param provider Optional provider override (defaults to the server's configured provider).
+ * @returns The preview payload, including `batch_plan`. When nothing is untranslated, `total_strings` is 0.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function previewTranslation(workshopId: string, provider?: string): Promise<WH3TranslationPreview> {
+    const res = await api.post("/translate/preview", { mod_id: workshopId, provider })
     if (!res.ok) throw await registryError(res)
     return res.json()
 }

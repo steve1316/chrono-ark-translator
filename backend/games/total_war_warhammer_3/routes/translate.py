@@ -178,7 +178,7 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
     provider = _t.ClaudeProvider()
 
     try:
-        translations, suggestions = await run_batch(
+        translations, _suggestions = await run_batch(
             provider,
             entries,
             source_lang,
@@ -191,6 +191,10 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+    # Glossary-suggestion review between batches is deferred to P1f (WH3 has no suggestions accept/dismiss endpoints yet), so the iterative loop never
+    # pauses for review. We return an empty list so the shared hook flows preview -> confirm -> batches -> complete without a reviewing phase.
+    suggestions: list = []
 
     raw = _t.store.load_translations_raw(req.mod_id)
     now = datetime.now(timezone.utc).isoformat()

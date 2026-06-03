@@ -30,6 +30,16 @@ const STRINGS: WH3DriftRow[] = [
     { source_filename: "units.loc.tsv", key: "k3", parent_text: "原三", translation_text: "Stale text", status: "stale", provider: "claude", canonical_status: "pending" },
 ]
 
+const PREVIEW = {
+    total_strings: 1,
+    total_batches: 1,
+    batch_size: 100,
+    provider: "claude",
+    previews: { Chinese: { system_prompt: "SYS PROMPT", user_messages: ["USER MSG"], strings_in_language: 1, batches: 1 } },
+    estimates: { Chinese: { estimated_input_tokens: 10, estimated_output_tokens: 10, estimated_cost_usd: 0.01, model: "claude", note: "estimate" } },
+    batch_plan: [{ source_lang: "Chinese", keys: ["k2"], size: 1 }],
+}
+
 function mockJson(body: unknown, status = 200) {
     return new Response(JSON.stringify(body), { status })
 }
@@ -341,32 +351,31 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         }
     })
 
-    it("renders the translate-in-progress banner while runTranslateBatch is executing", async () => {
-        // Mock /translate to never resolve so we can observe the banner mid-flight.
-        let resolveTranslate: (v: Response) => void = () => undefined
-        const translatePromise = new Promise<Response>((r) => {
-            resolveTranslate = r
+    it("previews then shows the in-progress banner after confirming the translation", async () => {
+        // Translate now previews first (opens the confirm modal); confirming starts the iterative batch loop. Hold /translate/batch open to observe the banner.
+        let resolveBatch: (v: Response) => void = () => undefined
+        const batchPromise = new Promise<Response>((r) => {
+            resolveBatch = r
         })
         const spy = vi.spyOn(globalThis, "fetch")
         spy.mockImplementation(async (input: RequestInfo | URL) => {
             const url = typeof input === "string" ? input : input.toString()
-            if (url.endsWith("/translate")) {
-                return translatePromise
-            }
+            if (url.endsWith("/translate/preview")) return mockJson(PREVIEW)
+            if (url.endsWith("/translate/batch")) return batchPromise
             if (url.endsWith("/translation/mods")) return mockJson([MOD])
             if (url.endsWith("/rescan")) return mockJson(SUMMARY)
-            if (url.includes("/strings?status=")) return mockJson(STRINGS.filter((r) => url.includes(r.status)))
             if (url.endsWith("/strings")) return mockJson(STRINGS)
             if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
             return mockJson({ status: "ok" })
         })
 
         render(wrap())
-        const translateBtn = await screen.findByRole("button", { name: /^Translate \(Claude\)/i })
-        fireEvent.click(translateBtn)
+        fireEvent.click(await screen.findByRole("button", { name: /^Translate \(Claude\)/i }))
+        // Confirm modal appears with the "Translate N strings" action.
+        fireEvent.click(await screen.findByRole("button", { name: /^Translate \d+ strings?$/i }))
         await waitFor(() => expect(screen.getByText(/Translating batch/i)).toBeInTheDocument())
         expect(screen.getByRole("button", { name: /^Cancel$/i })).toBeInTheDocument()
-        resolveTranslate(mockJson({ translated: 1, suggested_terms: [] }))
+        resolveBatch(mockJson({ status: "success", translated: 1, translations: { k2: "x" }, suggestions: [] }))
     })
 
     it("wraps the table inside .string-table-container glass-card", async () => {
@@ -426,31 +435,25 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         }
     })
 
-    it("Cancel button stops the batch loop and hides the banner", async () => {
-        let resolveTranslate: (v: Response) => void = () => undefined
+    it("Cancel during a run stops the loop and hides the banner", async () => {
         const spy = vi.spyOn(globalThis, "fetch")
         spy.mockImplementation(async (input: RequestInfo | URL) => {
             const url = typeof input === "string" ? input : input.toString()
-            if (url.endsWith("/translate")) {
-                return new Promise<Response>((r) => {
-                    resolveTranslate = r
-                })
-            }
+            if (url.endsWith("/translate/preview")) return mockJson(PREVIEW)
+            // Hold the batch open so the banner stays up until the user cancels.
+            if (url.endsWith("/translate/batch")) return new Promise<Response>(() => undefined)
             if (url.endsWith("/translation/mods")) return mockJson([MOD])
             if (url.endsWith("/rescan")) return mockJson(SUMMARY)
-            if (url.includes("/strings?status=")) return mockJson(STRINGS.filter((r) => url.includes(r.status)))
             if (url.endsWith("/strings")) return mockJson(STRINGS)
             if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
             return mockJson({ status: "ok" })
         })
 
         render(wrap())
-        const translateBtn = await screen.findByRole("button", { name: /^Translate \(Claude\)/i })
-        fireEvent.click(translateBtn)
+        fireEvent.click(await screen.findByRole("button", { name: /^Translate \(Claude\)/i }))
+        fireEvent.click(await screen.findByRole("button", { name: /^Translate \d+ strings?$/i }))
         await waitFor(() => expect(screen.getByText(/Translating batch/i)).toBeInTheDocument())
         fireEvent.click(screen.getByRole("button", { name: /^Cancel$/i }))
-        // Resolve the in-flight call so the loop reaches its cancel check.
-        resolveTranslate(mockJson({ translated: 1, suggested_terms: [] }))
         await waitFor(() => expect(screen.queryByText(/Translating batch/i)).not.toBeInTheDocument())
     })
 })

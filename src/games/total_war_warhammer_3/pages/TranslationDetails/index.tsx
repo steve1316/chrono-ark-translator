@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { FaExclamationCircle, FaFolderOpen, FaSteam } from "react-icons/fa"
 
 import EditableCell from "../../../../components/EditableCell"
+import TranslationConfirmModal from "../../../../components/TranslationConfirmModal"
 import { API_BASE } from "../../../../config"
+import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
 import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationPage } from "../../../../translation/TranslationPage"
 import type { ColumnDef } from "../../../../translation/types"
@@ -21,11 +23,12 @@ import {
     listTranslationMods,
     loadGlossary,
     openModFolder,
+    previewTranslation,
     rescanMod,
     saveModContext,
     saveString,
     syncChanges,
-    translateBatch,
+    type WH3TranslationPreview,
 } from "../../translationApi"
 
 // Canonical status filter pills, identical to Chrono Ark. WH3 never emits "untouched"/"untranslatable", but the pill set matches for 1-to-1 parity.
@@ -36,7 +39,6 @@ const STATUS_FILTERS: Array<{ value: RowStatus | "all"; label: string }> = [
     { value: "pending", label: "Pending" },
     { value: "synced", label: "Synced" },
 ]
-const BATCH_LIMIT = 50
 
 type ModalKey = "glossary" | "scan" | "responses" | "context" | "history" | "reset" | null
 
@@ -69,7 +71,6 @@ const TranslationDetailsPage: React.FC = () => {
     const [search, setSearch] = useState("")
     const [loading, setLoading] = useState(true)
     const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
-    const [translating, setTranslating] = useState(false)
     const [openModal, setOpenModal] = useState<ModalKey>(null)
     const [modContext, setModContext] = useState<WH3ModContext>({
         source_game: "",
@@ -81,8 +82,8 @@ const TranslationDetailsPage: React.FC = () => {
     const [glossaryCount, setGlossaryCount] = useState<number>(0)
     const [activeProvider, setActiveProvider] = useState<string>("claude")
     const [showTranslateDropdown, setShowTranslateDropdown] = useState<boolean>(false)
-    const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null)
-    const cancelRequestedRef = useRef<boolean>(false)
+    const [preview, setPreview] = useState<WH3TranslationPreview | null>(null)
+    const [pendingProvider, setPendingProvider] = useState<string>("")
     const [sortConfig, setSortConfig] = useState<{ key: SortField; direction: "asc" | "desc" | null }>({ key: "key", direction: null })
     const [columnWidths, setColumnWidths] = useState<Record<SortField, number>>(() => {
         try {
@@ -171,41 +172,60 @@ const TranslationDetailsPage: React.FC = () => {
         [workshopId]
     )
 
-    const runTranslateBatch = useCallback(async () => {
-        setTranslating(true)
-        cancelRequestedRef.current = false
-        try {
-            const targetRows = await fetchStrings(workshopId, "untranslated")
-            const candidates = targetRows.map((r) => r.key)
-            if (candidates.length === 0) {
-                setBanner({ type: "success", message: "No untranslated rows to translate." })
-                return
-            }
-            if (candidates.length > BATCH_LIMIT) {
-                const ok = window.confirm(`${candidates.length} rows match. Translating in batches of ${BATCH_LIMIT} may take a while and cost API credits. Continue?`)
-                if (!ok) return
-            }
-            const totalBatches = Math.ceil(candidates.length / BATCH_LIMIT)
-            for (let i = 0; i < candidates.length; i += BATCH_LIMIT) {
-                if (cancelRequestedRef.current) {
-                    setBanner({ type: "error", message: `Translation cancelled after ${i} of ${candidates.length} rows` })
+    // Optimistically reflect each completed batch's translations in the table while the run continues.
+    const onBatchTranslated = useCallback((translations: Record<string, string>) => {
+        setStrings((prev) =>
+            prev.map((r) => (translations[r.key] !== undefined ? { ...r, translation_text: translations[r.key], provider: "claude", status: "translated", canonical_status: "pending" } : r))
+        )
+    }, [])
+
+    const { state: batchState, startTranslation, cancel: cancelTranslation } = useIterativeTranslation("total_war_warhammer_3", workshopId, onBatchTranslated)
+    const isTranslating = batchState.phase === "translating"
+
+    // Clicking Translate previews the run (prompts + cost + batch plan) and opens the confirm modal. Confirming starts the iterative batch loop.
+    const handleTranslateClick = useCallback(
+        async (provider?: string) => {
+            const p = provider || activeProvider
+            setPendingProvider(p)
+            try {
+                const pv = await previewTranslation(workshopId, p)
+                if (pv.total_strings === 0) {
+                    setBanner({ type: "success", message: pv.message || "All strings are already translated." })
                     return
                 }
-                setBatchProgress({ current: Math.floor(i / BATCH_LIMIT) + 1, total: totalBatches })
-                await translateBatch(workshopId, candidates.slice(i, i + BATCH_LIMIT))
+                setPreview(pv)
+            } catch (e) {
+                setBanner({ type: "error", message: `Preview failed: ${(e as Error).message}` })
             }
-            const summary = await rescanMod(workshopId)
-            setProgress(summary)
-            await loadStrings()
-            setBanner({ type: "success", message: `Translated ${candidates.length} rows` })
-        } catch (e) {
-            setBanner({ type: "error", message: `Translate failed: ${(e as Error).message}` })
-        } finally {
-            setTranslating(false)
-            setBatchProgress(null)
-            cancelRequestedRef.current = false
+        },
+        [workshopId, activeProvider]
+    )
+
+    const onConfirmTranslate = useCallback(() => {
+        if (!preview) return
+        const plan = preview.batch_plan ?? []
+        setPreview(null)
+        startTranslation(pendingProvider || activeProvider, plan)
+    }, [preview, pendingProvider, activeProvider, startTranslation])
+
+    // When the iterative run finishes (or errors), refresh counts + rows and surface a result banner.
+    useEffect(() => {
+        if (batchState.phase === "complete") {
+            const total = batchState.totalTranslated
+            ;(async () => {
+                try {
+                    const summary = await rescanMod(workshopId)
+                    setProgress(summary)
+                    await loadStrings()
+                } catch {
+                    /* ignore refresh errors */
+                }
+                setBanner({ type: "success", message: `Translated ${total} strings` })
+            })()
+        } else if (batchState.phase === "error") {
+            setBanner({ type: "error", message: batchState.message })
         }
-    }, [workshopId, loadStrings])
+    }, [batchState, workshopId, loadStrings])
 
     const onSyncChanges = useCallback(async () => {
         try {
@@ -445,8 +465,8 @@ const TranslationDetailsPage: React.FC = () => {
                     <button
                         type="button"
                         className="btn btn-primary"
-                        onClick={runTranslateBatch}
-                        disabled={translating || translateCount === 0}
+                        onClick={() => handleTranslateClick()}
+                        disabled={isTranslating || translateCount === 0}
                         style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
                     >
                         Translate ({activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})
@@ -456,7 +476,7 @@ const TranslationDetailsPage: React.FC = () => {
                         className="btn btn-primary"
                         aria-label="Translate provider menu"
                         onClick={() => setShowTranslateDropdown((v) => !v)}
-                        disabled={translating}
+                        disabled={isTranslating}
                         style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeft: "1px solid rgba(255,255,255,0.2)", padding: "0.5rem 0.4rem" }}
                     >
                         &#9662;
@@ -511,6 +531,7 @@ const TranslationDetailsPage: React.FC = () => {
             {(openModal === "history" || openModal === "reset") && (
                 <HistoryModal workshopId={workshopId} onClose={() => setOpenModal(null)} defaultRestoreMode={openModal === "reset"} onRestored={onRestored} />
             )}
+            {preview && <TranslationConfirmModal preview={preview} onConfirm={onConfirmTranslate} onCancel={() => setPreview(null)} />}
         </>
     )
 
@@ -537,10 +558,8 @@ const TranslationDetailsPage: React.FC = () => {
             onSort={handleSort}
             columnWidths={columnWidths}
             onResizeColumn={onResizeColumn}
-            translating={batchProgress ? { batchIndex: batchProgress.current - 1, totalBatches: batchProgress.total } : null}
-            onCancelTranslate={() => {
-                cancelRequestedRef.current = true
-            }}
+            translating={batchState.phase === "translating" ? { batchIndex: batchState.batchIndex, totalBatches: batchState.totalBatches, streaming: batchState.streamingProgress } : null}
+            onCancelTranslate={cancelTranslation}
             banner={banner}
             onDismissBanner={() => setBanner(null)}
             modals={modals}
