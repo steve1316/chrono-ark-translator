@@ -23,6 +23,7 @@ import {
     listTranslationMods,
     loadGlossary,
     openModFolder,
+    openSourceFile,
     previewTranslation,
     rescanMod,
     saveModContext,
@@ -336,7 +337,19 @@ const TranslationDetailsPage: React.FC = () => {
             width: 200,
             sortable: true,
             cellClassName: "key-cell",
-            render: (r) => <span style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{r.source_filename}</span>,
+            render: (r) => (
+                <a
+                    href="#"
+                    title={r.source_filename}
+                    onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        openSourceFile(workshopId, r.source_filename).catch(() => {})
+                    }}
+                >
+                    {r.source_filename}
+                </a>
+            ),
         },
         { field: "key", label: "Key", width: 220, sortable: true, cellClassName: "key-cell", render: (r) => r.key },
         {

@@ -341,6 +341,18 @@ export async function openModFolder(workshopId: string): Promise<void> {
     if (!res.ok) throw await registryError(res)
 }
 
+/**
+ * Open one of the mod's source `.loc.tsv` files in the OS default application.
+ *
+ * @param workshopId Steam Workshop ID of the translation mod.
+ * @param filename The normalized `.loc.tsv` filename shown in the Source column.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function openSourceFile(workshopId: string, filename: string): Promise<void> {
+    const res = await api.post(`/translation/mods/${encodeURIComponent(workshopId)}/open-source-file/${encodeURIComponent(filename)}`)
+    if (!res.ok) throw await registryError(res)
+}
+
 async function registryError(res: Response): Promise<RegistryError> {
     let detail = res.statusText
     try {
