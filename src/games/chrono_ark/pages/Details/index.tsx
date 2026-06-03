@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { FaSteam, FaArrowLeft, FaSort, FaSortUp, FaSortDown, FaFileExport, FaBook, FaFolderOpen, FaExclamationCircle } from "react-icons/fa"
+import { FaSteam, FaFileExport, FaBook, FaFolderOpen, FaExclamationCircle } from "react-icons/fa"
 import type { GlossaryTerm, LocString, TermSuggestion } from "../../../../shared_types"
 import { getRowStatus, getRowStyle, filterStrings, sortStrings } from "../../../../utils/stringFilters"
 import type { SortField, SortDirection } from "../../../../utils/stringFilters"
@@ -12,6 +12,9 @@ import ApiResponsesModal from "../../components/ApiResponsesModal"
 import BackupHistoryModal from "../../components/BackupHistoryModal"
 import ChronoArkGlossaryPanel from "../../components/ChronoArkGlossaryPanel"
 import ConfirmModal from "../../../../components/ConfirmModal"
+import { TranslationPage } from "../../../../translation/TranslationPage"
+import { StatusBadge } from "../../../../translation/StatusBadge"
+import type { ColumnDef } from "../../../../translation/types"
 import EditableCell from "../../../../components/EditableCell"
 import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
 import type { BatchDescriptor } from "../../../../hooks/useIterativeTranslation"
@@ -156,7 +159,7 @@ const ModDetail: React.FC = () => {
     })
 
     const [columnWidths, setColumnWidths] = useState<{ [key: string]: number }>({
-        status: 120,
+        is_translated: 120,
         translated_by: 100,
         key: 200,
         source_file: 100,
@@ -291,7 +294,6 @@ const ModDetail: React.FC = () => {
      * is being resized, the pointer's starting X position, and the column's width
      * at the start of the drag. Null when no resize is in progress.
      */
-    const resizingRef = useRef<{ field: string; startX: number; startWidth: number } | null>(null)
 
     /**
      * Fetches whether there are pending translation changes that can be exported
@@ -457,45 +459,6 @@ const ModDetail: React.FC = () => {
     // each <th>. Minimum column width is clamped to 80px.
 
     /**
-     * Starts the column resizing process by capturing the pointer and recording
-     * the initial drag position and column width.
-     *
-     * @param e - Pointer event from the resizer handle element.
-     * @param field - The column field key being resized (e.g. `"status"`, `"key"`).
-     */
-    const onResizeStart = (e: React.PointerEvent, field: string) => {
-        resizingRef.current = {
-            field,
-            startX: e.pageX,
-            startWidth: columnWidths[field],
-        }
-        // Capture the pointer so move/up events continue even if the cursor leaves the element.
-        ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    }
-
-    /**
-     * Updates the column width in real-time as the pointer moves during a resize.
-     * Width is clamped to a minimum of 80px.
-     *
-     * @param e - Pointer move event.
-     */
-    const onResizeMove = (e: React.PointerEvent) => {
-        if (!resizingRef.current) return
-        const deltaX = e.pageX - resizingRef.current.startX
-        const newWidth = Math.max(80, resizingRef.current.startWidth + deltaX)
-        setColumnWidths((prev) => ({ ...prev, [resizingRef.current!.field]: newWidth }))
-    }
-
-    /**
-     * Ends the column resize operation by clearing the tracking ref.
-     *
-     * @param _ - Pointer up event.
-     */
-    const onResizeEnd = (_: React.PointerEvent) => {
-        resizingRef.current = null
-    }
-
-    /**
      * This memoized computation derives the visible rows from the full strings
      * array. It applies three stages in order:
      *   1. Filter by translation status (all / translated / untranslated)
@@ -508,16 +471,6 @@ const ModDetail: React.FC = () => {
     const processedStrings = React.useMemo(() => {
         return sortStrings(filterStrings(strings, filter, search), sortConfig)
     }, [strings, filter, search, sortConfig])
-
-    /**
-     * Retrieves the appropriate sort icon for a field.
-     * @param field - The field to check.
-     * @returns React icon component.
-     */
-    const getSortIcon = (field: SortField) => {
-        if (sortConfig.key !== field || !sortConfig.direction) return <FaSort className="sort-icon" />
-        return sortConfig.direction === "asc" ? <FaSortUp className="sort-icon active" /> : <FaSortDown className="sort-icon active" />
-    }
 
     /**
      * Writes saved translations back to the mod's original CSV files on disk.
@@ -681,137 +634,164 @@ const ModDetail: React.FC = () => {
 
     if (!modId) return <div>Mod ID not found.</div>
 
-    return (
-        <div className="mod-detail">
-            {/* --- Header: Mod info, navigation, and action buttons --- */}
-            <div className="dashboard-header">
-                <div className="title-group">
-                    <button className="btn btn-outline" onClick={onBack} style={{ marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <FaArrowLeft /> Back to Dashboard
-                    </button>
-                    <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
-                        {modPreviewImage && (
-                            <img
-                                src={`${API_BASE}${modPreviewImage}`}
-                                alt={modName}
-                                style={{
-                                    width: "80px",
-                                    height: "80px",
-                                    borderRadius: "12px",
-                                    objectFit: "cover",
-                                    border: "1px solid var(--glass-border)",
-                                    flexShrink: 0,
-                                }}
-                            />
+    const columns: ColumnDef<LocString>[] = [
+        { field: "is_translated", label: "Status", width: columnWidths.is_translated ?? 120, sortable: true, render: (s) => <StatusBadge status={getRowStatus(s)} reason={s.untranslatable_reason} /> },
+        { field: "translated_by", label: "Mode", width: 100, sortable: true, cellClassName: "key-cell", render: (s) => <span title={s.translated_by}>{s.translated_by || "—"}</span> },
+        {
+            field: "source_file",
+            label: "Source",
+            width: 100,
+            sortable: true,
+            cellClassName: "key-cell",
+            render: (s) => (
+                <a
+                    href="#"
+                    title={s.source_file}
+                    onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        gameApi("chrono_ark").post(`/mods/${modId}/open-source-file/${encodeURIComponent(s.source_file)}`)
+                    }}
+                >
+                    {s.source_file}
+                </a>
+            ),
+        },
+        { field: "key", label: "Key", width: 200, sortable: true, cellClassName: "key-cell", render: (s) => <span title={s.key}>{s.key}</span> },
+        { field: "source", label: `Original (${sourceLangOverride || "Chinese"})`, width: 400, sortable: true, cellClassName: "source-cell", render: (s) => s.source },
+        {
+            field: "english",
+            label: targetLangOverride || "English",
+            width: 500,
+            sortable: true,
+            cellClassName: "english-cell",
+            render: (s) =>
+                getRowStatus(s) === "untranslatable" ? (
+                    <span className="untranslatable-hint" title={s.untranslatable_reason}>
+                        {s.untranslatable_reason}
+                    </span>
+                ) : (
+                    <>
+                        {s.original_english && s.original_english !== s.english && (
+                            <div className="prev-translation" style={s.is_synced ? { color: "rgba(52, 211, 153, 0.6)" } : undefined}>
+                                {s.original_english}
+                            </div>
                         )}
-                        <div>
-                            <div style={{ display: "flex", alignItems: "baseline", gap: "0.6rem" }}>
-                                <h1>{modName || modId}</h1>
-                                {modUrl && (
-                                    <a
-                                        href={modUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        title="Open on Steam Workshop"
-                                        style={{ color: "var(--text-dim)", fontSize: "1.3rem", transition: "color 0.2s", display: "flex" }}
-                                        onMouseEnter={(e) => (e.currentTarget.style.color = "#66c0f4")}
-                                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-dim)")}
-                                    >
-                                        <FaSteam />
-                                    </a>
-                                )}
-                                <button
-                                    onClick={handleOpenFolder}
-                                    title="Open local folder"
-                                    style={{
-                                        background: "none",
-                                        border: "none",
-                                        cursor: "pointer",
-                                        color: "var(--text-dim)",
-                                        fontSize: "1.3rem",
-                                        transition: "color 0.2s",
-                                        display: "flex",
-                                        padding: 0,
-                                    }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent-primary)")}
-                                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-dim)")}
-                                >
-                                    <FaFolderOpen />
-                                </button>
-                                {hasExportChanges && (
-                                    <span
-                                        style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "0.4rem",
-                                            fontSize: "0.8rem",
-                                            padding: "0.3rem 0.7rem",
-                                            background: "rgba(251, 191, 36, 0.12)",
-                                            border: "1px solid rgba(251, 191, 36, 0.3)",
-                                            borderRadius: "8px",
-                                            color: "#fbbf24",
-                                            fontWeight: 600,
-                                        }}
-                                    >
-                                        <FaExclamationCircle size={12} />
-                                        Changes pending sync
-                                    </span>
-                                )}
-                            </div>
-                            {modAuthor && <p style={{ color: "var(--text-dim)", marginTop: "0.25rem" }}>by {modAuthor}</p>}
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
-                                <label style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Source Language:</label>
-                                <select
-                                    value={sourceLangOverride || "Chinese"}
-                                    onChange={(e) => saveSourceLanguage(e.target.value)}
-                                    style={{
-                                        padding: "0.3rem 0.5rem",
-                                        borderRadius: "6px",
-                                        background: "rgba(0,0,0,0.2)",
-                                        border: "1px solid var(--glass-border)",
-                                        color: "var(--text-main)",
-                                        fontSize: "0.85rem",
-                                    }}
-                                >
-                                    <option value="Chinese">Chinese</option>
-                                    <option value="Korean">Korean</option>
-                                    <option value="Japanese">Japanese</option>
-                                    <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
-                                    <option value="English">English</option>
-                                </select>
-                                {sourceLangOverride === "English" && (
-                                    <>
-                                        <span style={{ margin: "0 0.3rem", color: "var(--text-dim)" }}>→</span>
-                                        <select
-                                            value={targetLangOverride || "Chinese"}
-                                            onChange={(e) => saveTargetLanguage(e.target.value)}
-                                            style={{
-                                                padding: "0.3rem 0.5rem",
-                                                borderRadius: "6px",
-                                                background: "rgba(0,0,0,0.2)",
-                                                border: "1px solid var(--glass-border)",
-                                                color: "var(--text-main)",
-                                                fontSize: "0.85rem",
-                                            }}
-                                        >
-                                            <option value="Chinese">Chinese</option>
-                                            <option value="Korean">Korean</option>
-                                            <option value="Japanese">Japanese</option>
-                                            <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
-                                        </select>
-                                    </>
-                                )}
-                            </div>
-                            <p>
-                                {strings.filter((s) => s.source.trim() && !s.untranslatable_reason && s.is_translated).length} /{" "}
-                                {strings.filter((s) => s.source.trim() && !s.untranslatable_reason).length} total strings translated
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                        <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
+                    </>
+                ),
+        },
+    ]
 
-                {/* --- Action Buttons: glossary, suggestions, character context, clear, translate, sync --- */}
-                <div className="mod-actions">
+    return (
+        <TranslationPage<LocString>
+            onBack={onBack}
+            previewImage={modPreviewImage ? `${API_BASE}${modPreviewImage}` : null}
+            title={modName || modId}
+            titleBadges={
+                <>
+                    {" "}
+                    {modUrl && (
+                        <a
+                            href={modUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Open on Steam Workshop"
+                            style={{ color: "var(--text-dim)", fontSize: "1.3rem", transition: "color 0.2s", display: "flex" }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = "#66c0f4")}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-dim)")}
+                        >
+                            <FaSteam />
+                        </a>
+                    )}
+                    <button
+                        onClick={handleOpenFolder}
+                        title="Open local folder"
+                        style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "var(--text-dim)",
+                            fontSize: "1.3rem",
+                            transition: "color 0.2s",
+                            display: "flex",
+                            padding: 0,
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent-primary)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-dim)")}
+                    >
+                        <FaFolderOpen />
+                    </button>
+                    {hasExportChanges && (
+                        <span
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.4rem",
+                                fontSize: "0.8rem",
+                                padding: "0.3rem 0.7rem",
+                                background: "rgba(251, 191, 36, 0.12)",
+                                border: "1px solid rgba(251, 191, 36, 0.3)",
+                                borderRadius: "8px",
+                                color: "#fbbf24",
+                                fontWeight: 600,
+                            }}
+                        >
+                            <FaExclamationCircle size={12} />
+                            Changes pending sync
+                        </span>
+                    )}
+                </>
+            }
+            subtitle={modAuthor ? `by ${modAuthor}` : undefined}
+            languageControls={
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+                    <label style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Source Language:</label>
+                    <select
+                        value={sourceLangOverride || "Chinese"}
+                        onChange={(e) => saveSourceLanguage(e.target.value)}
+                        style={{
+                            padding: "0.3rem 0.5rem",
+                            borderRadius: "6px",
+                            background: "rgba(0,0,0,0.2)",
+                            border: "1px solid var(--glass-border)",
+                            color: "var(--text-main)",
+                            fontSize: "0.85rem",
+                        }}
+                    >
+                        <option value="Chinese">Chinese</option>
+                        <option value="Korean">Korean</option>
+                        <option value="Japanese">Japanese</option>
+                        <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
+                        <option value="English">English</option>
+                    </select>
+                    {sourceLangOverride === "English" && (
+                        <>
+                            <span style={{ margin: "0 0.3rem", color: "var(--text-dim)" }}>→</span>
+                            <select
+                                value={targetLangOverride || "Chinese"}
+                                onChange={(e) => saveTargetLanguage(e.target.value)}
+                                style={{
+                                    padding: "0.3rem 0.5rem",
+                                    borderRadius: "6px",
+                                    background: "rgba(0,0,0,0.2)",
+                                    border: "1px solid var(--glass-border)",
+                                    color: "var(--text-main)",
+                                    fontSize: "0.85rem",
+                                }}
+                            >
+                                <option value="Chinese">Chinese</option>
+                                <option value="Korean">Korean</option>
+                                <option value="Japanese">Japanese</option>
+                                <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
+                            </select>
+                        </>
+                    )}
+                </div>
+            }
+            progressLabel={`${strings.filter((s) => s.source.trim() && !s.untranslatable_reason && s.is_translated).length} / ${strings.filter((s) => s.source.trim() && !s.untranslatable_reason).length} total strings translated`}
+            toolbar={
+                <>
                     {/* Glossary, suggestions, and character context toggles. */}
                     <div className="mod-actions-group">
                         <button
@@ -981,483 +961,274 @@ const ModDetail: React.FC = () => {
                             </button>
                         )}
                     </div>
-                </div>
-            </div>
-
-            {/* --- Translation In-Progress Spinner --- */}
-            {batchState.phase === "translating" && (
-                <div
-                    className="glass-card"
-                    style={{
-                        padding: "1.25rem 1.5rem",
-                        marginBottom: "1rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "1rem",
-                        background: "rgba(125,211,252,0.08)",
-                        border: "1px solid rgba(125,211,252,0.25)",
-                    }}
-                >
+                </>
+            }
+            statusFilters={[
+                { value: "all", label: "All" },
+                { value: "missing", label: "Missing" },
+                { value: "untouched", label: "Untouched" },
+                { value: "pending", label: "Pending" },
+                { value: "synced", label: "Synced" },
+            ]}
+            activeFilter={filter}
+            onFilterChange={(v) => setFilter(v as typeof filter)}
+            search={search}
+            onSearchChange={setSearch}
+            columns={columns}
+            rows={processedStrings}
+            getRowKey={(s) => s.key}
+            getRowStyle={getRowStyle}
+            sortField={sortConfig.direction ? sortConfig.key : null}
+            sortDirection={sortConfig.direction}
+            onSort={(f) => handleSort(f as SortField)}
+            columnWidths={columnWidths}
+            onResizeColumn={(field, width) => setColumnWidths((prev) => ({ ...prev, [field]: width }))}
+            translating={batchState.phase === "translating" ? { batchIndex: batchState.batchIndex, totalBatches: batchState.totalBatches, streaming: batchState.streamingProgress } : null}
+            onCancelTranslate={() => {
+                cancelTranslation()
+                setTranslateBanner({ type: "success", message: "Translation cancelled." })
+            }}
+            extraBanners={
+                batchState.phase === "reviewing" &&
+                !showReviewModal && (
                     <div
+                        className="glass-card"
                         style={{
-                            width: "20px",
-                            height: "20px",
-                            border: "3px solid rgba(125,211,252,0.3)",
-                            borderTop: "3px solid var(--accent-primary)",
-                            borderRadius: "50%",
-                            animation: "spin 1s linear infinite",
+                            padding: "1.25rem 1.5rem",
+                            marginBottom: "1rem",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "1rem",
+                            background: "rgba(250,204,21,0.08)",
+                            border: "1px solid rgba(250,204,21,0.25)",
                         }}
-                    />
-                    <span style={{ color: "var(--text-main)" }}>
-                        Translating batch {batchState.batchIndex + 1} of {batchState.totalBatches}...{" "}
-                        {batchState.streamingProgress
-                            ? `${batchState.streamingProgress.tokensGenerated} tokens (${batchState.streamingProgress.tokensPerSec} tok/s, ${batchState.streamingProgress.elapsedSec}s elapsed)`
-                            : "waiting for provider response"}
-                    </span>
-                    <button
-                        className="btn btn-outline"
-                        onClick={() => {
-                            cancelTranslation()
-                            setTranslateBanner({ type: "success", message: `Translation cancelled. ${batchState.batchIndex} of ${batchState.totalBatches} batches completed.` })
-                        }}
-                        style={{ marginLeft: "auto", padding: "0.25rem 0.75rem" }}
                     >
-                        Cancel
-                    </button>
-                </div>
-            )}
-
-            {/* --- Batch Paused Banner ---
-                Shown when the user closes the review modal to inspect the table.
-                They can resume the review or cancel remaining batches. */}
-            {batchState.phase === "reviewing" && !showReviewModal && (
-                <div
-                    className="glass-card"
-                    style={{
-                        padding: "1.25rem 1.5rem",
-                        marginBottom: "1rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "1rem",
-                        background: "rgba(250,204,21,0.08)",
-                        border: "1px solid rgba(250,204,21,0.25)",
-                    }}
-                >
-                    <span style={{ color: "var(--text-main)" }}>
-                        Batch {batchState.batchIndex + 1} of {batchState.totalBatches} complete.
-                    </span>
-                    <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
-                        <button className="btn btn-primary" onClick={() => setShowReviewModal(true)} style={{ padding: "0.25rem 0.75rem" }}>
-                            Review Suggestions
-                        </button>
-                        <button
-                            className="btn btn-primary"
-                            onClick={() => {
-                                continueAfterReview()
-                            }}
-                            style={{ padding: "0.25rem 0.75rem" }}
-                        >
-                            Continue
-                        </button>
-                        <button
-                            className="btn btn-outline"
-                            onClick={() => {
-                                cancelTranslation()
-                                setTranslateBanner({ type: "success", message: `Translation cancelled. ${batchState.batchIndex} of ${batchState.totalBatches} batches completed.` })
-                            }}
-                            style={{ padding: "0.25rem 0.75rem" }}
-                        >
-                            Cancel
-                        </button>
+                        <span style={{ color: "var(--text-main)" }}>
+                            Batch {batchState.batchIndex + 1} of {batchState.totalBatches} complete.
+                        </span>
+                        <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
+                            <button className="btn btn-primary" onClick={() => setShowReviewModal(true)} style={{ padding: "0.25rem 0.75rem" }}>
+                                Review Suggestions
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => {
+                                    continueAfterReview()
+                                }}
+                                style={{ padding: "0.25rem 0.75rem" }}
+                            >
+                                Continue
+                            </button>
+                            <button
+                                className="btn btn-outline"
+                                onClick={() => {
+                                    cancelTranslation()
+                                    setTranslateBanner({ type: "success", message: `Translation cancelled. ${batchState.batchIndex} of ${batchState.totalBatches} batches completed.` })
+                                }}
+                                style={{ padding: "0.25rem 0.75rem" }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
+            banner={translateBanner}
+            onDismissBanner={() => setTranslateBanner(null)}
+            panels={
+                <>
+                    {showGlossaryPanel && (
+                        <ChronoArkGlossaryPanel
+                            glossary={modGlossary}
+                            modId={modId!}
+                            strings={strings}
+                            onChanged={fetchModGlossary}
+                            onApplied={(message) => {
+                                setTranslateBanner({ type: "success", message })
+                                fetchModDetail(true)
+                                fetchExportStatus()
+                            }}
+                            onRequestDeleteAll={() => setConfirmModal({ type: "delete-all-glossary", message: `Delete all ${Object.keys(modGlossary).length} glossary term(s)?` })}
+                            onSuggestionsChanged={fetchSuggestions}
+                        />
+                    )}
 
-            {/* --- Translation Result Banner (success/error) — dismissible --- */}
-            {translateBanner && (
-                <div
-                    className="glass-card"
-                    style={{
-                        padding: "1rem 1.5rem",
-                        marginBottom: "1rem",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        background: translateBanner.type === "error" ? "rgba(248,113,113,0.1)" : "rgba(52,211,153,0.1)",
-                        border: `1px solid ${translateBanner.type === "error" ? "rgba(248,113,113,0.3)" : "rgba(52,211,153,0.3)"}`,
-                    }}
-                >
-                    <span
-                        style={{
-                            color: translateBanner.type === "error" ? "#f87171" : "#34d399",
-                            whiteSpace: "pre-wrap",
-                        }}
-                    >
-                        {translateBanner.message}
-                    </span>
-                    <button
-                        onClick={() => setTranslateBanner(null)}
-                        style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", fontSize: "1.2rem", padding: "0 0.25rem" }}
-                    >
-                        &times;
-                    </button>
-                </div>
-            )}
-
-            {showGlossaryPanel && (
-                <ChronoArkGlossaryPanel
-                    glossary={modGlossary}
-                    modId={modId!}
-                    strings={strings}
-                    onChanged={fetchModGlossary}
-                    onApplied={(message) => {
-                        setTranslateBanner({ type: "success", message })
-                        fetchModDetail(true)
-                        fetchExportStatus()
-                    }}
-                    onRequestDeleteAll={() => setConfirmModal({ type: "delete-all-glossary", message: `Delete all ${Object.keys(modGlossary).length} glossary term(s)?` })}
-                    onSuggestionsChanged={fetchSuggestions}
-                />
-            )}
-
-            {/* --- Character Context Panel ---
+                    {/* --- Character Context Panel ---
                 Allows the user to provide metadata about the mod's character
                 (source game, character name, background lore). This context
                 is injected into the AI translation prompt so the provider can
                 produce more accurate, lore-consistent translations. */}
-            {showCharacterContext && modId && <CharacterContextPanel modId={modId} onHasContextChange={handleHasContextChange} />}
-
-            {/* --- Search & Filter Bar --- */}
-            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
-                <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-                    <div style={{ flex: 1, position: "relative" }}>
-                        <input
-                            type="text"
-                            placeholder="Search keys or text..."
-                            className="btn-outline"
-                            style={{ width: "100%", padding: "0.75rem", paddingRight: "2.5rem", borderRadius: "8px", background: "rgba(0,0,0,0.2)", boxSizing: "border-box" }}
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                    {showCharacterContext && modId && <CharacterContextPanel modId={modId} onHasContextChange={handleHasContextChange} />}
+                </>
+            }
+            modals={
+                <>
+                    {showSuggestionModal && (
+                        <GlossarySuggestionModal
+                            gameId="chrono_ark"
+                            modId={modId!}
+                            suggestions={suggestions}
+                            onClose={() => setShowSuggestionModal(false)}
+                            onUpdated={() => {
+                                fetchSuggestions()
+                                fetchModGlossary()
+                            }}
                         />
-                        {search && (
-                            <button
-                                onClick={() => setSearch("")}
-                                style={{
-                                    position: "absolute",
-                                    right: "0.5rem",
-                                    top: "50%",
-                                    transform: "translateY(-50%)",
-                                    background: "none",
-                                    border: "none",
-                                    color: "var(--text-dim)",
-                                    cursor: "pointer",
-                                    fontSize: "1.1rem",
-                                    padding: "0.25rem",
-                                    lineHeight: 1,
-                                }}
-                                title="Clear search"
-                            >
-                                &times;
-                            </button>
-                        )}
-                    </div>
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                        <button className={`btn ${filter === "all" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("all")}>
-                            All
-                        </button>
-                        <button className={`btn ${filter === "missing" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("missing")}>
-                            Missing
-                        </button>
-                        <button className={`btn ${filter === "untouched" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("untouched")}>
-                            Untouched
-                        </button>
-                        <button className={`btn ${filter === "pending" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("pending")}>
-                            Pending
-                        </button>
-                        <button className={`btn ${filter === "synced" ? "btn-primary" : "btn-outline"}`} onClick={() => setFilter("synced")}>
-                            Synced
-                        </button>
-                    </div>
-                </div>
-            </div>
+                    )}
 
-            {/* --- Strings Table ---
-                The main data table showing all localization strings. Features:
-                - Sticky header row with sortable columns (click header to cycle sort)
-                - Drag-to-resize column handles on each header
-                - Status column shows SYNCED/PENDING/MISSING badge
-                - Source column shows the original language text
-                - English column is inline-editable via the EditableCell component
-                - Rows with overridden translations (english !== original_english)
-                  are highlighted with a yellow background and show the previous
-                  translation above the editable cell */}
-            <div className="glass-card string-table-container" style={{ height: "calc(100vh - 400px)", minHeight: "500px", overflow: "auto" }}>
-                <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                    <thead style={{ background: "var(--bg-color)", position: "sticky", top: 0, zIndex: 10 }}>
-                        <tr>
-                            <th className="sortable-th" onClick={() => handleSort("is_translated")} style={{ width: columnWidths.status }}>
-                                Status {getSortIcon("is_translated")}
-                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "status")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
-                            </th>
-                            <th className="sortable-th" onClick={() => handleSort("translated_by")} style={{ width: columnWidths.translated_by }}>
-                                Mode {getSortIcon("translated_by")}
-                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "translated_by")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
-                            </th>
-                            <th className="sortable-th" onClick={() => handleSort("source_file")} style={{ width: columnWidths.source_file }}>
-                                Source {getSortIcon("source_file")}
-                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "source_file")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
-                            </th>
-                            <th className="sortable-th" onClick={() => handleSort("key")} style={{ width: columnWidths.key }}>
-                                Key {getSortIcon("key")}
-                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "key")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
-                            </th>
-                            <th className="sortable-th" onClick={() => handleSort("source")} style={{ width: columnWidths.source }}>
-                                Original ({sourceLangOverride || "Chinese"}) {getSortIcon("source")}
-                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "source")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
-                            </th>
-                            <th className="sortable-th" onClick={() => handleSort("english")} style={{ width: columnWidths.english }}>
-                                {targetLangOverride || "English"} {getSortIcon("english")}
-                                <div className="resizer" onPointerDown={(e) => onResizeStart(e, "english")} onPointerMove={onResizeMove} onPointerUp={onResizeEnd} />
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {processedStrings.map((s) => {
-                            const status = getRowStatus(s)
-                            const rowStyle = getRowStyle(s)
-                            const isUntranslatable = status === "untranslatable"
-                            return (
-                                <tr key={s.key} style={rowStyle}>
-                                    <td>
-                                        {isUntranslatable ? (
-                                            <span className="status-badge status-untranslatable" title={s.untranslatable_reason}>
-                                                N/A
-                                            </span>
-                                        ) : (
-                                            <span
-                                                className={`status-badge ${status === "synced" ? "status-synced" : status === "untouched" ? "status-untouched" : status === "pending" ? "status-translated" : "status-missing"}`}
-                                            >
-                                                {status === "synced" ? "SYNCED" : status === "untouched" ? "UNTOUCHED" : status === "pending" ? "PENDING" : "MISSING"}
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="key-cell" title={s.translated_by} style={{ maxWidth: columnWidths.translated_by }}>
-                                        {s.translated_by || "—"}
-                                    </td>
-                                    <td className="key-cell" title={s.source_file} style={{ maxWidth: columnWidths.source_file }}>
-                                        <a
-                                            href="#"
-                                            onClick={(e) => {
-                                                e.preventDefault()
-                                                e.stopPropagation()
-                                                gameApi("chrono_ark").post(`/mods/${modId}/open-source-file/${encodeURIComponent(s.source_file)}`)
-                                            }}
-                                        >
-                                            {s.source_file}
-                                        </a>
-                                    </td>
-                                    <td className="key-cell" title={s.key} style={{ maxWidth: columnWidths.key }}>
-                                        {s.key}
-                                    </td>
-                                    <td className="source-cell" style={{ maxWidth: columnWidths.source }}>
-                                        {s.source}
-                                    </td>
-                                    <td className="english-cell" style={{ maxWidth: columnWidths.english, position: "relative" }}>
-                                        {isUntranslatable ? (
-                                            <span className="untranslatable-hint" title={s.untranslatable_reason}>
-                                                {s.untranslatable_reason}
-                                            </span>
-                                        ) : (
-                                            <>
-                                                {/* Show previous translation above the editable field when overridden or synced. */}
-                                                {s.original_english && s.original_english !== s.english && (
-                                                    <div className="prev-translation" style={s.is_synced ? { color: "rgba(52, 211, 153, 0.6)" } : undefined}>
-                                                        {s.original_english}
-                                                    </div>
-                                                )}
-                                                <EditableCell
-                                                    value={s.english}
-                                                    onSave={(val) => handleSaveString(s.key, val)}
-                                                    placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."}
-                                                />
-                                            </>
-                                        )}
-                                    </td>
-                                </tr>
-                            )
-                        })}
-                    </tbody>
-                </table>
-            </div>
+                    {/* --- History Backup Modal --- */}
+                    {showHistory && modId && (
+                        <BackupHistoryModal
+                            modId={modId}
+                            refreshKey={historyRefreshKey}
+                            onClose={() => setShowHistory(false)}
+                            onRestore={(entry) =>
+                                setConfirmModal({
+                                    type: "restore-backup",
+                                    message: `Restore to backup from ${new Date(entry.created_at).toLocaleString()}? A backup of the current state will be created first.`,
+                                    entryId: entry.id,
+                                    entryDate: new Date(entry.created_at).toLocaleString(),
+                                })
+                            }
+                            onDelete={(entry) => setConfirmModal({ type: "delete-backup", message: "Delete this backup?", entryId: entry.id })}
+                        />
+                    )}
 
-            {/* --- Glossary Suggestion Modal ---
-                Modal for reviewing AI-generated glossary term suggestions.
-                The user can accept or reject each suggestion. Accepted terms
-                are added to the mod glossary. */}
-            {showSuggestionModal && (
-                <GlossarySuggestionModal
-                    gameId="chrono_ark"
-                    modId={modId!}
-                    suggestions={suggestions}
-                    onClose={() => setShowSuggestionModal(false)}
-                    onUpdated={() => {
-                        fetchSuggestions()
-                        fetchModGlossary()
-                    }}
-                />
-            )}
+                    {/* --- API Response Viewer Modal --- */}
+                    {showApiResponses && modId && <ApiResponsesModal modId={modId} onClose={() => setShowApiResponses(false)} />}
 
-            {/* --- History Backup Modal --- */}
-            {showHistory && modId && (
-                <BackupHistoryModal
-                    modId={modId}
-                    refreshKey={historyRefreshKey}
-                    onClose={() => setShowHistory(false)}
-                    onRestore={(entry) =>
-                        setConfirmModal({
-                            type: "restore-backup",
-                            message: `Restore to backup from ${new Date(entry.created_at).toLocaleString()}? A backup of the current state will be created first.`,
-                            entryId: entry.id,
-                            entryDate: new Date(entry.created_at).toLocaleString(),
-                        })
-                    }
-                    onDelete={(entry) => setConfirmModal({ type: "delete-backup", message: "Delete this backup?", entryId: entry.id })}
-                />
-            )}
-
-            {/* --- API Response Viewer Modal --- */}
-            {showApiResponses && modId && <ApiResponsesModal modId={modId} onClose={() => setShowApiResponses(false)} />}
-
-            {/* --- Translation Confirmation Modal ---
+                    {/* --- Translation Confirmation Modal ---
                 Shown after handleTranslateClick fetches a preview. Displays
                 prompt previews, batch counts, and cost estimates. On confirm,
                 starts the iterative batch translation loop via the hook. */}
-            {translationPreview && (
-                <TranslationConfirmModal
-                    preview={translationPreview}
-                    title={pendingRetranslate ? "Confirm Re-Translation" : undefined}
-                    onConfirm={() => {
-                        const plan: BatchDescriptor[] = translationPreview.batch_plan || []
-                        setTranslationPreview(null)
-                        setTranslateBanner(null)
-                        startTranslation(pendingProvider || activeProvider, plan)
-                    }}
-                    onCancel={() => setTranslationPreview(null)}
-                />
-            )}
+                    {translationPreview && (
+                        <TranslationConfirmModal
+                            preview={translationPreview}
+                            title={pendingRetranslate ? "Confirm Re-Translation" : undefined}
+                            onConfirm={() => {
+                                const plan: BatchDescriptor[] = translationPreview.batch_plan || []
+                                setTranslationPreview(null)
+                                setTranslateBanner(null)
+                                startTranslation(pendingProvider || activeProvider, plan)
+                            }}
+                            onCancel={() => setTranslationPreview(null)}
+                        />
+                    )}
 
-            {/* --- Batch Translation Review Modal ---
+                    {/* --- Batch Translation Review Modal ---
                 Shown automatically when the iterative hook pauses for glossary
                 suggestion review between batches. Closing the modal pauses the
                 process; the user can resume via the paused banner below. */}
-            {batchState.phase === "reviewing" && showReviewModal && (
-                <GlossarySuggestionModal
-                    gameId="chrono_ark"
-                    modId={modId!}
-                    suggestions={batchState.suggestions}
-                    onClose={() => setShowReviewModal(false)}
-                    onUpdated={() => {
-                        fetchSuggestions()
-                        fetchModGlossary()
-                    }}
-                    batchProgress={{ current: batchState.batchIndex + 1, total: batchState.totalBatches }}
-                    onContinue={() => {
-                        setShowReviewModal(false)
-                        continueAfterReview()
-                    }}
-                />
-            )}
+                    {batchState.phase === "reviewing" && showReviewModal && (
+                        <GlossarySuggestionModal
+                            gameId="chrono_ark"
+                            modId={modId!}
+                            suggestions={batchState.suggestions}
+                            onClose={() => setShowReviewModal(false)}
+                            onUpdated={() => {
+                                fetchSuggestions()
+                                fetchModGlossary()
+                            }}
+                            batchProgress={{ current: batchState.batchIndex + 1, total: batchState.totalBatches }}
+                            onContinue={() => {
+                                setShowReviewModal(false)
+                                continueAfterReview()
+                            }}
+                        />
+                    )}
 
-            {/* --- Confirm Modal ---
+                    {/* --- Confirm Modal ---
                 Single reusable confirmation modal that handles all destructive
                 action confirmations. The `confirmModal` state determines which
                 action to dispatch on confirm. */}
-            {confirmModal && (
-                <ConfirmModal
-                    title={
-                        {
-                            export: "Sync Changes",
-                            resync: "Re-sync Changes",
-                            reset: "Reset Mod",
-                            "clear-translations": "Clear Translations",
-                            "delete-all-glossary": "Delete All Glossary Terms",
-                            "restore-backup": "Restore Backup",
-                            "delete-backup": "Delete Backup",
-                        }[confirmModal.type]
-                    }
-                    message={confirmModal.message}
-                    variant={
-                        {
-                            export: "warning" as const,
-                            resync: "warning" as const,
-                            reset: "danger" as const,
-                            "clear-translations": "danger" as const,
-                            "delete-all-glossary": "danger" as const,
-                            "restore-backup": "warning" as const,
-                            "delete-backup": "danger" as const,
-                        }[confirmModal.type]
-                    }
-                    confirmLabel={
-                        {
-                            export: "Sync",
-                            resync: "Re-sync",
-                            reset: "Reset",
-                            "clear-translations": "Clear",
-                            "delete-all-glossary": "Delete All",
-                            "restore-backup": "Restore",
-                            "delete-backup": "Delete",
-                        }[confirmModal.type]
-                    }
-                    onCancel={() => setConfirmModal(null)}
-                    onConfirm={async () => {
-                        const type = confirmModal.type
-                        const entryId = confirmModal.entryId
-                        setConfirmModal(null)
-                        switch (type) {
-                            case "export":
-                                handleExport(false)
-                                break
-                            case "resync":
-                                handleExport(true)
-                                break
-                            case "reset":
-                                handleReset()
-                                break
-                            case "clear-translations":
-                                handleClearTranslations()
-                                break
-                            case "delete-all-glossary":
-                                await gameApi("chrono_ark").post(`/mods/${modId}/glossary/delete`, { all: true })
-                                fetchModGlossary()
-                                break
-                            case "restore-backup":
-                                try {
-                                    const res = await gameApi("chrono_ark").post(`/mods/${modId}/history/${entryId}/restore`)
-                                    if (res.ok) {
-                                        setShowHistory(false)
-                                        setTranslateBanner({ type: "success", message: "Restored from backup successfully." })
-                                        fetchModDetail()
-                                        fetchExportStatus()
-                                        fetchSuggestions()
+                    {confirmModal && (
+                        <ConfirmModal
+                            title={
+                                {
+                                    export: "Sync Changes",
+                                    resync: "Re-sync Changes",
+                                    reset: "Reset Mod",
+                                    "clear-translations": "Clear Translations",
+                                    "delete-all-glossary": "Delete All Glossary Terms",
+                                    "restore-backup": "Restore Backup",
+                                    "delete-backup": "Delete Backup",
+                                }[confirmModal.type]
+                            }
+                            message={confirmModal.message}
+                            variant={
+                                {
+                                    export: "warning" as const,
+                                    resync: "warning" as const,
+                                    reset: "danger" as const,
+                                    "clear-translations": "danger" as const,
+                                    "delete-all-glossary": "danger" as const,
+                                    "restore-backup": "warning" as const,
+                                    "delete-backup": "danger" as const,
+                                }[confirmModal.type]
+                            }
+                            confirmLabel={
+                                {
+                                    export: "Sync",
+                                    resync: "Re-sync",
+                                    reset: "Reset",
+                                    "clear-translations": "Clear",
+                                    "delete-all-glossary": "Delete All",
+                                    "restore-backup": "Restore",
+                                    "delete-backup": "Delete",
+                                }[confirmModal.type]
+                            }
+                            onCancel={() => setConfirmModal(null)}
+                            onConfirm={async () => {
+                                const type = confirmModal.type
+                                const entryId = confirmModal.entryId
+                                setConfirmModal(null)
+                                switch (type) {
+                                    case "export":
+                                        handleExport(false)
+                                        break
+                                    case "resync":
+                                        handleExport(true)
+                                        break
+                                    case "reset":
+                                        handleReset()
+                                        break
+                                    case "clear-translations":
+                                        handleClearTranslations()
+                                        break
+                                    case "delete-all-glossary":
+                                        await gameApi("chrono_ark").post(`/mods/${modId}/glossary/delete`, { all: true })
                                         fetchModGlossary()
-                                    }
-                                } catch (err) {
-                                    console.error("Failed to restore backup:", err)
+                                        break
+                                    case "restore-backup":
+                                        try {
+                                            const res = await gameApi("chrono_ark").post(`/mods/${modId}/history/${entryId}/restore`)
+                                            if (res.ok) {
+                                                setShowHistory(false)
+                                                setTranslateBanner({ type: "success", message: "Restored from backup successfully." })
+                                                fetchModDetail()
+                                                fetchExportStatus()
+                                                fetchSuggestions()
+                                                fetchModGlossary()
+                                            }
+                                        } catch (err) {
+                                            console.error("Failed to restore backup:", err)
+                                        }
+                                        break
+                                    case "delete-backup":
+                                        try {
+                                            await fetch(gameApi("chrono_ark").url(`/mods/${modId}/history/${entryId}`), { method: "DELETE" })
+                                            setHistoryRefreshKey((k) => k + 1)
+                                        } catch (err) {
+                                            console.error("Failed to delete backup:", err)
+                                        }
+                                        break
                                 }
-                                break
-                            case "delete-backup":
-                                try {
-                                    await fetch(gameApi("chrono_ark").url(`/mods/${modId}/history/${entryId}`), { method: "DELETE" })
-                                    setHistoryRefreshKey((k) => k + 1)
-                                } catch (err) {
-                                    console.error("Failed to delete backup:", err)
-                                }
-                                break
-                        }
-                    }}
-                />
-            )}
-        </div>
+                            }}
+                        />
+                    )}
+                </>
+            }
+        />
     )
 }
 
