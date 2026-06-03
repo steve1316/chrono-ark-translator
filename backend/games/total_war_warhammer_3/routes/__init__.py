@@ -6,6 +6,7 @@ from backend.games.total_war_warhammer_3.routes import (
     packs,
     registry,
     runner,
+    translate,
     translation,
     validation,
 )
@@ -23,4 +24,5 @@ def build_total_war_warhammer_3_router() -> APIRouter:
     composed.include_router(validation.router)
     composed.include_router(packs.router)
     composed.include_router(translation.router)
+    composed.include_router(translate.router)
     return composed
