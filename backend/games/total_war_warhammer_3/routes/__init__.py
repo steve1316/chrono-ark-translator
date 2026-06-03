@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from backend.games.total_war_warhammer_3.routes import (
+    glossary_suggestions,
     packs,
     registry,
     runner,
@@ -25,4 +26,5 @@ def build_total_war_warhammer_3_router() -> APIRouter:
     composed.include_router(packs.router)
     composed.include_router(translation.router)
     composed.include_router(translate.router)
+    composed.include_router(glossary_suggestions.router)
     return composed

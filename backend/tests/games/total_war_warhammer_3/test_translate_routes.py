@@ -104,6 +104,38 @@ def test_batch_translates_keys_and_persists(client: TestClient, monkeypatch, tmp
     assert raw["k2"]["provider"] == "claude"
 
 
+def test_batch_persists_and_returns_new_glossary_suggestions(client: TestClient, monkeypatch, tmp_path: Path):
+    """The provider's glossary suggestions are returned and persisted for the review modal; terms already in the glossary are filtered out."""
+    from backend.data import suggestion_manager
+    from backend.games.storage_paths import game_storage_path
+    from backend.games.total_war_warhammer_3 import glossary_store
+
+    # "Lord" is already in the glossary, so it must be filtered out; only "Cathay" should survive.
+    glossary_store.add_term("3315737452", {"english": "Lord", "source": "卿", "category": "title"})
+
+    def fake_translate_batch(self, entries, source_lang, glossary_prompt, **kwargs):
+        return (
+            {"k2": "New Translation"},
+            [
+                {"english": "Lord", "source": "卿", "source_lang": "Chinese", "category": "title", "reason": "already known"},
+                {"english": "Cathay", "source": "震旦", "source_lang": "Chinese", "category": "faction", "reason": "new term"},
+            ],
+        )
+
+    monkeypatch.setattr("backend.translator.claude_provider.ClaudeProvider.translate_batch", fake_translate_batch)
+
+    resp = client.post(
+        f"{PREFIX}/batch",
+        json={"mod_id": "3315737452", "provider": "claude", "keys": ["k2"], "source_lang": "Chinese", "is_first_batch": True},
+    )
+    assert resp.status_code == 200
+    returned = {s["english"] for s in resp.json()["suggestions"]}
+    assert returned == {"Cathay"}
+
+    persisted = {s["english"] for s in suggestion_manager.load_suggestions("3315737452", storage_path=game_storage_path("total_war_warhammer_3"))}
+    assert persisted == {"Cathay"}
+
+
 def test_batch_rejects_keys_with_no_source_text(client: TestClient):
     """A batch whose keys have no source text returns 400, matching Chrono Ark."""
     resp = client.post(

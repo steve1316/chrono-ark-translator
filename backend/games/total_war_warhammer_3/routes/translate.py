@@ -12,10 +12,13 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
+from backend.data import suggestion_manager
+from backend.games.storage_paths import game_storage_path
 from backend.games.total_war_warhammer_3.routes import translation as _t
 from backend.routes.models import BatchTranslationRequest, TranslationRequest
 from backend.translation.orchestrator import run_batch
 
+GAME_ID = "total_war_warhammer_3"
 router = APIRouter(prefix="/translate", tags=["translate"])
 
 
@@ -192,9 +195,12 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 
-    # Glossary-suggestion review between batches is deferred to P1f (WH3 has no suggestions accept/dismiss endpoints yet), so the iterative loop never
-    # pauses for review. We return an empty list so the shared hook flows preview -> confirm -> batches -> complete without a reviewing phase.
-    suggestions: list = []
+    # Persist the provider's glossary suggestions so the shared review modal can accept/dismiss them between batches. Drop any term already in the mod
+    # glossary so the user only reviews genuinely new terms (matching Chrono Ark's review behavior).
+    existing_glossary = _t.glossary_store.load_glossary(req.mod_id)
+    suggestions = [s for s in _suggestions if s.get("english") and s["english"] not in existing_glossary]
+    if suggestions:
+        suggestion_manager.add_suggestions(req.mod_id, suggestions, storage_path=game_storage_path(GAME_ID))
 
     raw = _t.store.load_translations_raw(req.mod_id)
     now = datetime.now(timezone.utc).isoformat()
