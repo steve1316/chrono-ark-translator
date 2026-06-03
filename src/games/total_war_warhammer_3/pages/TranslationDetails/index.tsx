@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { FaExclamationCircle, FaFolderOpen, FaSteam } from "react-icons/fa"
 
 import EditableCell from "../../../../components/EditableCell"
+import GlossarySuggestionModal from "../../../../components/GlossarySuggestionModal"
 import TranslationConfirmModal from "../../../../components/TranslationConfirmModal"
 import { API_BASE } from "../../../../config"
 import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
@@ -73,6 +74,7 @@ const TranslationDetailsPage: React.FC = () => {
     const [loading, setLoading] = useState(true)
     const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
     const [openModal, setOpenModal] = useState<ModalKey>(null)
+    const [showReviewModal, setShowReviewModal] = useState(false)
     const [modContext, setModContext] = useState<WH3ModContext>({
         source_game: "",
         character_name: "",
@@ -180,7 +182,7 @@ const TranslationDetailsPage: React.FC = () => {
         )
     }, [])
 
-    const { state: batchState, startTranslation, cancel: cancelTranslation } = useIterativeTranslation("total_war_warhammer_3", workshopId, onBatchTranslated)
+    const { state: batchState, startTranslation, continueAfterReview, cancel: cancelTranslation } = useIterativeTranslation("total_war_warhammer_3", workshopId, onBatchTranslated)
     const isTranslating = batchState.phase === "translating"
 
     // Clicking Translate previews the run (prompts + cost + batch plan) and opens the confirm modal. Confirming starts the iterative batch loop.
@@ -545,6 +547,26 @@ const TranslationDetailsPage: React.FC = () => {
                 <HistoryModal workshopId={workshopId} onClose={() => setOpenModal(null)} defaultRestoreMode={openModal === "reset"} onRestored={onRestored} />
             )}
             {preview && <TranslationConfirmModal preview={preview} onConfirm={onConfirmTranslate} onCancel={() => setPreview(null)} />}
+
+            {/* Shown when the iterative loop pauses for glossary suggestion review between batches. Closing pauses; the paused banner lets the user resume. */}
+            {batchState.phase === "reviewing" && showReviewModal && (
+                <GlossarySuggestionModal
+                    gameId="total_war_warhammer_3"
+                    modId={workshopId}
+                    suggestions={batchState.suggestions}
+                    onClose={() => setShowReviewModal(false)}
+                    onUpdated={() => {
+                        loadGlossary(workshopId)
+                            .then((d) => setGlossaryCount(Object.keys(d).length))
+                            .catch(() => {})
+                    }}
+                    batchProgress={{ current: batchState.batchIndex + 1, total: batchState.totalBatches }}
+                    onContinue={() => {
+                        setShowReviewModal(false)
+                        continueAfterReview()
+                    }}
+                />
+            )}
         </>
     )
 
@@ -573,6 +595,44 @@ const TranslationDetailsPage: React.FC = () => {
             onResizeColumn={onResizeColumn}
             translating={batchState.phase === "translating" ? { batchIndex: batchState.batchIndex, totalBatches: batchState.totalBatches, streaming: batchState.streamingProgress } : null}
             onCancelTranslate={cancelTranslation}
+            extraBanners={
+                batchState.phase === "reviewing" && !showReviewModal ? (
+                    <div
+                        className="glass-card"
+                        style={{
+                            padding: "1.25rem 1.5rem",
+                            marginBottom: "1rem",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "1rem",
+                            background: "rgba(250,204,21,0.08)",
+                            border: "1px solid rgba(250,204,21,0.25)",
+                        }}
+                    >
+                        <span style={{ color: "var(--text-main)" }}>
+                            Batch {batchState.batchIndex + 1} of {batchState.totalBatches} complete.
+                        </span>
+                        <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
+                            <button className="btn btn-primary" onClick={() => setShowReviewModal(true)} style={{ padding: "0.25rem 0.75rem" }}>
+                                Review Suggestions
+                            </button>
+                            <button className="btn btn-primary" onClick={() => continueAfterReview()} style={{ padding: "0.25rem 0.75rem" }}>
+                                Continue
+                            </button>
+                            <button
+                                className="btn btn-outline"
+                                onClick={() => {
+                                    cancelTranslation()
+                                    setBanner({ type: "success", message: `Translation cancelled. ${batchState.batchIndex} of ${batchState.totalBatches} batches completed.` })
+                                }}
+                                style={{ padding: "0.25rem 0.75rem" }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                ) : null
+            }
             banner={banner}
             onDismissBanner={() => setBanner(null)}
             modals={modals}
