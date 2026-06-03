@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { gameApi } from "../../../../api/games"
 
 /** One backup history entry for a mod. */
@@ -7,6 +7,8 @@ export interface HistoryEntry {
     id: string
     /** Why the backup was created (e.g. "Before translation run"). */
     reason: string
+    /** "auto" for backups taken automatically before destructive ops, "manual" for user-requested save snapshots. */
+    kind?: "auto" | "manual"
     /** ISO timestamp of when the backup was taken. */
     created_at: string
     /** Files captured in the backup. */
@@ -44,21 +46,34 @@ interface BackupHistoryModalProps {
  */
 export default function BackupHistoryModal({ modId, onClose, onRestore, onDelete, refreshKey }: BackupHistoryModalProps) {
     const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([])
+    const [label, setLabel] = useState("")
+    const [saving, setSaving] = useState(false)
+
+    const fetchHistory = useCallback(async () => {
+        try {
+            const res = await gameApi("chrono_ark").get(`/mods/${modId}/history`)
+            if (res.ok) setHistoryEntries(await res.json())
+        } catch (err) {
+            console.error("Failed to fetch history:", err)
+        }
+    }, [modId])
 
     useEffect(() => {
-        let cancelled = false
-        ;(async () => {
-            try {
-                const res = await gameApi("chrono_ark").get(`/mods/${modId}/history`)
-                if (res.ok && !cancelled) setHistoryEntries(await res.json())
-            } catch (err) {
-                console.error("Failed to fetch history:", err)
-            }
-        })()
-        return () => {
-            cancelled = true
+        fetchHistory()
+    }, [fetchHistory, refreshKey])
+
+    const onSaveSnapshot = async () => {
+        setSaving(true)
+        try {
+            await gameApi("chrono_ark").post(`/mods/${modId}/history`, { label })
+            setLabel("")
+            await fetchHistory()
+        } catch (err) {
+            console.error("Failed to save snapshot:", err)
+        } finally {
+            setSaving(false)
         }
-    }, [modId, refreshKey])
+    }
 
     return (
         <div
@@ -76,6 +91,21 @@ export default function BackupHistoryModal({ modId, onClose, onRestore, onDelete
                         title="Close"
                     >
                         &times;
+                    </button>
+                </div>
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
+                    <input
+                        type="text"
+                        placeholder="Snapshot label..."
+                        value={label}
+                        onChange={(e) => setLabel(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && !saving) onSaveSnapshot()
+                        }}
+                        style={{ flex: 1, padding: "0.5rem 0.75rem", borderRadius: "4px", border: "1px solid var(--glass-border)", background: "rgba(0,0,0,0.2)", color: "var(--text-main)" }}
+                    />
+                    <button className="btn btn-primary" onClick={onSaveSnapshot} disabled={saving} style={{ padding: "0.5rem 1rem", whiteSpace: "nowrap" }}>
+                        {saving ? "Saving..." : "Save snapshot"}
                     </button>
                 </div>
                 {historyEntries.length === 0 ? (
@@ -97,7 +127,10 @@ export default function BackupHistoryModal({ modId, onClose, onRestore, onDelete
                                 }}
                             >
                                 <div>
-                                    <div style={{ fontWeight: 500 }}>{entry.reason}</div>
+                                    <div style={{ fontWeight: 500, display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                                        <span className={`snapshot-kind ${entry.kind ?? "auto"}`}>{entry.kind ?? "auto"}</span>
+                                        {entry.reason}
+                                    </div>
                                     <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem" }}>{new Date(entry.created_at).toLocaleString()}</div>
                                     <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.15rem" }}>
                                         {(entry.total_count ?? 0) > 0 && (
