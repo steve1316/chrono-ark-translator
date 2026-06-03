@@ -23,7 +23,7 @@ from backend.routes.helpers import (
     _recalculate_mod_progress,
     resolve_source_language,
 )
-from backend.routes.models import TranslationUpdate, CharacterContext, SourceLanguageOverride, TargetLanguageOverride
+from backend.routes.models import TranslationUpdate, CharacterContext, SourceLanguageOverride, TargetLanguageOverride, HistorySnapshotRequest
 from backend.data.mod_settings import (
     load_source_language_override,
     load_target_language_override,
@@ -1014,6 +1014,23 @@ async def get_history(mod_id: str):
         A list of backup metadata dicts with id, reason, created_at, and files.
     """
     return list_backups(mod_id)
+
+
+@router.post("/mods/{mod_id}/history")
+async def create_history_snapshot(mod_id: str, body: HistorySnapshotRequest):
+    """Create a manual save-snapshot of the mod's current state.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        body: The snapshot request carrying an optional user-provided label.
+
+    Returns:
+        A dict with `{"status": "saved", "id": backup_id}` on success, or `{"status": "empty"}` when there was nothing to back up.
+    """
+    backup_id = create_backup(mod_id, body.label.strip() or "Manual snapshot", kind="manual")
+    if backup_id is None:
+        return {"status": "empty"}
+    return {"status": "saved", "id": backup_id}
 
 
 @router.post("/mods/{mod_id}/history/{backup_id}/restore")

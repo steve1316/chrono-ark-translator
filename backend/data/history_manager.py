@@ -30,7 +30,7 @@ def _history_dir(mod_id: str, storage_path: Optional[Path] = None) -> Path:
     return path
 
 
-def create_backup(mod_id: str, reason: str, storage_path: Optional[Path] = None) -> Optional[str]:
+def create_backup(mod_id: str, reason: str, storage_path: Optional[Path] = None, kind: str = "auto") -> Optional[str]:
     """Create a timestamped backup of the mod's current state.
 
     Args:
@@ -38,6 +38,7 @@ def create_backup(mod_id: str, reason: str, storage_path: Optional[Path] = None)
         reason: Human-readable description of why the backup was created
             (e.g. "Before clearing translations", "Before translation run").
         storage_path: Base storage path override.
+        kind: "auto" for backups taken automatically before destructive ops, "manual" for user-requested save snapshots.
 
     Returns:
         The backup ID (timestamp string), or None if there was nothing to back up.
@@ -96,6 +97,7 @@ def create_backup(mod_id: str, reason: str, storage_path: Optional[Path] = None)
     meta = {
         "timestamp": timestamp,
         "reason": reason,
+        "kind": kind,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "files": [f for f in files_to_backup if (mod_dir / f).exists()],
         "translated_count": translated_count,
@@ -130,6 +132,8 @@ def list_backups(mod_id: str, storage_path: Optional[Path] = None) -> list[dict]
                 with open(meta_path, "r", encoding="utf-8") as f:
                     meta = json.load(f)
                 meta["id"] = entry.name
+                # Backfill the kind for older backups taken before the field existed.
+                meta.setdefault("kind", "auto")
                 # Backfill counts for older backups that lack them.
                 if "translated_count" not in meta:
                     meta["translated_count"] = 0

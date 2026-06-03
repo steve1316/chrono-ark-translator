@@ -128,6 +128,17 @@ class TargetLanguageOverride(BaseModel):
     target_language: Optional[str] = None
 
 
+class HistorySnapshotRequest(BaseModel):
+    """Payload for creating a manual history snapshot.
+
+    Attributes:
+        label: User-provided description for the snapshot. Falls back to a
+            default label when blank.
+    """
+
+    label: str = ""
+
+
 class SettingsResponse(BaseModel):
     """Current application settings returned by GET /api/settings.
 
