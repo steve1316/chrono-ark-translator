@@ -8,6 +8,7 @@ import { gameApi } from "../../../../api/games"
 import { API_BASE } from "../../../../config"
 import GlossarySuggestionModal from "../../../../components/GlossarySuggestionModal"
 import TranslationConfirmModal from "../../../../components/TranslationConfirmModal"
+import ApiResponsesModal from "../../components/ApiResponsesModal"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import EditableCell from "../../../../components/EditableCell"
 import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
@@ -216,8 +217,6 @@ const ModDetail: React.FC = () => {
         needsInput: boolean
         affected: { key: string; old_text: string; new_text: string }[]
     } | null>(null)
-    const [apiResponses, setApiResponses] = useState<any[]>([])
-    const [activeResponseIdx, setActiveResponseIdx] = useState(0)
     const [showHistory, setShowHistory] = useState(false)
     const [historyEntries, setHistoryEntries] = useState<
         { id: string; reason: string; created_at: string; files: string[]; translated_count?: number; total_count?: number; glossary_count?: number }[]
@@ -703,21 +702,6 @@ const ModDetail: React.FC = () => {
         }
     }
 
-    const fetchApiResponses = async () => {
-        if (!modId) return
-        try {
-            const res = await gameApi("chrono_ark").get(`/mods/${modId}/api-responses`)
-            if (res.ok) {
-                const data = await res.json()
-                setApiResponses(data)
-                setActiveResponseIdx(0)
-                setShowApiResponses(true)
-            }
-        } catch (err) {
-            console.error("Failed to fetch API responses:", err)
-        }
-    }
-
     if (loading) {
         return (
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
@@ -925,7 +909,7 @@ const ModDetail: React.FC = () => {
                         >
                             <FaBook /> {scanning ? "Scanning..." : "Scan for Terms"}
                         </button>
-                        <button className="btn btn-outline" onClick={fetchApiResponses} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <button className="btn btn-outline" onClick={() => setShowApiResponses(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             API Responses
                         </button>
                         <button
@@ -1946,116 +1930,7 @@ const ModDetail: React.FC = () => {
             )}
 
             {/* --- API Response Viewer Modal --- */}
-            {showApiResponses && (
-                <div
-                    style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setShowApiResponses(false)
-                    }}
-                >
-                    <div className="glass-card" style={{ width: "900px", maxHeight: "85vh", display: "flex", flexDirection: "column", padding: "2rem" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                            <h2 style={{ margin: 0 }}>API Provider Responses</h2>
-                            <button
-                                onClick={() => setShowApiResponses(false)}
-                                style={{
-                                    background: "none",
-                                    border: "none",
-                                    color: "var(--text-dim)",
-                                    fontSize: "2rem",
-                                    lineHeight: 1,
-                                    cursor: "pointer",
-                                    padding: "0.25rem 0.5rem",
-                                    borderRadius: "4px",
-                                }}
-                                title="Close"
-                            >
-                                &times;
-                            </button>
-                        </div>
-                        {apiResponses.length === 0 ? (
-                            <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>No API responses recorded yet. Run a translation first.</p>
-                        ) : (
-                            <>
-                                {(() => {
-                                    const totalCost = apiResponses.reduce((sum: number, r: any) => sum + (r.cost_usd ?? 0), 0)
-                                    return totalCost > 0 ? (
-                                        <div style={{ marginBottom: "0.75rem", fontSize: "0.85rem", color: "var(--text-dim)" }}>
-                                            Total cost across {apiResponses.length} batch{apiResponses.length !== 1 ? "es" : ""}:{" "}
-                                            <span style={{ fontWeight: 600, color: "var(--text-main)" }}>${totalCost.toFixed(4)}</span>
-                                        </div>
-                                    ) : null
-                                })()}
-                                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
-                                    {apiResponses.map((_: any, idx: number) => (
-                                        <button
-                                            key={idx}
-                                            className={`btn ${activeResponseIdx === idx ? "btn-primary" : "btn-outline"}`}
-                                            onClick={() => setActiveResponseIdx(idx)}
-                                            style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
-                                        >
-                                            Batch {idx + 1}
-                                        </button>
-                                    ))}
-                                </div>
-                                {apiResponses[activeResponseIdx] && (
-                                    <>
-                                        <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1rem", fontSize: "0.85rem" }}>
-                                            <div>
-                                                <span style={{ color: "var(--text-dim)" }}>Model: </span>
-                                                <span style={{ fontWeight: 600 }}>{apiResponses[activeResponseIdx].model}</span>
-                                            </div>
-                                            {apiResponses[activeResponseIdx].input_tokens != null && (
-                                                <div>
-                                                    <span style={{ color: "var(--text-dim)" }}>Input tokens: </span>
-                                                    <span style={{ fontWeight: 600 }}>{apiResponses[activeResponseIdx].input_tokens}</span>
-                                                </div>
-                                            )}
-                                            {apiResponses[activeResponseIdx].output_tokens != null && (
-                                                <div>
-                                                    <span style={{ color: "var(--text-dim)" }}>Output tokens: </span>
-                                                    <span style={{ fontWeight: 600 }}>{apiResponses[activeResponseIdx].output_tokens}</span>
-                                                </div>
-                                            )}
-                                            {apiResponses[activeResponseIdx].cost_usd != null && (
-                                                <div>
-                                                    <span style={{ color: "var(--text-dim)" }}>Cost: </span>
-                                                    <span style={{ fontWeight: 600 }}>${apiResponses[activeResponseIdx].cost_usd.toFixed(4)}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div
-                                            style={{
-                                                flex: 1,
-                                                overflow: "auto",
-                                                background: "rgba(0,0,0,0.3)",
-                                                borderRadius: "8px",
-                                                border: "1px solid var(--glass-border)",
-                                                padding: "1rem",
-                                                minHeight: "300px",
-                                            }}
-                                        >
-                                            <pre
-                                                style={{
-                                                    margin: 0,
-                                                    whiteSpace: "pre-wrap",
-                                                    wordBreak: "break-word",
-                                                    fontSize: "0.85rem",
-                                                    lineHeight: "1.6",
-                                                    color: "var(--text-main)",
-                                                    fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
-                                                }}
-                                            >
-                                                {apiResponses[activeResponseIdx].raw_text}
-                                            </pre>
-                                        </div>
-                                    </>
-                                )}
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
+            {showApiResponses && modId && <ApiResponsesModal modId={modId} onClose={() => setShowApiResponses(false)} />}
 
             {/* --- Translation Confirmation Modal ---
                 Shown after handleTranslateClick fetches a preview. Displays
