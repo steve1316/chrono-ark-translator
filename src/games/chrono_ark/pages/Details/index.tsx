@@ -9,6 +9,7 @@ import { API_BASE } from "../../../../config"
 import GlossarySuggestionModal from "../../../../components/GlossarySuggestionModal"
 import TranslationConfirmModal from "../../../../components/TranslationConfirmModal"
 import ApiResponsesModal from "../../components/ApiResponsesModal"
+import BackupHistoryModal from "../../components/BackupHistoryModal"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import EditableCell from "../../../../components/EditableCell"
 import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
@@ -218,9 +219,7 @@ const ModDetail: React.FC = () => {
         affected: { key: string; old_text: string; new_text: string }[]
     } | null>(null)
     const [showHistory, setShowHistory] = useState(false)
-    const [historyEntries, setHistoryEntries] = useState<
-        { id: string; reason: string; created_at: string; files: string[]; translated_count?: number; total_count?: number; glossary_count?: number }[]
-    >([])
+    const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
     const [confirmModal, setConfirmModal] = useState<{
         type: "export" | "resync" | "reset" | "clear-translations" | "delete-all-glossary" | "restore-backup" | "delete-backup"
         message: string | React.ReactNode
@@ -688,20 +687,6 @@ const ModDetail: React.FC = () => {
         }
     }
 
-    const fetchHistory = async () => {
-        if (!modId) return
-        try {
-            const res = await gameApi("chrono_ark").get(`/mods/${modId}/history`)
-            if (res.ok) {
-                const data = await res.json()
-                setHistoryEntries(data)
-                setShowHistory(true)
-            }
-        } catch (err) {
-            console.error("Failed to fetch history:", err)
-        }
-    }
-
     if (loading) {
         return (
             <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
@@ -936,7 +921,7 @@ const ModDetail: React.FC = () => {
 
                     {/* Destructive actions and history. */}
                     <div className="mod-actions-group">
-                        <button className="btn btn-outline" onClick={fetchHistory} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <button className="btn btn-outline" onClick={() => setShowHistory(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             History
                         </button>
                         <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleResetConfirm}>
@@ -1644,103 +1629,21 @@ const ModDetail: React.FC = () => {
             )}
 
             {/* --- History Backup Modal --- */}
-            {showHistory && (
-                <div
-                    style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setShowHistory(false)
-                    }}
-                >
-                    <div className="glass-card" style={{ width: "700px", maxHeight: "80vh", overflow: "auto", padding: "2rem" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-                            <h2 style={{ margin: 0 }}>History Backups</h2>
-                            <button
-                                onClick={() => setShowHistory(false)}
-                                style={{
-                                    background: "none",
-                                    border: "none",
-                                    color: "var(--text-dim)",
-                                    fontSize: "2rem",
-                                    lineHeight: 1,
-                                    cursor: "pointer",
-                                    padding: "0.25rem 0.5rem",
-                                    borderRadius: "4px",
-                                }}
-                                title="Close"
-                            >
-                                &times;
-                            </button>
-                        </div>
-                        {historyEntries.length === 0 ? (
-                            <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>No backups available yet. Backups are created automatically before destructive operations.</p>
-                        ) : (
-                            <div>
-                                {historyEntries.map((entry) => (
-                                    <div
-                                        key={entry.id}
-                                        style={{
-                                            padding: "1rem",
-                                            marginBottom: "0.75rem",
-                                            background: "rgba(0,0,0,0.2)",
-                                            borderRadius: "8px",
-                                            border: "1px solid var(--glass-border)",
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            alignItems: "center",
-                                        }}
-                                    >
-                                        <div>
-                                            <div style={{ fontWeight: 500 }}>{entry.reason}</div>
-                                            <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem" }}>{new Date(entry.created_at).toLocaleString()}</div>
-                                            <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.15rem" }}>
-                                                {(entry.total_count ?? 0) > 0 && (
-                                                    <span>
-                                                        {entry.translated_count} / {entry.total_count} strings translated
-                                                    </span>
-                                                )}
-                                                {(entry.total_count ?? 0) > 0 && (entry.glossary_count ?? 0) > 0 && <span> &middot; </span>}
-                                                {(entry.glossary_count ?? 0) > 0 && (
-                                                    <span>
-                                                        {entry.glossary_count} glossary term{entry.glossary_count !== 1 ? "s" : ""}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div style={{ display: "flex", gap: "0.35rem", flexShrink: 0 }}>
-                                            <button
-                                                className="btn btn-primary"
-                                                style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
-                                                onClick={() => {
-                                                    setConfirmModal({
-                                                        type: "restore-backup",
-                                                        message: `Restore to backup from ${new Date(entry.created_at).toLocaleString()}? A backup of the current state will be created first.`,
-                                                        entryId: entry.id,
-                                                        entryDate: new Date(entry.created_at).toLocaleString(),
-                                                    })
-                                                }}
-                                            >
-                                                Restore
-                                            </button>
-                                            <button
-                                                className="btn btn-outline"
-                                                style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
-                                                onClick={() => {
-                                                    setConfirmModal({
-                                                        type: "delete-backup",
-                                                        message: "Delete this backup?",
-                                                        entryId: entry.id,
-                                                    })
-                                                }}
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
+            {showHistory && modId && (
+                <BackupHistoryModal
+                    modId={modId}
+                    refreshKey={historyRefreshKey}
+                    onClose={() => setShowHistory(false)}
+                    onRestore={(entry) =>
+                        setConfirmModal({
+                            type: "restore-backup",
+                            message: `Restore to backup from ${new Date(entry.created_at).toLocaleString()}? A backup of the current state will be created first.`,
+                            entryId: entry.id,
+                            entryDate: new Date(entry.created_at).toLocaleString(),
+                        })
+                    }
+                    onDelete={(entry) => setConfirmModal({ type: "delete-backup", message: "Delete this backup?", entryId: entry.id })}
+                />
             )}
 
             {/* --- Glossary Replace Preview Modal --- */}
@@ -2052,7 +1955,7 @@ const ModDetail: React.FC = () => {
                             case "delete-backup":
                                 try {
                                     await fetch(gameApi("chrono_ark").url(`/mods/${modId}/history/${entryId}`), { method: "DELETE" })
-                                    setHistoryEntries((prev) => prev.filter((e) => e.id !== entryId))
+                                    setHistoryRefreshKey((k) => k + 1)
                                 } catch (err) {
                                     console.error("Failed to delete backup:", err)
                                 }
