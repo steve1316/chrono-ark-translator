@@ -332,3 +332,27 @@ def test_get_api_responses_returns_logged_entries(client: TestClient):
     body = resp.json()
     assert len(body) == 1
     assert body[0]["kind"] == "translate-batch"
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# Group H: POST /open-source-file/{filename}
+
+
+def test_open_source_file_resolves_and_opens(client: TestClient, monkeypatch, tmp_path: Path):
+    mod_id = "3315737452"
+    loc_file = tmp_path / "translation_mod_source" / "text" / "units.loc.tsv"
+    loc_file.write_text("key\ttext\nk1\tHello", encoding="utf-8")
+    # Stub out both launch paths so no real application/explorer is spawned, regardless of platform.
+    monkeypatch.setattr("os.startfile", lambda p: None, raising=False)
+    monkeypatch.setattr(routes_module.subprocess, "Popen", lambda *a, **k: None)
+
+    resp = client.post(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/open-source-file/units.loc.tsv")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+    assert resp.json()["path"] == str(loc_file)
+
+
+def test_open_source_file_404_when_missing(client: TestClient):
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/open-source-file/missing.loc.tsv")
+    assert resp.status_code == 404

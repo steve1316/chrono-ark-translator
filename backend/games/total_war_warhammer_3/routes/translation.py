@@ -8,6 +8,7 @@ tests can monkeypatch them in isolation.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -42,7 +43,7 @@ from backend.games.total_war_warhammer_3.loc_extractor import (
     normalize_loc_filename,
     read_translation_loc_tsv,
 )
-from backend.games.total_war_warhammer_3.loc_tsv_writeback import sync_translations_to_loc_tsv
+from backend.games.total_war_warhammer_3.loc_tsv_writeback import _find_existing_user_file, sync_translations_to_loc_tsv
 from backend.games.total_war_warhammer_3.routes._paths import tw3_workshop_content_dir
 from backend.games.total_war_warhammer_3.translation_drift import (
     DriftRow,
@@ -1043,3 +1044,32 @@ def open_mod_folder(mod_id: str) -> dict:
     else:
         subprocess.Popen(["xdg-open", str(folder)])
     return {"status": "ok"}
+
+
+@router.post("/mods/{mod_id}/open-source-file/{filename}")
+def open_source_file(mod_id: str, filename: str) -> dict:
+    """Open one of the mod's source `.loc.tsv` files in the OS default application.
+
+    Resolves the normalized parent filename to the user's actual on-disk file (which may carry the mod prefix) and opens it.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+        filename: The normalized `.loc.tsv` filename shown in the Source column (e.g. `"units.loc.tsv"`).
+
+    Returns:
+        `{"status": "ok", "path": <resolved path>}` when the file opens.
+
+    Raises:
+        HTTPException: 404 when the mod is not registered or the source file cannot be found.
+    """
+    mod = _require_mod(mod_id)
+    target = _find_existing_user_file(mod, filename)
+    if target is None or not target.is_file():
+        raise HTTPException(404, f"source file not found: {filename}")
+    if sys.platform == "win32":
+        os.startfile(target)
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(target)])
+    else:
+        subprocess.Popen(["xdg-open", str(target)])
+    return {"status": "ok", "path": str(target)}
