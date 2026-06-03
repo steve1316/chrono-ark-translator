@@ -83,6 +83,8 @@ interface TranslationPageProps<Row> {
     languageControls?: ReactNode
     /** Extra banners rendered below the built-in banners (e.g. a batch-paused / review banner). */
     extraBanners?: ReactNode
+    /** Inline panels rendered between the banners and the search bar (e.g. an expandable glossary panel or character-context panel). */
+    panels?: ReactNode
     /** Game-specific modals/panels rendered at the end of the page. */
     modals?: ReactNode
 }
@@ -124,6 +126,7 @@ export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
         subtitle,
         languageControls,
         extraBanners,
+        panels,
         modals,
     } = props
     return (
@@ -161,6 +164,8 @@ export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
             {extraBanners}
 
             {banner && <FeedbackBanner type={banner.type} message={banner.message} onDismiss={() => onDismissBanner?.()} />}
+
+            {panels}
 
             <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
                 <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>

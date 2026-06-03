@@ -103,9 +103,10 @@ describe("TranslationPage", () => {
         expect(screen.getByText("lang-controls")).toBeInTheDocument()
     })
 
-    it("renders the extraBanners and modals slots", () => {
-        render(<TranslationPage {...baseProps({ extraBanners: <div>paused-banner</div>, modals: <div>my-modal</div> })} />)
+    it("renders the extraBanners, panels, and modals slots", () => {
+        render(<TranslationPage {...baseProps({ extraBanners: <div>paused-banner</div>, panels: <div>inline-panel</div>, modals: <div>my-modal</div> })} />)
         expect(screen.getByText("paused-banner")).toBeInTheDocument()
+        expect(screen.getByText("inline-panel")).toBeInTheDocument()
         expect(screen.getByText("my-modal")).toBeInTheDocument()
     })
 
