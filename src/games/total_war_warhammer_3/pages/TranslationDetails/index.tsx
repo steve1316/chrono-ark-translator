@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { FaExclamationCircle, FaFolderOpen, FaSteam } from "react-icons/fa"
 
@@ -11,7 +11,7 @@ import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationPage } from "../../../../translation/TranslationPage"
 import type { ColumnDef } from "../../../../translation/types"
 import type { RowStatus } from "../../../../utils/stringFilters"
-import type { WH3DriftRow, WH3ModContext, WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
+import type { TermSuggestion, WH3DriftRow, WH3ModContext, WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
 import ApiResponsesModal from "../../components/ApiResponsesModal"
 import HistoryModal from "../../components/HistoryModal"
 import ModContextModal from "../../components/ModContextModal"
@@ -23,6 +23,7 @@ import {
     fetchStrings,
     listTranslationMods,
     loadGlossary,
+    loadNameSuggestions,
     openModFolder,
     openSourceFile,
     previewTranslation,
@@ -75,6 +76,11 @@ const TranslationDetailsPage: React.FC = () => {
     const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
     const [openModal, setOpenModal] = useState<ModalKey>(null)
     const [showReviewModal, setShowReviewModal] = useState(false)
+    // Translate-Names-first: pendingScope drives the confirm-modal title; namesRunRef marks the active run as a names run (read in the batch effect,
+    // not a dependency, so resetting it does not re-fire the effect); nameReviewSuggestions opens the post-names glossary review.
+    const [pendingScope, setPendingScope] = useState<"all" | "names">("all")
+    const namesRunRef = useRef(false)
+    const [nameReviewSuggestions, setNameReviewSuggestions] = useState<TermSuggestion[] | null>(null)
     const [modContext, setModContext] = useState<WH3ModContext>({
         source_game: "",
         character_name: "",
@@ -190,6 +196,7 @@ const TranslationDetailsPage: React.FC = () => {
         async (provider?: string) => {
             const p = provider || activeProvider
             setPendingProvider(p)
+            setPendingScope("all")
             try {
                 const pv = await previewTranslation(workshopId, p)
                 if (pv.total_strings === 0) {
@@ -204,17 +211,45 @@ const TranslationDetailsPage: React.FC = () => {
         [workshopId, activeProvider]
     )
 
+    // Translate only the name strings (unit/skill/building/location/...) first. They are then reviewed into the glossary so the bulk run reuses them.
+    const handleTranslateNamesClick = useCallback(
+        async (provider?: string) => {
+            const p = provider || activeProvider
+            setPendingProvider(p)
+            setPendingScope("names")
+            try {
+                const pv = await previewTranslation(workshopId, p, "names")
+                if (pv.total_strings === 0) {
+                    setBanner({ type: "success", message: pv.message || "All names are already translated." })
+                    return
+                }
+                setPreview(pv)
+            } catch (e) {
+                setBanner({ type: "error", message: `Names preview failed: ${(e as Error).message}` })
+            }
+        },
+        [workshopId, activeProvider]
+    )
+
     const onConfirmTranslate = useCallback(() => {
         if (!preview) return
         const plan = preview.batch_plan ?? []
+        namesRunRef.current = pendingScope === "names"
         setPreview(null)
         startTranslation(pendingProvider || activeProvider, plan)
-    }, [preview, pendingProvider, activeProvider, startTranslation])
+    }, [preview, pendingProvider, pendingScope, activeProvider, startTranslation])
 
     // When the iterative run finishes (or errors), refresh counts + rows and surface a result banner.
     useEffect(() => {
+        // A names run does not pause for per-batch provider suggestions; the translated names are reviewed once at the end via name-suggestions.
+        if (batchState.phase === "reviewing" && namesRunRef.current) {
+            continueAfterReview()
+            return
+        }
         if (batchState.phase === "complete") {
             const total = batchState.totalTranslated
+            const wasNamesRun = namesRunRef.current
+            namesRunRef.current = false
             ;(async () => {
                 try {
                     const summary = await rescanMod(workshopId)
@@ -223,12 +258,27 @@ const TranslationDetailsPage: React.FC = () => {
                 } catch {
                     /* ignore refresh errors */
                 }
-                setBanner({ type: "success", message: `Translated ${total} strings` })
+                if (wasNamesRun) {
+                    try {
+                        const sugg = await loadNameSuggestions(workshopId)
+                        if (sugg.length > 0) {
+                            setNameReviewSuggestions(sugg)
+                            setBanner({ type: "success", message: `Translated ${total} names - review them to add to the glossary.` })
+                            return
+                        }
+                    } catch {
+                        /* fall through to the plain banner */
+                    }
+                    setBanner({ type: "success", message: `Translated ${total} names.` })
+                } else {
+                    setBanner({ type: "success", message: `Translated ${total} strings` })
+                }
             })()
         } else if (batchState.phase === "error") {
+            namesRunRef.current = false
             setBanner({ type: "error", message: batchState.message })
         }
-    }, [batchState, workshopId, loadStrings])
+    }, [batchState, workshopId, loadStrings, continueAfterReview])
 
     const onSyncChanges = useCallback(async () => {
         try {
@@ -478,6 +528,15 @@ const TranslationDetailsPage: React.FC = () => {
             </div>
 
             <div className="mod-actions-group">
+                <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => handleTranslateNamesClick()}
+                    disabled={isTranslating || translateCount === 0}
+                    title="Translate unit/skill/building/location names first, then review them into the glossary"
+                >
+                    Translate Names
+                </button>
                 <div style={{ position: "relative", display: "inline-flex" }}>
                     <button
                         type="button"
@@ -548,10 +607,25 @@ const TranslationDetailsPage: React.FC = () => {
             {(openModal === "history" || openModal === "reset") && (
                 <HistoryModal workshopId={workshopId} onClose={() => setOpenModal(null)} defaultRestoreMode={openModal === "reset"} onRestored={onRestored} />
             )}
-            {preview && <TranslationConfirmModal preview={preview} onConfirm={onConfirmTranslate} onCancel={() => setPreview(null)} />}
+            {preview && <TranslationConfirmModal preview={preview} title={pendingScope === "names" ? "Translate Names" : undefined} onConfirm={onConfirmTranslate} onCancel={() => setPreview(null)} />}
+
+            {/* Post-names review: the translated name strings, surfaced as glossary suggestions to accept/dismiss into the mod glossary. */}
+            {nameReviewSuggestions && (
+                <GlossarySuggestionModal
+                    gameId="total_war_warhammer_3"
+                    modId={workshopId}
+                    suggestions={nameReviewSuggestions}
+                    onClose={() => setNameReviewSuggestions(null)}
+                    onUpdated={() => {
+                        loadGlossary(workshopId)
+                            .then((d) => setGlossaryCount(Object.keys(d).length))
+                            .catch(() => {})
+                    }}
+                />
+            )}
 
             {/* Shown when the iterative loop pauses for glossary suggestion review between batches. Closing pauses; the paused banner lets the user resume. */}
-            {batchState.phase === "reviewing" && showReviewModal && (
+            {batchState.phase === "reviewing" && showReviewModal && !namesRunRef.current && (
                 <GlossarySuggestionModal
                     gameId="total_war_warhammer_3"
                     modId={workshopId}
@@ -598,7 +672,7 @@ const TranslationDetailsPage: React.FC = () => {
             translating={batchState.phase === "translating" ? { batchIndex: batchState.batchIndex, totalBatches: batchState.totalBatches, streaming: batchState.streamingProgress } : null}
             onCancelTranslate={cancelTranslation}
             extraBanners={
-                batchState.phase === "reviewing" && !showReviewModal ? (
+                batchState.phase === "reviewing" && !showReviewModal && !namesRunRef.current ? (
                     <div
                         className="glass-card"
                         style={{

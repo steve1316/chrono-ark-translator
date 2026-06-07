@@ -128,13 +128,27 @@ export async function translateBatch(workshopId: string, keys: string[]): Promis
  *
  * @param workshopId Steam Workshop ID of the translation mod.
  * @param provider Optional provider override (defaults to the server's configured provider).
+ * @param scope `"all"` (default) previews every untranslated row; `"names"` previews only name strings for the Translate-Names-first pass.
  * @returns The preview payload, including `batch_plan`. When nothing is untranslated, `total_strings` is 0.
  * @throws `RegistryError` On any non-2xx response.
  */
-export async function previewTranslation(workshopId: string, provider?: string): Promise<WH3TranslationPreview> {
-    const res = await api.post("/translate/preview", { mod_id: workshopId, provider })
+export async function previewTranslation(workshopId: string, provider?: string, scope: "all" | "names" = "all"): Promise<WH3TranslationPreview> {
+    const res = await api.post("/translate/preview", { mod_id: workshopId, provider, scope })
     if (!res.ok) throw await registryError(res)
     return res.json()
+}
+
+/**
+ * Build glossary suggestions from the mod's already-translated name rows (called after the Translate-Names pass) and persist them for review.
+ * @param workshopId - Steam Workshop ID of the translation mod.
+ * @returns The newly persisted name suggestions (may be empty).
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function loadNameSuggestions(workshopId: string): Promise<TermSuggestion[]> {
+    const res = await api.post("/translate/name-suggestions", { mod_id: workshopId })
+    if (!res.ok) throw await registryError(res)
+    const body = await res.json()
+    return body.suggestions ?? []
 }
 
 /**
