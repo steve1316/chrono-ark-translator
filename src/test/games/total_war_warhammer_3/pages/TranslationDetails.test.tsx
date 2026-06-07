@@ -25,9 +25,9 @@ const SUMMARY: WH3RescanSummary = {
 }
 
 const STRINGS: WH3DriftRow[] = [
-    { source_filename: "units.loc.tsv", key: "k1", parent_text: "原一", translation_text: "Original 1", status: "translated", provider: "manual", canonical_status: "synced" },
-    { source_filename: "units.loc.tsv", key: "k2", parent_text: "原二", translation_text: null, status: "untranslated", provider: null, canonical_status: "missing" },
-    { source_filename: "units.loc.tsv", key: "k3", parent_text: "原三", translation_text: "Stale text", status: "stale", provider: "claude", canonical_status: "pending" },
+    { source_filename: "units.loc.tsv", key: "k1", parent_text: "原一", translation_text: "Original 1", status: "translated", provider: "manual", canonical_status: "synced", previous_text: "Original 1" },
+    { source_filename: "units.loc.tsv", key: "k2", parent_text: "原二", translation_text: null, status: "untranslated", provider: null, canonical_status: "missing", previous_text: null },
+    { source_filename: "units.loc.tsv", key: "k3", parent_text: "原三", translation_text: "Stale text", status: "stale", provider: "claude", canonical_status: "pending", previous_text: null },
 ]
 
 const PREVIEW = {
