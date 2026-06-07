@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { FaSteam, FaFileExport, FaBook, FaFolderOpen, FaExclamationCircle } from "react-icons/fa"
 import type { GlossaryTerm, LocString, TermSuggestion } from "../../../../shared_types"
-import { getRowStatus, getRowStyle, filterStrings, sortStrings } from "../../../../utils/stringFilters"
+import { getRowStatus, filterStrings, sortStrings } from "../../../../utils/stringFilters"
 import type { SortField, SortDirection } from "../../../../utils/stringFilters"
 import { gameApi } from "../../../../api/games"
 import { API_BASE } from "../../../../config"
@@ -14,8 +14,9 @@ import ChronoArkGlossaryPanel from "../../components/ChronoArkGlossaryPanel"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { TranslationPage } from "../../../../translation/TranslationPage"
 import { StatusBadge } from "../../../../translation/StatusBadge"
+import { TranslationCell } from "../../../../translation/TranslationCell"
+import { canonicalRowStyle } from "../../../../translation/rowStyle"
 import type { ColumnDef } from "../../../../translation/types"
-import EditableCell from "../../../../components/EditableCell"
 import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
 import type { BatchDescriptor } from "../../../../hooks/useIterativeTranslation"
 
@@ -665,21 +666,16 @@ const ModDetail: React.FC = () => {
             width: 500,
             sortable: true,
             cellClassName: "english-cell",
-            render: (s) =>
-                getRowStatus(s) === "untranslatable" ? (
-                    <span className="untranslatable-hint" title={s.untranslatable_reason}>
-                        {s.untranslatable_reason}
-                    </span>
-                ) : (
-                    <>
-                        {s.original_english && s.original_english !== s.english && (
-                            <div className="prev-translation" style={s.is_synced ? { color: "rgba(52, 211, 153, 0.6)" } : undefined}>
-                                {s.original_english}
-                            </div>
-                        )}
-                        <EditableCell value={s.english} onSave={(val) => handleSaveString(s.key, val)} placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."} />
-                    </>
-                ),
+            render: (s) => (
+                <TranslationCell
+                    value={s.english}
+                    previous={s.original_english}
+                    synced={s.is_synced}
+                    untranslatableReason={getRowStatus(s) === "untranslatable" ? s.untranslatable_reason : undefined}
+                    placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."}
+                    onSave={(val) => handleSaveString(s.key, val)}
+                />
+            ),
         },
     ]
 
@@ -977,7 +973,7 @@ const ModDetail: React.FC = () => {
             columns={columns}
             rows={processedStrings}
             getRowKey={(s) => s.key}
-            getRowStyle={getRowStyle}
+            getRowStyle={(s) => canonicalRowStyle(getRowStatus(s), { override: !s.is_synced && s.english !== s.original_english })}
             sortField={sortConfig.direction ? sortConfig.key : null}
             sortDirection={sortConfig.direction}
             onSort={(f) => handleSort(f as SortField)}
