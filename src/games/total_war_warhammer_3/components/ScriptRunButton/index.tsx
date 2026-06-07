@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom"
+import { useGameSlug } from "../../../useGameSlug"
 import { startRun } from "../../api"
 import { kickPoll, useCurrentRun } from "../../hooks/useCurrentRun"
 
@@ -24,12 +25,13 @@ interface Props {
 export default function ScriptRunButton({ scriptId, label, style }: Props) {
     const run = useCurrentRun()
     const navigate = useNavigate()
+    const slug = useGameSlug()
     const disabled = run.status === "running"
 
     const handleClick = async () => {
         try {
             await startRun(scriptId)
-            navigate("/runner")
+            navigate(`/${slug}/runner`)
         } catch (err) {
             console.error("Failed to start run", err)
         } finally {

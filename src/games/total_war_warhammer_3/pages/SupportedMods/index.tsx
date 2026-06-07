@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { useGameSlug } from "../../../useGameSlug"
 import { useNavigate } from "react-router-dom"
 import { fetchSupportedMods, RegistryError } from "../../api"
 import type { SupportedMod, ValidationIssue } from "../../api"
@@ -16,6 +17,7 @@ import { useValidation } from "../../hooks/useValidation"
  */
 export default function SupportedModsPage() {
     const navigate = useNavigate()
+    const slug = useGameSlug()
     const [mods, setMods] = useState<SupportedMod[] | null>(null)
     const [error, setError] = useState<RegistryError | null>(null)
     const [search, setSearch] = useState("")
@@ -77,13 +79,13 @@ export default function SupportedModsPage() {
                     onChange={(e) => setSearch(e.target.value)}
                     style={{ width: 320, padding: "0.5rem 0.75rem", borderRadius: 8 }}
                 />
-                <button type="button" className="btn btn-primary" onClick={() => navigate("/supported-mods/new")} style={{ marginLeft: "0.5rem" }}>
+                <button type="button" className="btn btn-primary" onClick={() => navigate(`/${slug}/supported-mods/new`)} style={{ marginLeft: "0.5rem" }}>
                     + Add Mod
                 </button>
             </div>
             <div className="mod-grid">
                 {filtered.map((m) => (
-                    <SupportedModCard key={m.package_name} mod={m} issues={issuesByMod.get(m.package_name) ?? []} onEdit={(pn) => navigate(`/supported-mods/edit/${encodeURIComponent(pn)}`)} />
+                    <SupportedModCard key={m.package_name} mod={m} issues={issuesByMod.get(m.package_name) ?? []} onEdit={(pn) => navigate(`/${slug}/supported-mods/edit/${encodeURIComponent(pn)}`)} />
                 ))}
             </div>
         </>

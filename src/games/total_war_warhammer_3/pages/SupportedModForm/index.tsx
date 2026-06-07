@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
+import { useGameSlug } from "../../../useGameSlug"
 
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { createSupportedMod, deleteSupportedMod, fetchSupportedEffectsCategories, fetchSupportedMods, updateSupportedMod } from "../../api"
@@ -19,6 +20,7 @@ import MiscSection from "./sections/Misc"
 const SupportedModFormPage = () => {
     const { packageName } = useParams()
     const navigate = useNavigate()
+    const slug = useGameSlug()
     const isEdit = Boolean(packageName)
 
     const [basics, setBasics] = useState<BasicsState>(emptyBasicsState)
@@ -102,7 +104,7 @@ const SupportedModFormPage = () => {
         setErrorMessage(null)
         try {
             await deleteSupportedMod(packageName)
-            navigate("/supported-mods")
+            navigate(`/${slug}/supported-mods`)
         } catch (err: unknown) {
             setErrorMessage(err instanceof Error ? err.message : "Delete failed")
         } finally {
@@ -128,7 +130,7 @@ const SupportedModFormPage = () => {
             } else {
                 await createSupportedMod(serializeEntry())
             }
-            navigate("/supported-mods")
+            navigate(`/${slug}/supported-mods`)
         } catch (err: unknown) {
             setErrorMessage(err instanceof Error ? err.message : "Save failed")
         } finally {
@@ -149,7 +151,7 @@ const SupportedModFormPage = () => {
                     <button type="button" className="btn btn-primary" onClick={handleSave} disabled={submitting}>
                         {submitting ? "Saving..." : "Save"}
                     </button>
-                    <button type="button" className="btn btn-outline" onClick={() => navigate("/supported-mods")} disabled={submitting}>
+                    <button type="button" className="btn btn-outline" onClick={() => navigate(`/${slug}/supported-mods`)} disabled={submitting}>
                         Cancel
                     </button>
                 </div>

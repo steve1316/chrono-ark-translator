@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
+import { useGameSlug } from "../../../useGameSlug"
 import { FaSteam, FaFileExport, FaBook, FaFolderOpen, FaExclamationCircle } from "react-icons/fa"
 import type { GlossaryTerm, LocString, TermSuggestion } from "../../../../shared_types"
 import { getRowStatus, filterStrings, sortStrings } from "../../../../utils/stringFilters"
@@ -143,7 +144,8 @@ function CharacterContextPanel({ modId, onHasContextChange }: CharacterContextPa
 const ModDetail: React.FC = () => {
     const { modId } = useParams<{ modId: string }>()
     const navigate = useNavigate()
-    const onBack = useCallback(() => navigate("/dashboard"), [navigate])
+    const slug = useGameSlug()
+    const onBack = useCallback(() => navigate(`/${slug}/dashboard`), [navigate, slug])
     const [strings, setStrings] = useState<LocString[]>([])
     const [modName, setModName] = useState<string>("")
     const [modAuthor, setModAuthor] = useState<string>("")

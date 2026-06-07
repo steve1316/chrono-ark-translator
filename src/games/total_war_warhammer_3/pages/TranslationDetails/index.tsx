@@ -6,6 +6,7 @@ import GlossarySuggestionModal from "../../../../components/GlossarySuggestionMo
 import TranslationConfirmModal from "../../../../components/TranslationConfirmModal"
 import { API_BASE } from "../../../../config"
 import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
+import { useGameSlug } from "../../../useGameSlug"
 import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationPage } from "../../../../translation/TranslationPage"
 import { TranslationCell } from "../../../../translation/TranslationCell"
@@ -67,6 +68,7 @@ const DEFAULT_COLUMN_WIDTHS: Record<SortField, number> = {
 const TranslationDetailsPage: React.FC = () => {
     const { workshopId = "" } = useParams<{ workshopId: string }>()
     const navigate = useNavigate()
+    const slug = useGameSlug()
 
     const [mod, setMod] = useState<WH3TranslationModSummary | null>(null)
     const [progress, setProgress] = useState<WH3RescanSummary | null>(null)
@@ -659,7 +661,7 @@ const TranslationDetailsPage: React.FC = () => {
         <TranslationPage<WH3DriftRow>
             title={mod?.display_name ?? workshopId}
             progressLabel={`${done} / ${total} total strings translated`}
-            onBack={() => navigate("/dashboard")}
+            onBack={() => navigate(`/${slug}/dashboard`)}
             previewImage={mod?.preview_image_url ? `${API_BASE}${mod.preview_image_url}` : null}
             titleBadges={titleBadges}
             languageControls={languageControls}

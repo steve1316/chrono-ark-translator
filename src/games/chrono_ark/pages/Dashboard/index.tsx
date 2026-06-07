@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
+import { useGameSlug } from "../../../useGameSlug"
 import { FaSearch } from "react-icons/fa"
 import ModGrid from "../../../../components/ModGrid"
 import EstimateTotalCostModal from "../../../../components/EstimateTotalCostModal"
@@ -17,6 +18,7 @@ import { filterMods } from "../../../../utils/modFilters"
  */
 const DashboardPage: React.FC = () => {
     const navigate = useNavigate()
+    const slug = useGameSlug()
     const [mods, setMods] = useState<ModStatus[]>([])
     const [search, setSearch] = useState("")
     const [cardWidth, setCardWidth] = useState<number | undefined>(undefined)
@@ -248,7 +250,7 @@ const DashboardPage: React.FC = () => {
      */
     const handleModSelect = (modId: string) => {
         sessionStorage.setItem("lastViewedMod", modId)
-        navigate(`/translation/${modId}`)
+        navigate(`/${slug}/translation/${modId}`)
     }
 
     return (

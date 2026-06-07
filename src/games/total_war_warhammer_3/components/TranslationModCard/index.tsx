@@ -1,5 +1,6 @@
 import React from "react"
 import { useNavigate } from "react-router-dom"
+import { useGameSlug } from "../../../useGameSlug"
 
 import ModCard, { NeedsSyncBadge, type ModCardProgressSegment, type ModCardStat } from "../../../../components/ModCard"
 import { API_BASE } from "../../../../config"
@@ -30,6 +31,7 @@ export interface TranslationModCardProps {
  */
 const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, onRescan }) => {
     const navigate = useNavigate()
+    const slug = useGameSlug()
     const parents = mod.parent_workshop_ids
     const counts = progress?.counts ?? null
     const translated = counts?.translated ?? 0
@@ -93,7 +95,7 @@ const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, 
             primaryAction={{
                 label: "View Strings",
                 variant: untranslated > 0 ? "warning" : "primary",
-                onClick: () => navigate(`/translation/${mod.workshop_id}`),
+                onClick: () => navigate(`/${slug}/translation/${mod.workshop_id}`),
             }}
             steamUrl={steamUrl}
             onSync={() => onRescan(mod.workshop_id)}
