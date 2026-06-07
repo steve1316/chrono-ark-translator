@@ -237,11 +237,13 @@ const TranslationDetailsPage: React.FC = () => {
             const keyCount = Object.values(result.per_file).reduce((a, b) => a + b, 0)
             const summary = await rescanMod(workshopId)
             setProgress(summary)
-            setBanner({ type: "success", message: `Synced ${keyCount} keys across ${fileCount} files` })
+            await loadStrings()
+            const orphanNote = result.removed_orphans > 0 ? `, removed ${result.removed_orphans} orphan${result.removed_orphans !== 1 ? "s" : ""}` : ""
+            setBanner({ type: "success", message: `Synced ${keyCount} keys across ${fileCount} files${orphanNote}` })
         } catch (e) {
             setBanner({ type: "error", message: `Sync failed: ${(e as Error).message}` })
         }
-    }, [workshopId])
+    }, [workshopId, loadStrings])
 
     const onClearEnglish = useCallback(async () => {
         if (!window.confirm("Clear all translation text? An auto-snapshot is taken before clearing.")) return

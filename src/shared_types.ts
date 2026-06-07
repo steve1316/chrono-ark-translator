@@ -292,4 +292,6 @@ export interface WH3ApiResponseEntry {
 export interface WH3SyncResult {
     /** Map from absolute `.loc.tsv` path to number of keys written into it. */
     per_file: Record<string, number>
+    /** How many orphan rows (translated keys with no parent source) were pruned from the mod during this sync. */
+    removed_orphans: number
 }
