@@ -2,13 +2,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { FaExclamationCircle, FaFolderOpen, FaSteam } from "react-icons/fa"
 
-import EditableCell from "../../../../components/EditableCell"
 import GlossarySuggestionModal from "../../../../components/GlossarySuggestionModal"
 import TranslationConfirmModal from "../../../../components/TranslationConfirmModal"
 import { API_BASE } from "../../../../config"
 import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
 import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationPage } from "../../../../translation/TranslationPage"
+import { TranslationCell } from "../../../../translation/TranslationCell"
+import { canonicalRowStyle } from "../../../../translation/rowStyle"
 import type { ColumnDef } from "../../../../translation/types"
 import type { RowStatus } from "../../../../utils/stringFilters"
 import type { TermSuggestion, WH3DriftRow, WH3ModContext, WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
@@ -420,7 +421,15 @@ const TranslationDetailsPage: React.FC = () => {
             width: 300,
             sortable: true,
             cellClassName: "english-cell",
-            render: (r) => <EditableCell value={r.translation_text ?? ""} onSave={(text) => onRowSave(r.key, text)} placeholder="(untranslated)" />,
+            render: (r) => (
+                <TranslationCell
+                    value={r.translation_text ?? ""}
+                    previous={r.previous_text}
+                    synced={r.canonical_status === "synced"}
+                    placeholder="(untranslated)"
+                    onSave={(text) => onRowSave(r.key, text)}
+                />
+            ),
         },
     ]
 
@@ -664,6 +673,7 @@ const TranslationDetailsPage: React.FC = () => {
             rows={sortedRows}
             getRowKey={(r) => `${r.source_filename}::${r.key}`}
             getRowClassName={(r) => (r.provider === "claude" ? "wh3-translation-row-claude" : undefined)}
+            getRowStyle={(r) => canonicalRowStyle(r.canonical_status ?? "missing", { override: r.canonical_status === "pending" })}
             sortField={sortConfig.direction ? sortConfig.key : null}
             sortDirection={sortConfig.direction}
             onSort={handleSort}
