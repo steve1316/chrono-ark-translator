@@ -175,8 +175,8 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ gameI
                                 style={{ padding: "1rem", marginBottom: "0.75rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}
                             >
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                                    {/* Left side: term details. */}
-                                    <div>
+                                    {/* Left side: term details. flex:1 + minWidth:0 lets long text wrap instead of pushing the buttons off-screen. */}
+                                    <div data-testid="suggestion-details" style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                                         {/* English translation proposed by the AI, or edit showing old → new. */}
                                         <div style={{ fontWeight: 600, fontSize: "1.1rem" }}>
                                             {suggestion.edit_of ? (
