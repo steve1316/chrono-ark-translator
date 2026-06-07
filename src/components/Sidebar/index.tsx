@@ -3,22 +3,21 @@ import { NavLink } from "react-router-dom"
 import { FaCog } from "react-icons/fa"
 import GameSwitcher from "../GameSwitcher"
 import { getBranding } from "../GameSwitcher/branding"
-import { getGame } from "../../games/registry"
+import { getGame, slugForId } from "../../games/registry"
 
 interface SidebarProps {
     activeGameId: string
-    onGameChange: (gameId: string) => void
 }
 
 /**
  * Persistent sidebar navigation displayed on every page. Renders, in order: the `GameSwitcher` segmented toggle, an active-game header (gradient title + capability subtitle + hairline divider), then the active game's nav entries (from the registry manifest) and the cross-game Settings link. Each link uses `NavLink` so the current route is highlighted via the `active` class.
  *
  * @param activeGameId The currently active game's id, used to look up the manifest and branding.
- * @param onGameChange Forwarded to the `GameSwitcher` so the App can update state.
  * @returns The rendered sidebar JSX.
  */
-const Sidebar: React.FC<SidebarProps> = ({ activeGameId, onGameChange }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeGameId }) => {
     const game = getGame(activeGameId)
+    const slug = slugForId(activeGameId) ?? activeGameId
     const branding = getBranding(activeGameId)
     const hasBranding = branding.subtitle.length > 0
     const titleStyle: React.CSSProperties = hasBranding
@@ -34,7 +33,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeGameId, onGameChange }) => {
 
     return (
         <div className="sidebar">
-            <GameSwitcher activeGameId={activeGameId} onChange={onGameChange} />
+            <GameSwitcher activeGameId={activeGameId} />
 
             <div className="sidebar__game-header">
                 <div data-testid="sidebar-game-title" className="sidebar__game-title" style={titleStyle}>
@@ -52,7 +51,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeGameId, onGameChange }) => {
                 {game?.nav.map((entry) => (
                     <NavLink
                         key={entry.to}
-                        to={entry.to}
+                        to={`/${slug}${entry.to}`}
                         className={({ isActive }) => `nav-link btn-outline ${isActive ? "active" : ""}`}
                         style={{ border: "none", textAlign: "left", width: "100%", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.75rem" }}
                     >

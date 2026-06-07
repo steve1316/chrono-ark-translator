@@ -2,24 +2,22 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { fetchGames, type GameMetadata } from "../../api/games"
 import { API_BASE } from "../../config"
+import { slugForId } from "../../games/registry"
 import { getBranding } from "./branding"
 
 interface GameSwitcherProps {
     /** The currently active game's id. Used to mark the matching pill as `aria-checked` and to skip the POST when re-clicked. */
     activeGameId: string
-    /** Called with the new game id after the backend confirms the switch. */
-    onChange: (gameId: string) => void
 }
 
 /**
  * Two-pill segmented toggle for switching between registered games. Each pill shows the game's square logo (or a single-letter glyph fallback) and is wired as a `role="radio"` inside a `role="radiogroup"`.
- * Selection POSTs `{ active_game: gameId }` to `/api/settings`, calls `onChange`, then resets the URL to `/` so the new game's default route can take over.
+ * Selection POSTs `{ active_game: gameId }` to `/api/settings` (keeping the backend default in sync) then navigates to the new game's `/{slug}/dashboard`.
  *
  * @param activeGameId The currently active game's id.
- * @param onChange Called with the new game id after the backend confirms the switch.
  * @returns The radiogroup of pills, or `null` while the games list is still loading.
  */
-const GameSwitcher = ({ activeGameId, onChange }: GameSwitcherProps) => {
+const GameSwitcher = ({ activeGameId }: GameSwitcherProps) => {
     const [games, setGames] = useState<GameMetadata[]>([])
     const navigate = useNavigate()
     const pillRefs = useRef<Record<string, HTMLButtonElement | null>>({})
@@ -38,9 +36,8 @@ const GameSwitcher = ({ activeGameId, onChange }: GameSwitcherProps) => {
             body: JSON.stringify({ active_game: gameId }),
         })
         if (res.ok) {
-            onChange(gameId)
-            // Reset URL so the new game's <Navigate> redirects to its default page, avoiding a blank screen if the previous URL belonged to the prior game.
-            navigate("/")
+            // Navigate into the new game's namespace; its dashboard is the default landing page.
+            navigate(`/${slugForId(gameId) ?? gameId}/dashboard`)
         }
     }
 

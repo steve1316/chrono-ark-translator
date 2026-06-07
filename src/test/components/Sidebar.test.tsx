@@ -26,29 +26,29 @@ afterEach(() => vi.restoreAllMocks())
 
 describe("Sidebar active-game header", () => {
     it("renders the active game's display name as the header title", async () => {
-        render(wrap(<Sidebar activeGameId="chrono_ark" onGameChange={vi.fn()} />))
+        render(wrap(<Sidebar activeGameId="chrono_ark" />))
         const title = await screen.findByTestId("sidebar-game-title")
         expect(title).toHaveTextContent("Chrono Ark")
     })
 
     it("renders the active game's branding subtitle", async () => {
-        render(wrap(<Sidebar activeGameId="chrono_ark" onGameChange={vi.fn()} />))
+        render(wrap(<Sidebar activeGameId="chrono_ark" />))
         const subtitle = await screen.findByTestId("sidebar-game-subtitle")
         expect(subtitle).toHaveTextContent("Translation tools")
     })
 
     it("switches the title and subtitle when the active game changes", async () => {
-        const { rerender } = render(wrap(<Sidebar activeGameId="chrono_ark" onGameChange={vi.fn()} />))
+        const { rerender } = render(wrap(<Sidebar activeGameId="chrono_ark" />))
         const titleBefore = await screen.findByTestId("sidebar-game-title")
         expect(titleBefore).toHaveTextContent("Chrono Ark")
-        rerender(wrap(<Sidebar activeGameId="total_war_warhammer_3" onGameChange={vi.fn()} />))
+        rerender(wrap(<Sidebar activeGameId="total_war_warhammer_3" />))
         const titleAfter = await screen.findByTestId("sidebar-game-title")
         expect(titleAfter).toHaveTextContent("Warhammer III")
         expect(screen.getByTestId("sidebar-game-subtitle")).toHaveTextContent("Workshop tools")
     })
 
     it("renders a divider element between the game header and nav links", async () => {
-        render(wrap(<Sidebar activeGameId="chrono_ark" onGameChange={vi.fn()} />))
+        render(wrap(<Sidebar activeGameId="chrono_ark" />))
         const divider = await screen.findByTestId("sidebar-game-divider")
         expect(divider).toBeInTheDocument()
     })
@@ -57,7 +57,7 @@ describe("Sidebar active-game header", () => {
         vi.spyOn(globalThis, "fetch").mockImplementationOnce(() =>
             Promise.resolve(new Response(JSON.stringify([{ game_id: "future_game", display_name: "Future Game", icon: "", capabilities: [] }]), { status: 200 }))
         )
-        render(wrap(<Sidebar activeGameId="future_game" onGameChange={vi.fn()} />))
+        render(wrap(<Sidebar activeGameId="future_game" />))
         const title = await screen.findByTestId("sidebar-game-title")
         expect(title).toHaveTextContent("Future Game")
         expect(screen.queryByTestId("sidebar-game-subtitle")).toBeNull()
