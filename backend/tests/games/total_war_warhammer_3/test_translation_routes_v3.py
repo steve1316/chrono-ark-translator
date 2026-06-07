@@ -193,6 +193,25 @@ def test_strings_hides_orphan_rows(client: TestClient, monkeypatch):
     assert "k1" in keys
 
 
+def test_strings_include_previous_text_from_on_disk_loc(client: TestClient, monkeypatch, tmp_path: Path):
+    """previous_text is the on-disk .loc.tsv text; when translations.json overrides it, the row shows previous (on-disk) vs current (override)."""
+    mod_id = "3315737452"
+
+    def trans_on_disk(mod):
+        return {"units.loc.tsv": {"k1": LocRow("k1", "On Disk EN", True)}}
+
+    monkeypatch.setattr(routes_module, "_extract_translation_strings", trans_on_disk)
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    (mod_dir / "translations.json").write_text(json.dumps({"k1": {"text": "New Override", "provider": "claude"}}), encoding="utf-8")
+
+    resp = client.get(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/strings")
+    assert resp.status_code == 200
+    row = next(r for r in resp.json() if r["key"] == "k1")
+    assert row["translation_text"] == "New Override"
+    assert row["previous_text"] == "On Disk EN"
+
+
 def test_sync_prunes_orphans_from_disk_and_overlay(client: TestClient, monkeypatch, tmp_path: Path):
     """Sync removes orphan rows from the user's .loc.tsv and translations.json, and reports the count."""
     mod_id = "3315737452"

@@ -480,6 +480,8 @@ def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stal
     drift = compute_drift(parent=parent, translation=translation, snapshot=snapshot)
 
     raw_translations = store.load_translations_raw(mod_id)
+    # Pre-overlay translation_text is the on-disk .loc.tsv value - the "previous" translation (analogous to Chrono Ark's original_english).
+    previous_by_key = {r.key: r.translation_text for r in drift}
     # Orphan strings (translated keys whose parent source no longer exists) are hidden from the table; they are pruned from disk on the next sync.
     overlaid = [r for r in _overlay_translations(drift, raw_translations) if r.status != "orphan"]
     canonical = {(r.source_file, r.key): r.status for r in to_status_rows(drift, raw_translations)}
@@ -487,7 +489,10 @@ def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stal
     if status:
         overlaid = [r for r in overlaid if r.status == status]
 
-    return [{**_serialize_drift_row(r), "canonical_status": canonical.get((r.source_filename, r.key))} for r in overlaid]
+    return [
+        {**_serialize_drift_row(r), "canonical_status": canonical.get((r.source_filename, r.key)), "previous_text": previous_by_key.get(r.key)}
+        for r in overlaid
+    ]
 
 
 @router.put("/mods/{mod_id}/strings/{key}")

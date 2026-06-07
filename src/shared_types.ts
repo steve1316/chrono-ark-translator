@@ -212,6 +212,8 @@ export interface WH3DriftRow {
     provider: string | null
     /** Canonical five-state status (synced/untouched/pending/missing/untranslatable) for the shared status chips. `null` if the backend did not supply it. */
     canonical_status: RowStatus | null
+    /** The on-disk `.loc.tsv` translation text (the previously-synced value), for the prev-translation strikethrough. `null` when none on disk. */
+    previous_text: string | null
 }
 
 /** Summary returned by `POST /api/games/total_war_warhammer_3/translation/mods/{id}/rescan`. */
