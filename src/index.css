@@ -365,10 +365,6 @@ td {
     font-size: 0.9rem;
 }
 
-tr {
-    will-change: transform;
-}
-
 /* --- RESIZABLE TABLE COLUMNS --- */
 th {
     position: relative;
