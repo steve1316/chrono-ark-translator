@@ -179,6 +179,47 @@ def test_sync_writes_loc_tsv_and_returns_per_file_counts(client: TestClient, mon
     assert any("pre-sync" in s["label"].lower() for s in snaps)
 
 
+def test_strings_hides_orphan_rows(client: TestClient, monkeypatch):
+    """A translated key with no matching parent source (orphan) must not appear in the strings table."""
+
+    def trans_with_orphan(mod):
+        return {"units.loc.tsv": {"k1": LocRow("k1", "Existing", True), "gone": LocRow("gone", "Stale", True)}}
+
+    monkeypatch.setattr(routes_module, "_extract_translation_strings", trans_with_orphan)
+    resp = client.get("/api/games/total_war_warhammer_3/translation/mods/3315737452/strings")
+    assert resp.status_code == 200
+    keys = {r["key"] for r in resp.json()}
+    assert "gone" not in keys
+    assert "k1" in keys
+
+
+def test_sync_prunes_orphans_from_disk_and_overlay(client: TestClient, monkeypatch, tmp_path: Path):
+    """Sync removes orphan rows from the user's .loc.tsv and translations.json, and reports the count."""
+    mod_id = "3315737452"
+    loc = tmp_path / "translation_mod_source" / "text" / "units.loc.tsv"
+    loc.parent.mkdir(parents=True, exist_ok=True)
+    loc.write_text("key\ttext\ttooltip\n#Loc;1;text/units.loc\t\t\nk1\tExisting\ttrue\ngone\tStale\ttrue\n", encoding="utf-8")
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    (mod_dir / "translations.json").write_text(
+        json.dumps({"k1": {"text": "Existing", "provider": "manual"}, "gone": {"text": "Stale", "provider": "manual"}}),
+        encoding="utf-8",
+    )
+
+    def trans_with_orphan(mod):
+        return {"units.loc.tsv": {"k1": LocRow("k1", "Existing", True), "gone": LocRow("gone", "Stale", True)}}
+
+    monkeypatch.setattr(routes_module, "_extract_translation_strings", trans_with_orphan)
+
+    resp = client.post(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/sync")
+    assert resp.status_code == 200
+    assert resp.json()["removed_orphans"] == 1
+    assert "gone" not in loc.read_text(encoding="utf-8")
+    raw = json.loads((mod_dir / "translations.json").read_text(encoding="utf-8"))
+    assert "gone" not in raw
+    assert "k1" in raw
+
+
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # Group C: snapshot routes (GET/POST/restore/DELETE)

@@ -7,6 +7,7 @@ import pytest
 from backend.games.total_war_warhammer_3.loc_tsv_writeback import (
     apply_row_patches,
     read_loc_tsv_lines,
+    remove_keys_from_loc_tsv,
     sync_translations_to_loc_tsv,
 )
 from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
@@ -148,3 +149,32 @@ def test_sync_skips_rows_with_null_translation_text(tmp_path: Path):
     result = sync_translations_to_loc_tsv(mod, drift_rows)
     # Only one file touched, with one patch.
     assert sum(result.values()) == 1
+
+
+def test_remove_keys_from_loc_tsv_drops_rows_and_keeps_header(tmp_path: Path):
+    source = tmp_path / "translation_mod"
+    loc = source / "text" / "sample.loc.tsv"
+    _write_loc_tsv(loc, SAMPLE)  # contains key_a and key_b
+    mod = WH3TranslationMod(workshop_id="abc", display_name="t", parent_workshop_ids=("p",), local_source_dir=source)
+
+    result = remove_keys_from_loc_tsv(mod, {"sample.loc.tsv": {"key_a"}})
+
+    assert result[str(loc)] == 1
+    lines = loc.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "key\ttext\ttooltip"
+    assert lines[1] == "#Loc;1;text/sample.loc\t\t"
+    assert len(lines) == 3  # header + metadata + key_b
+    assert "key_a" not in loc.read_text(encoding="utf-8")
+    assert "key_b\tOld B\tfalse" in loc.read_text(encoding="utf-8")
+
+
+def test_remove_keys_from_loc_tsv_noop_when_key_absent(tmp_path: Path):
+    source = tmp_path / "translation_mod"
+    loc = source / "text" / "sample.loc.tsv"
+    _write_loc_tsv(loc, SAMPLE)
+    mod = WH3TranslationMod(workshop_id="abc", display_name="t", parent_workshop_ids=("p",), local_source_dir=source)
+
+    result = remove_keys_from_loc_tsv(mod, {"sample.loc.tsv": {"nonexistent"}})
+
+    assert result == {}
+    assert "key_a\tOld A\ttrue" in loc.read_text(encoding="utf-8")

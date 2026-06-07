@@ -43,7 +43,7 @@ from backend.games.total_war_warhammer_3.loc_extractor import (
     normalize_loc_filename,
     read_translation_loc_tsv,
 )
-from backend.games.total_war_warhammer_3.loc_tsv_writeback import _find_existing_user_file, sync_translations_to_loc_tsv
+from backend.games.total_war_warhammer_3.loc_tsv_writeback import _find_existing_user_file, remove_keys_from_loc_tsv, sync_translations_to_loc_tsv
 from backend.games.total_war_warhammer_3.routes._paths import tw3_workshop_content_dir
 from backend.games.total_war_warhammer_3.translation_drift import (
     DriftRow,
@@ -435,9 +435,10 @@ def rescan(mod_id: str) -> RescanSummary:
     for row in overlaid:
         counts[row.status] += 1
 
-    # Canonical five-state tally for the shared status pills. Zero-filled so the dict always carries every state, matching Chrono Ark.
+    # Canonical five-state tally for the shared status pills. Zero-filled so the dict always carries every state, matching Chrono Ark. Orphan rows are
+    # excluded so the counts match the orphan-free strings table.
     canonical_counts: dict[str, int] = {"synced": 0, "untouched": 0, "pending": 0, "missing": 0, "untranslatable": 0}
-    for srow in to_status_rows(drift, raw_translations):
+    for srow in to_status_rows([d for d in drift if d.status != "orphan"], raw_translations):
         canonical_counts[srow.status] += 1
 
     ctx = store.load_character_context(mod_id)
@@ -479,7 +480,8 @@ def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stal
     drift = compute_drift(parent=parent, translation=translation, snapshot=snapshot)
 
     raw_translations = store.load_translations_raw(mod_id)
-    overlaid = _overlay_translations(drift, raw_translations)
+    # Orphan strings (translated keys whose parent source no longer exists) are hidden from the table; they are pruned from disk on the next sync.
+    overlaid = [r for r in _overlay_translations(drift, raw_translations) if r.status != "orphan"]
     canonical = {(r.source_file, r.key): r.status for r in to_status_rows(drift, raw_translations)}
 
     if status:
@@ -731,13 +733,32 @@ def sync_changes(mod_id: str) -> dict:
         mod_id: Steam Workshop ID of the WH3 translation mod.
 
     Returns:
-        `{"per_file": {absolute_path: count}}` describing the writeback.
+        `{"per_file": {absolute_path: count}, "removed_orphans": N}` describing the writeback and how many orphan rows were pruned.
     """
     mod = _require_mod(mod_id)
     snapshot_store.create_snapshot(mod_id, label="pre-sync", kind="auto", local_source_dir=mod.local_source_dir)
+
+    # Prune orphan strings (translated keys whose parent source no longer exists) from the user's .loc.tsv files and translations.json. The pre-sync
+    # snapshot above keeps them recoverable.
+    parent = _extract_all_parent_strings(mod)
+    translation = _extract_translation_strings(mod)
+    snapshot = store.load_parent_snapshot(mod_id)
+    orphans = [d for d in compute_drift(parent=parent, translation=translation, snapshot=snapshot) if d.status == "orphan"]
+    removed_orphans = 0
+    if orphans:
+        keys_by_file: dict[str, set[str]] = {}
+        for d in orphans:
+            keys_by_file.setdefault(d.source_filename, set()).add(d.key)
+        removed_orphans = sum(remove_keys_from_loc_tsv(mod, keys_by_file).values())
+        orphan_keys = {d.key for d in orphans}
+        raw = store.load_translations_raw(mod_id)
+        pruned = {k: v for k, v in raw.items() if k not in orphan_keys}
+        if len(pruned) != len(raw):
+            store.save_translations_raw(mod_id, pruned)
+
     drift = get_strings(mod_id)
     per_file = sync_translations_to_loc_tsv(mod, drift)
-    return {"per_file": per_file}
+    return {"per_file": per_file, "removed_orphans": removed_orphans}
 
 
 @router.get("/mods/{mod_id}/snapshots")

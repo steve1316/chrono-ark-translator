@@ -91,6 +91,45 @@ def apply_row_patches(path: Path, patches: dict[str, str]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def remove_keys_from_loc_tsv(mod: WH3TranslationMod, keys_by_file: dict[str, set[str]]) -> dict[str, int]:
+    """Delete the given keys from each user `.loc.tsv` file, rewriting it without those rows.
+
+    Used to prune orphan strings (translated keys whose parent source no longer exists) during sync. Rows are matched by their key (column 0); the
+    two-line header is always preserved. Files that do not exist on disk are skipped.
+
+    Args:
+        mod: The translation mod whose `.loc.tsv` files to prune.
+        keys_by_file: Mapping of normalized `.loc.tsv` filename to the set of keys to remove from it.
+
+    Returns:
+        Mapping `{absolute_path: removed_count}` for each file that actually had rows removed.
+    """
+    result: dict[str, int] = {}
+    for fname, keys in keys_by_file.items():
+        if not keys:
+            continue
+        target = _find_existing_user_file(mod, fname)
+        if target is None or not target.exists():
+            continue
+        lines = read_loc_tsv_lines(target)
+        kept: list[str] = []
+        removed = 0
+        for i, line in enumerate(lines):
+            if i < 2 or not line or line.startswith("#"):
+                kept.append(line)
+                continue
+            first_tab = line.find("\t")
+            key = line[:first_tab] if first_tab >= 0 else line
+            if key in keys:
+                removed += 1
+                continue
+            kept.append(line)
+        if removed:
+            target.write_text("\n".join(kept) + "\n", encoding="utf-8")
+            result[str(target)] = removed
+    return result
+
+
 def _find_existing_user_file(mod: WH3TranslationMod, normalized_filename: str) -> Path | None:
     """Find the user's `.loc.tsv` file that maps to a normalized parent filename.
 
@@ -145,4 +184,4 @@ def sync_translations_to_loc_tsv(mod: WH3TranslationMod, drift_rows: list[dict])
     return result
 
 
-__all__ = ["read_loc_tsv_lines", "apply_row_patches", "sync_translations_to_loc_tsv"]
+__all__ = ["read_loc_tsv_lines", "apply_row_patches", "remove_keys_from_loc_tsv", "sync_translations_to_loc_tsv"]
