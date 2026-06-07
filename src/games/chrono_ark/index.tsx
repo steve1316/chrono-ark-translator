@@ -11,6 +11,7 @@ import { ChronoArkRoutes } from "./routes"
  */
 registerGame({
     id: "chrono_ark",
+    slug: "chrono_ark",
     displayName: "Chrono Ark",
     icon: "chrono_ark",
     nav: chronoArkNav,
