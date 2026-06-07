@@ -12,7 +12,7 @@ describe("TranslationCell", () => {
 
     it("omits the strikethrough when previous equals current or is empty", () => {
         render(<TranslationCell value="Same" previous="Same" synced={false} onSave={vi.fn()} />)
-        expect(screen.queryByText((_, el) => (el?.className.includes("prev-translation") ?? false))).toBeNull()
+        expect(screen.queryByText((_, el) => el?.className.includes("prev-translation") ?? false)).toBeNull()
     })
 
     it("renders the untranslatable reason instead of an editor when given one", () => {

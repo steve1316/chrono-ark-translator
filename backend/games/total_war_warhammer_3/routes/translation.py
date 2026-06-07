@@ -489,10 +489,7 @@ def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stal
     if status:
         overlaid = [r for r in overlaid if r.status == status]
 
-    return [
-        {**_serialize_drift_row(r), "canonical_status": canonical.get((r.source_filename, r.key)), "previous_text": previous_by_key.get(r.key)}
-        for r in overlaid
-    ]
+    return [{**_serialize_drift_row(r), "canonical_status": canonical.get((r.source_filename, r.key)), "previous_text": previous_by_key.get(r.key)} for r in overlaid]
 
 
 @router.put("/mods/{mod_id}/strings/{key}")
