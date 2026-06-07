@@ -16,12 +16,12 @@ import StatisticsPage from "./pages/Statistics"
 export function ChronoArkRoutes() {
     return (
         <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/translation/:modId" element={<ModDetail />} />
-            <Route path="/glossary" element={<GlossaryPage />} />
-            <Route path="/statistics" element={<StatisticsPage />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="translation/:modId" element={<ModDetail />} />
+            <Route path="glossary" element={<GlossaryPage />} />
+            <Route path="statistics" element={<StatisticsPage />} />
+            <Route path="*" element={<Navigate to="dashboard" replace />} />
         </Routes>
     )
 }

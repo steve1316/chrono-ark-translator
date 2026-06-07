@@ -15,16 +15,16 @@ import ValidatePage from "./pages/Validate"
 export function TotalWarWarhammer3Routes() {
     return (
         <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/supported-mods" element={<SupportedModsPage />} />
-            <Route path="/supported-mods/new" element={<SupportedModFormPage />} />
-            <Route path="/supported-mods/edit/:packageName" element={<SupportedModFormPage />} />
-            <Route path="/translation/:workshopId" element={<TranslationDetailsPage />} />
-            <Route path="/validate" element={<ValidatePage />} />
-            <Route path="/glossary" element={<GlossaryPage />} />
-            <Route path="/runner" element={<RunnerPage />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="supported-mods" element={<SupportedModsPage />} />
+            <Route path="supported-mods/new" element={<SupportedModFormPage />} />
+            <Route path="supported-mods/edit/:packageName" element={<SupportedModFormPage />} />
+            <Route path="translation/:workshopId" element={<TranslationDetailsPage />} />
+            <Route path="validate" element={<ValidatePage />} />
+            <Route path="glossary" element={<GlossaryPage />} />
+            <Route path="runner" element={<RunnerPage />} />
+            <Route path="*" element={<Navigate to="dashboard" replace />} />
         </Routes>
     )
 }
