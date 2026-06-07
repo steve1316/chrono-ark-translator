@@ -150,3 +150,102 @@ def test_cancel_returns_ok(client: TestClient):
     resp = client.post(f"{PREFIX}/cancel?mod_id=3315737452")
     assert resp.status_code == 200
     assert "cancelled" in resp.json()
+
+
+def test_preview_scope_names_includes_only_name_keys(client: TestClient, monkeypatch):
+    """preview(scope='names') restricts the batch plan to name keys, excluding description keys."""
+
+    def parent_with_names(mod):
+        return {
+            "units.loc.tsv": {
+                "land_units_onscreen_name_dragon": LocRow("land_units_onscreen_name_dragon", "龙卫", True),
+                "unit_description_short_texts_text_dragon": LocRow("unit_description_short_texts_text_dragon", "描述", True),
+            }
+        }
+
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", parent_with_names)
+    monkeypatch.setattr(routes_module, "_extract_translation_strings", lambda mod: {})
+
+    resp = client.post(f"{PREFIX}/preview", json={"mod_id": "3315737452", "scope": "names"})
+    assert resp.status_code == 200
+    body = resp.json()
+    planned = [k for batch in body["batch_plan"] for k in batch["keys"]]
+    assert planned == ["land_units_onscreen_name_dragon"]
+
+
+def test_preview_scope_names_zero_state(client: TestClient, monkeypatch):
+    """preview(scope='names') reports zero with a names-specific message when no name keys are untranslated."""
+
+    def parent_no_names(mod):
+        return {"units.loc.tsv": {"unit_description_short_texts_text_dragon": LocRow("unit_description_short_texts_text_dragon", "描述", True)}}
+
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", parent_no_names)
+    monkeypatch.setattr(routes_module, "_extract_translation_strings", lambda mod: {})
+
+    resp = client.post(f"{PREFIX}/preview", json={"mod_id": "3315737452", "scope": "names"})
+    assert resp.status_code == 200
+    assert resp.json()["total_strings"] == 0
+    assert "names" in resp.json()["message"].lower()
+
+
+def test_name_suggestions_builds_categorized_suggestions(client: TestClient, monkeypatch, tmp_path: Path):
+    """After a names pass, name-suggestions maps each translated name row to a categorized suggestion and persists it."""
+    from backend.data import suggestion_manager
+    from backend.games.storage_paths import game_storage_path
+
+    mod_id = "3315737452"
+
+    def parent_with_names(mod):
+        return {
+            "units.loc.tsv": {
+                "land_units_onscreen_name_dragon": LocRow("land_units_onscreen_name_dragon", "龙卫", True),
+                "effects_description_foo": LocRow("effects_description_foo", "效果", True),
+            }
+        }
+
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", parent_with_names)
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    (mod_dir / "translations.json").write_text(
+        json.dumps(
+            {
+                "land_units_onscreen_name_dragon": {"text": "Dragon Guard", "provider": "claude"},
+                "effects_description_foo": {"text": "Some effect", "provider": "claude"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    resp = client.post(f"{PREFIX}/name-suggestions", json={"mod_id": mod_id})
+    assert resp.status_code == 200
+    sugg = resp.json()["suggestions"]
+    assert len(sugg) == 1
+    assert sugg[0]["english"] == "Dragon Guard"
+    assert sugg[0]["source"] == "龙卫"
+    assert sugg[0]["category"] == "unit"
+
+    persisted = {s["english"] for s in suggestion_manager.load_suggestions(mod_id, storage_path=game_storage_path("total_war_warhammer_3"))}
+    assert persisted == {"Dragon Guard"}
+
+
+def test_name_suggestions_skips_terms_already_in_glossary(client: TestClient, monkeypatch, tmp_path: Path):
+    """A translated name already present in the mod glossary is not re-suggested."""
+    from backend.games.total_war_warhammer_3 import glossary_store
+
+    mod_id = "3315737452"
+    glossary_store.add_term(mod_id, {"english": "Dragon Guard", "source": "龙卫", "category": "unit"})
+
+    def parent_with_names(mod):
+        return {"units.loc.tsv": {"land_units_onscreen_name_dragon": LocRow("land_units_onscreen_name_dragon", "龙卫", True)}}
+
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", parent_with_names)
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    (mod_dir / "translations.json").write_text(
+        json.dumps({"land_units_onscreen_name_dragon": {"text": "Dragon Guard", "provider": "claude"}}),
+        encoding="utf-8",
+    )
+
+    resp = client.post(f"{PREFIX}/name-suggestions", json={"mod_id": mod_id})
+    assert resp.status_code == 200
+    assert resp.json()["suggestions"] == []

@@ -52,11 +52,16 @@ class TranslationRequest(BaseModel):
         provider: Optional override for the translation provider name.
             Defaults to the value in `config.TRANSLATION_PROVIDER` when
             `None`.
+        retranslate: When True, re-translate already-translated rows too.
+        scope: Which rows to include. `"all"` (default) is every untranslated
+            row; `"names"` restricts the WH3 preview to name strings only
+            (unit/skill/building/location/...), for the Translate-Names-first pass.
     """
 
     mod_id: str
     provider: Optional[str] = None
     retranslate: bool = False
+    scope: str = "all"
 
 
 class BatchTranslationRequest(BaseModel):

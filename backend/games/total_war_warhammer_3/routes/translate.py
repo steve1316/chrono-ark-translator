@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException
 
 from backend.data import suggestion_manager
 from backend.games.storage_paths import game_storage_path
+from backend.games.total_war_warhammer_3.name_keys import classify_name_key, is_name_key
 from backend.games.total_war_warhammer_3.routes import translation as _t
 from backend.routes.models import BatchTranslationRequest, TranslationRequest
 from backend.translation.orchestrator import run_batch
@@ -45,12 +46,13 @@ def _glossary_prompt(mod_id: str, source_lang: str, target_lang: str) -> str:
     return prompt or "No glossary available."
 
 
-def _untranslated_entries(mod, mod_id: str) -> list[tuple[str, str]]:
+def _untranslated_entries(mod, mod_id: str, key_filter=None) -> list[tuple[str, str]]:
     """Return (key, source_text) tuples for every untranslated row, honoring the translations.json overlay.
 
     Args:
         mod: The resolved `WH3TranslationMod`.
         mod_id: Workshop ID of the translation mod.
+        key_filter: Optional predicate `(key) -> bool`; when given, only keys for which it returns True are included.
 
     Returns:
         (key, source_text) tuples for rows whose overlaid drift status is `untranslated` and which still have parent source text.
@@ -66,7 +68,7 @@ def _untranslated_entries(mod, mod_id: str) -> list[tuple[str, str]]:
         for key, row in rows.items():
             src_by_key[key] = row.text
 
-    return [(r.key, src_by_key.get(r.key, "")) for r in overlaid if r.status == "untranslated" and src_by_key.get(r.key)]
+    return [(r.key, src_by_key.get(r.key, "")) for r in overlaid if r.status == "untranslated" and src_by_key.get(r.key) and (key_filter is None or key_filter(r.key))]
 
 
 @router.post("/preview")
@@ -87,9 +89,11 @@ async def preview(req: TranslationRequest) -> dict:
     source_lang = mod.source_language
     target_lang = mod.target_language
 
-    entries = _untranslated_entries(mod, req.mod_id)
+    names_only = req.scope == "names"
+    entries = _untranslated_entries(mod, req.mod_id, key_filter=is_name_key if names_only else None)
     if not entries:
-        return {"total_strings": 0, "message": "All strings already translated", "previews": {}}
+        message = "All names already translated" if names_only else "All strings already translated"
+        return {"total_strings": 0, "message": message, "previews": {}}
 
     provider = _t.ClaudeProvider()
     adapter = _t.TotalWarWarhammer3Adapter()
@@ -225,6 +229,61 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
     )
 
     return {"status": "success", "translated": len(translations), "translations": translations, "suggestions": suggestions}
+
+
+@router.post("/name-suggestions")
+async def name_suggestions(req: TranslationRequest) -> dict:
+    """Build glossary suggestions from the mod's already-translated name rows and persist them for review.
+
+    Called after the 'Translate Names' pass completes. Each translated name key (unit/skill/building/location/...) becomes a suggestion mapping its source
+    text to the new translation, tagged with its category. Terms already in the mod glossary are skipped. Results are persisted via the shared suggestion
+    store so the existing review modal + accept/dismiss endpoints handle them.
+
+    Args:
+        req: Translation request carrying the mod id.
+
+    Returns:
+        `{"suggestions": [...]}` - the newly persisted name suggestions (may be empty).
+
+    Raises:
+        HTTPException: 404 if `mod_id` is not registered.
+    """
+    mod = _t._require_mod(req.mod_id)
+    source_lang = mod.source_language
+
+    parent = _t._extract_all_parent_strings(mod)
+    src_by_key: dict[str, str] = {}
+    for rows in parent.values():
+        for key, row in rows.items():
+            src_by_key[key] = row.text
+
+    raw = _t.store.load_translations_raw(req.mod_id)
+    existing_glossary = _t.glossary_store.load_glossary(req.mod_id)
+
+    suggestions: list[dict] = []
+    seen: set[str] = set()
+    for key, entry in raw.items():
+        english = entry.get("text") if isinstance(entry, dict) else None
+        if not english or english in existing_glossary or english in seen:
+            continue
+        category = classify_name_key(key)
+        if category is None:
+            continue
+        suggestions.append(
+            {
+                "english": english,
+                "source": src_by_key.get(key, ""),
+                "source_lang": source_lang,
+                "category": category,
+                "reason": f"{category} name translated in the names-first pass",
+            }
+        )
+        seen.add(english)
+
+    if suggestions:
+        suggestion_manager.add_suggestions(req.mod_id, suggestions, storage_path=game_storage_path(GAME_ID))
+
+    return {"suggestions": suggestions}
 
 
 @router.post("/cancel")
