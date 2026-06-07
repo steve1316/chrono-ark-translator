@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import ModGlossaryModal from "../../../../games/total_war_warhammer_3/components/ModGlossaryModal"
@@ -46,7 +46,7 @@ describe("ModGlossaryModal", () => {
         fireEvent.change(screen.getByPlaceholderText(/Category/i), { target: { value: "factions" } })
 
         await act(async () => {
-            fireEvent.click(screen.getByRole("button", { name: /Add term/i }))
+            fireEvent.click(screen.getByRole("button", { name: /^Add$/ }))
         })
 
         await waitFor(() => expect(screen.getByText("Dragon")).toBeInTheDocument())
@@ -63,9 +63,9 @@ describe("ModGlossaryModal", () => {
         render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} />)
         await waitFor(() => screen.getByText("Phoenix"))
 
-        const buttons = screen.getAllByRole("button", { name: /Delete/i })
+        const phoenixRow = screen.getByText("Phoenix").closest(".glossary-row") as HTMLElement
         await act(async () => {
-            fireEvent.click(buttons[0])
+            fireEvent.click(within(phoenixRow).getByRole("button", { name: /Remove/i }))
         })
         await waitFor(() => expect(screen.queryByText("Phoenix")).not.toBeInTheDocument())
     })
@@ -79,8 +79,8 @@ describe("ModGlossaryModal", () => {
         render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} />)
         await waitFor(() => screen.getByText("Phoenix"))
 
-        const editButtons = screen.getAllByRole("button", { name: /Edit/i })
-        fireEvent.click(editButtons[0])
+        const phoenixRow = screen.getByText("Phoenix").closest(".glossary-row") as HTMLElement
+        fireEvent.click(within(phoenixRow).getByRole("button", { name: /Edit/i }))
 
         const englishInput = screen.getByDisplayValue("Phoenix")
         fireEvent.change(englishInput, { target: { value: "Phoenix Lord" } })

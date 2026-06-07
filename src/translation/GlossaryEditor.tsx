@@ -12,6 +12,8 @@ export interface GlossaryEditorTerm {
 
 /** Props for the shared `GlossaryEditor` body. */
 interface GlossaryEditorProps {
+    /** Optional heading shown above the list (e.g. "Mod Glossary Terms"). Omit when the container already provides a title. */
+    title?: string
     /** Terms to edit. */
     terms: GlossaryEditorTerm[]
     /** When true, the add/edit form shows a language dropdown and rows show every `lang: text` mapping; when false, a single source field. */
@@ -60,6 +62,7 @@ function sourceSummary(t: GlossaryEditorTerm, perLanguage: boolean): string {
  * @returns The editor element.
  */
 export function GlossaryEditor({
+    title,
     terms,
     perLanguage = false,
     languages = ["Chinese", "Korean", "Japanese"],
@@ -115,7 +118,7 @@ export function GlossaryEditor({
         setEditEnglish(t.english)
         const firstLang = Object.keys(t.sourceMappings)[0] ?? languages[0] ?? "Chinese"
         setEditSource(perLanguage ? (t.sourceMappings[firstLang] ?? "") : singleSource(t))
-        setEditLang(perLanguage ? firstLang : languages[0] ?? "Chinese")
+        setEditLang(perLanguage ? firstLang : (languages[0] ?? "Chinese"))
         setEditCategory(t.category)
     }
 
@@ -138,7 +141,11 @@ export function GlossaryEditor({
         )
 
     const renderRow = (t: GlossaryEditorTerm) => (
-        <div key={t.english} className="glossary-row" style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap", padding: "0.5rem 0", borderBottom: "1px solid var(--glass-border)" }}>
+        <div
+            key={t.english}
+            className="glossary-row"
+            style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap", padding: "0.5rem 0", borderBottom: "1px solid var(--glass-border)" }}
+        >
             {editing === t.english ? (
                 <>
                     <input type="text" value={editEnglish} onChange={(e) => setEditEnglish(e.target.value)} style={INPUT_STYLE} />
@@ -170,7 +177,17 @@ export function GlossaryEditor({
                             {sourceSummary(t, perLanguage)}
                         </span>
                         {!groupByCategory && t.category && (
-                            <span style={{ marginLeft: "0.75rem", fontSize: "0.75rem", padding: "0.1rem 0.4rem", borderRadius: "4px", background: "rgba(138,180,248,0.15)", color: "var(--accent-primary)", textTransform: "capitalize" }}>
+                            <span
+                                style={{
+                                    marginLeft: "0.75rem",
+                                    fontSize: "0.75rem",
+                                    padding: "0.1rem 0.4rem",
+                                    borderRadius: "4px",
+                                    background: "rgba(138,180,248,0.15)",
+                                    color: "var(--accent-primary)",
+                                    textTransform: "capitalize",
+                                }}
+                            >
                                 {t.category}
                             </span>
                         )}
@@ -180,7 +197,12 @@ export function GlossaryEditor({
                             Edit
                         </button>
                         {renderRowActions?.(t)}
-                        <button type="button" className="btn btn-outline" style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }} onClick={() => onRemove(t.english)}>
+                        <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
+                            onClick={() => onRemove(t.english)}
+                        >
                             Remove
                         </button>
                     </div>
@@ -191,10 +213,12 @@ export function GlossaryEditor({
 
     return (
         <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                <h3 style={{ margin: 0 }}>Mod Glossary Terms</h3>
-                {headerActions && <div style={{ display: "flex", gap: "0.5rem" }}>{headerActions}</div>}
-            </div>
+            {(title || headerActions) && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                    {title ? <h3 style={{ margin: 0 }}>{title}</h3> : <span />}
+                    {headerActions && <div style={{ display: "flex", gap: "0.5rem" }}>{headerActions}</div>}
+                </div>
+            )}
 
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
                 <input type="text" placeholder="English term" value={newEnglish} onChange={(e) => setNewEnglish(e.target.value)} style={INPUT_STYLE} />
