@@ -8,6 +8,8 @@ export interface GameNavEntry {
 
 export interface GameManifest {
     id: string
+    /** URL slug for game-prefixed routes (e.g. `warhammer_3` for id `total_war_warhammer_3`). */
+    slug: string
     displayName: string
     icon: string
     nav: GameNavEntry[]
@@ -26,4 +28,16 @@ export function getGame(id: string): GameManifest | undefined {
 
 export function listGames(): GameManifest[] {
     return [..._registry.values()]
+}
+
+export function getGameBySlug(slug: string): GameManifest | undefined {
+    return [..._registry.values()].find((g) => g.slug === slug)
+}
+
+export function idForSlug(slug: string): string | undefined {
+    return getGameBySlug(slug)?.id
+}
+
+export function slugForId(id: string): string | undefined {
+    return _registry.get(id)?.slug
 }
