@@ -22,7 +22,7 @@ class RpfmNotConfiguredError(PackBuildError):
 
 
 class PackNotFoundError(PackBuildError):
-    """No `.pack` exists in the mod's workshop content directory."""
+    """No `.pack` exists in the mod's workshop content directory, or the directory itself is missing."""
 
 
 class AmbiguousPackError(PackBuildError):
