@@ -471,4 +471,42 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         fireEvent.click(screen.getByRole("button", { name: /^Cancel$/i }))
         await waitFor(() => expect(screen.queryByText(/Translating batch/i)).not.toBeInTheDocument())
     })
+
+    it("appends a rebuilt-pack note to the sync banner when pack_built is true", async () => {
+        const spy = vi.spyOn(globalThis, "fetch")
+        spy.mockImplementation(async (input: RequestInfo | URL) => {
+            const url = typeof input === "string" ? input : input.toString()
+            if (url.endsWith("/translation/mods")) return mockJson([MOD])
+            if (url.endsWith("/rescan")) return mockJson(SUMMARY)
+            if (url.includes("/strings?status=")) return mockJson(STRINGS.filter((r) => url.includes(r.status)))
+            if (url.endsWith("/strings")) return mockJson(STRINGS)
+            if (url.endsWith("/sync")) return mockJson({ per_file: { "/abs/units.loc.tsv": 3 }, removed_orphans: 0, pack_built: true, pack_error: null })
+            if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
+            return mockJson({ status: "ok" })
+        })
+
+        render(wrap())
+        const syncBtn = await screen.findByRole("button", { name: /Sync Changes/i })
+        fireEvent.click(syncBtn)
+        await waitFor(() => expect(screen.getByText(/rebuilt pack/i)).toBeInTheDocument())
+    })
+
+    it("appends a pack-rebuild-failed warning to the sync banner when pack_error is set", async () => {
+        const spy = vi.spyOn(globalThis, "fetch")
+        spy.mockImplementation(async (input: RequestInfo | URL) => {
+            const url = typeof input === "string" ? input : input.toString()
+            if (url.endsWith("/translation/mods")) return mockJson([MOD])
+            if (url.endsWith("/rescan")) return mockJson(SUMMARY)
+            if (url.includes("/strings?status=")) return mockJson(STRINGS.filter((r) => url.includes(r.status)))
+            if (url.endsWith("/strings")) return mockJson(STRINGS)
+            if (url.endsWith("/sync")) return mockJson({ per_file: { "/abs/units.loc.tsv": 3 }, removed_orphans: 0, pack_built: false, pack_error: "no .pack found in X" })
+            if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
+            return mockJson({ status: "ok" })
+        })
+
+        render(wrap())
+        const syncBtn = await screen.findByRole("button", { name: /Sync Changes/i })
+        fireEvent.click(syncBtn)
+        await waitFor(() => expect(screen.getByText(/pack rebuild failed: no \.pack found in X/i)).toBeInTheDocument())
+    })
 })

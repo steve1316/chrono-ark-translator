@@ -292,7 +292,8 @@ const TranslationDetailsPage: React.FC = () => {
             setProgress(summary)
             await loadStrings()
             const orphanNote = result.removed_orphans > 0 ? `, removed ${result.removed_orphans} orphan${result.removed_orphans !== 1 ? "s" : ""}` : ""
-            setBanner({ type: "success", message: `Synced ${keyCount} keys across ${fileCount} files${orphanNote}` })
+            const packNote = result.pack_built ? ", rebuilt pack" : result.pack_error ? ` (pack rebuild failed: ${result.pack_error})` : ""
+            setBanner({ type: "success", message: `Synced ${keyCount} keys across ${fileCount} files${orphanNote}${packNote}` })
         } catch (e) {
             setBanner({ type: "error", message: `Sync failed: ${(e as Error).message}` })
         }
