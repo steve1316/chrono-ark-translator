@@ -434,8 +434,11 @@ def test_sync_invokes_pack_build_when_keys_written(client: TestClient, monkeypat
     assert body["pack_error"] is None
 
 
-def test_sync_skips_pack_build_when_no_keys_written(client: TestClient, monkeypatch):
+def test_sync_skips_pack_build_when_no_keys_written(client: TestClient, monkeypatch, tmp_path: Path):
     monkeypatch.setattr(routes_module, "sync_translations_to_loc_tsv", lambda mod, drift: {})
+    # Stub RPFM + content dir so the ONLY thing preventing the build is the empty per_file (proves the guard, not config).
+    monkeypatch.setattr(routes_module, "resolve_rpfm_cli_path", lambda: Path("/fake/rpfm_cli.exe"))
+    monkeypatch.setattr(routes_module, "tw3_workshop_content_dir", lambda mid: tmp_path)
 
     def must_not_call(mod, **kw):
         raise AssertionError("build_translation_pack must not run when nothing was written")

@@ -81,10 +81,13 @@ def _run_rpfm(rpfm_cli_path: Path, args: list[str]) -> None:
         args: Additional arguments to pass after `--game warhammer_3`.
 
     Raises:
-        RpfmFailedError: When `rpfm_cli` returns a non-zero exit code.
+        RpfmFailedError: When `rpfm_cli` cannot be launched or returns a non-zero exit code.
     """
     cmd = [str(rpfm_cli_path), "--game", "warhammer_3", *args]
-    result = subprocess.run(cmd, capture_output=True, cwd=str(rpfm_cli_path.parent))
+    try:
+        result = subprocess.run(cmd, capture_output=True, cwd=str(rpfm_cli_path.parent))
+    except OSError as exc:
+        raise RpfmFailedError(f"failed to launch rpfm_cli: {exc}") from exc
     if result.returncode != 0:
         raise RpfmFailedError(f"RPFM failed (exit {result.returncode}): {result.stderr.decode('utf-8', errors='replace')}")
 

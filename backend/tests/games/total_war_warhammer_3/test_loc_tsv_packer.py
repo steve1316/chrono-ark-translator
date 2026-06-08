@@ -101,6 +101,22 @@ def test_build_translation_pack_raises_on_rpfm_nonzero(monkeypatch, tmp_path: Pa
         build_translation_pack(_mod(tmp_path / "src"), rpfm_cli_path=rpfm, workshop_content_dir=content_dir)
 
 
+def test_build_translation_pack_wraps_launch_failure_as_rpfm_failed(monkeypatch, tmp_path: Path):
+    rpfm = tmp_path / "rpfm_cli.exe"
+    rpfm.write_bytes(b"x")
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "MyMod.pack").write_bytes(b"x")
+
+    def raise_oserror(cmd, **kwargs):
+        raise FileNotFoundError("cannot launch")
+
+    monkeypatch.setattr(subprocess, "run", raise_oserror)
+
+    with pytest.raises(RpfmFailedError):
+        build_translation_pack(_mod(tmp_path / "src"), rpfm_cli_path=rpfm, workshop_content_dir=content_dir)
+
+
 def test_build_translation_pack_raises_when_rpfm_missing(tmp_path: Path):
     content_dir = tmp_path / "content"
     content_dir.mkdir()
