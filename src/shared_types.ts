@@ -298,6 +298,6 @@ export interface WH3SyncResult {
     removed_orphans: number
     /** True when the mod's `.pack` was rebuilt from the synced loose files during this sync. */
     pack_built: boolean
-    /** Human-readable reason when the pack rebuild was attempted but failed or skipped; null otherwise. */
+    /** Human-readable reason the pack rebuild was not completed (failed, or not attempted); null when it succeeded or was not applicable. */
     pack_error: string | null
 }

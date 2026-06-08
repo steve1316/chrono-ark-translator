@@ -155,7 +155,7 @@ export async function loadNameSuggestions(workshopId: string): Promise<TermSugge
  * Apply translations.json into the user's `.loc.tsv` files via surgical patch.
  *
  * @param workshopId Steam Workshop ID of the translation mod.
- * @returns Per-file change counts (`{absolute_path: keys_written}`).
+ * @returns The full `WH3SyncResult`: per-file key counts, orphan removal tally, and pack-rebuild outcome.
  * @throws `RegistryError` On any non-2xx response.
  */
 export async function syncChanges(workshopId: string): Promise<WH3SyncResult> {

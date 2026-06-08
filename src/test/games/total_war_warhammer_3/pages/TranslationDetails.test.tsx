@@ -488,7 +488,7 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         render(wrap())
         const syncBtn = await screen.findByRole("button", { name: /Sync Changes/i })
         fireEvent.click(syncBtn)
-        await waitFor(() => expect(screen.getByText(/rebuilt pack/i)).toBeInTheDocument())
+        await waitFor(() => expect(screen.getByText(/, rebuilt pack/i)).toBeInTheDocument())
     })
 
     it("appends a pack-rebuild-failed warning to the sync banner when pack_error is set", async () => {
