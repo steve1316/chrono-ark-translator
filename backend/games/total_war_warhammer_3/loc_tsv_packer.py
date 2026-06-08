@@ -76,8 +76,12 @@ def resolve_rpfm_cli_path() -> Path | None:
 def _run_rpfm(rpfm_cli_path: Path, args: list[str]) -> None:
     """Run `rpfm_cli --game warhammer_3 <args>` from the exe's directory, raising on non-zero exit.
 
-    @param rpfm_cli_path: Path to `rpfm_cli.exe`.
-    @param args: Additional arguments to pass after `--game warhammer_3`.
+    Args:
+        rpfm_cli_path: Path to `rpfm_cli.exe`.
+        args: Additional arguments to pass after `--game warhammer_3`.
+
+    Raises:
+        RpfmFailedError: When `rpfm_cli` returns a non-zero exit code.
     """
     cmd = [str(rpfm_cli_path), "--game", "warhammer_3", *args]
     result = subprocess.run(cmd, capture_output=True, cwd=str(rpfm_cli_path.parent))
@@ -91,9 +95,10 @@ def build_translation_pack(mod: WH3TranslationMod, *, rpfm_cli_path: Path, works
     Clears the pack's `text` folder (so removed/renamed keys don't linger) then re-adds the loose source, converting each
     `.loc.tsv` back to binary `.loc` via `--tsv-to-binary`.
 
-    @param mod: The translation mod whose pack to rebuild.
-    @param rpfm_cli_path: Path to `rpfm_cli.exe`.
-    @param workshop_content_dir: The mod's local Steam Workshop content folder (holding its `.pack`).
+    Args:
+        mod: The translation mod whose pack to rebuild.
+        rpfm_cli_path: Path to `rpfm_cli.exe`.
+        workshop_content_dir: The mod's local Steam Workshop content folder (holding its `.pack`).
 
     Returns:
         Path to the rebuilt `.pack`.
