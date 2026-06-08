@@ -296,4 +296,8 @@ export interface WH3SyncResult {
     per_file: Record<string, number>
     /** How many orphan rows (translated keys with no parent source) were pruned from the mod during this sync. */
     removed_orphans: number
+    /** True when the mod's `.pack` was rebuilt from the synced loose files during this sync. */
+    pack_built: boolean
+    /** Human-readable reason when the pack rebuild was attempted but failed or skipped; null otherwise. */
+    pack_error: string | null
 }
