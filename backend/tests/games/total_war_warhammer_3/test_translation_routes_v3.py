@@ -416,3 +416,53 @@ def test_open_source_file_resolves_and_opens(client: TestClient, monkeypatch, tm
 def test_open_source_file_404_when_missing(client: TestClient):
     resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/open-source-file/missing.loc.tsv")
     assert resp.status_code == 404
+
+
+def test_sync_invokes_pack_build_when_keys_written(client: TestClient, monkeypatch, tmp_path: Path):
+    calls = {}
+    monkeypatch.setattr(routes_module, "sync_translations_to_loc_tsv", lambda mod, drift: {"/abs/units.loc.tsv": 2})
+    # The build is only reached when RPFM + the content dir resolve, so stub both (tests have no real RPFM configured).
+    monkeypatch.setattr(routes_module, "resolve_rpfm_cli_path", lambda: Path("/fake/rpfm_cli.exe"))
+    monkeypatch.setattr(routes_module, "tw3_workshop_content_dir", lambda mid: tmp_path)
+    monkeypatch.setattr(routes_module, "build_translation_pack", lambda mod, **kw: calls.setdefault("built", True))
+
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/sync")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert calls.get("built") is True
+    assert body["pack_built"] is True
+    assert body["pack_error"] is None
+
+
+def test_sync_skips_pack_build_when_no_keys_written(client: TestClient, monkeypatch):
+    monkeypatch.setattr(routes_module, "sync_translations_to_loc_tsv", lambda mod, drift: {})
+
+    def must_not_call(mod, **kw):
+        raise AssertionError("build_translation_pack must not run when nothing was written")
+
+    monkeypatch.setattr(routes_module, "build_translation_pack", must_not_call)
+
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/sync")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["pack_built"] is False
+    assert body["pack_error"] is None
+
+
+def test_sync_reports_pack_error_non_fatally(client: TestClient, monkeypatch, tmp_path: Path):
+    from backend.games.total_war_warhammer_3.loc_tsv_packer import PackNotFoundError
+
+    monkeypatch.setattr(routes_module, "sync_translations_to_loc_tsv", lambda mod, drift: {"/abs/units.loc.tsv": 1})
+    monkeypatch.setattr(routes_module, "resolve_rpfm_cli_path", lambda: Path("/fake/rpfm_cli.exe"))
+    monkeypatch.setattr(routes_module, "tw3_workshop_content_dir", lambda mid: tmp_path)
+
+    def boom(mod, **kw):
+        raise PackNotFoundError("no .pack found in X")
+
+    monkeypatch.setattr(routes_module, "build_translation_pack", boom)
+
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/sync")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["pack_built"] is False
+    assert "no .pack found" in body["pack_error"]

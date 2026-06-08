@@ -43,6 +43,12 @@ from backend.games.total_war_warhammer_3.loc_extractor import (
     normalize_loc_filename,
     read_translation_loc_tsv,
 )
+from backend.games.total_war_warhammer_3.loc_tsv_packer import (
+    PackBuildError,
+    RpfmNotConfiguredError,
+    build_translation_pack,
+    resolve_rpfm_cli_path,
+)
 from backend.games.total_war_warhammer_3.loc_tsv_writeback import _find_existing_user_file, remove_keys_from_loc_tsv, sync_translations_to_loc_tsv
 from backend.games.total_war_warhammer_3.routes._paths import tw3_workshop_content_dir
 from backend.games.total_war_warhammer_3.translation_drift import (
@@ -735,7 +741,7 @@ def sync_changes(mod_id: str) -> dict:
         mod_id: Steam Workshop ID of the WH3 translation mod.
 
     Returns:
-        `{"per_file": {absolute_path: count}, "removed_orphans": N}` describing the writeback and how many orphan rows were pruned.
+        `{"per_file": {absolute_path: count}, "removed_orphans": N, "pack_built": bool, "pack_error": str | None}` describing the writeback, orphan pruning, and pack rebuild.
     """
     mod = _require_mod(mod_id)
     snapshot_store.create_snapshot(mod_id, label="pre-sync", kind="auto", local_source_dir=mod.local_source_dir)
@@ -760,7 +766,25 @@ def sync_changes(mod_id: str) -> dict:
 
     drift = get_strings(mod_id)
     per_file = sync_translations_to_loc_tsv(mod, drift)
-    return {"per_file": per_file, "removed_orphans": removed_orphans}
+
+    # Rebuild the published .pack from the freshly written loose files. Non-fatal: the writeback already succeeded, so any
+    # build problem is reported as a warning rather than failing the sync. Skipped when nothing was written.
+    pack_built = False
+    pack_error: str | None = None
+    if sum(per_file.values()) > 0:
+        try:
+            rpfm = resolve_rpfm_cli_path()
+            if rpfm is None:
+                raise RpfmNotConfiguredError("RPFM not configured; set CATL_TW3_RPFM_CLI_PATH or place rpfm_cli.exe in CATL_TW3_HELPER_PATH")
+            content_dir = tw3_workshop_content_dir(mod_id)
+            if content_dir is None:
+                raise PackBuildError("TW3 Steam library drive is not configured")
+            build_translation_pack(mod, rpfm_cli_path=rpfm, workshop_content_dir=content_dir)
+            pack_built = True
+        except PackBuildError as exc:
+            pack_error = str(exc)
+
+    return {"per_file": per_file, "removed_orphans": removed_orphans, "pack_built": pack_built, "pack_error": pack_error}
 
 
 @router.get("/mods/{mod_id}/snapshots")
