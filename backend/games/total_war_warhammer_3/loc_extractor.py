@@ -42,11 +42,66 @@ def _parse_tooltip(value: str) -> bool:
     return value.strip().lower() == "true"
 
 
+def escape_loc_text(text: str) -> str:
+    """Escape a translation string so it occupies a single RPFM loc TSV cell.
+
+    RPFM stores the loc text field verbatim, so a real newline or tab in the cell would break the one-row-per-entry TSV
+    structure that `--tsv-to-binary` requires (continuation lines get parsed as bogus rows). Convert real newlines and tabs
+    to the literal escape sequences WH3 renders (`\\n`, `\\t`), doubling backslashes so the round-trip is lossless.
+    Carriage returns are folded into `\\n`.
+
+    Args:
+        text: The raw translation text (may contain real newlines, tabs, or backslashes).
+
+    Returns:
+        A single-line string safe to write as a loc TSV text cell.
+    """
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("\\", "\\\\")
+    return text.replace("\t", "\\t").replace("\n", "\\n")
+
+
+def unescape_loc_text(text: str) -> str:
+    """Inverse of `escape_loc_text`: turn RPFM loc escape sequences back into real characters.
+
+    Scans left to right so an escaped backslash (`\\\\`) is consumed before its following character, leaving sequences like
+    `\\\\n` as the literal text `\\n` rather than a newline.
+
+    Args:
+        text: A loc TSV text cell as read from disk.
+
+    Returns:
+        The text with `\\n` -> newline, `\\t` -> tab, and `\\\\` -> a single backslash.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if ch == "\\" and i + 1 < n:
+            nxt = text[i + 1]
+            if nxt == "\\":
+                out.append("\\")
+                i += 2
+                continue
+            if nxt == "n":
+                out.append("\n")
+                i += 2
+                continue
+            if nxt == "t":
+                out.append("\t")
+                i += 2
+                continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def read_translation_loc_tsv(path: Path) -> dict[str, LocRow]:
     """Parse a `.loc.tsv` file into a dict keyed by loc key.
 
-    Skips the literal header row and the RPFM `#Loc;1;...` metadata row.
-    Whitespace-only `text` cells are preserved verbatim.
+    Skips the literal header row and the RPFM `#Loc;1;...` metadata row. The `text` cell is unescaped via `unescape_loc_text`
+    so callers see real newlines/tabs. Whitespace-only `text` cells are preserved verbatim.
 
     Args:
         path: Filesystem path to the `.loc.tsv` file.
@@ -73,7 +128,7 @@ def read_translation_loc_tsv(path: Path) -> dict[str, LocRow]:
             if len(parts) < 3:
                 # malformed row - pad missing columns with empty strings
                 parts = parts + [""] * (3 - len(parts))
-            key, text, tooltip = parts[0], parts[1], parts[2]
+            key, text, tooltip = parts[0], unescape_loc_text(parts[1]), parts[2]
             if not key:
                 continue
             rows[key] = LocRow(key=key, text=text, tooltip=_parse_tooltip(tooltip))

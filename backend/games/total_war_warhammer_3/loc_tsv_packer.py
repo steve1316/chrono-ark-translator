@@ -33,6 +33,31 @@ class RpfmFailedError(PackBuildError):
     """The `rpfm_cli` subprocess returned a non-zero exit code."""
 
 
+class MalformedLocTsvError(PackBuildError):
+    """A loose `.loc.tsv` file has a data row that is not a single 3-column line (e.g. an unescaped embedded newline)."""
+
+
+def validate_loc_tsv_dir(local_source_dir: Path) -> None:
+    """Reject loose `.loc.tsv` files whose data rows are not well-formed single lines before they reach RPFM.
+
+    RPFM parses the loc TSV line by line, so a row with an embedded newline (which would split into continuation lines) gets
+    imported as bogus rows whose key column holds stray text. Every non-blank, non-`#` line must have exactly two tab characters
+    (three columns). This is a defensive guard. The writeback escapes specials so well-formed files always pass.
+
+    Args:
+        local_source_dir: The mod's loose source directory (scanned recursively for `.loc.tsv`).
+
+    Raises:
+        MalformedLocTsvError: When any data row does not have exactly three tab-separated columns.
+    """
+    for tsv in sorted(local_source_dir.rglob("*.loc.tsv")):
+        for line_no, line in enumerate(tsv.read_text(encoding="utf-8").splitlines()):
+            if not line or line.startswith("#"):
+                continue
+            if line.count("\t") != 2:
+                raise MalformedLocTsvError(f"malformed loc row in {tsv} line {line_no + 1}: expected 3 tab-separated columns")
+
+
 def resolve_target_pack(workshop_content_dir: Path) -> Path:
     """Return the single `.pack` inside the workshop content directory.
 
@@ -108,12 +133,14 @@ def build_translation_pack(mod: WH3TranslationMod, *, rpfm_cli_path: Path, works
 
     Raises:
         RpfmNotConfiguredError: When `rpfm_cli_path` is not a file.
+        MalformedLocTsvError: When a loose `.loc.tsv` row is not a single 3-column line.
         PackNotFoundError: From `resolve_target_pack` when no pack or dir.
         AmbiguousPackError: From `resolve_target_pack` when more than one pack.
         RpfmFailedError: When either RPFM call returns a non-zero exit code.
     """
     if not rpfm_cli_path.is_file():
         raise RpfmNotConfiguredError(f"rpfm_cli not found: {rpfm_cli_path}")
+    validate_loc_tsv_dir(mod.local_source_dir)
     pack = resolve_target_pack(workshop_content_dir)
     schema_path = rpfm_cli_path.parent / "schemas" / "schema_wh3.ron"
     _run_rpfm(rpfm_cli_path, ["pack", "delete", "--pack-path", str(pack), "--folder-path", "text"])

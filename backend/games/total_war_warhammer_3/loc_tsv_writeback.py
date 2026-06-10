@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from backend.games.total_war_warhammer_3.loc_extractor import normalize_loc_filename
+from backend.games.total_war_warhammer_3.loc_extractor import escape_loc_text, normalize_loc_filename
 from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
 
 
@@ -82,11 +82,11 @@ def apply_row_patches(path: Path, patches: dict[str, str]) -> None:
         if key in remaining:
             second_tab = line.find("\t", first_tab + 1)
             tooltip = line[second_tab + 1 :] if second_tab >= 0 else "true"
-            lines[i] = f"{key}\t{remaining[key]}\t{tooltip}"
+            lines[i] = f"{key}\t{escape_loc_text(remaining[key])}\t{tooltip}"
             remaining.pop(key)
 
     for key, text in remaining.items():
-        lines.append(f"{key}\t{text}\ttrue")
+        lines.append(f"{key}\t{escape_loc_text(text)}\ttrue")
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
