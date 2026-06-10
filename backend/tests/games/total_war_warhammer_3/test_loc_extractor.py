@@ -9,20 +9,21 @@ from backend.games.total_war_warhammer_3.loc_extractor import LocRow, escape_loc
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_translation.loc.tsv"
 
 
-def test_escape_loc_text_converts_real_newline_to_backslash_n():
-    assert escape_loc_text("Line1\nLine2") == "Line1\\nLine2"
+def test_escape_loc_text_converts_real_newline_to_double_backslash_n():
+    # Real newline -> the RPFM/WH3 TSV line-break token `\\n` (two backslashes + n).
+    assert escape_loc_text("Line1\nLine2") == "Line1\\\\nLine2"
 
 
-def test_escape_loc_text_converts_real_tab_to_backslash_t():
-    assert escape_loc_text("a\tb") == "a\\tb"
+def test_escape_loc_text_converts_real_tab_to_double_backslash_t():
+    assert escape_loc_text("a\tb") == "a\\\\tb"
 
 
 def test_escape_loc_text_doubles_backslashes():
     assert escape_loc_text("a\\b") == "a\\\\b"
 
 
-def test_escape_loc_text_folds_crlf_into_backslash_n():
-    assert escape_loc_text("a\r\nb") == "a\\nb"
+def test_escape_loc_text_folds_crlf_into_double_backslash_n():
+    assert escape_loc_text("a\r\nb") == "a\\\\nb"
 
 
 def test_escape_loc_text_output_is_single_line():
@@ -31,14 +32,9 @@ def test_escape_loc_text_output_is_single_line():
 
 
 def test_unescape_loc_text_reverses_escapes():
-    assert unescape_loc_text("Line1\\nLine2") == "Line1\nLine2"
-    assert unescape_loc_text("a\\tb") == "a\tb"
+    assert unescape_loc_text("Line1\\\\nLine2") == "Line1\nLine2"
+    assert unescape_loc_text("a\\\\tb") == "a\tb"
     assert unescape_loc_text("a\\\\b") == "a\\b"
-
-
-def test_unescape_loc_text_keeps_escaped_backslash_before_n_literal():
-    # `\\n` (escaped backslash + literal n) must stay the two chars `\` and `n`, not become a newline.
-    assert unescape_loc_text("a\\\\nb") == "a\\nb"
 
 
 def test_escape_unescape_round_trips_text_with_specials():

@@ -45,10 +45,11 @@ def _parse_tooltip(value: str) -> bool:
 def escape_loc_text(text: str) -> str:
     """Escape a translation string so it occupies a single RPFM loc TSV cell.
 
-    RPFM stores the loc text field verbatim, so a real newline or tab in the cell would break the one-row-per-entry TSV
-    structure that `--tsv-to-binary` requires (continuation lines get parsed as bogus rows). Convert real newlines and tabs
-    to the literal escape sequences WH3 renders (`\\n`, `\\t`), doubling backslashes so the round-trip is lossless.
-    Carriage returns are folded into `\\n`.
+    A real newline or tab in the cell would break the one-row-per-entry TSV structure that `--tsv-to-binary` requires
+    (continuation lines get parsed as bogus rows whose key column holds stray text). RPFM's TSV form escapes the loc
+    line-break marker, so a rendered line break is stored as `\\\\n` (backslash, backslash, n) and a literal backslash as
+    `\\\\`. Convert real newlines/tabs (and folded carriage returns) accordingly to match how the user's loc files - and
+    RPFM's own exports - represent them.
 
     Args:
         text: The raw translation text (may contain real newlines, tabs, or backslashes).
@@ -58,41 +59,39 @@ def escape_loc_text(text: str) -> str:
     """
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = text.replace("\\", "\\\\")
-    return text.replace("\t", "\\t").replace("\n", "\\n")
+    return text.replace("\t", "\\\\t").replace("\n", "\\\\n")
 
 
 def unescape_loc_text(text: str) -> str:
-    """Inverse of `escape_loc_text`: turn RPFM loc escape sequences back into real characters.
+    """Inverse of `escape_loc_text`: turn RPFM loc TSV escape sequences back into real characters.
 
-    Scans left to right so an escaped backslash (`\\\\`) is consumed before its following character, leaving sequences like
-    `\\\\n` as the literal text `\\n` rather than a newline.
+    Scans left to right so an escaped backslash pair (`\\\\`) is consumed as a unit: `\\\\n` -> newline, `\\\\t` -> tab, and a
+    bare `\\\\` -> a single backslash. A lone `\\` (not doubled) is left as-is.
 
     Args:
         text: A loc TSV text cell as read from disk.
 
     Returns:
-        The text with `\\n` -> newline, `\\t` -> tab, and `\\\\` -> a single backslash.
+        The text with the escape sequences turned back into real newlines, tabs, and backslashes.
     """
     out: list[str] = []
     i = 0
     n = len(text)
     while i < n:
-        ch = text[i]
-        if ch == "\\" and i + 1 < n:
-            nxt = text[i + 1]
-            if nxt == "\\":
-                out.append("\\")
-                i += 2
-                continue
-            if nxt == "n":
+        if text[i] == "\\" and i + 1 < n and text[i + 1] == "\\":
+            after = text[i + 2] if i + 2 < n else ""
+            if after == "n":
                 out.append("\n")
-                i += 2
+                i += 3
                 continue
-            if nxt == "t":
+            if after == "t":
                 out.append("\t")
-                i += 2
+                i += 3
                 continue
-        out.append(ch)
+            out.append("\\")
+            i += 2
+            continue
+        out.append(text[i])
         i += 1
     return "".join(out)
 
