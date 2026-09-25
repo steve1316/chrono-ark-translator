@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { FaExclamationCircle, FaFolderOpen, FaSteam } from "react-icons/fa"
 
 import GlossarySuggestionModal from "../../../../components/GlossarySuggestionModal"
 import TranslationConfirmModal from "../../../../components/TranslationConfirmModal"
@@ -9,6 +8,7 @@ import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslati
 import { useGameSlug } from "../../../useGameSlug"
 import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationPage } from "../../../../translation/TranslationPage"
+import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../translation/TitleAdornments"
 import { TranslationCell } from "../../../../translation/TranslationCell"
 import { canonicalRowStyle } from "../../../../translation/rowStyle"
 import type { ColumnDef } from "../../../../translation/types"
@@ -443,29 +443,9 @@ const TranslationDetailsPage: React.FC = () => {
 
     const titleBadges = (
         <>
-            <a
-                href={`https://steamcommunity.com/sharedfiles/filedetails/?id=${workshopId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Open on Steam Workshop"
-                style={{ color: "var(--text-dim)", fontSize: "1.3rem", display: "flex" }}
-            >
-                <FaSteam />
-            </a>
-            <button
-                type="button"
-                onClick={onOpenFolder}
-                title="Open local folder"
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-dim)", fontSize: "1.3rem", display: "flex", padding: 0 }}
-            >
-                <FaFolderOpen />
-            </button>
-            {progress?.has_unsynced_changes && (
-                <span className="wh3-pending-sync-badge">
-                    <FaExclamationCircle size={12} />
-                    Changes pending sync
-                </span>
-            )}
+            <SteamLink href={`https://steamcommunity.com/sharedfiles/filedetails/?id=${workshopId}`} />
+            <OpenFolderButton onClick={onOpenFolder} />
+            {progress?.has_unsynced_changes && <PendingSyncPill />}
         </>
     )
 

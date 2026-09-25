@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useGameSlug } from "../../../useGameSlug"
-import { FaSteam, FaFileExport, FaBook, FaFolderOpen, FaExclamationCircle } from "react-icons/fa"
+import { FaFileExport, FaBook } from "react-icons/fa"
 import type { GlossaryTerm, LocString, TermSuggestion } from "../../../../shared_types"
 import { getRowStatus, filterStrings, sortStrings } from "../../../../utils/stringFilters"
 import type { SortField, SortDirection } from "../../../../utils/stringFilters"
@@ -14,6 +14,7 @@ import BackupHistoryModal from "../../components/BackupHistoryModal"
 import ChronoArkGlossaryPanel from "../../components/ChronoArkGlossaryPanel"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { TranslationPage } from "../../../../translation/TranslationPage"
+import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../translation/TitleAdornments"
 import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationCell } from "../../../../translation/TranslationCell"
 import { canonicalRowStyle } from "../../../../translation/rowStyle"
@@ -688,57 +689,9 @@ const ModDetail: React.FC = () => {
             title={modName || modId}
             titleBadges={
                 <>
-                    {" "}
-                    {modUrl && (
-                        <a
-                            href={modUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Open on Steam Workshop"
-                            style={{ color: "var(--text-dim)", fontSize: "1.3rem", transition: "color 0.2s", display: "flex" }}
-                            onMouseEnter={(e) => (e.currentTarget.style.color = "#66c0f4")}
-                            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-dim)")}
-                        >
-                            <FaSteam />
-                        </a>
-                    )}
-                    <button
-                        onClick={handleOpenFolder}
-                        title="Open local folder"
-                        style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: "var(--text-dim)",
-                            fontSize: "1.3rem",
-                            transition: "color 0.2s",
-                            display: "flex",
-                            padding: 0,
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent-primary)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-dim)")}
-                    >
-                        <FaFolderOpen />
-                    </button>
-                    {hasExportChanges && (
-                        <span
-                            style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "0.4rem",
-                                fontSize: "0.8rem",
-                                padding: "0.3rem 0.7rem",
-                                background: "rgba(251, 191, 36, 0.12)",
-                                border: "1px solid rgba(251, 191, 36, 0.3)",
-                                borderRadius: "8px",
-                                color: "#fbbf24",
-                                fontWeight: 600,
-                            }}
-                        >
-                            <FaExclamationCircle size={12} />
-                            Changes pending sync
-                        </span>
-                    )}
+                    {modUrl && <SteamLink href={modUrl} />}
+                    <OpenFolderButton onClick={handleOpenFolder} />
+                    {hasExportChanges && <PendingSyncPill />}
                 </>
             }
             subtitle={modAuthor ? `by ${modAuthor}` : undefined}
