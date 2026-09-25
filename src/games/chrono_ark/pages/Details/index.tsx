@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useGameSlug } from "../../../useGameSlug"
-import { FaBook } from "react-icons/fa"
 import type { GlossaryTerm, LocString } from "../../../../shared_types"
 import { getRowStatus, filterStrings, sortStrings } from "../../../../utils/stringFilters"
 import type { SortField, SortDirection } from "../../../../utils/stringFilters"
@@ -15,6 +14,7 @@ import ChronoArkGlossaryPanel from "../../components/ChronoArkGlossaryPanel"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { TranslationPage } from "../../../../translation/TranslationPage"
 import { SyncButton } from "../../../../translation/SyncButton"
+import { TranslationToolbar } from "../../../../translation/TranslationToolbar"
 import { usePendingSuggestions } from "../../../../translation/usePendingSuggestions"
 import SplitButton from "../../../../ui/SplitButton"
 import { LanguageControls } from "../../../../translation/LanguageControls"
@@ -674,90 +674,22 @@ const ModDetail: React.FC = () => {
             }
             progressLabel={`${strings.filter((s) => s.source.trim() && !s.untranslatable_reason && s.is_translated).length} / ${strings.filter((s) => s.source.trim() && !s.untranslatable_reason).length} total strings translated`}
             toolbar={
-                <>
-                    {/* Glossary, suggestions, and character context toggles. */}
-                    <div className="mod-actions-group">
-                        <button
-                            className="btn btn-outline"
-                            onClick={() => {
-                                setShowGlossaryPanel(!showGlossaryPanel)
-                                if (!showGlossaryPanel) fetchModGlossary()
-                            }}
-                            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-                        >
-                            <FaBook /> Mod Glossary ({Object.keys(modGlossary).length})
-                        </button>
-                        {suggestions.length > 0 && (
-                            <button
-                                className="btn btn-outline"
-                                onClick={() => setShowSuggestionModal(true)}
-                                style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--accent-secondary)", borderColor: "rgba(187,154,247,0.3)", position: "relative" }}
-                            >
-                                <FaBook /> Suggestions
-                                <span
-                                    style={{
-                                        position: "absolute",
-                                        top: "-6px",
-                                        right: "-6px",
-                                        background: "var(--accent-secondary)",
-                                        color: "#fff",
-                                        borderRadius: "50%",
-                                        width: "20px",
-                                        height: "20px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "0.7rem",
-                                        fontWeight: 700,
-                                    }}
-                                >
-                                    {suggestions.length}
-                                </span>
-                            </button>
-                        )}
-                        <button className="btn btn-outline" disabled={scanning} onClick={scan} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <FaBook /> {scanning ? "Scanning..." : "Scan for Terms"}
-                        </button>
-                        <button className="btn btn-outline" onClick={() => setShowApiResponses(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            API Responses
-                        </button>
-                        <button
-                            className="btn btn-outline"
-                            onClick={() => setShowCharacterContext(!showCharacterContext)}
-                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)", position: "relative" }}
-                        >
-                            Character Context
-                            {hasCharacterContext && (
-                                <span
-                                    style={{
-                                        position: "absolute",
-                                        top: "-4px",
-                                        right: "-4px",
-                                        width: "8px",
-                                        height: "8px",
-                                        borderRadius: "50%",
-                                        background: "#81e6d9",
-                                    }}
-                                />
-                            )}
-                        </button>
-                    </div>
-
-                    {/* Destructive actions and history. */}
-                    <div className="mod-actions-group">
-                        <button className="btn btn-outline" onClick={() => setShowHistory(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            History
-                        </button>
-                        <button className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={handleResetConfirm}>
-                            Reset
-                        </button>
-                        <button className="btn btn-outline" style={{ color: "#ffaa44", borderColor: "rgba(255, 170, 68, 0.3)" }} onClick={handleClearTranslationsConfirm}>
-                            Clear English
-                        </button>
-                    </div>
-
-                    {/* Translation trigger and CSV sync. */}
-                    <div className="mod-actions-group">
+                <TranslationToolbar
+                    glossary={{
+                        count: Object.keys(modGlossary).length,
+                        onClick: () => {
+                            setShowGlossaryPanel(!showGlossaryPanel)
+                            if (!showGlossaryPanel) fetchModGlossary()
+                        },
+                    }}
+                    suggestions={{ count: suggestions.length, onClick: () => setShowSuggestionModal(true) }}
+                    scan={{ scanning, onClick: scan }}
+                    apiResponses={{ onClick: () => setShowApiResponses(true) }}
+                    context={{ label: "Character Context", hasContext: hasCharacterContext, onClick: () => setShowCharacterContext(!showCharacterContext) }}
+                    history={{ onClick: () => setShowHistory(true) }}
+                    reset={{ onClick: handleResetConfirm }}
+                    clearEnglish={{ onClick: handleClearTranslationsConfirm }}
+                    translate={
                         <SplitButton
                             label={`Translate${activeProvider ? ` (${activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})` : ""}`}
                             onClick={() => handleTranslateClick("")}
@@ -765,6 +697,8 @@ const ModDetail: React.FC = () => {
                             menuLabel="Translate options"
                             items={[{ label: "Re-Translate All", onSelect: () => handleTranslateClick("", true) }]}
                         />
+                    }
+                    sync={
                         <SyncButton
                             state={hasExportChanges ? "sync" : hasPreviousSync ? "resync" : "disabled"}
                             confirmMessage={(resync) =>
@@ -772,8 +706,8 @@ const ModDetail: React.FC = () => {
                             }
                             onSync={handleExport}
                         />
-                    </div>
-                </>
+                    }
+                />
             }
             statusFilters={[
                 { value: "all", label: "All" },
