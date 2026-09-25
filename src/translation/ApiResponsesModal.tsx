@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import Modal from "../ui/Modal"
 
 /** One normalized provider API-response record, rendered by the shared modal. Each game maps its own audit-log shape onto this. */
 export interface ApiResponseEntry {
@@ -49,71 +50,58 @@ export function ApiResponsesModal({ entries, loading, error, onClose }: ApiRespo
     const totalCost = useMemo(() => entries.reduce((sum, e) => sum + (e.costUsd ?? 0), 0), [entries])
 
     return (
-        <div
-            className="modal-backdrop"
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose()
-            }}
-        >
-            <div className="glass-card modal-panel" style={{ width: "900px", display: "flex", flexDirection: "column" }}>
-                <div className="modal-header">
-                    <h2 style={{ margin: 0 }}>API Responses</h2>
-                    <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
-                        &times;
-                    </button>
-                </div>
-                {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
-                {loading && !error && <p>Loading...</p>}
-                {!loading && !error && entries.length === 0 && <p style={{ color: "var(--text-dim)" }}>No API responses recorded yet.</p>}
-                {entries.length > 0 && (
-                    <>
-                        {totalCost > 0 && (
-                            <div style={{ marginBottom: "0.75rem", fontSize: "0.85rem", color: "var(--text-dim)" }}>
-                                Total cost across {entries.length} call{entries.length !== 1 ? "s" : ""}: <span style={{ fontWeight: 600, color: "var(--text-main)" }}>${totalCost.toFixed(4)}</span>
-                            </div>
-                        )}
-                        <div style={{ display: "flex", gap: "1rem", flex: 1, minHeight: 0 }}>
-                            <div className="api-response-sidebar">
-                                {entries.map((e, i) => (
-                                    <button key={e.id} type="button" className={`api-response-tab${i === activeIdx ? " active" : ""}`} data-testid="api-response-tab" onClick={() => setActiveIdx(i)}>
-                                        <div className="api-response-kind">{e.kind ?? `Batch ${i + 1}`}</div>
-                                        <div className="api-response-time">{e.timestamp ? new Date(e.timestamp).toLocaleString() : e.model}</div>
-                                    </button>
-                                ))}
-                            </div>
-                            <div className="api-response-detail">
-                                {active && (
-                                    <>
-                                        <dl className="api-response-meta">
-                                            {active.timestamp && (
-                                                <>
-                                                    <dt>Timestamp</dt>
-                                                    <dd>{new Date(active.timestamp).toLocaleString()}</dd>
-                                                </>
-                                            )}
-                                            <dt>Model</dt>
-                                            <dd>{active.model}</dd>
-                                            <dt>Tokens (in / out)</dt>
-                                            <dd>
-                                                {active.inputTokens ?? "-"} / {active.outputTokens ?? "-"}
-                                            </dd>
-                                            <dt>Cost (USD)</dt>
-                                            <dd>{active.costUsd != null ? `$${active.costUsd.toFixed(4)}` : "-"}</dd>
-                                            {active.keysOrInputs && active.keysOrInputs.length > 0 && (
-                                                <>
-                                                    <dt>Keys / Inputs</dt>
-                                                    <dd>{active.keysOrInputs.join(", ")}</dd>
-                                                </>
-                                            )}
-                                        </dl>
-                                        <pre className="api-response-raw">{active.rawText}</pre>
-                                    </>
-                                )}
-                            </div>
+        <Modal title="API Responses" size="lg" fill onClose={onClose}>
+            {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
+            {loading && !error && <p>Loading...</p>}
+            {!loading && !error && entries.length === 0 && <p style={{ color: "var(--text-dim)" }}>No API responses recorded yet.</p>}
+            {entries.length > 0 && (
+                <>
+                    {totalCost > 0 && (
+                        <div style={{ marginBottom: "0.75rem", fontSize: "0.85rem", color: "var(--text-dim)" }}>
+                            Total cost across {entries.length} call{entries.length !== 1 ? "s" : ""}: <span style={{ fontWeight: 600, color: "var(--text-main)" }}>${totalCost.toFixed(4)}</span>
                         </div>
-                    </>
-                )}
-            </div>
-        </div>
+                    )}
+                    <div style={{ display: "flex", gap: "1rem", flex: 1, minHeight: 0 }}>
+                        <div className="api-response-sidebar">
+                            {entries.map((e, i) => (
+                                <button key={e.id} type="button" className={`api-response-tab${i === activeIdx ? " active" : ""}`} data-testid="api-response-tab" onClick={() => setActiveIdx(i)}>
+                                    <div className="api-response-kind">{e.kind ?? `Batch ${i + 1}`}</div>
+                                    <div className="api-response-time">{e.timestamp ? new Date(e.timestamp).toLocaleString() : e.model}</div>
+                                </button>
+                            ))}
+                        </div>
+                        <div className="api-response-detail">
+                            {active && (
+                                <>
+                                    <dl className="api-response-meta">
+                                        {active.timestamp && (
+                                            <>
+                                                <dt>Timestamp</dt>
+                                                <dd>{new Date(active.timestamp).toLocaleString()}</dd>
+                                            </>
+                                        )}
+                                        <dt>Model</dt>
+                                        <dd>{active.model}</dd>
+                                        <dt>Tokens (in / out)</dt>
+                                        <dd>
+                                            {active.inputTokens ?? "-"} / {active.outputTokens ?? "-"}
+                                        </dd>
+                                        <dt>Cost (USD)</dt>
+                                        <dd>{active.costUsd != null ? `$${active.costUsd.toFixed(4)}` : "-"}</dd>
+                                        {active.keysOrInputs && active.keysOrInputs.length > 0 && (
+                                            <>
+                                                <dt>Keys / Inputs</dt>
+                                                <dd>{active.keysOrInputs.join(", ")}</dd>
+                                            </>
+                                        )}
+                                    </dl>
+                                    <pre className="api-response-raw">{active.rawText}</pre>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
+        </Modal>
     )
 }
