@@ -3,6 +3,9 @@
 from pathlib import Path
 from typing import Literal, TypedDict
 
+# Package name of the base-game entry in SUPPORTED_MODS. It has no pack on disk, so an empty path is expected.
+VANILLA_PACKAGE_NAME = "vanilla"
+
 
 class Issue(TypedDict):
     """One broken cross-reference flagged by `validate_registries`.
@@ -46,8 +49,8 @@ def validate_registries(mods: list[dict], effects: dict) -> list[Issue]:
     1. If `modified_attributes` is present and non-empty, each entry that is not a key
        in `effects` produces a `missing_effect_category` issue.
     2. If `path` is missing, None, or empty, produces a `missing_mod_path` issue with
-       `target=""`. Otherwise, if the path does not exist on disk, produces a
-       `missing_mod_path` issue with `target=path`.
+       `target=""`, except for the vanilla entry which has no pack by design. Otherwise, if the
+       path does not exist on disk, produces a `missing_mod_path` issue with `target=path`.
 
     @param mods: List of mod dicts as returned by `load_supported_mods`.
     @param effects: Dict of effect categories as returned by `load_supported_effects`.
@@ -76,9 +79,11 @@ def validate_registries(mods: list[dict], effects: dict) -> list[Issue]:
                         )
                     )
 
-        # Path check.
+        # Path check. The vanilla entry has no pack on disk by design, so its empty path is not an issue.
         path = mod.get("path")
         if not path:
+            if mod_package_name == VANILLA_PACKAGE_NAME:
+                continue
             issues.append(
                 Issue(
                     kind="missing_mod_path",

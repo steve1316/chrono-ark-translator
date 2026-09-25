@@ -100,6 +100,24 @@ def test_missing_path_field_emits_issue():
         assert issue["message"] == "path field is missing or empty"
 
 
+def test_vanilla_entry_with_empty_path_emits_no_issue():
+    """The vanilla entry has no pack on disk by design, so an empty path is not flagged."""
+    mods = [
+        _mod("Vanilla", "vanilla"),
+        _mod("Vanilla", "vanilla", path=None),
+        _mod("Vanilla", "vanilla", path=""),
+    ]
+    issues = validate_registries(mods, {})
+    assert issues == []
+
+
+def test_vanilla_entry_with_nonexistent_path_still_emits_issue():
+    """Only the empty-path case is exempt for vanilla - a set but broken path is still flagged."""
+    mods = [_mod("Vanilla", "vanilla", path="/nonexistent/vanilla.pack")]
+    issues = validate_registries(mods, {})
+    assert [i["target"] for i in issues] == ["/nonexistent/vanilla.pack"]
+
+
 def test_existing_path_emits_no_issue(tmp_path: Path):
     real_file = tmp_path / "real.pack"
     real_file.write_bytes(b"x")
