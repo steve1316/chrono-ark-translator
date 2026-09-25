@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react"
+import type { CSSProperties } from "react"
 import { Routes, Route, Navigate, useParams, useMatch } from "react-router-dom"
 import Sidebar from "./components/Sidebar"
+import { getBranding } from "./components/GameSwitcher/branding"
 import SettingsPage from "./pages/Settings"
 import { API_BASE } from "./config"
 import { getGameBySlug, slugForId } from "./games/registry"
@@ -44,12 +46,17 @@ function App() {
     const isDetailPage = !!useMatch("/:gameSlug/translation/*")
     const defaultSlug = slugForId(defaultGameId) ?? "chrono_ark"
 
+    // Page titles and active filter pills follow the game in the URL. Off-game routes (e.g. /settings) keep the CSS default.
+    const onGameRoute = !!(activeSlug && getGameBySlug(activeSlug))
+    const branding = getBranding(activeGameId)
+    const accentStyle = onGameRoute ? ({ "--game-accent": branding.accent, "--game-accent-gradient": branding.gradient } as CSSProperties) : undefined
+
     return (
         <>
             <Sidebar activeGameId={activeGameId} />
 
             {/* Detail pages get the wider container-fluid for the string table. */}
-            <main className={isDetailPage ? "container-fluid" : "container"}>
+            <main className={isDetailPage ? "container-fluid" : "container"} style={accentStyle}>
                 {loading ? (
                     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
                         <h2 style={{ color: "var(--text-dim)", animation: "pulse 2s infinite" }}>Loading resources...</h2>

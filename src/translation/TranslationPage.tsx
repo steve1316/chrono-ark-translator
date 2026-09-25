@@ -203,7 +203,7 @@ export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
                     </div>
                     <div style={{ display: "flex", gap: "0.5rem" }}>
                         {statusFilters.map((f) => (
-                            <button key={f.value} className={activeFilter === f.value ? "btn btn-primary" : "btn btn-outline"} onClick={() => onFilterChange(f.value)}>
+                            <button key={f.value} className={`filter-pill btn ${activeFilter === f.value ? "btn-primary" : "btn-outline"}`} onClick={() => onFilterChange(f.value)}>
                                 {f.label}
                             </button>
                         ))}

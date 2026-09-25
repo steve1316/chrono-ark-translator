@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react"
+import { cleanup, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import App from "../App"
 
@@ -26,5 +26,61 @@ describe("App game-prefixed routing", () => {
         )
         // The WH3 sidebar header proves the slug (not the persisted chrono_ark) drove the active game.
         await waitFor(() => expect(screen.getByTestId("sidebar-game-title")).toHaveTextContent("Warhammer III"))
+    })
+})
+
+describe("App game accent", () => {
+    beforeEach(() => {
+        // jsdom has no ResizeObserver. The Chrono Ark dashboard uses it to size the search bar.
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                observe() {}
+                disconnect() {}
+            }
+        )
+    })
+
+    afterEach(() => {
+        // Unmount before unstubbing so no pending effect reaches the missing global.
+        cleanup()
+        vi.unstubAllGlobals()
+    })
+
+    /**
+     * Render the app at a URL with every endpoint returning an empty payload.
+     *
+     * @param path Initial URL to render.
+     * @returns The `<main>` element.
+     */
+    function renderAt(path: string) {
+        vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+            const url = String(input)
+            if (url.endsWith("/settings")) return Promise.resolve(jsonResponse({ active_game: "chrono_ark" }))
+            return Promise.resolve(jsonResponse([]))
+        })
+        const { container } = render(
+            <MemoryRouter initialEntries={[path]}>
+                <App />
+            </MemoryRouter>
+        )
+        return container.querySelector("main") as HTMLElement
+    }
+
+    it("sets the WH3 accent on main for warhammer_3 routes", async () => {
+        const main = renderAt("/warhammer_3/dashboard")
+        await waitFor(() => expect(main.style.getPropertyValue("--game-accent-gradient")).toContain("#dc2626"))
+        expect(main.style.getPropertyValue("--game-accent")).toBe("#dc2626")
+    })
+
+    it("sets the Chrono Ark accent on main for chrono_ark routes", async () => {
+        const main = renderAt("/chrono_ark/dashboard")
+        await waitFor(() => expect(main.style.getPropertyValue("--game-accent-gradient")).toContain("#38bdf8"))
+    })
+
+    it("leaves the accent at its CSS default on /settings", async () => {
+        const main = renderAt("/settings")
+        await waitFor(() => expect(main).toBeInTheDocument())
+        expect(main.style.getPropertyValue("--game-accent-gradient")).toBe("")
     })
 })

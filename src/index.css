@@ -123,7 +123,7 @@ body {
 .title-group h1 {
     font-size: 2.5rem;
     font-weight: 800;
-    background: var(--accent-gradient);
+    background: var(--game-accent-gradient);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -190,6 +190,12 @@ body {
 .btn-outline:hover {
     background-color: var(--glass-bg);
     border-color: var(--text-dim);
+}
+
+/* Active filter pill follows the game accent (CA keeps its blue gradient, WH3 turns red to orange). */
+.filter-pill.btn-primary {
+    background: var(--game-accent-gradient);
+    box-shadow: 0 4px 15px color-mix(in srgb, var(--game-accent) 30%, transparent);
 }
 
 /* Native selects draw their arrow jammed against the right border. Reset appearance and supply a custom chevron with a fixed gap and reserved padding. */
