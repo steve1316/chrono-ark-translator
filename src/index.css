@@ -1354,3 +1354,9 @@ th {
     margin-top: 1.5rem;
     flex-shrink: 0;
 }
+
+.confirm-message {
+    color: var(--text-main);
+    line-height: 1.6;
+    white-space: pre-wrap;
+}

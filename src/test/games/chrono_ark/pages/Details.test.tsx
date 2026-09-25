@@ -124,7 +124,8 @@ describe("Chrono Ark Details page", () => {
         renderPage()
         await screen.findByText("Mook Workshop")
         await userEvent.click(screen.getByRole("button", { name: /Sync Changes/ }))
-        const dialog = screen.getByText(/This will overwrite the mod's localization files/).closest(".glass-card") as HTMLElement
+        const dialog = screen.getByRole("dialog", { name: "Sync Changes" })
+        expect(dialog).toHaveTextContent(/This will overwrite the mod's localization files/)
         await userEvent.click(within(dialog).getByRole("button", { name: /^Sync$/ }))
         expect(await screen.findByText(/Synced 1 translation/)).toBeInTheDocument()
         expect(fetchSpy.mock.calls.some(([url, init]) => String(url).endsWith(`/mods/${MOD_ID}/export`) && init?.method === "POST")).toBe(true)
