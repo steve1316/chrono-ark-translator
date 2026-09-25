@@ -30,7 +30,7 @@ interface CostEstimate {
      * over all batches.
      */
     estimated_cost_usd: number
-    /** The LLM model name used for the estimate (e.g. `"gpt-4.1"`, `"claude-sonnet-4-6"`) */
+    /** The LLM model name used for the estimate (e.g. `"gpt-4.1"`, `"claude-sonnet-5"`) */
     model: string
     /** Human-readable note about the estimate (e.g. `"Prices are approximate"`) */
     note: string

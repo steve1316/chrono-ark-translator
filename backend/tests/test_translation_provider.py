@@ -81,3 +81,103 @@ def test_build_character_context_section_empty():
 def test_build_character_context_section_none():
     section = build_character_context_section(None)
     assert section == ""
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# Claude model table and request shape
+
+
+class _Block:
+    """Minimal stand-in for an Anthropic content block."""
+
+    def __init__(self, type: str, **fields):
+        self.type = type
+        for k, v in fields.items():
+            setattr(self, k, v)
+
+
+class _FakeAnthropic:
+    """Captures `messages.create` kwargs and returns a canned response."""
+
+    last_kwargs: dict = {}
+    content: list = []
+
+    def __init__(self, api_key: str):
+        self.messages = self
+
+    def create(self, **kwargs):
+        _FakeAnthropic.last_kwargs = kwargs
+
+        class _Usage:
+            input_tokens = 100
+            output_tokens = 50
+
+        class _Response:
+            content = _FakeAnthropic.content
+            usage = _Usage()
+
+        return _Response()
+
+
+def _run_batch(monkeypatch, model: str, content: list) -> tuple[dict, list]:
+    """Run `translate_batch` for one entry against the fake client.
+
+    Args:
+        monkeypatch: The pytest monkeypatch fixture.
+        model: Claude model id to construct the provider with.
+        content: Content blocks the fake response returns.
+
+    Returns:
+        The `(translations, suggestions)` tuple from `translate_batch`.
+    """
+    import anthropic
+
+    monkeypatch.setattr(anthropic, "Anthropic", _FakeAnthropic)
+    _FakeAnthropic.content = content
+    provider = ClaudeProvider(api_key="test-key", model=model)
+    return provider.translate_batch([("k1", "테스트")], "Korean", "")
+
+
+def test_claude_models_lists_current_models_with_pricing():
+    from backend.translator.claude_provider import CLAUDE_MODELS
+
+    assert {k: (v["input_per_mtok"], v["output_per_mtok"]) for k, v in CLAUDE_MODELS.items()} == {
+        "claude-opus-5-5": (4.0, 20.0),
+        "claude-opus-5": (5.0, 25.0),
+        "claude-sonnet-5": (2.0, 10.0),
+        "claude-sonnet-4-6": (3.0, 15.0),
+        "claude-haiku-4-5": (1.0, 5.0),
+    }
+
+
+def test_default_pricing_is_sonnet_5():
+    from backend.translator.claude_provider import _DEFAULT_PRICING, CLAUDE_MODELS
+
+    assert _DEFAULT_PRICING is CLAUDE_MODELS["claude-sonnet-5"]
+
+
+def test_translate_batch_reads_the_text_block_after_a_thinking_block(monkeypatch):
+    text = json.dumps({"translations": {"k1": "Test"}, "suggested_terms": []})
+    translations, _ = _run_batch(monkeypatch, "claude-opus-5-5", [_Block("thinking", thinking=""), _Block("text", text=text)])
+    assert translations == {"k1": "Test"}
+
+
+def test_translate_batch_disables_thinking_for_sonnet_5(monkeypatch):
+    text = json.dumps({"translations": {"k1": "Test"}, "suggested_terms": []})
+    _run_batch(monkeypatch, "claude-sonnet-5", [_Block("text", text=text)])
+    assert _FakeAnthropic.last_kwargs["extra_body"] == {"thinking": {"type": "disabled"}}
+
+
+def test_translate_batch_uses_low_effort_for_opus_5_models(monkeypatch):
+    text = json.dumps({"translations": {"k1": "Test"}, "suggested_terms": []})
+    for model in ("claude-opus-5", "claude-opus-5-5"):
+        _run_batch(monkeypatch, model, [_Block("text", text=text)])
+        assert _FakeAnthropic.last_kwargs["extra_body"] == {"output_config": {"effort": "low"}}
+
+
+def test_translate_batch_sends_no_extra_options_for_older_models(monkeypatch):
+    text = json.dumps({"translations": {"k1": "Test"}, "suggested_terms": []})
+    for model in ("claude-sonnet-4-6", "claude-haiku-4-5"):
+        _run_batch(monkeypatch, model, [_Block("text", text=text)])
+        assert "extra_body" not in _FakeAnthropic.last_kwargs

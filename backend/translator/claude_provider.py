@@ -12,12 +12,43 @@ from backend.translator.base import TranslationProvider
 
 
 CLAUDE_MODELS: dict[str, dict] = {
+    "claude-opus-5-5": {"label": "Claude Opus 5.5", "input_per_mtok": 4.0, "output_per_mtok": 20.0},
+    "claude-opus-5": {"label": "Claude Opus 5", "input_per_mtok": 5.0, "output_per_mtok": 25.0},
+    "claude-sonnet-5": {"label": "Claude Sonnet 5", "input_per_mtok": 2.0, "output_per_mtok": 10.0},
     "claude-sonnet-4-6": {"label": "Claude Sonnet 4.6", "input_per_mtok": 3.0, "output_per_mtok": 15.0},
-    "claude-haiku-4-5-20251001": {"label": "Claude Haiku 4.5", "input_per_mtok": 1.0, "output_per_mtok": 5.0},
-    "claude-opus-4-6": {"label": "Claude Opus 4.6", "input_per_mtok": 5.0, "output_per_mtok": 25.0},
+    "claude-haiku-4-5": {"label": "Claude Haiku 4.5", "input_per_mtok": 1.0, "output_per_mtok": 5.0},
 }
 
-_DEFAULT_PRICING = CLAUDE_MODELS["claude-sonnet-4-6"]
+_DEFAULT_PRICING = CLAUDE_MODELS["claude-sonnet-5"]
+
+# Extra request fields per model, sent via `extra_body` so they work on SDK versions that predate them. Translation does not need
+# thinking and thinking tokens bill as output. Sonnet 5 can turn it off. The Opus 5 models think by default (Opus 5.5 cannot disable it),
+# so they run at low effort instead. Older models do not think unless asked, so they need nothing.
+_MODEL_REQUEST_OPTIONS: dict[str, dict] = {
+    "claude-sonnet-5": {"thinking": {"type": "disabled"}},
+    "claude-opus-5": {"output_config": {"effort": "low"}},
+    "claude-opus-5-5": {"output_config": {"effort": "low"}},
+}
+
+
+def _response_text(response) -> str:
+    """Return the text of the first text block in a Messages API response.
+
+    Models that think return thinking blocks before the answer, so `content[0]` is not always the text.
+
+    Args:
+        response: The Messages API response object.
+
+    Raises:
+        ValueError: If the response contains no text block.
+
+    Returns:
+        The text of the first text block.
+    """
+    for block in response.content:
+        if block.type == "text":
+            return block.text
+    raise ValueError("Claude response contained no text block")
 
 
 class ClaudeProvider(TranslationProvider):
@@ -105,13 +136,16 @@ class ClaudeProvider(TranslationProvider):
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                response = client.messages.create(
-                    model=self._model,
-                    max_tokens=16384,
-                    system=system_prompt,
-                    messages=[{"role": "user", "content": user_message}],
-                )
-                raw_text = response.content[0].text
+                request = {
+                    "model": self._model,
+                    "max_tokens": 16384,
+                    "system": system_prompt,
+                    "messages": [{"role": "user", "content": user_message}],
+                }
+                if self._model in _MODEL_REQUEST_OPTIONS:
+                    request["extra_body"] = _MODEL_REQUEST_OPTIONS[self._model]
+                response = client.messages.create(**request)
+                raw_text = _response_text(response)
                 translations, suggestions = self._parse_response(raw_text, entries)
                 # Store raw response for inspection
                 self.last_raw_responses = getattr(self, "last_raw_responses", [])
@@ -160,7 +194,7 @@ class ClaudeProvider(TranslationProvider):
 
         Builds the full prompt to get a realistic character count, then
         estimates token counts using heuristic ratios for CJK vs ASCII
-        characters. Applies Claude Sonnet pricing rates.
+        characters. Applies the selected model's pricing rates.
 
         Args:
             entries: List of (key, source_text) tuples.

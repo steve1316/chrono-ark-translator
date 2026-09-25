@@ -33,7 +33,7 @@ DEEPL_API_KEY = os.environ.get("CATL_DEEPL_API_KEY", "")
 
 # ── Model Selection ────────────────────────────────────────────────────────────
 
-CLAUDE_MODEL = os.environ.get("CATL_CLAUDE_MODEL", "claude-sonnet-4-6")
+CLAUDE_MODEL = os.environ.get("CATL_CLAUDE_MODEL", "claude-sonnet-5")
 OPENAI_MODEL = os.environ.get("CATL_OPENAI_MODEL", "gpt-4.1")
 
 # ── Ollama Settings ───────────────────────────────────────────────────────────
