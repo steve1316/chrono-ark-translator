@@ -1,4 +1,5 @@
 import React from "react"
+import Modal from "../../ui/Modal"
 
 /**
  * Per-mod cost estimate returned by the backend's bulk estimate endpoint.
@@ -62,113 +63,68 @@ const EstimateTotalCostModal: React.FC<EstimateTotalCostModalProps> = ({ results
     const model = firstWithEstimates ? (Object.values(firstWithEstimates.estimates)[0]?.model ?? "") : ""
 
     return (
-        <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0,0,0,0.6)",
-                zIndex: 1000,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-            }}
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose()
-            }}
-        >
-            <div
-                className="glass-card"
-                style={{
-                    width: "600px",
-                    maxHeight: "85vh",
-                    display: "flex",
-                    flexDirection: "column",
-                    padding: "2rem",
-                }}
-            >
-                {/* Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                    <h2 style={{ margin: 0 }}>Estimate Total Cost</h2>
-                    <button
-                        onClick={onClose}
-                        style={{
-                            background: "none",
-                            border: "none",
-                            color: "var(--text-dim)",
-                            fontSize: "2rem",
-                            lineHeight: 1,
-                            cursor: "pointer",
-                            padding: "0.25rem 0.5rem",
-                            borderRadius: "4px",
-                        }}
-                        title="Close"
-                    >
-                        &times;
-                    </button>
+        <Modal title="Estimate Total Cost" size="md" fill onClose={onClose}>
+            {/* Summary stats */}
+            <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+                <div>
+                    <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Provider</span>
+                    <div style={{ fontWeight: 600 }}>{provider}</div>
                 </div>
-
-                {/* Summary stats */}
-                <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
-                    <div>
-                        <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Provider</span>
-                        <div style={{ fontWeight: 600 }}>{provider}</div>
-                    </div>
-                    <div>
-                        <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Model</span>
-                        <div style={{ fontWeight: 600 }}>{model}</div>
-                    </div>
-                    <div>
-                        <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Total Strings</span>
-                        <div style={{ fontWeight: 600 }}>{grandTotalStrings.toLocaleString()}</div>
-                    </div>
-                    <div>
-                        <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Total Estimated Cost</span>
-                        <div style={{ fontWeight: 600, color: "var(--accent-primary)" }}>~${grandTotalCost.toFixed(4)}</div>
-                    </div>
+                <div>
+                    <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Model</span>
+                    <div style={{ fontWeight: 600 }}>{model}</div>
                 </div>
-
-                {/* Per-mod list */}
-                <div
-                    style={{
-                        flex: 1,
-                        overflow: "auto",
-                        background: "rgba(0,0,0,0.3)",
-                        borderRadius: "8px",
-                        border: "1px solid var(--glass-border)",
-                        marginBottom: "1rem",
-                    }}
-                >
-                    {results.map((mod) => {
-                        const modCost = Object.values(mod.estimates).reduce((s, e) => s + e.estimated_cost_usd, 0)
-                        return (
-                            <div
-                                key={mod.mod_id}
-                                style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    padding: "0.75rem 1rem",
-                                    borderBottom: "1px solid var(--glass-border)",
-                                }}
-                            >
-                                <div>
-                                    <div style={{ fontWeight: 500 }}>{mod.mod_name}</div>
-                                    <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{mod.total_strings.toLocaleString()} strings</div>
-                                </div>
-                                <div style={{ fontWeight: 600, color: "var(--accent-primary)", whiteSpace: "nowrap" }}>~${modCost.toFixed(4)}</div>
-                            </div>
-                        )
-                    })}
+                <div>
+                    <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Total Strings</span>
+                    <div style={{ fontWeight: 600 }}>{grandTotalStrings.toLocaleString()}</div>
                 </div>
-
-                {/* Close button */}
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                    <button className="btn btn-outline" onClick={onClose}>
-                        Close
-                    </button>
+                <div>
+                    <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Total Estimated Cost</span>
+                    <div style={{ fontWeight: 600, color: "var(--accent-primary)" }}>~${grandTotalCost.toFixed(4)}</div>
                 </div>
             </div>
-        </div>
+
+            {/* Per-mod list */}
+            <div
+                style={{
+                    flex: 1,
+                    overflow: "auto",
+                    background: "rgba(0,0,0,0.3)",
+                    borderRadius: "8px",
+                    border: "1px solid var(--glass-border)",
+                    marginBottom: "1rem",
+                }}
+            >
+                {results.map((mod) => {
+                    const modCost = Object.values(mod.estimates).reduce((s, e) => s + e.estimated_cost_usd, 0)
+                    return (
+                        <div
+                            key={mod.mod_id}
+                            style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                padding: "0.75rem 1rem",
+                                borderBottom: "1px solid var(--glass-border)",
+                            }}
+                        >
+                            <div>
+                                <div style={{ fontWeight: 500 }}>{mod.mod_name}</div>
+                                <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{mod.total_strings.toLocaleString()} strings</div>
+                            </div>
+                            <div style={{ fontWeight: 600, color: "var(--accent-primary)", whiteSpace: "nowrap" }}>~${modCost.toFixed(4)}</div>
+                        </div>
+                    )
+                })}
+            </div>
+
+            {/* Close button */}
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button className="btn btn-outline" onClick={onClose}>
+                    Close
+                </button>
+            </div>
+        </Modal>
     )
 }
 
