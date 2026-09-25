@@ -27,6 +27,7 @@ interface Props {
  */
 const SupportedModCard = ({ mod, issues, onEdit }: Props) => {
     const previewImageUrl = mod.workshop_id ? `${API_BASE}/games/total_war_warhammer_3/packs/${mod.workshop_id}/preview` : null
+    const hasAttributes = !!mod.modified_attributes && mod.modified_attributes.length > 0
     return (
         <WorkshopCard previewImageUrl={previewImageUrl} previewAlt={mod.name} title={mod.name} idBadge={mod.workshop_id ?? undefined} subtitle={mod.package_name}>
             {issues.length > 0 && (
@@ -44,33 +45,38 @@ const SupportedModCard = ({ mod, issues, onEdit }: Props) => {
                     </ul>
                 </details>
             )}
-            {mod.modified_attributes && mod.modified_attributes.length > 0 && (
-                <p style={{ margin: 0, fontSize: "0.9em" }}>
-                    <strong>Modified attributes:</strong> {mod.modified_attributes.join(", ")}
-                </p>
-            )}
-            {(onEdit || mod.workshop_id) && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "auto" }}>
-                    {onEdit && (
-                        <button type="button" className="btn btn-outline" onClick={() => onEdit(mod.package_name)} style={{ fontSize: "0.85em" }}>
-                            Edit
-                        </button>
+            {/* Footer is pinned to the bottom of the card body so the attributes line sits at the same height on every card. */}
+            {(hasAttributes || onEdit || mod.workshop_id) && (
+                <div data-testid="supported-mod-card-footer" style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "auto" }}>
+                    {hasAttributes && (
+                        <p style={{ margin: 0, fontSize: "0.9em" }}>
+                            <strong>Modified attributes:</strong> {mod.modified_attributes!.join(", ")}
+                        </p>
                     )}
-                    {mod.workshop_id && (
-                        <button
-                            type="button"
-                            className="btn btn-outline"
-                            onClick={async () => {
-                                try {
-                                    await fetch(`${API_BASE}/games/total_war_warhammer_3/packs/${mod.workshop_id}/open`, { method: "POST" })
-                                } catch (err) {
-                                    console.error("Failed to open workshop folder:", err)
-                                }
-                            }}
-                            style={{ fontSize: "0.85em" }}
-                        >
-                            Open Workshop Folder
-                        </button>
+                    {(onEdit || mod.workshop_id) && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                            {onEdit && (
+                                <button type="button" className="btn btn-outline" onClick={() => onEdit(mod.package_name)} style={{ fontSize: "0.85em" }}>
+                                    Edit
+                                </button>
+                            )}
+                            {mod.workshop_id && (
+                                <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    onClick={async () => {
+                                        try {
+                                            await fetch(`${API_BASE}/games/total_war_warhammer_3/packs/${mod.workshop_id}/open`, { method: "POST" })
+                                        } catch (err) {
+                                            console.error("Failed to open workshop folder:", err)
+                                        }
+                                    }}
+                                    style={{ fontSize: "0.85em" }}
+                                >
+                                    Open Workshop Folder
+                                </button>
+                            )}
+                        </div>
                     )}
                 </div>
             )}

@@ -58,6 +58,14 @@ describe("SupportedModCard", () => {
         expect(screen.getByText(/firing_arc/)).toBeInTheDocument()
     })
 
+    it("pins the modified_attributes line and the actions to the bottom of the card body in one footer", () => {
+        render(<SupportedModCard mod={MOD_WITH_ATTRS} issues={[ISSUE]} onEdit={vi.fn()} />)
+        const footer = screen.getByTestId("supported-mod-card-footer")
+        expect(footer.style.marginTop).toBe("auto")
+        expect(footer).toContainElement(screen.getByText(/Modified attributes:/i))
+        expect(footer).toContainElement(screen.getByRole("button", { name: /Edit/i }))
+    })
+
     it("does not render the modified_attributes line when empty", () => {
         render(<SupportedModCard mod={BASE_MOD} issues={[]} />)
         expect(screen.queryByText(/Modified attributes:/i)).not.toBeInTheDocument()
