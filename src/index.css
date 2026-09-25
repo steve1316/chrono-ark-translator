@@ -95,6 +95,16 @@ body {
     transform: translateY(-2px);
 }
 
+/* Static glass cards (panels, banners) never lift on hover and never clip nested fixed content. */
+.glass-card.static,
+.glass-card.static:hover {
+    transform: none;
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
+    contain: none;
+    content-visibility: visible;
+}
+
 /* --- Layout --- */
 
 .container {
@@ -472,6 +482,31 @@ body {
     height: 8px;
     border-radius: 50%;
     background: var(--tone-teal);
+}
+
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Batch review banner (src/translation/BatchReviewBanner.tsx) */
+.glass-card.batch-review-banner,
+.glass-card.batch-review-banner:hover {
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: rgba(250, 204, 21, 0.08);
+    border: 1px solid rgba(250, 204, 21, 0.25);
+    color: var(--text-main);
+}
+
+.batch-review-banner-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.batch-review-banner-actions .btn {
+    padding: 0.25rem 0.75rem;
 }
 
 /* Native selects draw their arrow jammed against the right border. Reset appearance and supply a custom chevron with a fixed gap and reserved padding. */

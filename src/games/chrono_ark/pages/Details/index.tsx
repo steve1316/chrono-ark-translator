@@ -13,6 +13,7 @@ import BackupHistoryModal from "../../components/BackupHistoryModal"
 import ChronoArkGlossaryPanel from "../../components/ChronoArkGlossaryPanel"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { TranslationPage } from "../../../../translation/TranslationPage"
+import { BatchReviewBanner } from "../../../../translation/BatchReviewBanner"
 import { SyncButton } from "../../../../translation/SyncButton"
 import { TranslationToolbar } from "../../../../translation/TranslationToolbar"
 import { usePendingSuggestions } from "../../../../translation/usePendingSuggestions"
@@ -737,46 +738,16 @@ const ModDetail: React.FC = () => {
             extraBanners={
                 batchState.phase === "reviewing" &&
                 !showReviewModal && (
-                    <div
-                        className="glass-card"
-                        style={{
-                            padding: "1.25rem 1.5rem",
-                            marginBottom: "1rem",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "1rem",
-                            background: "rgba(250,204,21,0.08)",
-                            border: "1px solid rgba(250,204,21,0.25)",
+                    <BatchReviewBanner
+                        batchIndex={batchState.batchIndex}
+                        totalBatches={batchState.totalBatches}
+                        onReview={() => setShowReviewModal(true)}
+                        onContinue={continueAfterReview}
+                        onCancel={() => {
+                            cancelTranslation()
+                            setTranslateBanner({ type: "success", message: `Translation cancelled. ${batchState.batchIndex} of ${batchState.totalBatches} batches completed.` })
                         }}
-                    >
-                        <span style={{ color: "var(--text-main)" }}>
-                            Batch {batchState.batchIndex + 1} of {batchState.totalBatches} complete.
-                        </span>
-                        <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
-                            <button className="btn btn-primary" onClick={() => setShowReviewModal(true)} style={{ padding: "0.25rem 0.75rem" }}>
-                                Review Suggestions
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                onClick={() => {
-                                    continueAfterReview()
-                                }}
-                                style={{ padding: "0.25rem 0.75rem" }}
-                            >
-                                Continue
-                            </button>
-                            <button
-                                className="btn btn-outline"
-                                onClick={() => {
-                                    cancelTranslation()
-                                    setTranslateBanner({ type: "success", message: `Translation cancelled. ${batchState.batchIndex} of ${batchState.totalBatches} batches completed.` })
-                                }}
-                                style={{ padding: "0.25rem 0.75rem" }}
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
+                    />
                 )
             }
             banner={translateBanner}
