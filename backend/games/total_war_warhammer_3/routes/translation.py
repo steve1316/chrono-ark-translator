@@ -950,58 +950,6 @@ def post_glossary_apply_all(mod_id: str, req: GlossaryApplyAllRequest) -> dict:
     return {"replaced": count}
 
 
-@router.post("/mods/{mod_id}/glossary/suggest-edits")
-def post_glossary_suggest_edits(mod_id: str) -> list[dict]:
-    """Ask Claude for refinements to the current glossary. Logs to api_responses.
-
-    Args:
-        mod_id: Steam Workshop ID of the WH3 translation mod.
-
-    Returns:
-        List of suggested glossary edits from Claude.
-    """
-    mod = _require_mod(mod_id)
-    adapter = TotalWarWarhammer3Adapter()
-
-    parent = _extract_all_parent_strings(mod)
-    sample: dict[str, str] = {}
-    for rows in parent.values():
-        for key, row in rows.items():
-            if len(sample) >= 25:
-                break
-            sample[key] = row.text
-        if len(sample) >= 25:
-            break
-
-    glossary_section = json.dumps(glossary_store.load_glossary(mod_id), ensure_ascii=False, indent=2)
-    _, suggestions = ClaudeProvider().translate_batch(
-        list(sample.items()),
-        mod.source_language,
-        glossary_prompt=f"Current glossary (suggest improvements via suggested_terms only):\n{glossary_section}",
-        game_context=adapter.get_translation_context(),
-        format_rules=adapter.get_format_preservation_rules(),
-        style_examples=adapter.get_style_examples(mod.source_language),
-        character_context=None,
-        target_lang=mod.target_language,
-    )
-
-    api_responses_store.append(
-        mod_id,
-        {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "kind": "suggest-edits",
-            "provider": "claude",
-            "model": "claude",
-            "input_tokens": None,
-            "output_tokens": None,
-            "cost_usd": None,
-            "keys_or_inputs": list(sample.keys()),
-            "raw_response": json.dumps(suggestions, ensure_ascii=False),
-        },
-    )
-    return suggestions
-
-
 @router.get("/mods/{mod_id}/api-responses")
 def get_api_responses(mod_id: str) -> list[dict]:
     """List all API response entries for a mod, newest first.

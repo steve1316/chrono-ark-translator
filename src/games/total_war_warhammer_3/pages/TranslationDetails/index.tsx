@@ -543,7 +543,7 @@ const TranslationDetailsPage: React.FC = () => {
                     }}
                 />
             )}
-            {openModal === "glossary" && <ModGlossaryModal workshopId={workshopId} onClose={() => setOpenModal(null)} />}
+            {openModal === "glossary" && <ModGlossaryModal workshopId={workshopId} onClose={() => setOpenModal(null)} onSuggestionsChanged={() => refreshSuggestions()} />}
             {openModal === "responses" && <ApiResponsesModal workshopId={workshopId} onClose={() => setOpenModal(null)} />}
             {(openModal === "history" || openModal === "reset") && (
                 <HistoryModal workshopId={workshopId} onClose={() => setOpenModal(null)} defaultRestoreMode={openModal === "reset"} onRestored={onRestored} />

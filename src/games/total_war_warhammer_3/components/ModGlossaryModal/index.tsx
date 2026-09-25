@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react"
 
-import type { TermSuggestion } from "../../../../shared_types"
 import { GlossaryEditor, type GlossaryEditorTerm } from "../../../../translation/GlossaryEditor"
 import { addGlossaryTerm, deleteGlossaryTerm, glossaryApplyAll, glossarySuggestEdits, loadGlossary, updateGlossaryTerm } from "../../translationApi"
+import Modal from "../../../../ui/Modal"
 import { useConfirm } from "../../../../ui/useConfirm"
 
 /** Props for `ModGlossaryModal`. */
@@ -11,6 +11,8 @@ interface ModGlossaryModalProps {
     workshopId: string
     /** Called when the modal is closed. */
     onClose: () => void
+    /** Called with how many edit suggestions were saved, so the page refreshes its Suggestions count. */
+    onSuggestionsChanged: (added: number) => void
 }
 
 /** Read the single source text from an editor term's mappings (WH3 stores one source per term). */
@@ -23,12 +25,14 @@ function sourceOf(term: GlossaryEditorTerm): string {
  * Claude-powered Suggest Edits, and Apply All (word-boundary find-and-replace), wiring CRUD to the WH3 translation API.
  * @param workshopId - Steam Workshop ID whose glossary to edit.
  * @param onClose - Called when the modal is closed.
+ * @param onSuggestionsChanged - Called with how many edit suggestions were saved.
  * @returns The rendered modal.
  */
-const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose }) => {
+const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose, onSuggestionsChanged }) => {
     const [terms, setTerms] = useState<GlossaryEditorTerm[]>([])
     const [error, setError] = useState("")
-    const [suggestions, setSuggestions] = useState<TermSuggestion[] | null>(null)
+    const [notice, setNotice] = useState("")
+    const [suggesting, setSuggesting] = useState(false)
     const [applyAllOpen, setApplyAllOpen] = useState(false)
     const [applyAllOld, setApplyAllOld] = useState("")
     const [applyAllNew, setApplyAllNew] = useState("")
@@ -78,22 +82,16 @@ const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose
     }
 
     const onSuggestEdits = async () => {
-        setSuggestions(null)
+        setSuggesting(true)
+        setNotice("")
         try {
-            setSuggestions(await glossarySuggestEdits(workshopId))
+            const result = await glossarySuggestEdits(workshopId)
+            onSuggestionsChanged(result.new)
+            setNotice(result.new > 0 ? `Added ${result.new} edit suggestion(s). Review them from the Suggestions button.` : "No edits to suggest.")
         } catch (e) {
             setError((e as Error).message)
-        }
-    }
-
-    const acceptSuggestion = async (s: TermSuggestion) => {
-        try {
-            if (s.edit_of) await updateGlossaryTerm(workshopId, s.edit_of, { english: s.english, source: s.source, category: s.category })
-            else await addGlossaryTerm(workshopId, { english: s.english, source: s.source, category: s.category })
-            setSuggestions((prev) => (prev ?? []).filter((x) => x.english !== s.english))
-            await refresh()
-        } catch (e) {
-            setError((e as Error).message)
+        } finally {
+            setSuggesting(false)
         }
     }
 
@@ -111,11 +109,11 @@ const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose
 
     const headerActions = (
         <>
-            <button type="button" className="btn btn-outline" onClick={onSuggestEdits}>
-                Suggest edits
+            <button type="button" className="btn btn-outline btn-xs" onClick={onSuggestEdits} disabled={suggesting}>
+                {suggesting ? "Suggesting..." : "Suggest Edits"}
             </button>
-            <button type="button" className="btn btn-outline" onClick={() => setApplyAllOpen(!applyAllOpen)}>
-                Apply all
+            <button type="button" className="btn btn-outline btn-xs tone-accent" onClick={() => setApplyAllOpen(!applyAllOpen)}>
+                Apply All
             </button>
         </>
     )
@@ -132,59 +130,16 @@ const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose
                 </div>
             )}
             {applyResult && <p style={{ color: "var(--text-dim)", margin: "0.5rem 0" }}>{applyResult}</p>}
-            {suggestions && suggestions.length > 0 && (
-                <div className="glossary-suggestions">
-                    <div className="glossary-group-header">Suggestions</div>
-                    {suggestions.map((s) => (
-                        <div key={s.english} className="suggestion-row">
-                            <div className="suggestion-meta">
-                                <span className="suggestion-english">{s.english}</span>
-                                <span className="suggestion-source"> ({s.source})</span>
-                                <div className="suggestion-reason">{s.reason}</div>
-                            </div>
-                            <div className="suggestion-actions">
-                                <button type="button" className="btn btn-primary" onClick={() => acceptSuggestion(s)}>
-                                    Accept
-                                </button>
-                                <button type="button" className="btn btn-outline" onClick={() => setSuggestions((prev) => (prev ?? []).filter((x) => x.english !== s.english))}>
-                                    Reject
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
         </>
     )
 
     return (
-        <div
-            className="modal-backdrop"
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose()
-            }}
-        >
-            <div className="glass-card modal-panel" style={{ width: "800px" }}>
-                <div className="modal-header">
-                    <h2 style={{ margin: 0 }}>Mod Glossary</h2>
-                    <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
-                        &times;
-                    </button>
-                </div>
-                {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
-                <GlossaryEditor
-                    terms={terms}
-                    groupByCategory
-                    emptyMessage="No glossary entries yet."
-                    onAdd={handleAdd}
-                    onUpdate={handleUpdate}
-                    onRemove={handleRemove}
-                    headerActions={headerActions}
-                    footer={footer}
-                />
-            </div>
+        <Modal title="Mod Glossary" size="xl" fill headerActions={headerActions} onClose={onClose}>
+            {error && <p className="dialog-error">{error}</p>}
+            {notice && <p className="help-text dialog-notice">{notice}</p>}
+            <GlossaryEditor terms={terms} groupByCategory fillHeight emptyMessage="No glossary entries yet." onAdd={handleAdd} onUpdate={handleUpdate} onRemove={handleRemove} footer={footer} />
             {confirmDialog}
-        </div>
+        </Modal>
     )
 }
 

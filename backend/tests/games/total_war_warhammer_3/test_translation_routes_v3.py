@@ -326,22 +326,6 @@ def test_glossary_apply_all_renames_existing_translations(client: TestClient, tm
     assert "Cathayan Phoenix awakens" in raw["k1"]["text"]
 
 
-def test_glossary_suggest_edits_logs_to_api_responses(client: TestClient, monkeypatch):
-    mod_id = "3315737452"
-
-    def fake_translate_batch(self, entries, source_lang, glossary_prompt, **kwargs):
-        return ({k: "x" for k, _ in entries}, [{"english": "Sky", "source": "天", "source_lang": "Chinese", "category": "lore_terms", "reason": "common term"}])
-
-    monkeypatch.setattr("backend.translator.claude_provider.ClaudeProvider.translate_batch", fake_translate_batch)
-
-    resp = client.post(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/glossary/suggest-edits")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert isinstance(body, list)
-    entries = list_entries(mod_id)
-    assert any(e["kind"] == "suggest-edits" for e in entries)
-
-
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # Group F: GET /api-responses

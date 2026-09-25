@@ -306,14 +306,14 @@ export async function glossaryApplyAll(workshopId: string, oldEnglish: string, n
 }
 
 /**
- * Ask Claude to suggest refinements to the current glossary. Logs to api_responses.
+ * Ask Claude for glossary refinements and save them as pending suggestions for review. Logs to api_responses.
  *
  * @param workshopId Steam Workshop ID of the translation mod.
- * @returns Suggested glossary edits.
+ * @returns How many new suggestions were saved.
  * @throws `RegistryError` On any non-2xx response.
  */
-export async function glossarySuggestEdits(workshopId: string): Promise<TermSuggestion[]> {
-    const res = await api.post(`/translation/mods/${encodeURIComponent(workshopId)}/glossary/suggest-edits`)
+export async function glossarySuggestEdits(workshopId: string): Promise<{ status: string; new: number }> {
+    const res = await api.post(`/mods/${encodeURIComponent(workshopId)}/glossary/suggest-edits`)
     if (!res.ok) throw await registryError(res)
     return res.json()
 }

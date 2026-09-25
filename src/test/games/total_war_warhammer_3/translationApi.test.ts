@@ -191,11 +191,11 @@ describe("plan3 routes", () => {
         expect(JSON.parse((init as RequestInit).body as string)).toEqual({ old_english: "Cathay Phoenix", new_english: "Cathayan Phoenix" })
     })
 
-    it("glossarySuggestEdits POSTs and returns suggestions", async () => {
-        mockFetchOk([{ english: "Sky", source: "天", source_lang: "Chinese", category: "lore_terms", reason: "common" }])
+    it("glossarySuggestEdits POSTs to the game-root endpoint and returns the added count", async () => {
+        const spy = mockFetchOk({ status: "success", new: 1 })
         const result = await glossarySuggestEdits("123")
-        expect(result.length).toBe(1)
-        expect(result[0].english).toBe("Sky")
+        expect(result.new).toBe(1)
+        expect(String(spy.mock.calls[0][0])).toMatch(/\/api\/games\/total_war_warhammer_3\/mods\/123\/glossary\/suggest-edits$/)
     })
 
     it("listApiResponses GETs and returns the list", async () => {

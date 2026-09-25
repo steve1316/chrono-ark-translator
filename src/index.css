@@ -1700,6 +1700,15 @@ th {
     flex-shrink: 0;
 }
 
+.dialog-error {
+    color: var(--tone-error-text);
+    margin: 0 0 0.75rem;
+}
+
+.dialog-notice {
+    margin: 0 0 0.75rem;
+}
+
 .confirm-message {
     color: var(--text-main);
     line-height: 1.6;

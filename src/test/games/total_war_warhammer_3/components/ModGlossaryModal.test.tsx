@@ -23,7 +23,7 @@ afterEach(() => {
 
 describe("ModGlossaryModal", () => {
     it("loads and lists entries grouped by category", async () => {
-        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} />)
+        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} onSuggestionsChanged={vi.fn()} />)
         await waitFor(() => screen.getByText("Phoenix"))
         expect(screen.getByText("Cathay")).toBeInTheDocument()
         expect(screen.getByText("Sky")).toBeInTheDocument()
@@ -37,7 +37,7 @@ describe("ModGlossaryModal", () => {
         fetchSpy.mockResolvedValueOnce(mockJson({ status: "ok" })) // POST
         fetchSpy.mockResolvedValueOnce(mockJson({ ...GLOSSARY, Dragon: { source: "龙", category: "factions" } })) // refresh
 
-        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} />)
+        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} onSuggestionsChanged={vi.fn()} />)
         await waitFor(() => screen.getByText("Phoenix"))
 
         fireEvent.change(screen.getByPlaceholderText(/English term/i), { target: { value: "Dragon" } })
@@ -59,7 +59,7 @@ describe("ModGlossaryModal", () => {
         void Phoenix
         fetchSpy.mockResolvedValueOnce(mockJson(rest)) // refresh
 
-        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} />)
+        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} onSuggestionsChanged={vi.fn()} />)
         await waitFor(() => screen.getByText("Phoenix"))
 
         const phoenixRow = screen.getByText("Phoenix").closest(".glossary-row") as HTMLElement
@@ -76,7 +76,7 @@ describe("ModGlossaryModal", () => {
         fetchSpy.mockResolvedValueOnce(mockJson({ status: "ok" })) // PUT
         fetchSpy.mockResolvedValueOnce(mockJson({ ...GLOSSARY, "Phoenix Lord": { source: "凤", category: "factions" } })) // refresh
 
-        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} />)
+        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} onSuggestionsChanged={vi.fn()} />)
         await waitFor(() => screen.getByText("Phoenix"))
 
         const phoenixRow = screen.getByText("Phoenix").closest(".glossary-row") as HTMLElement
@@ -95,18 +95,24 @@ describe("ModGlossaryModal", () => {
         expect(JSON.parse((init as RequestInit).body as string).english).toBe("Phoenix Lord")
     })
 
-    it("Suggest Edits surfaces returned suggestions inline", async () => {
+    it("saves suggested edits for review and reports how many were added", async () => {
         const fetchSpy = vi.spyOn(globalThis, "fetch")
         fetchSpy.mockResolvedValueOnce(mockJson(GLOSSARY))
-        fetchSpy.mockResolvedValueOnce(mockJson([{ english: "Dragon Sky", source: "天龙", source_lang: "Chinese", category: "factions", reason: "compound" }]))
-
-        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} />)
+        fetchSpy.mockResolvedValueOnce(mockJson({ status: "success", new: 2 }))
+        const onSuggestionsChanged = vi.fn()
+        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} onSuggestionsChanged={onSuggestionsChanged} />)
         await waitFor(() => screen.getByText("Phoenix"))
-
         await act(async () => {
             fireEvent.click(screen.getByRole("button", { name: /Suggest edits/i }))
         })
-        await waitFor(() => screen.getByText("Dragon Sky"))
+        await waitFor(() => expect(onSuggestionsChanged).toHaveBeenCalledWith(2))
+        expect(screen.getByText(/Added 2 edit suggestion\(s\)/)).toBeInTheDocument()
+        expect(String(fetchSpy.mock.calls[1][0])).toMatch(/\/api\/games\/total_war_warhammer_3\/mods\/123\/glossary\/suggest-edits$/)
+    })
+
+    it("opens as the large glossary dialog", async () => {
+        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} onSuggestionsChanged={vi.fn()} />)
+        expect(await screen.findByRole("dialog", { name: "Mod Glossary" })).toHaveClass("dialog-xl", "dialog-fill")
     })
 
     it("Apply All POSTs old + new english", async () => {
@@ -114,7 +120,7 @@ describe("ModGlossaryModal", () => {
         fetchSpy.mockResolvedValueOnce(mockJson(GLOSSARY))
         fetchSpy.mockResolvedValueOnce(mockJson({ replaced: 5 }))
 
-        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} />)
+        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} onSuggestionsChanged={vi.fn()} />)
         await waitFor(() => screen.getByText("Phoenix"))
 
         fireEvent.click(screen.getByRole("button", { name: /Apply all/i }))
