@@ -1,4 +1,5 @@
 import React, { useState } from "react"
+import Modal from "../../ui/Modal"
 
 /**
  * Preview data for a single target language, showing the prompts that will be
@@ -106,187 +107,167 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
     const totalInputTokens = preview.estimates ? Object.values(preview.estimates).reduce((sum, est) => sum + est.estimated_input_tokens, 0) : null
 
     return (
-        // Backdrop overlay: clicking outside the card cancels the translation.
-        <div
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onCancel()
-            }}
-        >
-            <div className="glass-card" style={{ width: "900px", maxHeight: "85vh", display: "flex", flexDirection: "column", padding: "2rem" }}>
-                {/* Modal header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                    <h2 style={{ margin: 0 }}>{title || "Confirm Translation"}</h2>
-                    <button
-                        onClick={onCancel}
-                        style={{ background: "none", border: "none", color: "var(--text-dim)", fontSize: "2rem", lineHeight: 1, cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px" }}
-                        title="Close"
-                    >
-                        &times;
-                    </button>
+        <Modal title={title || "Confirm Translation"} size="lg" fill onClose={onCancel}>
+            {/* Summary stats row: provider, string count, batch count, and optional cost */}
+            <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+                <div>
+                    <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Provider</span>
+                    <div style={{ fontWeight: 600 }}>{preview.provider}</div>
                 </div>
-
-                {/* Summary stats row: provider, string count, batch count, and optional cost */}
-                <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
-                    <div>
-                        <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Provider</span>
-                        <div style={{ fontWeight: 600 }}>{preview.provider}</div>
-                    </div>
-                    <div>
-                        <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Strings</span>
-                        <div style={{ fontWeight: 600 }}>{preview.total_strings}</div>
-                    </div>
-                    <div>
-                        <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Batches</span>
-                        <div style={{ fontWeight: 600 }}>
-                            {preview.total_batches} (size {preview.batch_size})
-                        </div>
-                    </div>
-                    {/*
-                     * Cost estimate section -- only rendered when the provider
-                     * returns estimates. Shows the aggregate total, and if
-                     * multiple languages are present, a per-language breakdown
-                     * in parentheses (e.g. "en: ~$0.0012, fr: ~$0.0015").
-                     */}
-                    {totalInputTokens !== null && (
-                        <div>
-                            <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Input Tokens</span>
-                            <div style={{ fontWeight: 600 }}>{totalInputTokens.toLocaleString()}</div>
-                        </div>
-                    )}
-                    {totalCost !== null && (
-                        <div>
-                            <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Estimated Cost</span>
-                            <div style={{ fontWeight: 600, color: "var(--accent-primary)" }}>
-                                ~${totalCost.toFixed(4)}
-                                {/* Per-language breakdown shown only when translating to 2+ languages */}
-                                {Object.keys(preview.estimates!).length > 1 && (
-                                    <span style={{ fontSize: "0.8rem", color: "var(--text-dim)", fontWeight: 400, marginLeft: "0.5rem" }}>
-                                        (
-                                        {Object.entries(preview.estimates!)
-                                            .map(([lang, est]) => `${lang}: ~$${est.estimated_cost_usd.toFixed(4)}`)
-                                            .join(", ")}
-                                        )
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                <div>
+                    <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Strings</span>
+                    <div style={{ fontWeight: 600 }}>{preview.total_strings}</div>
                 </div>
-
+                <div>
+                    <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Batches</span>
+                    <div style={{ fontWeight: 600 }}>
+                        {preview.total_batches} (size {preview.batch_size})
+                    </div>
+                </div>
                 {/*
-                 * Language selector tabs (level 1).
-                 * Only rendered when translating to multiple target languages.
-                 * Each button shows the language code and its string count.
-                 * Switching language preserves the current prompt tab selection.
+                 * Cost estimate section -- only rendered when the provider
+                 * returns estimates. Shows the aggregate total, and if
+                 * multiple languages are present, a per-language breakdown
+                 * in parentheses (e.g. "en: ~$0.0012, fr: ~$0.0015").
                  */}
-                {languages.length > 1 && (
-                    <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-                        {languages.map((lang) => (
-                            <button
-                                key={lang}
-                                className={`btn ${activeLang === lang ? "btn-primary" : "btn-outline"}`}
-                                onClick={() => {
-                                    setActiveLang(lang)
-                                    setActiveBatch(0)
-                                }}
-                                style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
-                            >
-                                {lang} ({preview.previews[lang].strings_in_language})
-                            </button>
-                        ))}
+                {totalInputTokens !== null && (
+                    <div>
+                        <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Input Tokens</span>
+                        <div style={{ fontWeight: 600 }}>{totalInputTokens.toLocaleString()}</div>
                     </div>
                 )}
-
-                {/*
-                 * Prompt preview section (level 2 tabs + content pane).
-                 * "System Prompt" shows the instructions/rules sent as the system message.
-                 * "User Message" shows the batch strings with prev/next navigation.
-                 */}
-                {langPreview && (
-                    <>
-                        {/* Prompt type selector tabs */}
-                        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem", alignItems: "center" }}>
-                            <button
-                                className={`btn ${activeTab === "system" ? "btn-primary" : "btn-outline"}`}
-                                onClick={() => setActiveTab("system")}
-                                style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
-                            >
-                                System Prompt
-                            </button>
-                            <button
-                                className={`btn ${activeTab === "user" ? "btn-primary" : "btn-outline"}`}
-                                onClick={() => setActiveTab("user")}
-                                style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
-                            >
-                                User Message
-                            </button>
-                            {activeTab === "user" && langPreview.batches > 1 && (
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginLeft: "0.5rem" }}>
-                                    <button
-                                        className="btn btn-outline"
-                                        onClick={() => setActiveBatch((b) => Math.max(0, b - 1))}
-                                        disabled={activeBatch === 0}
-                                        style={{ padding: "0.15rem 0.5rem", fontSize: "0.85rem", lineHeight: 1 }}
-                                    >
-                                        &larr;
-                                    </button>
-                                    <span style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>
-                                        Batch {activeBatch + 1} of {langPreview.batches}
-                                    </span>
-                                    <button
-                                        className="btn btn-outline"
-                                        onClick={() => setActiveBatch((b) => Math.min(langPreview.batches - 1, b + 1))}
-                                        disabled={activeBatch === langPreview.batches - 1}
-                                        style={{ padding: "0.15rem 0.5rem", fontSize: "0.85rem", lineHeight: 1 }}
-                                    >
-                                        &rarr;
-                                    </button>
-                                </div>
+                {totalCost !== null && (
+                    <div>
+                        <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Estimated Cost</span>
+                        <div style={{ fontWeight: 600, color: "var(--accent-primary)" }}>
+                            ~${totalCost.toFixed(4)}
+                            {/* Per-language breakdown shown only when translating to 2+ languages */}
+                            {Object.keys(preview.estimates!).length > 1 && (
+                                <span style={{ fontSize: "0.8rem", color: "var(--text-dim)", fontWeight: 400, marginLeft: "0.5rem" }}>
+                                    (
+                                    {Object.entries(preview.estimates!)
+                                        .map(([lang, est]) => `${lang}: ~$${est.estimated_cost_usd.toFixed(4)}`)
+                                        .join(", ")}
+                                    )
+                                </span>
                             )}
                         </div>
+                    </div>
+                )}
+            </div>
 
-                        {/* Scrollable code-style preview of the selected prompt */}
-                        <div
+            {/*
+             * Language selector tabs (level 1).
+             * Only rendered when translating to multiple target languages.
+             * Each button shows the language code and its string count.
+             * Switching language preserves the current prompt tab selection.
+             */}
+            {languages.length > 1 && (
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+                    {languages.map((lang) => (
+                        <button
+                            key={lang}
+                            className={`btn ${activeLang === lang ? "btn-primary" : "btn-outline"}`}
+                            onClick={() => {
+                                setActiveLang(lang)
+                                setActiveBatch(0)
+                            }}
+                            style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
+                        >
+                            {lang} ({preview.previews[lang].strings_in_language})
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/*
+             * Prompt preview section (level 2 tabs + content pane).
+             * "System Prompt" shows the instructions/rules sent as the system message.
+             * "User Message" shows the batch strings with prev/next navigation.
+             */}
+            {langPreview && (
+                <>
+                    {/* Prompt type selector tabs */}
+                    <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem", alignItems: "center" }}>
+                        <button
+                            className={`btn ${activeTab === "system" ? "btn-primary" : "btn-outline"}`}
+                            onClick={() => setActiveTab("system")}
+                            style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
+                        >
+                            System Prompt
+                        </button>
+                        <button
+                            className={`btn ${activeTab === "user" ? "btn-primary" : "btn-outline"}`}
+                            onClick={() => setActiveTab("user")}
+                            style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }}
+                        >
+                            User Message
+                        </button>
+                        {activeTab === "user" && langPreview.batches > 1 && (
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginLeft: "0.5rem" }}>
+                                <button
+                                    className="btn btn-outline"
+                                    onClick={() => setActiveBatch((b) => Math.max(0, b - 1))}
+                                    disabled={activeBatch === 0}
+                                    style={{ padding: "0.15rem 0.5rem", fontSize: "0.85rem", lineHeight: 1 }}
+                                >
+                                    &larr;
+                                </button>
+                                <span style={{ fontSize: "0.85rem", color: "var(--text-dim)" }}>
+                                    Batch {activeBatch + 1} of {langPreview.batches}
+                                </span>
+                                <button
+                                    className="btn btn-outline"
+                                    onClick={() => setActiveBatch((b) => Math.min(langPreview.batches - 1, b + 1))}
+                                    disabled={activeBatch === langPreview.batches - 1}
+                                    style={{ padding: "0.15rem 0.5rem", fontSize: "0.85rem", lineHeight: 1 }}
+                                >
+                                    &rarr;
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Scrollable code-style preview of the selected prompt */}
+                    <div
+                        style={{
+                            flex: 1,
+                            overflow: "auto",
+                            background: "rgba(0,0,0,0.3)",
+                            borderRadius: "8px",
+                            border: "1px solid var(--glass-border)",
+                            padding: "1rem",
+                            marginBottom: "1rem",
+                            minHeight: "300px",
+                        }}
+                    >
+                        <pre
                             style={{
-                                flex: 1,
-                                overflow: "auto",
-                                background: "rgba(0,0,0,0.3)",
-                                borderRadius: "8px",
-                                border: "1px solid var(--glass-border)",
-                                padding: "1rem",
-                                marginBottom: "1rem",
-                                minHeight: "300px",
+                                margin: 0,
+                                whiteSpace: "pre-wrap",
+                                wordBreak: "break-word",
+                                fontSize: "0.85rem",
+                                lineHeight: "1.6",
+                                color: "var(--text-main)",
+                                fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
                             }}
                         >
-                            <pre
-                                style={{
-                                    margin: 0,
-                                    whiteSpace: "pre-wrap",
-                                    wordBreak: "break-word",
-                                    fontSize: "0.85rem",
-                                    lineHeight: "1.6",
-                                    color: "var(--text-main)",
-                                    fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
-                                }}
-                            >
-                                {activeTab === "system" ? langPreview.system_prompt : langPreview.user_messages[activeBatch]}
-                            </pre>
-                        </div>
-                    </>
-                )}
+                            {activeTab === "system" ? langPreview.system_prompt : langPreview.user_messages[activeBatch]}
+                        </pre>
+                    </div>
+                </>
+            )}
 
-                {/* Action buttons: Cancel or Confirm translation */}
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-                    <button className="btn btn-outline" onClick={onCancel}>
-                        Cancel
-                    </button>
-                    <button className="btn btn-primary" onClick={onConfirm}>
-                        Translate {preview.total_strings} strings
-                    </button>
-                </div>
+            {/* Action buttons: Cancel or Confirm translation */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                <button className="btn btn-outline" onClick={onCancel}>
+                    Cancel
+                </button>
+                <button className="btn btn-primary" onClick={onConfirm}>
+                    Translate {preview.total_strings} strings
+                </button>
             </div>
-        </div>
+        </Modal>
     )
 }
 
