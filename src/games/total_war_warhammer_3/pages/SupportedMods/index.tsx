@@ -5,12 +5,13 @@ import { fetchSupportedMods, RegistryError } from "../../api"
 import type { SupportedMod, ValidationIssue } from "../../api"
 import RegistryErrorBanner from "../../components/RegistryErrorBanner"
 import SupportedModCard from "../../components/SupportedModCard"
+import ValidationPanel from "../../components/ValidationPanel"
 import { useValidation } from "../../hooks/useValidation"
 
 /**
  * Card grid over `SUPPORTED_MODS` from the configured helper_scripts directory. Supports add, edit,
  * and delete via the `+ Add Mod` button and the per-card Edit button. Search filters across `name`
- * and `package_name`.
+ * and `package_name`. A `ValidationPanel` above the grid lists any broken registry references.
  *
  * @returns A page that renders a searchable card grid of TW3 supported mods, or a
  *     `RegistryErrorBanner` when the backend reports a configuration error.
@@ -21,7 +22,7 @@ export default function SupportedModsPage() {
     const [mods, setMods] = useState<SupportedMod[] | null>(null)
     const [error, setError] = useState<RegistryError | null>(null)
     const [search, setSearch] = useState("")
-    const { issues: validationIssues } = useValidation()
+    const { issues: validationIssues, refresh: refreshValidation } = useValidation()
 
     useEffect(() => {
         let cancelled = false
@@ -83,6 +84,7 @@ export default function SupportedModsPage() {
                     + Add Mod
                 </button>
             </div>
+            <ValidationPanel issues={validationIssues} onRefresh={refreshValidation} />
             <div className="mod-grid">
                 {filtered.map((m) => (
                     <SupportedModCard key={m.package_name} mod={m} issues={issuesByMod.get(m.package_name) ?? []} onEdit={(pn) => navigate(`/${slug}/supported-mods/edit/${encodeURIComponent(pn)}`)} />

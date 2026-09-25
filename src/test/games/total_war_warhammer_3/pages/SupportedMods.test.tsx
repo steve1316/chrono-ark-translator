@@ -105,6 +105,27 @@ describe("SupportedMods page", () => {
         expect(screen.getByLabelText(/1 validation issue/)).toBeInTheDocument()
     })
 
+    it("renders the validation panel above the grid when useValidation reports issues", async () => {
+        defaultHook({
+            issues: [
+                {
+                    kind: "missing_mod_path",
+                    severity: "error",
+                    mod_package_name: "mod_a",
+                    mod_name: "Mod A",
+                    target: "/fake/a.pack",
+                    message: "path '/fake/a.pack' does not exist on disk",
+                },
+            ],
+        })
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(
+            new Response(JSON.stringify({ mods: [{ name: "Mod A", package_name: "mod_a", path: "/fake/a.pack", modified_attributes: [] }] }), { status: 200 })
+        )
+        render(withRouter(<SupportedModsPage />))
+        await waitFor(() => expect(screen.getByText(/missing mod paths \(1\)/i)).toBeInTheDocument())
+        expect(screen.getByRole("button", { name: /^refresh$/i })).toBeInTheDocument()
+    })
+
     it("renders no badge when there are no issues for a given mod", async () => {
         defaultHook({ issues: [] })
         vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ mods: [{ name: "Clean Mod", package_name: "clean", path: "/c", modified_attributes: [] }] }), { status: 200 }))

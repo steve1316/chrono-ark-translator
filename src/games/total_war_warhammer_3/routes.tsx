@@ -5,7 +5,6 @@ import RunnerPage from "./pages/Runner"
 import SupportedModFormPage from "./pages/SupportedModForm"
 import SupportedModsPage from "./pages/SupportedMods"
 import TranslationDetailsPage from "./pages/TranslationDetails"
-import ValidatePage from "./pages/Validate"
 
 /**
  * Routes contributed by the Total War: Warhammer III game manifest.
@@ -21,7 +20,8 @@ export function TotalWarWarhammer3Routes() {
             <Route path="supported-mods/new" element={<SupportedModFormPage />} />
             <Route path="supported-mods/edit/:packageName" element={<SupportedModFormPage />} />
             <Route path="translation/:workshopId" element={<TranslationDetailsPage />} />
-            <Route path="validate" element={<ValidatePage />} />
+            {/* Validation now lives on the Supported Mods page. */}
+            <Route path="validate" element={<Navigate to="../supported-mods" replace />} />
             <Route path="glossary" element={<GlossaryPage />} />
             <Route path="runner" element={<RunnerPage />} />
             <Route path="*" element={<Navigate to="dashboard" replace />} />
