@@ -6,7 +6,6 @@ import GlossaryReplacePreviewModal, { type ReplacePreview } from "../GlossaryRep
 
 const CATEGORY_OPTIONS = ["custom", "characters", "skills", "buffs/debuffs", "items", "mechanics"]
 const LANGUAGES = ["Chinese", "Korean", "Japanese"]
-const SMALL_BTN = { padding: "0.2rem 0.6rem", fontSize: "0.75rem" } as const
 
 /** Props for ChronoArkGlossaryPanel. */
 interface ChronoArkGlossaryPanelProps {
@@ -116,13 +115,13 @@ export default function ChronoArkGlossaryPanel({ glossary, modId, strings, onCha
     const headerActions =
         terms.length > 0 ? (
             <>
-                <button className="btn btn-outline" style={SMALL_BTN} onClick={suggestEdits}>
+                <button className="btn btn-outline btn-xs" onClick={suggestEdits}>
                     Suggest Edits
                 </button>
-                <button className="btn btn-outline" style={{ ...SMALL_BTN, color: "var(--accent-primary)", borderColor: "rgba(138,180,248,0.3)" }} onClick={applyAll}>
+                <button className="btn btn-outline btn-xs tone-accent" onClick={applyAll}>
                     Apply All
                 </button>
-                <button className="btn btn-outline" style={{ ...SMALL_BTN, color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }} onClick={onRequestDeleteAll}>
+                <button className="btn btn-outline btn-xs tone-danger" onClick={onRequestDeleteAll}>
                     Delete All
                 </button>
             </>
@@ -143,11 +142,7 @@ export default function ChronoArkGlossaryPanel({ glossary, modId, strings, onCha
                     onRemove={handleRemove}
                     headerActions={headerActions}
                     renderRowActions={(term) => (
-                        <button
-                            className="btn btn-outline"
-                            style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "var(--accent-primary)", borderColor: "rgba(138,180,248,0.3)" }}
-                            onClick={() => applyTerm(term)}
-                        >
+                        <button className="btn btn-outline btn-xs tone-accent" onClick={() => applyTerm(term)}>
                             Apply
                         </button>
                     )}

@@ -81,7 +81,7 @@ export default function HistoryModal({ title = "History Backups", entries, onSav
                         &times;
                     </button>
                 </div>
-                {error && <p style={{ color: "#ff4444", marginTop: 0, marginBottom: "1rem" }}>{error}</p>}
+                {error && <p style={{ color: "var(--tone-danger)", marginTop: 0, marginBottom: "1rem" }}>{error}</p>}
                 <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
                     <input
                         type="text"
@@ -125,14 +125,10 @@ export default function HistoryModal({ title = "History Backups", entries, onSav
                                     {entry.subtitle != null && <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.15rem" }}>{entry.subtitle}</div>}
                                 </div>
                                 <div style={{ display: "flex", gap: "0.35rem", flexShrink: 0 }}>
-                                    <button className="btn btn-primary" style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem" }} onClick={() => onRestore(entry)}>
+                                    <button className="btn btn-primary btn-sm" onClick={() => onRestore(entry)}>
                                         Restore
                                     </button>
-                                    <button
-                                        className="btn btn-outline"
-                                        style={{ padding: "0.25rem 0.75rem", fontSize: "0.85rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
-                                        onClick={() => onDelete(entry)}
-                                    >
+                                    <button className="btn btn-outline btn-sm tone-danger" onClick={() => onDelete(entry)}>
                                         Delete
                                     </button>
                                 </div>

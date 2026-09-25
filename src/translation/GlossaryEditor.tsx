@@ -193,16 +193,11 @@ export function GlossaryEditor({
                         )}
                     </div>
                     <div style={{ display: "flex", gap: "0.35rem", flexShrink: 0 }}>
-                        <button type="button" className="btn btn-outline" style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem" }} onClick={() => startEdit(t)}>
+                        <button type="button" className="btn btn-outline btn-xs" onClick={() => startEdit(t)}>
                             Edit
                         </button>
                         {renderRowActions?.(t)}
-                        <button
-                            type="button"
-                            className="btn btn-outline"
-                            style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
-                            onClick={() => onRemove(t.english)}
-                        >
+                        <button type="button" className="btn btn-outline btn-xs tone-danger" onClick={() => onRemove(t.english)}>
                             Remove
                         </button>
                     </div>
