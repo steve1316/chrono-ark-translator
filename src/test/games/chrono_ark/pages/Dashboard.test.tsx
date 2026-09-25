@@ -22,6 +22,9 @@ const MOD = {
 
 const wrap = (ui: React.ReactNode) => <MemoryRouter>{ui}</MemoryRouter>
 
+// jsdom has no scrollIntoView. Scroll-restore calls it on the last viewed card from a requestAnimationFrame callback.
+const scrollIntoView = vi.fn()
+
 beforeEach(() => {
     // jsdom has no ResizeObserver. The dashboard only uses it to size the search bar.
     vi.stubGlobal(
@@ -31,12 +34,15 @@ beforeEach(() => {
             disconnect() {}
         }
     )
+    scrollIntoView.mockClear()
+    Element.prototype.scrollIntoView = scrollIntoView
 })
 
 afterEach(() => {
     // Unmount before unstubbing. Hooks run in reverse order, so RTL's own cleanup would otherwise run after the stub is gone.
     cleanup()
     vi.unstubAllGlobals()
+    Reflect.deleteProperty(Element.prototype, "scrollIntoView")
     vi.restoreAllMocks()
     sessionStorage.clear()
 })
@@ -64,5 +70,6 @@ describe("Chrono Ark Dashboard page", () => {
         resolve(new Response(JSON.stringify([MOD]), { status: 200 }))
         await screen.findByText("Zerooz Cathy")
         await waitFor(() => expect(sessionStorage.getItem("lastViewedMod")).toBeNull())
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "instant", block: "center" }))
     })
 })
