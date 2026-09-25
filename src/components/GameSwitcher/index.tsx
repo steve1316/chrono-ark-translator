@@ -12,7 +12,7 @@ interface GameSwitcherProps {
 
 /**
  * Two-pill segmented toggle for switching between registered games. Each pill shows the game's square logo (or a single-letter glyph fallback) and is wired as a `role="radio"` inside a `role="radiogroup"`.
- * Selection POSTs `{ active_game: gameId }` to `/api/settings` (keeping the backend default in sync) then navigates to the new game's `/{slug}/dashboard`.
+ * Selection navigates to the new game's `/{slug}/dashboard` immediately, then POSTs `{ active_game: gameId }` to `/api/settings` in the background.
  *
  * @param activeGameId The currently active game's id.
  * @returns The radiogroup of pills, or `null` while the games list is still loading.
@@ -28,17 +28,16 @@ const GameSwitcher = ({ activeGameId }: GameSwitcherProps) => {
             .catch((err) => console.error("Failed to load games:", err))
     }, [])
 
-    const handleSelect = async (gameId: string) => {
+    const handleSelect = (gameId: string) => {
         if (gameId === activeGameId) return
-        const res = await fetch(`${API_BASE}/settings`, {
+        // Navigate first so the new dashboard (and its loading skeleton) shows at once. The URL is the source of truth for the active
+        // game, and the persisted setting only seeds the "/" redirect, so saving it can finish in the background.
+        navigate(`/${slugForId(gameId) ?? gameId}/dashboard`)
+        fetch(`${API_BASE}/settings`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ active_game: gameId }),
-        })
-        if (res.ok) {
-            // Navigate into the new game's namespace; its dashboard is the default landing page.
-            navigate(`/${slugForId(gameId) ?? gameId}/dashboard`)
-        }
+        }).catch((err) => console.error("Failed to persist active game:", err))
     }
 
     const handleKey = (evt: KeyboardEvent<HTMLButtonElement>, idx: number) => {
@@ -54,7 +53,7 @@ const GameSwitcher = ({ activeGameId }: GameSwitcherProps) => {
         } else if (evt.key === "Enter" || evt.key === " ") {
             evt.preventDefault()
             const current = games[idx]
-            void handleSelect(current.game_id)
+            handleSelect(current.game_id)
         }
     }
 
@@ -84,7 +83,7 @@ const GameSwitcher = ({ activeGameId }: GameSwitcherProps) => {
                         ref={(el) => {
                             pillRefs.current[g.game_id] = el
                         }}
-                        onClick={() => void handleSelect(g.game_id)}
+                        onClick={() => handleSelect(g.game_id)}
                         onKeyDown={(e) => handleKey(e, idx)}
                         className={`game-switcher__pill${selected ? " game-switcher__pill--active" : ""}`}
                         style={pillStyle}

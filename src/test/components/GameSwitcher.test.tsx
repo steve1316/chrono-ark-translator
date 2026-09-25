@@ -72,6 +72,19 @@ describe("GameSwitcher (segmented)", () => {
         expect(navigateMock).toHaveBeenCalledWith("/warhammer_3/dashboard")
     })
 
+    it("navigates immediately without waiting for the settings POST to finish", async () => {
+        vi.mocked(globalThis.fetch).mockImplementation((input) => {
+            const url = String(input)
+            if (url.endsWith("/games")) return Promise.resolve(new Response(JSON.stringify(GAMES), { status: 200 }))
+            // The settings POST never settles, so navigation must not depend on it.
+            return new Promise<Response>(() => {})
+        })
+        render(wrap(<GameSwitcher activeGameId="chrono_ark" />))
+        const user = userEvent.setup()
+        await user.click(await screen.findByRole("radio", { name: /Warhammer III/i }))
+        expect(navigateMock).toHaveBeenCalledWith("/warhammer_3/dashboard")
+    })
+
     it("clicking the already-active pill does nothing", async () => {
         render(wrap(<GameSwitcher activeGameId="chrono_ark" />))
         const user = userEvent.setup()
