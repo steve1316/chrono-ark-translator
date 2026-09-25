@@ -509,6 +509,63 @@ body {
     padding: 0.25rem 0.75rem;
 }
 
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Context panel (src/translation/ContextPanel.tsx) */
+.help-text {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+}
+
+.context-panel {
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.context-panel-title {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+.context-panel-help {
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.context-panel-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.context-panel-field {
+    flex: 1;
+}
+
+.context-panel-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.context-panel-saved {
+    color: var(--tone-success);
+    font-size: 0.85rem;
+}
+
+.context-panel-error {
+    color: var(--tone-error-text);
+    font-size: 0.85rem;
+}
+
+/* Chrono Ark's soft teal Save Context button keeps the primary button's shape and glow. */
+.btn-primary.btn-soft-teal {
+    background: rgba(129, 230, 217, 0.15);
+    color: var(--tone-teal);
+}
+
 /* Native selects draw their arrow jammed against the right border. Reset appearance and supply a custom chevron with a fixed gap and reserved padding. */
 .app-select {
     -webkit-appearance: none;
@@ -1447,11 +1504,15 @@ th {
     background: var(--surface);
     border: 1px solid var(--glass-border);
     color: var(--text-main);
-    font: inherit;
+    /* Chrono Ark's fields use the browser's default control font and size. */
+    font-size: 13.333px;
+    line-height: normal;
 }
 
+/* Chrono Ark's textareas take the page font, while its single-line inputs keep the browser default. */
 .textarea {
     resize: vertical;
+    font-family: inherit;
 }
 
 .input:focus-visible,
@@ -1663,12 +1724,9 @@ th {
     pointer-events: none;
 }
 
-/* Chrono Ark's search field used the browser's smaller input font, which keeps it level with the 42px filter pills. */
 .input.search-input-field {
     padding: 0.75rem 2.5rem;
     border-radius: var(--radius-md);
-    font-size: 13.333px;
-    line-height: normal;
 }
 
 .search-input-clear {

@@ -14,6 +14,7 @@ import ChronoArkGlossaryPanel from "../../components/ChronoArkGlossaryPanel"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { TranslationPage } from "../../../../translation/TranslationPage"
 import { BatchReviewBanner } from "../../../../translation/BatchReviewBanner"
+import { ContextPanel, type ContextFields } from "../../../../translation/ContextPanel"
 import { SyncButton } from "../../../../translation/SyncButton"
 import { TranslationToolbar } from "../../../../translation/TranslationToolbar"
 import { usePendingSuggestions } from "../../../../translation/usePendingSuggestions"
@@ -26,118 +27,6 @@ import { canonicalRowStyle } from "../../../../translation/rowStyle"
 import type { ColumnDef } from "../../../../translation/types"
 import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
 import type { BatchDescriptor } from "../../../../hooks/useIterativeTranslation"
-
-interface CharacterContextPanelProps {
-    modId: string
-    onHasContextChange: (has: boolean) => void
-}
-
-function CharacterContextPanel({ modId, onHasContextChange }: CharacterContextPanelProps) {
-    const [ctx, setCtx] = useState({ source_game: "", character_name: "", background: "" })
-    const [saved, setSaved] = useState(false)
-
-    useEffect(() => {
-        const fetchCtx = async () => {
-            try {
-                const res = await gameApi("chrono_ark").get(`/mods/${modId}/character-context`)
-                if (res.ok) {
-                    const data = await res.json()
-                    setCtx(data)
-                    onHasContextChange(!!(data.source_game || data.character_name || data.background))
-                }
-            } catch {}
-        }
-        fetchCtx()
-    }, [modId, onHasContextChange])
-
-    const handleSave = async () => {
-        try {
-            const res = await gameApi("chrono_ark").post(`/mods/${modId}/character-context`, ctx)
-            if (res.ok) {
-                onHasContextChange(!!(ctx.source_game || ctx.character_name || ctx.background))
-                setSaved(true)
-                setTimeout(() => setSaved(false), 2000)
-            }
-        } catch (err) {
-            console.error("Failed to save character context:", err)
-        }
-    }
-
-    return (
-        <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1rem" }}>
-            <h3 style={{ marginTop: 0, marginBottom: "0.5rem" }}>Character Context</h3>
-            <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: 0, marginBottom: "1rem" }}>
-                This context is included in the translation prompt to help the AI understand the character's lore.
-            </p>
-            <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem" }}>
-                <div style={{ flex: 1 }}>
-                    <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Source Game</label>
-                    <input
-                        type="text"
-                        placeholder="e.g. Library of Ruina"
-                        value={ctx.source_game}
-                        onChange={(e) => setCtx((prev) => ({ ...prev, source_game: e.target.value }))}
-                        style={{
-                            width: "100%",
-                            padding: "0.5rem",
-                            borderRadius: "6px",
-                            background: "rgba(0,0,0,0.2)",
-                            border: "1px solid var(--glass-border)",
-                            color: "var(--text-main)",
-                            boxSizing: "border-box",
-                        }}
-                    />
-                </div>
-                <div style={{ flex: 1 }}>
-                    <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                        Character Name
-                    </label>
-                    <input
-                        type="text"
-                        placeholder="e.g. Roland"
-                        value={ctx.character_name}
-                        onChange={(e) => setCtx((prev) => ({ ...prev, character_name: e.target.value }))}
-                        style={{
-                            width: "100%",
-                            padding: "0.5rem",
-                            borderRadius: "6px",
-                            background: "rgba(0,0,0,0.2)",
-                            border: "1px solid var(--glass-border)",
-                            color: "var(--text-main)",
-                            boxSizing: "border-box",
-                        }}
-                    />
-                </div>
-            </div>
-            <div>
-                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-dim)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>Background</label>
-                <textarea
-                    placeholder="Describe the character's personality, role in their source game, and any lore that would help with translation..."
-                    value={ctx.background}
-                    onChange={(e) => setCtx((prev) => ({ ...prev, background: e.target.value }))}
-                    rows={4}
-                    style={{
-                        width: "100%",
-                        padding: "0.5rem",
-                        borderRadius: "6px",
-                        background: "rgba(0,0,0,0.2)",
-                        border: "1px solid var(--glass-border)",
-                        color: "var(--text-main)",
-                        resize: "vertical",
-                        fontFamily: "inherit",
-                        boxSizing: "border-box",
-                    }}
-                />
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.75rem", alignItems: "center", gap: "0.75rem" }}>
-                {saved && <span style={{ color: "#34d399", fontSize: "0.85rem" }}>Saved!</span>}
-                <button className="btn btn-primary" onClick={handleSave} style={{ background: "rgba(129,230,217,0.15)", color: "#81e6d9", borderColor: "rgba(129,230,217,0.3)" }}>
-                    Save Context
-                </button>
-            </div>
-        </div>
-    )
-}
 
 /**
  * Detail view for a specific mod, showing all translatable strings.
@@ -192,20 +81,31 @@ const ModDetail: React.FC = () => {
     const { suggestions, refresh: fetchSuggestions, scan, scanning } = usePendingSuggestions("chrono_ark", modId ?? "", setTranslateBanner)
 
     const [showCharacterContext, setShowCharacterContext] = useState(false)
-    const [hasCharacterContext, setHasCharacterContext] = useState(false)
-    const handleHasContextChange = useCallback((has: boolean) => setHasCharacterContext(has), [])
+    const [characterContext, setCharacterContext] = useState<ContextFields>({ source_game: "", character_name: "", background: "" })
+    const hasCharacterContext = !!(characterContext.source_game || characterContext.character_name || characterContext.background)
 
-    // Preflight: check whether character context exists so the dot indicator shows on mount.
+    // Load the character context once per mod so the toolbar dot shows before the panel opens.
     useEffect(() => {
         if (!modId) return
         gameApi("chrono_ark")
             .get(`/mods/${modId}/character-context`)
             .then((res) => (res.ok ? res.json() : null))
             .then((data) => {
-                if (data) setHasCharacterContext(!!(data.source_game || data.character_name || data.background))
+                if (data) setCharacterContext({ source_game: data.source_game ?? "", character_name: data.character_name ?? "", background: data.background ?? "" })
             })
             .catch(() => {})
     }, [modId])
+
+    /**
+     * Persist the character context and adopt it as the saved value.
+     *
+     * @param next The edited fields.
+     */
+    const saveCharacterContext = async (next: ContextFields) => {
+        const res = await gameApi("chrono_ark").post(`/mods/${modId}/character-context`, next)
+        if (!res.ok) throw new Error("Failed to save character context.")
+        setCharacterContext(next)
+    }
 
     const [sourceLangOverride, setSourceLangOverride] = useState<string | null>(null)
     const [targetLangOverride, setTargetLangOverride] = useState<string | null>(null)
@@ -770,12 +670,7 @@ const ModDetail: React.FC = () => {
                         />
                     )}
 
-                    {/* --- Character Context Panel ---
-                Allows the user to provide metadata about the mod's character
-                (source game, character name, background lore). This context
-                is injected into the AI translation prompt so the provider can
-                produce more accurate, lore-consistent translations. */}
-                    {showCharacterContext && modId && <CharacterContextPanel modId={modId} onHasContextChange={handleHasContextChange} />}
+                    {showCharacterContext && <ContextPanel title="Character Context" value={characterContext} onSave={saveCharacterContext} />}
                 </>
             }
             modals={
