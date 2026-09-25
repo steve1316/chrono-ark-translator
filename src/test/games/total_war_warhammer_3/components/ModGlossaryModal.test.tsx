@@ -15,7 +15,6 @@ function mockJson(body: unknown, status = 200) {
 
 beforeEach(() => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(mockJson(GLOSSARY))
-    vi.spyOn(window, "confirm").mockReturnValue(true)
 })
 
 afterEach(() => {
@@ -67,6 +66,7 @@ describe("ModGlossaryModal", () => {
         await act(async () => {
             fireEvent.click(within(phoenixRow).getByRole("button", { name: /Remove/i }))
         })
+        fireEvent.click(within(await screen.findByRole("dialog", { name: "Remove glossary term" })).getByRole("button", { name: "Remove" }))
         await waitFor(() => expect(screen.queryByText("Phoenix")).not.toBeInTheDocument())
     })
 

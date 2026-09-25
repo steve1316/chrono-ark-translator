@@ -35,6 +35,7 @@ import {
     syncChanges,
     type WH3TranslationPreview,
 } from "../../translationApi"
+import { useConfirm } from "../../../../ui/useConfirm"
 
 // Canonical status filter pills, identical to Chrono Ark. WH3 never emits "untouched"/"untranslatable", but the pill set matches for 1-to-1 parity.
 const STATUS_FILTERS: Array<{ value: RowStatus | "all"; label: string }> = [
@@ -78,6 +79,7 @@ const TranslationDetailsPage: React.FC = () => {
     const [loading, setLoading] = useState(true)
     const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
     const [openModal, setOpenModal] = useState<ModalKey>(null)
+    const { confirm, confirmDialog } = useConfirm()
     const [showReviewModal, setShowReviewModal] = useState(false)
     // Translate-Names-first: pendingScope drives the confirm-modal title; namesRunRef marks the active run as a names run (read in the batch effect,
     // not a dependency, so resetting it does not re-fire the effect); nameReviewSuggestions opens the post-names glossary review.
@@ -300,7 +302,8 @@ const TranslationDetailsPage: React.FC = () => {
     }, [workshopId, loadStrings])
 
     const onClearEnglish = useCallback(async () => {
-        if (!window.confirm("Clear all translation text? An auto-snapshot is taken before clearing.")) return
+        const ok = await confirm({ title: "Clear English", message: "Clear all translation text? An auto-snapshot is taken before clearing.", confirmLabel: "Clear", variant: "danger" })
+        if (!ok) return
         try {
             const result = await clearTranslations(workshopId)
             const summary = await rescanMod(workshopId)
@@ -310,7 +313,7 @@ const TranslationDetailsPage: React.FC = () => {
         } catch (e) {
             setBanner({ type: "error", message: `Clear failed: ${(e as Error).message}` })
         }
-    }, [workshopId, loadStrings])
+    }, [workshopId, loadStrings, confirm])
 
     const onRestored = useCallback(async () => {
         const summary = await rescanMod(workshopId)
@@ -655,6 +658,7 @@ const TranslationDetailsPage: React.FC = () => {
                     }}
                 />
             )}
+            {confirmDialog}
         </>
     )
 

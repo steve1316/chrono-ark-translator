@@ -32,6 +32,8 @@ interface HistoryModalProps {
     onClose: () => void
     /** Message shown when there are no entries. */
     emptyMessage?: string
+    /** Error from the parent's data layer, shown above the list. */
+    error?: string | null
 }
 
 /**
@@ -44,21 +46,22 @@ interface HistoryModalProps {
  * @param onDelete - Invoked with the entry to delete.
  * @param onClose - Closes the modal.
  * @param emptyMessage - Shown when there are no entries.
+ * @param error - Parent data-layer error shown above the list, alongside any save error.
  * @returns The modal element.
  */
-export default function HistoryModal({ title = "History Backups", entries, onSave, onRestore, onDelete, onClose, emptyMessage }: HistoryModalProps) {
+export default function HistoryModal({ title = "History Backups", entries, onSave, onRestore, onDelete, onClose, emptyMessage, error }: HistoryModalProps) {
     const [label, setLabel] = useState("")
     const [saving, setSaving] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+    const [saveError, setSaveError] = useState<string | null>(null)
 
     const handleSave = async () => {
         setSaving(true)
-        setError(null)
+        setSaveError(null)
         try {
             await onSave(label)
             setLabel("")
         } catch (err) {
-            setError((err as Error).message || "Failed to save snapshot.")
+            setSaveError((err as Error).message || "Failed to save snapshot.")
         } finally {
             setSaving(false)
         }
@@ -66,7 +69,7 @@ export default function HistoryModal({ title = "History Backups", entries, onSav
 
     return (
         <Modal title={title} size="md" onClose={onClose}>
-            {error && <p style={{ color: "var(--tone-danger)", marginTop: 0, marginBottom: "1rem" }}>{error}</p>}
+            {(error || saveError) && <p style={{ color: "var(--tone-danger)", marginTop: 0, marginBottom: "1rem" }}>{error || saveError}</p>}
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
                 <input
                     type="text"

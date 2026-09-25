@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from "react"
 import type { TermSuggestion } from "../../../../shared_types"
 import { GlossaryEditor, type GlossaryEditorTerm } from "../../../../translation/GlossaryEditor"
 import { addGlossaryTerm, deleteGlossaryTerm, glossaryApplyAll, glossarySuggestEdits, loadGlossary, updateGlossaryTerm } from "../../translationApi"
+import { useConfirm } from "../../../../ui/useConfirm"
 
 /** Props for `ModGlossaryModal`. */
 interface ModGlossaryModalProps {
@@ -32,6 +33,7 @@ const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose
     const [applyAllOld, setApplyAllOld] = useState("")
     const [applyAllNew, setApplyAllNew] = useState("")
     const [applyResult, setApplyResult] = useState("")
+    const { confirm, confirmDialog } = useConfirm()
 
     const refresh = useCallback(async () => {
         try {
@@ -65,7 +67,8 @@ const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose
     }
 
     const handleRemove = async (english: string) => {
-        if (!window.confirm(`Delete glossary entry "${english}"?`)) return
+        const ok = await confirm({ title: "Remove glossary term", message: `Remove the glossary entry "${english}"?`, confirmLabel: "Remove", variant: "danger" })
+        if (!ok) return
         try {
             await deleteGlossaryTerm(workshopId, english)
             await refresh()
@@ -180,6 +183,7 @@ const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose
                     footer={footer}
                 />
             </div>
+            {confirmDialog}
         </div>
     )
 }

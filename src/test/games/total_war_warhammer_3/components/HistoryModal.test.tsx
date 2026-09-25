@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import HistoryModal from "../../../../games/total_war_warhammer_3/components/HistoryModal"
@@ -15,7 +15,6 @@ function mockJson(body: unknown, status = 200) {
 
 beforeEach(() => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(mockJson(SNAPS))
-    vi.spyOn(window, "confirm").mockReturnValue(true)
 })
 
 afterEach(() => {
@@ -66,6 +65,9 @@ describe("HistoryModal", () => {
         await act(async () => {
             fireEvent.click(restoreButtons[0])
         })
+        await act(async () => {
+            fireEvent.click(within(await screen.findByRole("dialog", { name: "Restore snapshot" })).getByRole("button", { name: "Restore" }))
+        })
         await waitFor(() => expect(onRestored).toHaveBeenCalled())
     })
 
@@ -82,7 +84,18 @@ describe("HistoryModal", () => {
         await act(async () => {
             fireEvent.click(deleteButtons[0])
         })
+        await act(async () => {
+            fireEvent.click(await screen.findByRole("button", { name: "Delete snapshot" }))
+        })
         await waitFor(() => expect(screen.queryByText(/pre-clear-translations/)).not.toBeInTheDocument())
+    })
+
+    it("shows load errors inside the dialog instead of an alert", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(mockJson({ detail: "snapshots unavailable" }, 500))
+        const alertSpy = vi.spyOn(window, "alert")
+        render(<HistoryModal workshopId="123" onClose={vi.fn()} defaultRestoreMode={false} onRestored={vi.fn()} />)
+        expect(await screen.findByText(/snapshots unavailable|500/)).toBeInTheDocument()
+        expect(alertSpy).not.toHaveBeenCalled()
     })
 
     it("shows a restore-focused header when defaultRestoreMode is true", async () => {

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -147,12 +147,14 @@ describe("TranslationDetails (Plan 3 layout)", () => {
     })
 
     it("POSTs to /clear-translations after Clear English confirmation", async () => {
-        vi.spyOn(window, "confirm").mockReturnValue(true)
         const fetchSpy = mockRouteFlow()
         render(wrap())
         await waitFor(() => screen.getByRole("button", { name: /Clear English/i }))
         await act(async () => {
             fireEvent.click(screen.getByRole("button", { name: /Clear English/i }))
+        })
+        await act(async () => {
+            fireEvent.click(within(await screen.findByRole("dialog", { name: "Clear English" })).getByRole("button", { name: "Clear" }))
         })
         await waitFor(() => {
             const calls = fetchSpy.mock.calls.map((c) => (typeof c[0] === "string" ? c[0] : (c[0] as URL).toString()))
