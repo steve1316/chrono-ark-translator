@@ -12,6 +12,7 @@ import { usePendingSuggestions } from "../../../../translation/usePendingSuggest
 import { TranslationToolbar } from "../../../../translation/TranslationToolbar"
 import { SyncButton } from "../../../../translation/SyncButton"
 import { BatchReviewBanner } from "../../../../translation/BatchReviewBanner"
+import { ContextPanel, type ContextFields } from "../../../../translation/ContextPanel"
 import SplitButton from "../../../../ui/SplitButton"
 import { LanguageControls } from "../../../../translation/LanguageControls"
 import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../translation/TitleAdornments"
@@ -22,7 +23,6 @@ import type { RowStatus } from "../../../../utils/stringFilters"
 import type { TermSuggestion, WH3DriftRow, WH3ModContext, WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
 import ApiResponsesModal from "../../components/ApiResponsesModal"
 import HistoryModal from "../../components/HistoryModal"
-import ModContextModal from "../../components/ModContextModal"
 import ModGlossaryModal from "../../components/ModGlossaryModal"
 import {
     clearTranslations,
@@ -51,7 +51,7 @@ const STATUS_FILTERS: Array<{ value: RowStatus | "all"; label: string }> = [
     { value: "synced", label: "Synced" },
 ]
 
-type ModalKey = "glossary" | "responses" | "context" | "history" | "reset" | null
+type ModalKey = "glossary" | "responses" | "history" | "reset" | null
 
 type SortField = "status" | "provider" | "source_filename" | "key" | "parent_text" | "translation_text"
 
@@ -93,6 +93,7 @@ const TranslationDetailsPage: React.FC = () => {
     const [loading, setLoading] = useState(true)
     const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
     const [openModal, setOpenModal] = useState<ModalKey>(null)
+    const [showContext, setShowContext] = useState(false)
     const { suggestions, refresh: refreshSuggestions, scan, scanning } = usePendingSuggestions("total_war_warhammer_3", workshopId, setBanner)
     const [showSuggestions, setShowSuggestions] = useState(false)
 
@@ -370,6 +371,17 @@ const TranslationDetailsPage: React.FC = () => {
         [workshopId, modContext]
     )
 
+    // The page owns the mod context. Saving merges the three fields into it before the full PUT, so a later language change keeps them.
+    const saveContext = useCallback(
+        async (fields: ContextFields) => {
+            const next: WH3ModContext = { ...modContext, ...fields }
+            await saveModContext(workshopId, next)
+            setModContext(next)
+        },
+        [workshopId, modContext]
+    )
+    const hasContext = !!(modContext.source_game || modContext.character_name || modContext.background)
+
     const onOpenFolder = useCallback(async () => {
         try {
             await openModFolder(workshopId)
@@ -488,7 +500,7 @@ const TranslationDetailsPage: React.FC = () => {
             suggestions={{ count: suggestions.length, onClick: () => setShowSuggestions(true) }}
             scan={{ scanning, onClick: scan }}
             apiResponses={{ onClick: () => setOpenModal("responses") }}
-            context={{ label: "Mod Context", hasContext: !!progress?.has_mod_context, onClick: () => setOpenModal("context") }}
+            context={{ label: "Mod Context", hasContext, onClick: () => setShowContext((v) => !v) }}
             history={{ onClick: () => setOpenModal("history") }}
             reset={{ onClick: () => setOpenModal("reset") }}
             clearEnglish={{ onClick: onClearEnglish }}
@@ -533,7 +545,6 @@ const TranslationDetailsPage: React.FC = () => {
             )}
             {openModal === "glossary" && <ModGlossaryModal workshopId={workshopId} onClose={() => setOpenModal(null)} />}
             {openModal === "responses" && <ApiResponsesModal workshopId={workshopId} onClose={() => setOpenModal(null)} />}
-            {openModal === "context" && <ModContextModal workshopId={workshopId} onClose={() => setOpenModal(null)} />}
             {(openModal === "history" || openModal === "reset") && (
                 <HistoryModal workshopId={workshopId} onClose={() => setOpenModal(null)} defaultRestoreMode={openModal === "reset"} onRestored={onRestored} />
             )}
@@ -619,6 +630,21 @@ const TranslationDetailsPage: React.FC = () => {
             }
             banner={banner}
             onDismissBanner={() => setBanner(null)}
+            panels={
+                showContext && (
+                    <ContextPanel
+                        title="Mod Context"
+                        description="This context is included in the translation prompt to help the AI understand the mod's setting and lore."
+                        value={modContext}
+                        onSave={saveContext}
+                        placeholders={{
+                            source_game: "e.g. Total War: Warhammer III",
+                            character_name: "e.g. Grand Cathay",
+                            background: "Describe the factions, units and lore this mod adds, and any naming conventions the translation should follow...",
+                        }}
+                    />
+                )
+            }
             modals={modals}
         />
     )

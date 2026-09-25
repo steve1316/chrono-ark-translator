@@ -23,9 +23,11 @@ interface ContextPanelProps {
     value: ContextFields
     /** Persists the edited fields. The panel shows "Saved!" when it resolves, and the error message when it rejects. */
     onSave: (next: ContextFields) => Promise<void>
+    /** Per-field placeholder overrides. Fields left out keep Chrono Ark's examples. */
+    placeholders?: Partial<ContextFields>
 }
 
-const PLACEHOLDERS: ContextFields = {
+const DEFAULT_PLACEHOLDERS: ContextFields = {
     source_game: "e.g. Library of Ruina",
     character_name: "e.g. Roland",
     background: "Describe the character's personality, role in their source game, and any lore that would help with translation...",
@@ -48,10 +50,18 @@ function fieldsOf(value: ContextFields): ContextFields {
  * @param description Help line.
  * @param value Saved context.
  * @param onSave Persists the draft.
+ * @param placeholders Per-field placeholder overrides.
  * @returns The panel.
  */
-export function ContextPanel({ title, description = "This context is included in the translation prompt to help the AI understand the character's lore.", value, onSave }: ContextPanelProps) {
+export function ContextPanel({
+    title,
+    description = "This context is included in the translation prompt to help the AI understand the character's lore.",
+    value,
+    onSave,
+    placeholders,
+}: ContextPanelProps) {
     const id = useId()
+    const hints = { ...DEFAULT_PLACEHOLDERS, ...placeholders }
     const savedKey = JSON.stringify(fieldsOf(value))
     const [draft, setDraft] = useState<ContextFields>(() => fieldsOf(value))
     const [draftKey, setDraftKey] = useState(savedKey)
@@ -93,14 +103,14 @@ export function ContextPanel({ title, description = "This context is included in
             <p className="help-text context-panel-help">{description}</p>
             <div className="context-panel-row">
                 <Field label="Source Game" htmlFor={`${id}-source-game`} className="context-panel-field">
-                    <input id={`${id}-source-game`} type="text" className="input" placeholder={PLACEHOLDERS.source_game} value={draft.source_game} onChange={update("source_game")} />
+                    <input id={`${id}-source-game`} type="text" className="input" placeholder={hints.source_game} value={draft.source_game} onChange={update("source_game")} />
                 </Field>
                 <Field label="Character Name" htmlFor={`${id}-character-name`} className="context-panel-field">
-                    <input id={`${id}-character-name`} type="text" className="input" placeholder={PLACEHOLDERS.character_name} value={draft.character_name} onChange={update("character_name")} />
+                    <input id={`${id}-character-name`} type="text" className="input" placeholder={hints.character_name} value={draft.character_name} onChange={update("character_name")} />
                 </Field>
             </div>
             <Field label="Background" htmlFor={`${id}-background`}>
-                <textarea id={`${id}-background`} className="textarea" rows={4} placeholder={PLACEHOLDERS.background} value={draft.background} onChange={update("background")} />
+                <textarea id={`${id}-background`} className="textarea" rows={4} placeholder={hints.background} value={draft.background} onChange={update("background")} />
             </Field>
             <div className="context-panel-footer">
                 {error && <span className="context-panel-error">{error}</span>}

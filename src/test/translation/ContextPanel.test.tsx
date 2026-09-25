@@ -37,4 +37,10 @@ describe("ContextPanel", () => {
         await userEvent.click(screen.getByRole("button", { name: "Save Context" }))
         expect(await screen.findByText("disk full")).toBeInTheDocument()
     })
+
+    it("uses game-specific placeholders when given", () => {
+        render(<ContextPanel title="Mod Context" value={EMPTY} onSave={vi.fn()} placeholders={{ source_game: "e.g. Total War: Warhammer III" }} />)
+        expect(screen.getByLabelText("Source Game")).toHaveAttribute("placeholder", "e.g. Total War: Warhammer III")
+        expect(screen.getByLabelText("Character Name")).toHaveAttribute("placeholder", "e.g. Roland")
+    })
 })

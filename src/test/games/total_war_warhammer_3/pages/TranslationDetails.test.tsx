@@ -557,4 +557,23 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         })
         expect(await screen.findByRole("dialog", { name: "Suggested Glossary Terms" })).toHaveTextContent("Cathay")
     })
+
+    it("keeps saved Mod Context when the source language changes afterwards", async () => {
+        const spy = mockRouteFlow()
+        render(wrap())
+        const contextButton = await screen.findByRole("button", { name: /^Mod Context$/ })
+        await act(async () => {
+            fireEvent.click(contextButton)
+        })
+        fireEvent.change(await screen.findByLabelText("Background"), { target: { value: "Cathay lore" } })
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Save Context" }))
+        })
+        fireEvent.change(screen.getByLabelText(/Source Language/), { target: { value: "Korean" } })
+        await waitFor(() => {
+            const puts = spy.mock.calls.filter(([u, i]) => String(u).endsWith("/mod-context") && (i as RequestInit | undefined)?.method === "PUT")
+            expect(puts).toHaveLength(2)
+            expect(JSON.parse(String((puts[1][1] as RequestInit).body))).toMatchObject({ background: "Cathay lore", source_language_override: "Korean" })
+        })
+    })
 })
