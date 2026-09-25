@@ -819,25 +819,6 @@ th {
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* WH3 Translation Mods */
 
-.translation-mod-meta {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.5rem;
-    color: var(--text-dim);
-    font-size: 0.85rem;
-}
-
-.translation-lang-pill {
-    background: rgba(56, 189, 248, 0.15);
-    color: var(--accent-primary);
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
 .translation-parent-link {
     color: var(--accent-primary);
     text-decoration: none;
@@ -853,98 +834,6 @@ th {
 
 .translation-mods-section h2 {
     margin-bottom: 1rem;
-}
-
-.translation-status-pill {
-    display: inline-block;
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-transform: capitalize;
-}
-
-.translation-status-pill.translated {
-    background: rgba(16, 185, 129, 0.18);
-    color: var(--success);
-}
-
-.translation-status-pill.untranslated {
-    background: rgba(239, 68, 68, 0.18);
-    color: var(--danger);
-}
-
-.translation-status-pill.stale {
-    background: rgba(245, 158, 11, 0.18);
-    color: var(--warning);
-}
-
-.translation-status-pill.orphan {
-    background: rgba(148, 163, 184, 0.18);
-    color: var(--text-dim);
-}
-
-.translation-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.translation-table th,
-.translation-table td {
-    padding: 0.5rem 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid var(--glass-border);
-    vertical-align: top;
-}
-
-.translation-table th {
-    position: sticky;
-    top: 0;
-    background: var(--bg-color);
-    z-index: 1;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    letter-spacing: 0.05em;
-}
-
-.translation-filter-pills {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.translation-toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    margin: 1.25rem 0;
-    flex-wrap: wrap;
-}
-
-.mod-context-panel {
-    margin-top: 2rem;
-    padding: 1rem;
-}
-
-.mod-context-panel textarea {
-    width: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--glass-border);
-    color: var(--text-main);
-    border-radius: 8px;
-    padding: 0.5rem;
-    font-family: inherit;
-    margin-bottom: 0.75rem;
-    resize: vertical;
-}
-
-.mod-context-panel label {
-    display: block;
-    color: var(--text-dim);
-    font-size: 0.85rem;
-    margin-bottom: 0.25rem;
 }
 
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
@@ -1126,24 +1015,6 @@ th {
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* WH3 glossary modal layout */
-.glossary-add-row {
-    display: grid;
-    grid-template-columns: 1.5fr 1.5fr 1fr auto;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-}
-.glossary-add-row input {
-    padding: 0.5rem 0.75rem;
-    border-radius: 4px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-main);
-}
-.glossary-toolbar {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-}
 .glossary-apply-all {
     display: grid;
     grid-template-columns: 1fr 1fr auto;
@@ -1234,29 +1105,6 @@ th {
     height: 8px;
     border-radius: 50%;
     background: #81e6d9;
-}
-
-.translate-banner {
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    background: rgba(125, 211, 252, 0.08);
-    border: 1px solid rgba(125, 211, 252, 0.25);
-}
-.translate-banner-spinner {
-    width: 20px;
-    height: 20px;
-    border: 3px solid rgba(125, 211, 252, 0.3);
-    border-top: 3px solid var(--accent-primary);
-    border-radius: 50%;
-    animation: wh3-translate-spin 1s linear infinite;
-}
-@keyframes wh3-translate-spin {
-    to {
-        transform: rotate(360deg);
-    }
 }
 
 .wh3-translation-row-claude {
