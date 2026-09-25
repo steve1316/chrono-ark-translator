@@ -41,6 +41,16 @@ describe("ModCard", () => {
         expect(screen.getByText("75% Translated")).toBeInTheDocument()
     })
 
+    it("pins progress, stats, and actions to the bottom of the card body in one footer", () => {
+        const { container } = render(wrap(<ModCard {...baseProps({ onSync: () => undefined })} />))
+        const footer = container.querySelector(".mod-card-footer") as HTMLElement
+        expect(footer).not.toBeNull()
+        expect(footer.parentElement).toHaveClass("mod-card-content")
+        expect(footer.querySelector(".progress-section")).not.toBeNull()
+        expect(footer.querySelector(".mod-stats")).not.toBeNull()
+        expect(footer.querySelector(".mod-actions")).not.toBeNull()
+    })
+
     it("renders progress bar segments with the correct widths", () => {
         const { container } = render(wrap(<ModCard {...baseProps()} />))
         const segments = container.querySelectorAll(".progress-bar-bg > div")

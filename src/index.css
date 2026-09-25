@@ -354,6 +354,18 @@ body {
     margin-bottom: 0;
 }
 
+/* ModCard footer: progress, stats, and actions pinned to the bottom of the card body */
+.mod-card-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-top: auto;
+}
+
+.mod-card-footer > .mod-actions {
+    margin-bottom: 0;
+}
+
 .mod-actions-group {
     display: flex;
     align-items: center;

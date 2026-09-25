@@ -67,7 +67,7 @@ interface ModCardProps {
 
 /**
  * Reusable dashboard card for a single mod. Composes `WorkshopCard` with a progress bar,
- * stat boxes, optional badges, and an action row. All variant content is supplied via props
+ * stat boxes, optional badges, and an action row, all grouped in a footer pinned to the bottom of the card. All variant content is supplied via props
  * so the same component fits both Chrono Ark mods (via `ModGrid`) and WH3 translation mods
  * (via `TranslationModCard`).
  *
@@ -81,71 +81,78 @@ const ModCard: React.FC<ModCardProps> = React.memo((props) => {
     const variantClass = primaryAction.variant === "warning" ? "btn-warning" : "btn-primary"
     return (
         <WorkshopCard data-mod-id={id} previewImageUrl={previewImageUrl ?? null} previewAlt={typeof title === "string" ? title : "Mod"} title={title} idBadge={idBadge} subtitle={subtitle}>
-            <div className="progress-section">
-                <div className="progress-info">
-                    <span>{progress.leftLabel}</span>
-                    {progress.rightLabel != null && <span>{progress.rightLabel}</span>}
-                </div>
-                <div className="progress-bar-bg" style={{ display: "flex" }}>
-                    {progress.segments.map((seg, i) => (
-                        <div
-                            key={i}
-                            title={seg.title}
-                            style={{
-                                height: "100%",
-                                width: `${seg.widthPercent}%`,
-                                background: seg.background,
-                                transition: "width 1s ease-out",
-                            }}
-                        />
-                    ))}
-                </div>
-            </div>
-            <div className="mod-stats">
-                {stats.map((stat, i) => (
-                    <div key={i} className="stat-item">
-                        <span className="stat-value">{stat.value}</span>
-                        <span className="stat-label">{stat.label}</span>
+            {/* Footer is pinned to the bottom of the card body so progress, stats, and actions line up across cards with different title lengths. */}
+            <div className="mod-card-footer">
+                <div className="progress-section">
+                    <div className="progress-info">
+                        <span>{progress.leftLabel}</span>
+                        {progress.rightLabel != null && <span>{progress.rightLabel}</span>}
                     </div>
-                ))}
-                {badges}
-            </div>
-            <div className="mod-actions">
-                {primaryAction.to != null ? (
-                    <Link to={primaryAction.to} className={`btn ${variantClass}`} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>
-                        {primaryAction.label}
-                    </Link>
-                ) : (
-                    <button className={`btn ${variantClass}`} style={{ flex: 1 }} onClick={primaryAction.onClick}>
-                        {primaryAction.label}
-                    </button>
-                )}
-                {steamUrl && (
-                    <a
-                        href={steamUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-outline"
-                        title="Open mod page"
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: "42px",
-                            height: "42px",
-                            textDecoration: "none",
-                            color: "var(--text-main)",
-                            padding: "0",
-                        }}
-                    >
-                        <FaSteam size={20} />
-                    </a>
-                )}
-                {onSync && (
-                    <button className="btn btn-outline" onClick={onSync} title="Rescan workshop folder">
-                        <FaSync />
-                    </button>
-                )}
+                    <div className="progress-bar-bg" style={{ display: "flex" }}>
+                        {progress.segments.map((seg, i) => (
+                            <div
+                                key={i}
+                                title={seg.title}
+                                style={{
+                                    height: "100%",
+                                    width: `${seg.widthPercent}%`,
+                                    background: seg.background,
+                                    transition: "width 1s ease-out",
+                                }}
+                            />
+                        ))}
+                    </div>
+                </div>
+                <div className="mod-stats">
+                    {stats.map((stat, i) => (
+                        <div key={i} className="stat-item">
+                            <span className="stat-value">{stat.value}</span>
+                            <span className="stat-label">{stat.label}</span>
+                        </div>
+                    ))}
+                    {badges}
+                </div>
+                <div className="mod-actions">
+                    {primaryAction.to != null ? (
+                        <Link
+                            to={primaryAction.to}
+                            className={`btn ${variantClass}`}
+                            style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}
+                        >
+                            {primaryAction.label}
+                        </Link>
+                    ) : (
+                        <button className={`btn ${variantClass}`} style={{ flex: 1 }} onClick={primaryAction.onClick}>
+                            {primaryAction.label}
+                        </button>
+                    )}
+                    {steamUrl && (
+                        <a
+                            href={steamUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-outline"
+                            title="Open mod page"
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: "42px",
+                                height: "42px",
+                                textDecoration: "none",
+                                color: "var(--text-main)",
+                                padding: "0",
+                            }}
+                        >
+                            <FaSteam size={20} />
+                        </a>
+                    )}
+                    {onSync && (
+                        <button className="btn btn-outline" onClick={onSync} title="Rescan workshop folder">
+                            <FaSync />
+                        </button>
+                    )}
+                </div>
             </div>
         </WorkshopCard>
     )
