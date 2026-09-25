@@ -1,4 +1,4 @@
-"""Tests for the Plan 3 translation routes (sync, snapshots, glossary, scan-terms, api-responses)."""
+"""Tests for the Plan 3 translation routes (sync, snapshots, glossary, api-responses)."""
 
 import json
 from collections import Counter
@@ -340,29 +340,6 @@ def test_glossary_suggest_edits_logs_to_api_responses(client: TestClient, monkey
     assert isinstance(body, list)
     entries = list_entries(mod_id)
     assert any(e["kind"] == "suggest-edits" for e in entries)
-
-
-# //////////////////////////////////////////////////////////////////////////////////////////////////
-# //////////////////////////////////////////////////////////////////////////////////////////////////
-# Group E: POST /scan-terms
-
-
-def test_scan_terms_returns_suggestions_and_logs(client: TestClient, monkeypatch):
-    mod_id = "3315737452"
-
-    def fake_translate_batch(self, entries, source_lang, glossary_prompt, **kwargs):
-        return ({}, [{"english": "Phoenix", "source": "凤", "source_lang": "Chinese", "category": "factions", "reason": "recurring"}])
-
-    monkeypatch.setattr("backend.translator.claude_provider.ClaudeProvider.translate_batch", fake_translate_batch)
-
-    resp = client.post(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/scan-terms")
-    assert resp.status_code == 200
-    suggestions = resp.json()
-    assert isinstance(suggestions, list)
-    assert len(suggestions) >= 1
-
-    entries = list_entries(mod_id)
-    assert any(e["kind"] == "scan-terms" for e in entries)
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////

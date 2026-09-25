@@ -8,6 +8,9 @@ import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslati
 import { useGameSlug } from "../../../useGameSlug"
 import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationPage } from "../../../../translation/TranslationPage"
+import { usePendingSuggestions } from "../../../../translation/usePendingSuggestions"
+import { TranslationToolbar } from "../../../../translation/TranslationToolbar"
+import { SyncButton } from "../../../../translation/SyncButton"
 import { BatchReviewBanner } from "../../../../translation/BatchReviewBanner"
 import SplitButton from "../../../../ui/SplitButton"
 import { LanguageControls } from "../../../../translation/LanguageControls"
@@ -21,7 +24,6 @@ import ApiResponsesModal from "../../components/ApiResponsesModal"
 import HistoryModal from "../../components/HistoryModal"
 import ModContextModal from "../../components/ModContextModal"
 import ModGlossaryModal from "../../components/ModGlossaryModal"
-import ScanForTermsModal from "../../components/ScanForTermsModal"
 import {
     clearTranslations,
     fetchModContext,
@@ -49,9 +51,18 @@ const STATUS_FILTERS: Array<{ value: RowStatus | "all"; label: string }> = [
     { value: "synced", label: "Synced" },
 ]
 
-type ModalKey = "glossary" | "scan" | "responses" | "context" | "history" | "reset" | null
+type ModalKey = "glossary" | "responses" | "context" | "history" | "reset" | null
 
 type SortField = "status" | "provider" | "source_filename" | "key" | "parent_text" | "translation_text"
+
+/**
+ * Confirm text for WH3's Sync button.
+ *
+ * @param resync True for a re-sync with nothing new pending.
+ * @returns The dialog body.
+ */
+const wh3SyncMessage = (resync: boolean) =>
+    `${resync ? "Nothing has changed since the last sync. Re-syncing writes every translation again.\n\n" : ""}This will overwrite the mod's .loc.tsv files with your translations and rebuild the translation pack. Continue?`
 
 const COLUMN_WIDTH_KEY = "wh3-translation-column-widths"
 
@@ -82,6 +93,15 @@ const TranslationDetailsPage: React.FC = () => {
     const [loading, setLoading] = useState(true)
     const [banner, setBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
     const [openModal, setOpenModal] = useState<ModalKey>(null)
+    const { suggestions, refresh: refreshSuggestions, scan, scanning } = usePendingSuggestions("total_war_warhammer_3", workshopId, setBanner)
+    const [showSuggestions, setShowSuggestions] = useState(false)
+
+    // Keep the Mod Glossary count current after suggestions are accepted.
+    const refreshGlossaryCount = useCallback(() => {
+        loadGlossary(workshopId)
+            .then((d) => setGlossaryCount(Object.keys(d).length))
+            .catch(() => {})
+    }, [workshopId])
     const { confirm, confirmDialog } = useConfirm()
     const [showReviewModal, setShowReviewModal] = useState(false)
     // Translate-Names-first: pendingScope drives the confirm-modal title; namesRunRef marks the active run as a names run (read in the batch effect,
@@ -460,37 +480,19 @@ const TranslationDetailsPage: React.FC = () => {
         />
     )
 
+    const syncState = progress?.has_unsynced_changes ? "sync" : (progress?.canonical_counts.synced ?? 0) > 0 ? "resync" : "disabled"
+
     const toolbar = (
-        <>
-            <div className="mod-actions-group">
-                <button type="button" className="btn btn-outline" onClick={() => setOpenModal("glossary")}>
-                    Mod Glossary ({glossaryCount})
-                </button>
-                <button type="button" className="btn btn-outline" onClick={() => setOpenModal("scan")}>
-                    Scan for Terms
-                </button>
-                <button type="button" className="btn btn-outline" onClick={() => setOpenModal("responses")}>
-                    API Responses
-                </button>
-                <button type="button" className="btn btn-outline" onClick={() => setOpenModal("context")} style={{ position: "relative" }}>
-                    Mod Context
-                    {progress?.has_mod_context && <span className="wh3-mod-context-dot" />}
-                </button>
-            </div>
-
-            <div className="mod-actions-group">
-                <button type="button" className="btn btn-outline" onClick={() => setOpenModal("history")}>
-                    History
-                </button>
-                <button type="button" className="btn btn-outline" style={{ color: "#ff4444", borderColor: "rgba(255, 68, 68, 0.3)" }} onClick={() => setOpenModal("reset")}>
-                    Reset
-                </button>
-                <button type="button" className="btn btn-outline" style={{ color: "#ffaa44", borderColor: "rgba(255, 170, 68, 0.3)" }} onClick={onClearEnglish}>
-                    Clear English
-                </button>
-            </div>
-
-            <div className="mod-actions-group">
+        <TranslationToolbar
+            glossary={{ count: glossaryCount, onClick: () => setOpenModal("glossary") }}
+            suggestions={{ count: suggestions.length, onClick: () => setShowSuggestions(true) }}
+            scan={{ scanning, onClick: scan }}
+            apiResponses={{ onClick: () => setOpenModal("responses") }}
+            context={{ label: "Mod Context", hasContext: !!progress?.has_mod_context, onClick: () => setOpenModal("context") }}
+            history={{ onClick: () => setOpenModal("history") }}
+            reset={{ onClick: () => setOpenModal("reset") }}
+            clearEnglish={{ onClick: onClearEnglish }}
+            extraActions={
                 <button
                     type="button"
                     className="btn btn-outline"
@@ -500,6 +502,8 @@ const TranslationDetailsPage: React.FC = () => {
                 >
                     Translate Names
                 </button>
+            }
+            translate={
                 <SplitButton
                     label={`Translate (${activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})`}
                     onClick={() => handleTranslateClick()}
@@ -508,17 +512,26 @@ const TranslationDetailsPage: React.FC = () => {
                     menuLabel="Translate provider menu"
                     items={["claude"].map((p) => ({ label: p.charAt(0).toUpperCase() + p.slice(1), onSelect: () => setActiveProvider(p) }))}
                 />
-                <button type="button" className="btn btn-primary" onClick={onSyncChanges}>
-                    {progress?.has_unsynced_changes ? "Re-sync Changes" : "Sync Changes"}
-                </button>
-            </div>
-        </>
+            }
+            sync={<SyncButton state={syncState} confirmMessage={wh3SyncMessage} onSync={onSyncChanges} />}
+        />
     )
 
     const modals = (
         <>
+            {showSuggestions && (
+                <GlossarySuggestionModal
+                    gameId="total_war_warhammer_3"
+                    modId={workshopId}
+                    suggestions={suggestions}
+                    onClose={() => setShowSuggestions(false)}
+                    onUpdated={() => {
+                        refreshSuggestions()
+                        refreshGlossaryCount()
+                    }}
+                />
+            )}
             {openModal === "glossary" && <ModGlossaryModal workshopId={workshopId} onClose={() => setOpenModal(null)} />}
-            {openModal === "scan" && <ScanForTermsModal workshopId={workshopId} onClose={() => setOpenModal(null)} />}
             {openModal === "responses" && <ApiResponsesModal workshopId={workshopId} onClose={() => setOpenModal(null)} />}
             {openModal === "context" && <ModContextModal workshopId={workshopId} onClose={() => setOpenModal(null)} />}
             {(openModal === "history" || openModal === "reset") && (
@@ -534,9 +547,8 @@ const TranslationDetailsPage: React.FC = () => {
                     suggestions={nameReviewSuggestions}
                     onClose={() => setNameReviewSuggestions(null)}
                     onUpdated={() => {
-                        loadGlossary(workshopId)
-                            .then((d) => setGlossaryCount(Object.keys(d).length))
-                            .catch(() => {})
+                        refreshSuggestions()
+                        refreshGlossaryCount()
                     }}
                 />
             )}
@@ -549,9 +561,8 @@ const TranslationDetailsPage: React.FC = () => {
                     suggestions={batchState.suggestions}
                     onClose={() => setShowReviewModal(false)}
                     onUpdated={() => {
-                        loadGlossary(workshopId)
-                            .then((d) => setGlossaryCount(Object.keys(d).length))
-                            .catch(() => {})
+                        refreshSuggestions()
+                        refreshGlossaryCount()
                     }}
                     batchProgress={{ current: batchState.batchIndex + 1, total: batchState.totalBatches }}
                     onContinue={() => {

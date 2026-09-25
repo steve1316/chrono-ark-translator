@@ -319,19 +319,6 @@ export async function glossarySuggestEdits(workshopId: string): Promise<TermSugg
 }
 
 /**
- * Scan all parent source text in the mod for recurring proper nouns. Logs to api_responses.
- *
- * @param workshopId Steam Workshop ID of the translation mod.
- * @returns Suggested glossary terms.
- * @throws `RegistryError` On any non-2xx response.
- */
-export async function scanTerms(workshopId: string): Promise<TermSuggestion[]> {
-    const res = await api.post(`/translation/mods/${encodeURIComponent(workshopId)}/scan-terms`)
-    if (!res.ok) throw await registryError(res)
-    return res.json()
-}
-
-/**
  * Fetch the audit log of recent Claude API calls (newest first, cap 20).
  *
  * @param workshopId Steam Workshop ID of the translation mod.

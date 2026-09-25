@@ -1002,57 +1002,6 @@ def post_glossary_suggest_edits(mod_id: str) -> list[dict]:
     return suggestions
 
 
-@router.post("/mods/{mod_id}/scan-terms")
-def post_scan_terms(mod_id: str) -> list[dict]:
-    """Scan all parent source text in the mod for recurring proper nouns. Logs to api_responses.
-
-    Args:
-        mod_id: Steam Workshop ID of the WH3 translation mod.
-
-    Returns:
-        List of suggested terms from Claude.
-    """
-    mod = _require_mod(mod_id)
-    adapter = TotalWarWarhammer3Adapter()
-
-    parent = _extract_all_parent_strings(mod)
-    entries: list[tuple[str, str]] = []
-    for rows in parent.values():
-        for key, row in rows.items():
-            entries.append((key, row.text))
-            if len(entries) >= 100:
-                break
-        if len(entries) >= 100:
-            break
-
-    _, suggestions = ClaudeProvider().translate_batch(
-        entries,
-        mod.source_language,
-        glossary_prompt="Identify recurring proper nouns and domain-specific terms via suggested_terms. Do NOT translate.",
-        game_context=adapter.get_translation_context(),
-        format_rules=adapter.get_format_preservation_rules(),
-        style_examples=adapter.get_style_examples(mod.source_language),
-        character_context=None,
-        target_lang=mod.target_language,
-    )
-
-    api_responses_store.append(
-        mod_id,
-        {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "kind": "scan-terms",
-            "provider": "claude",
-            "model": "claude",
-            "input_tokens": None,
-            "output_tokens": None,
-            "cost_usd": None,
-            "keys_or_inputs": [k for k, _ in entries],
-            "raw_response": json.dumps(suggestions, ensure_ascii=False),
-        },
-    )
-    return suggestions
-
-
 @router.get("/mods/{mod_id}/api-responses")
 def get_api_responses(mod_id: str) -> list[dict]:
     """List all API response entries for a mod, newest first.

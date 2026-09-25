@@ -20,7 +20,6 @@ import {
     restoreSnapshot,
     saveModContext,
     saveString,
-    scanTerms,
     syncChanges,
     translateBatch,
     updateGlossaryTerm,
@@ -197,12 +196,6 @@ describe("plan3 routes", () => {
         const result = await glossarySuggestEdits("123")
         expect(result.length).toBe(1)
         expect(result[0].english).toBe("Sky")
-    })
-
-    it("scanTerms POSTs and returns suggestions", async () => {
-        mockFetchOk([{ english: "Phoenix", source: "凤", source_lang: "Chinese", category: "factions", reason: "recurring" }])
-        const result = await scanTerms("123")
-        expect(result.length).toBe(1)
     })
 
     it("listApiResponses GETs and returns the list", async () => {

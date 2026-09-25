@@ -53,6 +53,23 @@ function mockJson(body: unknown, status = 200) {
     return new Response(JSON.stringify(body), { status })
 }
 
+/**
+ * Click the Sync button and confirm its dialog.
+ *
+ * @param label The Sync button's current label.
+ */
+async function syncAndConfirm(label: RegExp) {
+    // Find elements outside act: an async act holds renders until it ends, so a find inside it never sees the loaded page.
+    const button = await screen.findByRole("button", { name: label })
+    await act(async () => {
+        fireEvent.click(button)
+    })
+    const dialog = await screen.findByRole("dialog", { name: label })
+    await act(async () => {
+        fireEvent.click(within(dialog).getByRole("button", { name: /^(Sync|Re-sync)$/ }))
+    })
+}
+
 function mockRouteFlow() {
     const spy = vi.spyOn(globalThis, "fetch")
     spy.mockImplementation(async (input: RequestInfo | URL) => {
@@ -162,16 +179,15 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         })
     })
 
-    it("POSTs to /sync when Sync Changes is clicked", async () => {
+    it("confirms, then POSTs to /sync when Sync Changes is clicked", async () => {
         const fetchSpy = mockRouteFlow()
+        const base = fetchSpy.getMockImplementation()!
+        fetchSpy.mockImplementation(async (input, init) => (String(input).endsWith("/rescan") ? mockJson({ ...SUMMARY, has_unsynced_changes: true }) : base(input, init)))
         render(wrap())
-        await waitFor(() => screen.getByRole("button", { name: /Sync Changes/i }))
-        await act(async () => {
-            fireEvent.click(screen.getByRole("button", { name: /Sync Changes/i }))
-        })
+        await syncAndConfirm(/^Sync Changes$/)
         await waitFor(() => {
-            const calls = fetchSpy.mock.calls.map((c) => (typeof c[0] === "string" ? c[0] : (c[0] as URL).toString()))
-            expect(calls.some((u) => u.includes("/sync"))).toBe(true)
+            const calls = fetchSpy.mock.calls.map((c) => String(c[0]))
+            expect(calls.some((u) => u.endsWith("/sync"))).toBe(true)
         })
     })
 
@@ -288,7 +304,7 @@ describe("TranslationDetails (Plan 3 layout)", () => {
             return mockJson({ status: "ok" })
         })
         const { container } = render(wrap())
-        await waitFor(() => expect(container.querySelector(".wh3-mod-context-dot")).not.toBeNull())
+        await waitFor(() => expect(container.querySelector(".btn-dot")).not.toBeNull())
     })
 
     it("renders the Translate button as a split-dropdown with provider label", async () => {
@@ -308,18 +324,26 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         await waitFor(() => expect(screen.getByRole("menuitem", { name: /Claude/i })).toBeInTheDocument())
     })
 
-    it("renders 'Re-sync Changes' label when has_unsynced_changes is true", async () => {
-        const spy = vi.spyOn(globalThis, "fetch")
-        spy.mockImplementation(async (input: RequestInfo | URL) => {
-            const url = typeof input === "string" ? input : input.toString()
-            if (url.endsWith("/translation/mods")) return mockJson([MOD])
-            if (url.endsWith("/rescan")) return mockJson({ ...SUMMARY, has_unsynced_changes: true })
-            if (url.endsWith("/strings")) return mockJson(STRINGS)
-            if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
-            return mockJson({ status: "ok" })
-        })
+    it("labels Sync 'Sync Changes' while there are unsynced changes", async () => {
+        const spy = mockRouteFlow()
+        const base = spy.getMockImplementation()!
+        spy.mockImplementation(async (input, init) => (String(input).endsWith("/rescan") ? mockJson({ ...SUMMARY, has_unsynced_changes: true }) : base(input, init)))
         render(wrap())
-        await waitFor(() => expect(screen.getByRole("button", { name: /Re-sync Changes/i })).toBeInTheDocument())
+        expect(await screen.findByRole("button", { name: /^Sync Changes$/ })).toBeEnabled()
+    })
+
+    it("labels Sync 'Re-sync Changes' when nothing is pending but rows were synced before", async () => {
+        render(wrap())
+        expect(await screen.findByRole("button", { name: /^Re-sync Changes$/ })).toBeEnabled()
+    })
+
+    it("disables Sync when nothing is pending and nothing was ever synced", async () => {
+        const spy = mockRouteFlow()
+        const base = spy.getMockImplementation()!
+        spy.mockImplementation(async (input, init) => (String(input).endsWith("/rescan") ? mockJson({ ...SUMMARY, canonical_counts: { ...SUMMARY.canonical_counts, synced: 0 } }) : base(input, init)))
+        render(wrap())
+        await screen.findByRole("button", { name: /Back to Dashboard/ })
+        await waitFor(() => expect(screen.getByRole("button", { name: /^Sync Changes$/ })).toBeDisabled())
     })
 
     it("wraps the search input and filter pills in a single glass-card", async () => {
@@ -488,8 +512,7 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         })
 
         render(wrap())
-        const syncBtn = await screen.findByRole("button", { name: /Sync Changes/i })
-        fireEvent.click(syncBtn)
+        await syncAndConfirm(/Sync Changes/i)
         await waitFor(() => expect(screen.getByText(/, rebuilt pack/i)).toBeInTheDocument())
     })
 
@@ -507,8 +530,31 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         })
 
         render(wrap())
-        const syncBtn = await screen.findByRole("button", { name: /Sync Changes/i })
-        fireEvent.click(syncBtn)
+        await syncAndConfirm(/Sync Changes/i)
         await waitFor(() => expect(screen.getByText(/pack rebuild failed: no \.pack found in X/i)).toBeInTheDocument())
+    })
+
+    it("scans for terms, then offers the new suggestions for review", async () => {
+        const SUGGESTION = { english: "Cathay", source: "震旦", source_lang: "Chinese", category: "faction", reason: "place" }
+        const pending: unknown[][] = [[], [SUGGESTION]]
+        const spy = mockRouteFlow()
+        const base = spy.getMockImplementation()!
+        spy.mockImplementation(async (input, init) => {
+            const url = String(input)
+            if (url.endsWith("/glossary/suggestions/scan")) return mockJson({ status: "success", new: 1 })
+            if (url.endsWith("/glossary/suggestions")) return mockJson(pending.length > 1 ? pending.shift() : pending[0])
+            return base(input, init)
+        })
+        render(wrap())
+        const scanButton = await screen.findByRole("button", { name: "Scan for Terms" })
+        await act(async () => {
+            fireEvent.click(scanButton)
+        })
+        expect(await screen.findByText("Found 1 new glossary term suggestion(s).")).toBeInTheDocument()
+        const suggestionsButton = await screen.findByRole("button", { name: /Suggestions/ })
+        await act(async () => {
+            fireEvent.click(suggestionsButton)
+        })
+        expect(await screen.findByRole("dialog", { name: "Suggested Glossary Terms" })).toHaveTextContent("Cathay")
     })
 })
