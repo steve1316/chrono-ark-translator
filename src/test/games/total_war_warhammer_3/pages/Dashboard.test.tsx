@@ -17,6 +17,13 @@ describe("Dashboard page", () => {
         await waitFor(() => expect(screen.getAllByRole("button", { name: /rebuild/i }).length).toBeGreaterThanOrEqual(6))
     })
 
+    it("keeps a space between the bolded Rebuild and the word button in the about text", () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ status: "idle" }), { status: 200 }))
+        render(wrap(<DashboardPage />))
+        const about = screen.getByRole("heading", { name: /about the compat packs/i }).nextElementSibling
+        expect(about?.textContent).toContain("The Rebuild button regenerates")
+    })
+
     it("opens the PublishAllDialog when the Publish All button is clicked", async () => {
         vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ status: "idle" }), { status: 200 }))
         const { default: userEvent } = await import("@testing-library/user-event")

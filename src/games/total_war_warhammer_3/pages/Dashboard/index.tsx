@@ -76,8 +76,8 @@ export default function DashboardPage() {
             <div className="glass-card" style={{ padding: "1rem", marginBottom: "1rem" }}>
                 <h3 style={{ marginTop: 0 }}>About the Compat Packs</h3>
                 <p style={{ margin: 0, color: "var(--text-dim)" }}>
-                    Each card below is one compat pack you maintain on the Steam Workshop. The <strong>Rebuild</strong>
-                    button regenerates that pack by running the matching helper script against your local mod files. Use <strong>Rebuild All</strong> to run every pipeline in sequence.
+                    Each card below is one compat pack you maintain on the Steam Workshop. The <strong>Rebuild</strong> button regenerates that pack by running the matching helper script against your
+                    local mod files. Use <strong>Rebuild All</strong> to run every pipeline in sequence.
                 </p>
             </div>
 
