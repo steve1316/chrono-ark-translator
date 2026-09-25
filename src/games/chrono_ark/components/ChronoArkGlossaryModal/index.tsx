@@ -2,13 +2,14 @@ import { useState } from "react"
 import { gameApi } from "../../../../api/games"
 import type { GlossaryTerm, LocString } from "../../../../shared_types"
 import { GlossaryEditor, type GlossaryEditorTerm } from "../../../../translation/GlossaryEditor"
+import Modal from "../../../../ui/Modal"
 import GlossaryReplacePreviewModal, { type ReplacePreview } from "../GlossaryReplacePreviewModal"
 
 const CATEGORY_OPTIONS = ["custom", "characters", "skills", "buffs/debuffs", "items", "mechanics"]
 const LANGUAGES = ["Chinese", "Korean", "Japanese"]
 
-/** Props for ChronoArkGlossaryPanel. */
-interface ChronoArkGlossaryPanelProps {
+/** Props for ChronoArkGlossaryModal. */
+interface ChronoArkGlossaryModalProps {
     /** The mod's glossary terms (owned by the parent, shared with the toolbar count and suggestion flow). */
     glossary: Record<string, GlossaryTerm>
     /** Mod id for glossary CRUD calls. */
@@ -23,10 +24,12 @@ interface ChronoArkGlossaryPanelProps {
     onRequestDeleteAll: () => void
     /** Called after the panel triggers new edit suggestions so the parent re-fetches them. */
     onSuggestionsChanged: () => void
+    /** Closes the dialog. */
+    onClose: () => void
 }
 
 /**
- * Inline panel for managing a mod's glossary terms. A thin wrapper around the shared `GlossaryEditor`: it maps CA's per-language glossary to/from the
+ * Mod glossary dialog (75% of the screen) for managing a mod's glossary terms. A thin wrapper around the shared `GlossaryEditor`: it maps CA's per-language glossary to/from the
  * editor's shape, wires CA's REST CRUD, and keeps CA's power features (per-term Apply + Apply-All via the replace-preview modal, Suggest Edits, Delete All).
  * @param glossary - The mod's glossary terms.
  * @param modId - Mod id for CRUD calls.
@@ -35,9 +38,10 @@ interface ChronoArkGlossaryPanelProps {
  * @param onApplied - Banner + refresh after a replace-apply.
  * @param onRequestDeleteAll - Open the shared confirm dialog for delete-all.
  * @param onSuggestionsChanged - Re-fetch suggestions after suggest-edits.
- * @returns The panel element plus its replace-preview modal.
+ * @param onClose - Closes the dialog.
+ * @returns The glossary dialog, with its replace-preview dialog nested inside.
  */
-export default function ChronoArkGlossaryPanel({ glossary, modId, strings, onChanged, onApplied, onRequestDeleteAll, onSuggestionsChanged }: ChronoArkGlossaryPanelProps) {
+export default function ChronoArkGlossaryModal({ glossary, modId, strings, onChanged, onApplied, onRequestDeleteAll, onSuggestionsChanged, onClose }: ChronoArkGlossaryModalProps) {
     const [renamedTerm, setRenamedTerm] = useState<{ oldName: string; newName: string } | null>(null)
     const [replacePreview, setReplacePreview] = useState<ReplacePreview | null>(null)
 
@@ -128,26 +132,23 @@ export default function ChronoArkGlossaryPanel({ glossary, modId, strings, onCha
         ) : undefined
 
     return (
-        <>
-            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1rem" }}>
-                <GlossaryEditor
-                    title="Mod Glossary Terms"
-                    terms={terms}
-                    perLanguage
-                    languages={LANGUAGES}
-                    categoryOptions={CATEGORY_OPTIONS}
-                    emptyMessage="No mod-specific glossary terms yet. Add terms above or accept AI suggestions."
-                    onAdd={handleAdd}
-                    onUpdate={handleUpdate}
-                    onRemove={handleRemove}
-                    headerActions={headerActions}
-                    renderRowActions={(term) => (
-                        <button className="btn btn-outline btn-xs tone-accent" onClick={() => applyTerm(term)}>
-                            Apply
-                        </button>
-                    )}
-                />
-            </div>
+        <Modal title="Mod Glossary" size="xl" fill headerActions={headerActions} onClose={onClose}>
+            <GlossaryEditor
+                terms={terms}
+                perLanguage
+                languages={LANGUAGES}
+                categoryOptions={CATEGORY_OPTIONS}
+                emptyMessage="No mod-specific glossary terms yet. Add terms above or accept AI suggestions."
+                onAdd={handleAdd}
+                onUpdate={handleUpdate}
+                onRemove={handleRemove}
+                fillHeight
+                renderRowActions={(term) => (
+                    <button className="btn btn-outline btn-xs tone-accent" onClick={() => applyTerm(term)}>
+                        Apply
+                    </button>
+                )}
+            />
             {replacePreview && (
                 <GlossaryReplacePreviewModal
                     initialPreview={replacePreview}
@@ -160,6 +161,6 @@ export default function ChronoArkGlossaryPanel({ glossary, modId, strings, onCha
                     onApplied={onApplied}
                 />
             )}
-        </>
+        </Modal>
     )
 }

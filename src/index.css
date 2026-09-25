@@ -566,6 +566,28 @@ body {
     color: var(--tone-teal);
 }
 
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Glossary editor (src/translation/GlossaryEditor.tsx) */
+.glossary-editor-list {
+    max-height: 300px;
+    overflow: auto;
+    padding-right: 0.75rem;
+}
+
+.glossary-editor-fill {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.glossary-editor-fill .glossary-editor-list {
+    max-height: none;
+    flex: 1;
+    min-height: 0;
+}
+
 /* Native selects draw their arrow jammed against the right border. Reset appearance and supply a custom chevron with a fixed gap and reserved padding. */
 .app-select {
     -webkit-appearance: none;

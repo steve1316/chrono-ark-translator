@@ -143,4 +143,14 @@ describe("Chrono Ark Details page", () => {
             expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({ source_game: "Library of Ruina" })
         })
     })
+
+    it("opens the mod glossary in a large dialog", async () => {
+        mockBackend()
+        renderPage()
+        await screen.findByText("Mook Workshop")
+        await userEvent.click(screen.getByRole("button", { name: /^Mod Glossary/ }))
+        const dialog = await screen.findByRole("dialog", { name: "Mod Glossary" })
+        expect(dialog).toHaveClass("dialog-xl")
+        expect(within(dialog).getByText("Roland")).toBeInTheDocument()
+    })
 })

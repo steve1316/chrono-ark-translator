@@ -10,7 +10,7 @@ import GlossarySuggestionModal from "../../../../components/GlossarySuggestionMo
 import TranslationConfirmModal from "../../../../components/TranslationConfirmModal"
 import ApiResponsesModal from "../../components/ApiResponsesModal"
 import BackupHistoryModal from "../../components/BackupHistoryModal"
-import ChronoArkGlossaryPanel from "../../components/ChronoArkGlossaryPanel"
+import ChronoArkGlossaryModal from "../../components/ChronoArkGlossaryModal"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { TranslationPage } from "../../../../translation/TranslationPage"
 import { BatchReviewBanner } from "../../../../translation/BatchReviewBanner"
@@ -76,7 +76,7 @@ const ModDetail: React.FC = () => {
     const [pendingRetranslate, setPendingRetranslate] = useState(false)
     const [pendingProvider, setPendingProvider] = useState<string>("")
     const [activeProvider, setActiveProvider] = useState<string>("")
-    const [showGlossaryPanel, setShowGlossaryPanel] = useState(false)
+    const [showGlossary, setShowGlossary] = useState(false)
     const [translateBanner, setTranslateBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
     const { suggestions, refresh: fetchSuggestions, scan, scanning } = usePendingSuggestions("chrono_ark", modId ?? "", setTranslateBanner)
 
@@ -579,8 +579,8 @@ const ModDetail: React.FC = () => {
                     glossary={{
                         count: Object.keys(modGlossary).length,
                         onClick: () => {
-                            setShowGlossaryPanel(!showGlossaryPanel)
-                            if (!showGlossaryPanel) fetchModGlossary()
+                            setShowGlossary(true)
+                            fetchModGlossary()
                         },
                     }}
                     suggestions={{ count: suggestions.length, onClick: () => setShowSuggestionModal(true) }}
@@ -652,27 +652,7 @@ const ModDetail: React.FC = () => {
             }
             banner={translateBanner}
             onDismissBanner={() => setTranslateBanner(null)}
-            panels={
-                <>
-                    {showGlossaryPanel && (
-                        <ChronoArkGlossaryPanel
-                            glossary={modGlossary}
-                            modId={modId!}
-                            strings={strings}
-                            onChanged={fetchModGlossary}
-                            onApplied={(message) => {
-                                setTranslateBanner({ type: "success", message })
-                                fetchModDetail(true)
-                                fetchExportStatus()
-                            }}
-                            onRequestDeleteAll={() => setConfirmModal({ type: "delete-all-glossary", message: `Delete all ${Object.keys(modGlossary).length} glossary term(s)?` })}
-                            onSuggestionsChanged={fetchSuggestions}
-                        />
-                    )}
-
-                    {showCharacterContext && <ContextPanel title="Character Context" value={characterContext} onSave={saveCharacterContext} />}
-                </>
-            }
+            panels={<>{showCharacterContext && <ContextPanel title="Character Context" value={characterContext} onSave={saveCharacterContext} />}</>}
             modals={
                 <>
                     {showSuggestionModal && (
@@ -753,6 +733,23 @@ const ModDetail: React.FC = () => {
                 Single reusable confirmation modal that handles all destructive
                 action confirmations. The `confirmModal` state determines which
                 action to dispatch on confirm. */}
+                    {showGlossary && (
+                        <ChronoArkGlossaryModal
+                            glossary={modGlossary}
+                            modId={modId!}
+                            strings={strings}
+                            onClose={() => setShowGlossary(false)}
+                            onChanged={fetchModGlossary}
+                            onApplied={(message) => {
+                                setTranslateBanner({ type: "success", message })
+                                fetchModDetail(true)
+                                fetchExportStatus()
+                            }}
+                            onRequestDeleteAll={() => setConfirmModal({ type: "delete-all-glossary", message: `Delete all ${Object.keys(modGlossary).length} glossary term(s)?` })}
+                            onSuggestionsChanged={fetchSuggestions}
+                        />
+                    )}
+
                     {confirmModal && (
                         <ConfirmModal
                             title={

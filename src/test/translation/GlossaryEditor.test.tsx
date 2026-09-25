@@ -51,4 +51,12 @@ describe("GlossaryEditor", () => {
         render(<GlossaryEditor terms={TERMS} perLanguage onAdd={vi.fn()} onUpdate={vi.fn()} onRemove={vi.fn()} renderRowActions={(t) => <button>Apply {t.english}</button>} />)
         expect(screen.getByRole("button", { name: "Apply Dragon" })).toBeInTheDocument()
     })
+
+    it("lets the term list fill its container when fillHeight is set", () => {
+        const { container } = render(
+            <GlossaryEditor terms={[{ english: "Roland", category: "characters", sourceMappings: { Chinese: "罗兰" } }]} onAdd={vi.fn()} onUpdate={vi.fn()} onRemove={vi.fn()} fillHeight />
+        )
+        expect(container.firstChild).toHaveClass("glossary-editor", "glossary-editor-fill")
+        expect(container.querySelector(".glossary-editor-list")).not.toBeNull()
+    })
 })

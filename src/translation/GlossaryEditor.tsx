@@ -38,6 +38,8 @@ interface GlossaryEditorProps {
     headerActions?: ReactNode
     /** Optional footer content (e.g. apply-all inputs or a suggestions section). */
     footer?: ReactNode
+    /** When true, the editor fills its container's height and the term list scrolls within it (the list is capped at 300px otherwise). */
+    fillHeight?: boolean
 }
 
 const INPUT_STYLE = { padding: "0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", flex: 1, minWidth: "120px" }
@@ -75,6 +77,7 @@ export function GlossaryEditor({
     renderRowActions,
     headerActions,
     footer,
+    fillHeight = false,
 }: GlossaryEditorProps) {
     const defaultCategory = categoryOptions?.[0] ?? ""
     const [newEnglish, setNewEnglish] = useState("")
@@ -207,7 +210,7 @@ export function GlossaryEditor({
     )
 
     return (
-        <div>
+        <div className={fillHeight ? "glossary-editor glossary-editor-fill" : "glossary-editor"}>
             {(title || headerActions) && (
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                     {title ? <h3 style={{ margin: 0 }}>{title}</h3> : <span />}
@@ -236,7 +239,7 @@ export function GlossaryEditor({
             {terms.length === 0 ? (
                 <p style={{ color: "var(--text-dim)", textAlign: "center" }}>{emptyMessage}</p>
             ) : groups ? (
-                <div style={{ maxHeight: "300px", overflow: "auto", paddingRight: "0.75rem" }}>
+                <div className="glossary-editor-list">
                     {groups.map(([cat, items]) => (
                         <div key={cat}>
                             <div className="glossary-group-header" style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-dim)", marginTop: "0.5rem" }}>
@@ -247,7 +250,7 @@ export function GlossaryEditor({
                     ))}
                 </div>
             ) : (
-                <div style={{ maxHeight: "300px", overflow: "auto", paddingRight: "0.75rem" }}>{sorted.map(renderRow)}</div>
+                <div className="glossary-editor-list">{sorted.map(renderRow)}</div>
             )}
 
             {footer}
