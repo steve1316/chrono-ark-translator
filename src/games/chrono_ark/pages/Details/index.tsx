@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useGameSlug } from "../../../useGameSlug"
-import { FaFileExport, FaBook } from "react-icons/fa"
+import { FaBook } from "react-icons/fa"
 import type { GlossaryTerm, LocString, TermSuggestion } from "../../../../shared_types"
 import { getRowStatus, filterStrings, sortStrings } from "../../../../utils/stringFilters"
 import type { SortField, SortDirection } from "../../../../utils/stringFilters"
@@ -14,6 +14,7 @@ import BackupHistoryModal from "../../components/BackupHistoryModal"
 import ChronoArkGlossaryPanel from "../../components/ChronoArkGlossaryPanel"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { TranslationPage } from "../../../../translation/TranslationPage"
+import { SyncButton } from "../../../../translation/SyncButton"
 import SplitButton from "../../../../ui/SplitButton"
 import { LanguageControls } from "../../../../translation/LanguageControls"
 import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../translation/TitleAdornments"
@@ -207,13 +208,12 @@ const ModDetail: React.FC = () => {
     const [sourceLangOverride, setSourceLangOverride] = useState<string | null>(null)
     const [targetLangOverride, setTargetLangOverride] = useState<string | null>(null)
 
-    const [exporting, setExporting] = useState(false)
     const [scanning, setScanning] = useState(false)
     const [showApiResponses, setShowApiResponses] = useState(false)
     const [showHistory, setShowHistory] = useState(false)
     const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
     const [confirmModal, setConfirmModal] = useState<{
-        type: "export" | "resync" | "reset" | "clear-translations" | "delete-all-glossary" | "restore-backup" | "delete-backup"
+        type: "reset" | "clear-translations" | "delete-all-glossary" | "restore-backup" | "delete-backup"
         message: string | React.ReactNode
         entryId?: string
         entryDate?: string
@@ -483,19 +483,11 @@ const ModDetail: React.FC = () => {
      *
      * On success, reports how many translations were applied and which files were
      * written.
+     *
+     * @param resync When true, restores the original files first and re-applies every translation.
      */
-    const handleExportConfirm = (resync: boolean) => {
+    const handleExport = async (resync: boolean) => {
         if (!modId) return
-        const resyncNote = resync ? "This will restore the original files and re-apply all translations from scratch.\n\n" : ""
-        setConfirmModal({
-            type: resync ? "resync" : "export",
-            message: `${resyncNote}This will overwrite the mod's localization files (CSVs and/or gdata JSONs) with your translations. Continue?`,
-        })
-    }
-
-    const handleExport = async (resync = false) => {
-        if (!modId) return
-        setExporting(true)
         try {
             const path = resync ? `/mods/${modId}/export?resync=true` : `/mods/${modId}/export`
             const res = await gameApi("chrono_ark").post(path)
@@ -526,8 +518,6 @@ const ModDetail: React.FC = () => {
         } catch (err) {
             console.error("Failed to export translations:", err)
             setTranslateBanner({ type: "error", message: "Failed to export translations. Check console for details." })
-        } finally {
-            setExporting(false)
         }
     }
 
@@ -815,22 +805,13 @@ const ModDetail: React.FC = () => {
                             menuLabel="Translate options"
                             items={[{ label: "Re-Translate All", onSelect: () => handleTranslateClick("", true) }]}
                         />
-                        {hasExportChanges ? (
-                            <button className="btn btn-primary" onClick={() => handleExportConfirm(false)} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                <FaFileExport />
-                                {exporting ? "Syncing..." : "Sync Changes"}
-                            </button>
-                        ) : hasPreviousSync ? (
-                            <button className="btn btn-primary" onClick={() => handleExportConfirm(true)} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                <FaFileExport />
-                                {exporting ? "Syncing..." : "Re-sync Changes"}
-                            </button>
-                        ) : (
-                            <button className="btn btn-primary" disabled style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                <FaFileExport />
-                                Sync Changes
-                            </button>
-                        )}
+                        <SyncButton
+                            state={hasExportChanges ? "sync" : hasPreviousSync ? "resync" : "disabled"}
+                            confirmMessage={(resync) =>
+                                `${resync ? "This will restore the original files and re-apply all translations from scratch.\n\n" : ""}This will overwrite the mod's localization files (CSVs and/or gdata JSONs) with your translations. Continue?`
+                            }
+                            onSync={handleExport}
+                        />
                     </div>
                 </>
             }
@@ -1016,8 +997,6 @@ const ModDetail: React.FC = () => {
                         <ConfirmModal
                             title={
                                 {
-                                    export: "Sync Changes",
-                                    resync: "Re-sync Changes",
                                     reset: "Reset Mod",
                                     "clear-translations": "Clear Translations",
                                     "delete-all-glossary": "Delete All Glossary Terms",
@@ -1028,8 +1007,6 @@ const ModDetail: React.FC = () => {
                             message={confirmModal.message}
                             variant={
                                 {
-                                    export: "warning" as const,
-                                    resync: "warning" as const,
                                     reset: "danger" as const,
                                     "clear-translations": "danger" as const,
                                     "delete-all-glossary": "danger" as const,
@@ -1039,8 +1016,6 @@ const ModDetail: React.FC = () => {
                             }
                             confirmLabel={
                                 {
-                                    export: "Sync",
-                                    resync: "Re-sync",
                                     reset: "Reset",
                                     "clear-translations": "Clear",
                                     "delete-all-glossary": "Delete All",
@@ -1054,12 +1029,6 @@ const ModDetail: React.FC = () => {
                                 const entryId = confirmModal.entryId
                                 setConfirmModal(null)
                                 switch (type) {
-                                    case "export":
-                                        handleExport(false)
-                                        break
-                                    case "resync":
-                                        handleExport(true)
-                                        break
                                     case "reset":
                                         handleReset()
                                         break
