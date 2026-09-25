@@ -49,6 +49,24 @@ def current_adapter() -> GameAdapter:
     return _adapter
 
 
+_chrono_ark_adapter: GameAdapter | None = None
+"""Cached Chrono Ark adapter. Use `chrono_ark_adapter()` to read."""
+
+
+def chrono_ark_adapter() -> GameAdapter:
+    """Return the Chrono Ark adapter used by the routes mounted under `/api/games/chrono_ark`.
+
+    Those routes serve Chrono Ark whatever the persisted `active_game` is, since the game comes from the URL.
+
+    Returns:
+        The cached Chrono Ark adapter instance.
+    """
+    global _chrono_ark_adapter
+    if _chrono_ark_adapter is None:
+        _chrono_ark_adapter = get_adapter("chrono_ark")
+    return _chrono_ark_adapter
+
+
 def set_active_game(game_id: str) -> None:
     """Update active game in config and rotate the cached adapter.
 
@@ -98,7 +116,7 @@ def resolve_source_language(
         if override in loc_str.translations and loc_str.translations[override]:
             return override
         return None
-    return _adapter.detect_source_language(loc_str)
+    return chrono_ark_adapter().detect_source_language(loc_str)
 
 
 def _stamp_raw_responses(responses: list[dict]) -> list[dict]:
@@ -184,7 +202,7 @@ def _find_mod(mod_id: str):
     Raises:
         HTTPException: 404 if no mod with the given id is found.
     """
-    mods = _adapter.scan_mods()
+    mods = chrono_ark_adapter().scan_mods()
     matching = [m for m in mods if m.mod_id == mod_id]
     if not matching:
         raise HTTPException(status_code=404, detail="Mod not found")
@@ -203,7 +221,7 @@ def _find_mod_path(mod_id: str) -> Path:
     Raises:
         HTTPException: 404 if no mod with the given id is found.
     """
-    mods = _adapter.scan_mods()
+    mods = chrono_ark_adapter().scan_mods()
     matching = [m for m in mods if m.mod_id == mod_id]
     if not matching:
         raise HTTPException(status_code=404, detail="Mod not found")
@@ -301,7 +319,7 @@ def _compute_export_snapshot(mod_id: str, mod_path: Path, mod_name: str = "") ->
     # Hash this mod's entries in the Harmony injector override JSONs.
     # Include a sentinel when the overrides directory exists so the hash
     # changes when the injector is installed or uninstalled.
-    overrides_dir = _adapter.get_translation_overrides_dir()
+    overrides_dir = chrono_ark_adapter().get_translation_overrides_dir()
     if overrides_dir:
         h.update(b"overrides_dir_present")
         if not mod_name:
@@ -411,7 +429,7 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
         mod_id: Workshop identifier of the mod (e.g. "12345").
         mod_path: Filesystem path to the mod's workshop directory.
     """
-    strings, _ = _adapter.extract_strings(mod_path)
+    strings, _ = chrono_ark_adapter().extract_strings(mod_path)
     target_lang = load_target_language_override(mod_id) or "English"
     _merge_gdata_originals(mod_id, strings, target_lang=target_lang)
 
@@ -424,7 +442,7 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
     # When the Harmony injection mod is installed, DLL strings become
     # translatable — clear their untranslatable_reason so the progress
     # tracker includes them in total_keys.
-    has_harmony_mod = _adapter.get_translation_overrides_dir() is not None
+    has_harmony_mod = chrono_ark_adapter().get_translation_overrides_dir() is not None
     if has_harmony_mod:
         for key, loc_str in strings.items():
             if key.startswith("DLL/") and loc_str.untranslatable_reason:
@@ -432,7 +450,7 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
 
     # Update the progress snapshot.
     tracker = ProgressTracker()
-    tracker.update(mod_id, strings, _adapter.source_languages, target_lang=target_lang)
+    tracker.update(mod_id, strings, chrono_ark_adapter().source_languages, target_lang=target_lang)
 
     # Compute translated keys the same way get_mod_detail does.
     lang_override = load_source_language_override(mod_id)

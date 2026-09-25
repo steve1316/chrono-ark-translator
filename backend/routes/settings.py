@@ -8,7 +8,7 @@ from backend.games.registry import list_games as registry_list_games
 from backend.process_manager import is_managed
 from backend.data.translation_memory import TranslationMemory
 from backend.data.progress_tracker import ProgressTracker
-from backend.routes.helpers import current_adapter, _mask_key, _update_env_file, set_active_game
+from backend.routes.helpers import chrono_ark_adapter, current_adapter, _mask_key, _update_env_file, set_active_game
 from backend.routes.models import SettingsResponse, SettingsUpdate
 
 router = APIRouter(prefix="/api")
@@ -232,7 +232,7 @@ async def get_stats():
 
     # Also count total mods and translation progress
     tracker = ProgressTracker()
-    mods = current_adapter().scan_mods()
+    mods = chrono_ark_adapter().scan_mods()
 
     total_strings = 0
     total_translated = 0
