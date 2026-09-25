@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react"
+import { cleanup, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -34,6 +34,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+    // Unmount before unstubbing. Hooks run in reverse order, so RTL's own cleanup would otherwise run after the stub is gone.
+    cleanup()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
     sessionStorage.clear()
