@@ -4,6 +4,7 @@ These endpoints back the shared `GlossarySuggestionModal` so WH3's iterative tra
 """
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI
@@ -12,6 +13,7 @@ from fastapi.testclient import TestClient
 from backend.data import suggestion_manager
 from backend.games.storage_paths import game_storage_path
 from backend.games.total_war_warhammer_3 import glossary_store
+from backend.games.total_war_warhammer_3.api_responses_store import list_entries
 from backend.games.total_war_warhammer_3.routes import glossary_suggestions as gs_module
 from backend.games.total_war_warhammer_3.translation_mods import WH3TranslationMod
 
@@ -83,3 +85,91 @@ def test_dismiss_all_clears_pending(client: TestClient):
 def test_accept_unknown_mod_returns_404(client: TestClient):
     resp = client.post("/api/games/total_war_warhammer_3/mods/unknown/glossary/suggestions/accept", json={"all": True})
     assert resp.status_code == 404
+
+
+BASE = f"/api/games/total_war_warhammer_3/mods/{MOD_ID}"
+
+
+class FakeClaude:
+    """Stands in for `ClaudeProvider` and returns canned suggested terms."""
+
+    suggestions: list[dict] = []
+
+    def translate_batch(self, entries, source_lang, glossary_prompt, **kwargs):
+        """Return no translations and the canned suggestions.
+
+        Args:
+            entries: Ignored key/source pairs.
+            source_lang: Ignored source language.
+            glossary_prompt: Ignored prompt.
+            **kwargs: Ignored extras.
+
+        Returns:
+            An empty translation dict and the canned suggestions.
+        """
+        return {}, list(self.suggestions)
+
+
+@pytest.fixture
+def fake_claude(monkeypatch):
+    """Route Claude calls and parent extraction through fakes so no API call is made.
+
+    Args:
+        monkeypatch: The pytest monkeypatch fixture.
+
+    Returns:
+        The fake provider class, whose `suggestions` each test sets.
+    """
+    FakeClaude.suggestions = []
+    monkeypatch.setattr(gs_module, "ClaudeProvider", FakeClaude)
+    monkeypatch.setattr(gs_module, "_extract_all_parent_strings", lambda mod: {"units.loc.tsv": {"k1": SimpleNamespace(text="震旦凤")}})
+    return FakeClaude
+
+
+def test_get_suggestions_returns_the_pending_list(client: TestClient):
+    _seed_pending(SUGGESTIONS)
+    resp = client.get(f"{BASE}/glossary/suggestions")
+    assert resp.status_code == 200
+    assert {s["english"] for s in resp.json()} == {"Lord", "Cathay"}
+
+
+def test_scan_saves_new_terms_and_skips_ones_already_in_the_glossary(client: TestClient, fake_claude):
+    glossary_store.add_term(MOD_ID, {"english": "Cathay", "source": "震旦", "category": "faction"})
+    fake_claude.suggestions = [dict(SUGGESTIONS[1]), dict(SUGGESTIONS[0])]
+    resp = client.post(f"{BASE}/glossary/suggestions/scan")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "success", "new": 1}
+    assert _remaining_terms() == {"Lord"}
+    assert any(e["kind"] == "scan-terms" for e in list_entries(MOD_ID))
+
+
+def test_scan_does_not_duplicate_a_term_that_is_already_pending(client: TestClient, fake_claude):
+    _seed_pending([SUGGESTIONS[0]])
+    fake_claude.suggestions = [dict(SUGGESTIONS[0])]
+    resp = client.post(f"{BASE}/glossary/suggestions/scan")
+    assert resp.json()["new"] == 0
+    assert _remaining_terms() == {"Lord"}
+
+
+def test_suggest_edits_saves_suggestions_for_review(client: TestClient, fake_claude):
+    glossary_store.add_term(MOD_ID, {"english": "Chongtang", "source": "祟唐", "category": "character"})
+    fake_claude.suggestions = [{"english": "[Sentinel] Suitang", "source": "『戍望』祟唐", "source_lang": "Chinese", "category": "character", "reason": "title", "edit_of": "Chongtang"}]
+    resp = client.post(f"{BASE}/glossary/suggest-edits")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "success", "new": 1}
+    assert _remaining_terms() == {"[Sentinel] Suitang"}
+    assert any(e["kind"] == "suggest-edits" for e in list_entries(MOD_ID))
+
+
+def test_accepting_an_edit_suggestion_renames_the_old_term(client: TestClient):
+    glossary_store.add_term(MOD_ID, {"english": "Chongtang", "source": "祟唐", "category": "character"})
+    _seed_pending([{"english": "[Sentinel] Suitang", "source": "『戍望』祟唐", "source_lang": "Chinese", "category": "character", "reason": "title", "edit_of": "Chongtang"}])
+    resp = client.post(f"{BASE}/glossary/suggestions/accept", json={"all": True})
+    assert resp.status_code == 200
+    glossary = glossary_store.load_glossary(MOD_ID)
+    assert "Chongtang" not in glossary
+    assert glossary["[Sentinel] Suitang"]["source"] == "『戍望』祟唐"
+
+
+def test_scan_returns_404_for_an_unknown_mod(client: TestClient, fake_claude):
+    assert client.post("/api/games/total_war_warhammer_3/mods/999/glossary/suggestions/scan").status_code == 404
