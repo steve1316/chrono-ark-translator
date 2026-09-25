@@ -767,6 +767,11 @@ def sync_changes(mod_id: str) -> dict:
     drift = get_strings(mod_id)
     per_file = sync_translations_to_loc_tsv(mod, drift)
 
+    # Re-baseline the parent snapshot to the current parent hashes (mirrors Chrono Ark's export re-saving last_csv_hash). Syncing accepts the current
+    # source as the baseline for every key, so rows whose source had drifted (stale -> pending) settle to synced once their translation is written.
+    next_snapshot = {fn: {k: hash_text(r.text) for k, r in rows.items()} for fn, rows in parent.items()}
+    store.save_parent_snapshot(mod_id, next_snapshot)
+
     # Rebuild the published .pack from the freshly written loose files. Non-fatal: the writeback already succeeded, so any
     # build problem is reported as a warning rather than failing the sync. Skipped when nothing was written.
     pack_built = False

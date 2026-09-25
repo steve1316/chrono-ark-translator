@@ -469,3 +469,27 @@ def test_sync_reports_pack_error_non_fatally(client: TestClient, monkeypatch, tm
     body = resp.json()
     assert body["pack_built"] is False
     assert "no .pack found" in body["pack_error"]
+
+
+def test_sync_rebaselines_parent_snapshot_clearing_stale(client: TestClient, tmp_path: Path):
+    """Sync re-baselines the parent snapshot to the current parent hashes (Chrono Ark export parity).
+
+    A previously stale row (parent source drifted from the recorded snapshot) whose translation already matches disk shows as pending before sync.
+    After sync the snapshot is re-baselined, so the row settles back to synced.
+    """
+    mod_id = "3315737452"
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    # k1's on-disk translation is "Existing" (fixture). The override matches it, so is_synced is true.
+    (mod_dir / "translations.json").write_text(json.dumps({"k1": {"text": "Existing", "provider": "manual"}}), encoding="utf-8")
+    # Seed a stale snapshot: the recorded hash for k1 differs from the current parent text hash, so k1 starts as stale -> pending.
+    (mod_dir / "parent_snapshot.json").write_text(json.dumps({"units.loc.tsv": {"k1": "0" * 64}}), encoding="utf-8")
+
+    before = client.get(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/strings").json()
+    assert next(r for r in before if r["key"] == "k1")["canonical_status"] == "pending"
+
+    resp = client.post(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/sync")
+    assert resp.status_code == 200
+
+    after = client.get(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/strings").json()
+    assert next(r for r in after if r["key"] == "k1")["canonical_status"] == "synced"
