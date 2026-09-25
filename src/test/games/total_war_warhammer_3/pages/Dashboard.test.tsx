@@ -24,6 +24,15 @@ describe("Dashboard page", () => {
         expect(about?.textContent).toContain("The Rebuild button regenerates")
     })
 
+    it("shows skeleton cards while the translation mods are loading", () => {
+        vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+            if (String(input).includes("/translation/mods")) return new Promise<Response>(() => {})
+            return Promise.resolve(new Response(JSON.stringify({ status: "idle" }), { status: 200 }))
+        })
+        render(wrap(<DashboardPage />))
+        expect(screen.getByRole("status", { name: /loading translation mods/i })).toBeInTheDocument()
+    })
+
     it("opens the PublishAllDialog when the Publish All button is clicked", async () => {
         vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ status: "idle" }), { status: 200 }))
         const { default: userEvent } = await import("@testing-library/user-event")

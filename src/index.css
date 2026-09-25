@@ -225,6 +225,37 @@ body {
     transform: scale(1.05);
 }
 
+/* Loading placeholders for mod grids (ModGridSkeleton) */
+.mod-card-skeleton {
+    pointer-events: none;
+}
+
+.skeleton-block {
+    border-radius: 6px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.04) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.mod-preview.skeleton-block {
+    border-radius: 0;
+}
+
+@keyframes skeleton-shimmer {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: -200% 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton-block {
+        animation: none;
+    }
+}
+
 /* Cards without a preview image get top padding */
 .mod-card:not(:has(.mod-preview)) .mod-card-content {
     padding-top: 1.5rem;

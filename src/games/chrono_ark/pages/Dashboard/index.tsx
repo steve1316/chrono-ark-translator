@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { useGameSlug } from "../../../useGameSlug"
 import { FaSearch } from "react-icons/fa"
 import ModGrid from "../../../../components/ModGrid"
+import ModGridSkeleton from "../../../../components/ModGridSkeleton"
 import EstimateTotalCostModal from "../../../../components/EstimateTotalCostModal"
 import type { ModStatus } from "../../../../shared_types"
 import { gameApi } from "../../../../api/games"
@@ -19,7 +20,8 @@ import { filterMods } from "../../../../utils/modFilters"
 const DashboardPage: React.FC = () => {
     const navigate = useNavigate()
     const slug = useGameSlug()
-    const [mods, setMods] = useState<ModStatus[]>([])
+    // `null` until the first fetch settles, so the grid can show a skeleton instead of an empty page.
+    const [mods, setMods] = useState<ModStatus[] | null>(null)
     const [search, setSearch] = useState("")
     const [cardWidth, setCardWidth] = useState<number | undefined>(undefined)
     const [refreshing, setRefreshing] = useState(false)
@@ -45,7 +47,7 @@ const DashboardPage: React.FC = () => {
      *
      * Hits `GET /api/games/chrono_ark/mods` and replaces local state with the
      * returned array of `ModStatus` objects. Errors are logged but do not
-     * surface to the UI; the existing list is preserved on failure.
+     * surface to the UI. The existing list is preserved on failure, or an empty list is set if nothing had loaded yet.
      */
     const fetchMods = async () => {
         try {
@@ -54,6 +56,8 @@ const DashboardPage: React.FC = () => {
             setMods(data)
         } catch (err) {
             console.error("Failed to fetch mods:", err)
+            // Leave the loading state so a failed first load shows an empty grid rather than a skeleton forever.
+            setMods((prev) => prev ?? [])
         }
     }
 
@@ -212,10 +216,12 @@ const DashboardPage: React.FC = () => {
         }
     }
 
-    const filteredMods = useMemo(() => filterMods(mods, search), [mods, search])
+    const filteredMods = useMemo(() => filterMods(mods ?? [], search), [mods, search])
 
     // Scroll to the mod card the user was last viewing when returning from the detail page.
     useEffect(() => {
+        // Wait for the real list. Consuming the saved id on the initial empty render would leave no card to scroll to.
+        if (mods === null) return
         const lastMod = sessionStorage.getItem("lastViewedMod")
         if (!lastMod) return
         sessionStorage.removeItem("lastViewedMod")
@@ -223,7 +229,7 @@ const DashboardPage: React.FC = () => {
             const card = document.querySelector(`[data-mod-id="${lastMod}"]`)
             card?.scrollIntoView({ behavior: "instant", block: "center" })
         })
-    }, [filteredMods])
+    }, [mods, filteredMods])
 
     // Observe the first mod card's width so the search bar can match it exactly.
     useEffect(() => {
@@ -282,9 +288,7 @@ const DashboardPage: React.FC = () => {
                 </div>
             </div>
 
-            <div ref={gridWrapperRef}>
-                <ModGrid mods={filteredMods} onModSelect={handleModSelect} onModSync={handleModSync} searchQuery={search.trim()} />
-            </div>
+            <div ref={gridWrapperRef}>{mods === null ? <ModGridSkeleton /> : <ModGrid mods={filteredMods} onModSelect={handleModSelect} onModSync={handleModSync} searchQuery={search.trim()} />}</div>
             {showEstimateModal && <EstimateTotalCostModal results={estimateResults} onClose={() => setShowEstimateModal(false)} />}
         </>
     )

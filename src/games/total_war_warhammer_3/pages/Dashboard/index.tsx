@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 
+import ModGridSkeleton from "../../../../components/ModGridSkeleton"
 import PackCard, { type PackEntry } from "../../components/PackCard"
 import PublishAllDialog from "../../components/PublishAllDialog"
 import ScriptRunButton from "../../components/ScriptRunButton"
@@ -28,7 +29,8 @@ const PACKS: PackEntry[] = [
  *     `ScriptRunButton`.
  */
 export default function DashboardPage() {
-    const [translationMods, setTranslationMods] = useState<WH3TranslationModSummary[]>([])
+    // `null` until the list request settles, so the section can show a skeleton instead of an empty grid.
+    const [translationMods, setTranslationMods] = useState<WH3TranslationModSummary[] | null>(null)
     const [progressByMod, setProgressByMod] = useState<Record<string, WH3RescanSummary | null>>({})
     const [translationLoadError, setTranslationLoadError] = useState<string | null>(null)
     const [publishAllOpen, setPublishAllOpen] = useState(false)
@@ -94,8 +96,10 @@ export default function DashboardPage() {
                 <h2>Translation Mods</h2>
                 {translationLoadError ? (
                     <p style={{ color: "var(--danger)" }}>Failed to load translation mods: {translationLoadError}</p>
+                ) : translationMods === null ? (
+                    <ModGridSkeleton count={3} label="Loading translation mods" />
                 ) : translationMods.length === 0 ? (
-                    <p style={{ color: "var(--text-dim)" }}>Loading translation mods...</p>
+                    <p style={{ color: "var(--text-dim)" }}>No translation mods found.</p>
                 ) : (
                     <div className="mod-grid">
                         {translationMods.map((mod) => (
