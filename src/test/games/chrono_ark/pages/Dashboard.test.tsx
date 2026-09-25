@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -61,6 +61,6 @@ describe("Chrono Ark Dashboard page", () => {
         expect(sessionStorage.getItem("lastViewedMod")).toBe(MOD.id)
         resolve(new Response(JSON.stringify([MOD]), { status: 200 }))
         await screen.findByText("Zerooz Cathy")
-        expect(sessionStorage.getItem("lastViewedMod")).toBeNull()
+        await waitFor(() => expect(sessionStorage.getItem("lastViewedMod")).toBeNull())
     })
 })
