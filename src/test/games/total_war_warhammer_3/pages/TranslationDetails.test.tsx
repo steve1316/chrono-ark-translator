@@ -448,14 +448,6 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         expect(keyHeader.querySelector(".sort-icon.active")).toBeNull()
     })
 
-    it("highlights rows where provider === 'claude' with the wh3-translation-row-claude class", async () => {
-        const { container } = render(wrap())
-        await screen.findByText("Stale text")
-        const claudeRow = container.querySelector(".wh3-translation-row-claude")
-        expect(claudeRow).not.toBeNull()
-        expect(claudeRow?.textContent).toContain("Stale text")
-    })
-
     it("renders a .resizer handle on each sortable column header", async () => {
         const { container } = render(wrap())
         await screen.findByRole("button", { name: /Back to Dashboard/i })

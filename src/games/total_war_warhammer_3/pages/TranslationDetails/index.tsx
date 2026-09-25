@@ -18,7 +18,8 @@ import { LanguageControls } from "../../../../translation/LanguageControls"
 import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../translation/TitleAdornments"
 import { TranslationCell } from "../../../../translation/TranslationCell"
 import { canonicalRowStyle } from "../../../../translation/rowStyle"
-import type { ColumnDef } from "../../../../translation/types"
+import { TRANSLATION_COLUMN_WIDTHS, translationColumns } from "../../../../translation/columns"
+import LoadingState from "../../../../ui/LoadingState"
 import type { RowStatus } from "../../../../utils/stringFilters"
 import type { TermSuggestion, WH3DriftRow, WH3ModContext, WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
 import ApiResponsesModal from "../../components/ApiResponsesModal"
@@ -67,12 +68,12 @@ const wh3SyncMessage = (resync: boolean) =>
 const COLUMN_WIDTH_KEY = "wh3-translation-column-widths"
 
 const DEFAULT_COLUMN_WIDTHS: Record<SortField, number> = {
-    status: 120,
-    provider: 90,
-    source_filename: 200,
-    key: 220,
-    parent_text: 280,
-    translation_text: 300,
+    status: TRANSLATION_COLUMN_WIDTHS.status,
+    provider: TRANSLATION_COLUMN_WIDTHS.mode,
+    source_filename: TRANSLATION_COLUMN_WIDTHS.source,
+    key: TRANSLATION_COLUMN_WIDTHS.key,
+    parent_text: TRANSLATION_COLUMN_WIDTHS.original,
+    translation_text: TRANSLATION_COLUMN_WIDTHS.translation,
 }
 
 /**
@@ -423,57 +424,45 @@ const TranslationDetailsPage: React.FC = () => {
     const sourceLang = modContext.source_language_override ?? mod?.source_language ?? "Chinese"
     const targetLang = sourceLang === "English" ? (modContext.target_language_override ?? mod?.target_language ?? "Chinese") : "English"
 
-    const columns: ColumnDef<WH3DriftRow>[] = [
-        { field: "status", label: "Status", width: 120, sortable: true, render: (r) => <StatusBadge status={r.canonical_status ?? "missing"} /> },
-        { field: "provider", label: "Mode", width: 90, sortable: true, cellClassName: "wh3-mode-cell", render: (r) => r.provider ?? "" },
+    const columns = translationColumns<WH3DriftRow>(
         {
-            field: "source_filename",
-            label: "Source",
-            width: 200,
-            sortable: true,
-            cellClassName: "key-cell",
-            render: (r) => (
-                <a
-                    href="#"
-                    title={r.source_filename}
-                    onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        openSourceFile(workshopId, r.source_filename).catch(() => {})
-                    }}
-                >
-                    {r.source_filename}
-                </a>
-            ),
+            status: { field: "status", render: (r) => <StatusBadge status={r.canonical_status ?? "missing"} /> },
+            mode: { field: "provider", render: (r) => <span title={r.provider ?? ""}>{r.provider ?? ""}</span> },
+            source: {
+                field: "source_filename",
+                render: (r) => (
+                    <a
+                        href="#"
+                        title={r.source_filename}
+                        onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            openSourceFile(workshopId, r.source_filename).catch(() => {})
+                        }}
+                    >
+                        {r.source_filename}
+                    </a>
+                ),
+            },
+            key: { field: "key", render: (r) => r.key },
+            original: { field: "parent_text", render: (r) => r.parent_text ?? <em style={{ color: "var(--text-dim)" }}>orphan</em> },
+            translation: {
+                field: "translation_text",
+                render: (r) => (
+                    <TranslationCell
+                        value={r.translation_text ?? ""}
+                        previous={r.previous_text}
+                        synced={r.canonical_status === "synced"}
+                        placeholder="(untranslated)"
+                        onSave={(text) => onRowSave(r.key, text)}
+                    />
+                ),
+            },
         },
-        { field: "key", label: "Key", width: 220, sortable: true, cellClassName: "key-cell", render: (r) => r.key },
-        {
-            field: "parent_text",
-            label: `Original (${sourceLang})`,
-            width: 280,
-            sortable: true,
-            cellClassName: "source-cell",
-            render: (r) => r.parent_text ?? <em style={{ color: "var(--text-dim)" }}>orphan</em>,
-        },
-        {
-            field: "translation_text",
-            label: targetLang,
-            width: 300,
-            sortable: true,
-            cellClassName: "english-cell",
-            render: (r) => (
-                <TranslationCell
-                    value={r.translation_text ?? ""}
-                    previous={r.previous_text}
-                    synced={r.canonical_status === "synced"}
-                    placeholder="(untranslated)"
-                    onSave={(text) => onRowSave(r.key, text)}
-                />
-            ),
-        },
-    ]
+        { original: `Original (${sourceLang})`, translation: targetLang }
+    )
 
-    if (loading) return <p>Loading...</p>
+    if (loading) return <LoadingState message="Loading mod details..." />
 
     const titleBadges = (
         <>
@@ -603,7 +592,6 @@ const TranslationDetailsPage: React.FC = () => {
             columns={columns}
             rows={sortedRows}
             getRowKey={(r) => `${r.source_filename}::${r.key}`}
-            getRowClassName={(r) => (r.provider === "claude" ? "wh3-translation-row-claude" : undefined)}
             getRowStyle={(r) => canonicalRowStyle(r.canonical_status ?? "missing", { override: r.canonical_status === "pending" })}
             sortField={sortConfig.direction ? sortConfig.key : null}
             sortDirection={sortConfig.direction}

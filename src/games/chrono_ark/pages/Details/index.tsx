@@ -26,7 +26,7 @@ import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../transl
 import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationCell } from "../../../../translation/TranslationCell"
 import { canonicalRowStyle } from "../../../../translation/rowStyle"
-import type { ColumnDef } from "../../../../translation/types"
+import { translationColumns } from "../../../../translation/columns"
 import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
 import type { BatchDescriptor } from "../../../../hooks/useIterativeTranslation"
 
@@ -526,49 +526,44 @@ const ModDetail: React.FC = () => {
 
     if (loadError) return <ErrorState title="Could not load this mod" message={loadError} action={{ label: "Back to Dashboard", onClick: onBack }} />
 
-    const columns: ColumnDef<LocString>[] = [
-        { field: "is_translated", label: "Status", width: columnWidths.is_translated ?? 120, sortable: true, render: (s) => <StatusBadge status={getRowStatus(s)} reason={s.untranslatable_reason} /> },
-        { field: "translated_by", label: "Mode", width: 100, sortable: true, cellClassName: "key-cell", render: (s) => <span title={s.translated_by}>{s.translated_by || "—"}</span> },
+    const columns = translationColumns<LocString>(
         {
-            field: "source_file",
-            label: "Source",
-            width: 100,
-            sortable: true,
-            cellClassName: "key-cell",
-            render: (s) => (
-                <a
-                    href="#"
-                    title={s.source_file}
-                    onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        gameApi("chrono_ark").post(`/mods/${modId}/open-source-file/${encodeURIComponent(s.source_file)}`)
-                    }}
-                >
-                    {s.source_file}
-                </a>
-            ),
+            status: { field: "is_translated", render: (s) => <StatusBadge status={getRowStatus(s)} reason={s.untranslatable_reason} /> },
+            mode: { field: "translated_by", render: (s) => <span title={s.translated_by}>{s.translated_by || "\u2014"}</span> },
+            source: {
+                field: "source_file",
+                render: (s) => (
+                    <a
+                        href="#"
+                        title={s.source_file}
+                        onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            gameApi("chrono_ark").post(`/mods/${modId}/open-source-file/${encodeURIComponent(s.source_file)}`)
+                        }}
+                    >
+                        {s.source_file}
+                    </a>
+                ),
+            },
+            key: { field: "key", render: (s) => <span title={s.key}>{s.key}</span> },
+            original: { field: "source", render: (s) => s.source },
+            translation: {
+                field: "english",
+                render: (s) => (
+                    <TranslationCell
+                        value={s.english}
+                        previous={s.original_english}
+                        synced={s.is_synced}
+                        untranslatableReason={getRowStatus(s) === "untranslatable" ? s.untranslatable_reason : undefined}
+                        placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."}
+                        onSave={(val) => handleSaveString(s.key, val)}
+                    />
+                ),
+            },
         },
-        { field: "key", label: "Key", width: 200, sortable: true, cellClassName: "key-cell", render: (s) => <span title={s.key}>{s.key}</span> },
-        { field: "source", label: `Original (${sourceLangOverride || "Chinese"})`, width: 400, sortable: true, cellClassName: "source-cell", render: (s) => s.source },
-        {
-            field: "english",
-            label: targetLangOverride || "English",
-            width: 500,
-            sortable: true,
-            cellClassName: "english-cell",
-            render: (s) => (
-                <TranslationCell
-                    value={s.english}
-                    previous={s.original_english}
-                    synced={s.is_synced}
-                    untranslatableReason={getRowStatus(s) === "untranslatable" ? s.untranslatable_reason : undefined}
-                    placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."}
-                    onSave={(val) => handleSaveString(s.key, val)}
-                />
-            ),
-        },
-    ]
+        { original: `Original (${sourceLangOverride || "Chinese"})`, translation: targetLangOverride || "English" }
+    )
 
     return (
         <TranslationPage<LocString>

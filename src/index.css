@@ -1261,49 +1261,6 @@ th {
 
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
-/* WH3 modal scaffolding (shared by all Plan 3 modals) */
-.modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    z-index: 1000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-.modal-panel {
-    max-height: 85vh;
-    overflow: auto;
-    padding: 1.5rem 2rem;
-}
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-.modal-close {
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    font-size: 1.75rem;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-}
-.modal-close:hover {
-    background: rgba(255, 255, 255, 0.08);
-}
-.modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    margin-top: 1.25rem;
-}
-
-/* //////////////////////////////////////////////////////////////////////////////////////////////// */
-/* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* History modal auto/manual kind pill (shared by both games) */
 .snapshot-kind {
     display: inline-block;
@@ -1403,39 +1360,6 @@ th {
     border-bottom: 1px solid var(--border);
     margin-bottom: 0.4rem;
 }
-.suggestion-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 4px;
-}
-.suggestion-row:hover {
-    background: rgba(255, 255, 255, 0.04);
-}
-.suggestion-meta {
-    flex: 1;
-    min-width: 0;
-}
-.suggestion-english {
-    font-weight: 500;
-    color: var(--text-main);
-}
-.suggestion-source {
-    color: var(--text-dim);
-}
-.suggestion-reason {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    margin-top: 0.15rem;
-}
-.suggestion-actions {
-    display: flex;
-    gap: 0.4rem;
-    flex-shrink: 0;
-}
-
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* WH3 glossary modal layout */
@@ -1491,41 +1415,6 @@ th {
     font-size: 0.8rem;
     color: var(--text-dim);
 }
-.glossary-suggestions {
-    background: rgba(96, 165, 250, 0.08);
-    border: 1px solid rgba(96, 165, 250, 0.2);
-    border-radius: 6px;
-    padding: 0.75rem;
-    margin-bottom: 0.75rem;
-}
-
-/* //////////////////////////////////////////////////////////////////////////////////////////////// */
-/* //////////////////////////////////////////////////////////////////////////////////////////////// */
-/* WH3 translation page mode column */
-.wh3-mode-cell {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    text-transform: lowercase;
-}
-
-
-.wh3-mod-context-dot {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #81e6d9;
-}
-
-.wh3-translation-row-claude {
-    background: rgba(125, 211, 252, 0.04);
-}
-.wh3-translation-row-claude:hover {
-    background: rgba(125, 211, 252, 0.08);
-}
-
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* Form controls (Chrono Ark field style) */
