@@ -107,7 +107,22 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
     const totalInputTokens = preview.estimates ? Object.values(preview.estimates).reduce((sum, est) => sum + est.estimated_input_tokens, 0) : null
 
     return (
-        <Modal title={title || "Confirm Translation"} size="lg" fill onClose={onCancel}>
+        <Modal
+            title={title || "Confirm Translation"}
+            size="lg"
+            fill
+            onClose={onCancel}
+            footer={
+                <>
+                    <button className="btn btn-outline" onClick={onCancel}>
+                        Cancel
+                    </button>
+                    <button className="btn btn-primary" onClick={onConfirm}>
+                        Translate {preview.total_strings} strings
+                    </button>
+                </>
+            }
+        >
             {/* Summary stats row: provider, string count, batch count, and optional cost */}
             <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
                 <div>
@@ -257,16 +272,6 @@ const TranslationConfirmModal: React.FC<TranslationConfirmModalProps> = ({ previ
                     </div>
                 </>
             )}
-
-            {/* Action buttons: Cancel or Confirm translation */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-                <button className="btn btn-outline" onClick={onCancel}>
-                    Cancel
-                </button>
-                <button className="btn btn-primary" onClick={onConfirm}>
-                    Translate {preview.total_strings} strings
-                </button>
-            </div>
         </Modal>
     )
 }
