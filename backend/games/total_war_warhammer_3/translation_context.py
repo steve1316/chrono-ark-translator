@@ -22,6 +22,8 @@ FORMAT_PRESERVATION_RULES: list[str] = [
     "Preserve literal `\\n` line breaks; do not insert or remove them.",
     "Preserve leading/trailing whitespace exactly as it appears in the source string.",
     "Do not translate game-internal keys or identifiers that appear in the text.",
+    "Render a 『title』 written before a character name as `[Title] Name` (e.g. 『戍望』祟唐 -> `[Sentinel] Suitang`), both in translated text "
+    "and in suggested glossary terms. Do not use `Name / 'Title'` or `the 'Title,' Name`.",
 ]
 
 STYLE_EXAMPLES_BY_LANG: dict[str, list[tuple[str, str]]] = {
