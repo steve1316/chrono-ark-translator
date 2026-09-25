@@ -219,15 +219,16 @@ describe("PublishAllDialog", () => {
         await waitFor(() => expect(MockEventSource.instances.length).toBe(1))
         const es = MockEventSource.instances[0]
 
-        // While running, the Close button is disabled.
-        const closeBtn = screen.getByRole("button", { name: /close/i })
-        expect(closeBtn).toBeDisabled()
+        // While running, both the header X and the footer Close are disabled.
+        const closeButtons = screen.getAllByRole("button", { name: /^close$/i })
+        expect(closeButtons).toHaveLength(2)
+        for (const button of closeButtons) expect(button).toBeDisabled()
 
         act(() => {
             es.fire("batch_started", { batch_id: "batch-1", total: 2, items: [] })
             es.fire("batch_done", { batch_id: "batch-1", succeeded: 2, failed: 0, duration_seconds: 3.0 })
         })
 
-        expect(screen.getByRole("button", { name: /close/i })).not.toBeDisabled()
+        for (const button of screen.getAllByRole("button", { name: /^close$/i })) expect(button).not.toBeDisabled()
     })
 })

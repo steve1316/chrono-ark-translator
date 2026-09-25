@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import { publishAllPacks, publishAllStreamUrl, RegistryError, type BatchPublishHandle, type BatchPublishItem } from "../../api"
+import Modal from "../../../../ui/Modal"
 
 /** One pack entry as the Dashboard hands them in. */
 interface PackEntry {
@@ -221,169 +222,127 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
     }
 
     return (
-        <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0,0,0,0.6)",
-                zIndex: 1000,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-            }}
-            onClick={(e) => {
-                if (e.target === e.currentTarget && !isRunning) handleClose()
-            }}
-        >
-            <div className="glass-card" style={{ width: "720px", maxWidth: "92vw", maxHeight: "88vh", overflow: "auto", padding: "2rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-                    <h2 style={{ margin: 0 }}>Publish All to Workshop</h2>
-                    <button
-                        onClick={handleClose}
-                        disabled={isRunning}
-                        style={{
-                            background: "none",
-                            border: "none",
-                            color: "var(--text-dim)",
-                            fontSize: "2rem",
-                            lineHeight: 1,
-                            cursor: isRunning ? "not-allowed" : "pointer",
-                            padding: "0.25rem 0.5rem",
-                            borderRadius: "4px",
-                            opacity: isRunning ? 0.4 : 1,
-                        }}
-                        title={isRunning ? "Batch publish in progress" : "Close"}
-                    >
-                        &times;
-                    </button>
-                </div>
+        <Modal title="Publish All to Workshop" size="md" onClose={handleClose} closeDisabled={isRunning} closeDisabledReason="Batch publish in progress">
+            <label style={{ display: "block", marginBottom: "1rem" }}>
+                <span style={{ display: "block", marginBottom: "0.4rem", color: "var(--text-main)" }}>Changenote (required - applied to every mod in the batch)</span>
+                <textarea
+                    value={changenote}
+                    onChange={(e) => setChangenote(e.target.value)}
+                    disabled={isRunning || isDone}
+                    rows={3}
+                    style={{
+                        width: "100%",
+                        padding: "0.5rem",
+                        background: "rgba(0,0,0,0.25)",
+                        color: "var(--text-main)",
+                        border: "1px solid var(--border-dim, rgba(255,255,255,0.15))",
+                        borderRadius: 6,
+                        fontFamily: "inherit",
+                        fontSize: "0.9rem",
+                        resize: "vertical",
+                        boxSizing: "border-box",
+                    }}
+                    placeholder="e.g. Resync against latest game patch"
+                />
+            </label>
 
-                <label style={{ display: "block", marginBottom: "1rem" }}>
-                    <span style={{ display: "block", marginBottom: "0.4rem", color: "var(--text-main)" }}>Changenote (required - applied to every mod in the batch)</span>
-                    <textarea
-                        value={changenote}
-                        onChange={(e) => setChangenote(e.target.value)}
-                        disabled={isRunning || isDone}
-                        rows={3}
+            <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "var(--text-dim)" }}>
+                This will publish {selectedEligible.length} {selectedEligible.length === 1 ? "mod" : "mods"} to the Steam Workshop sharing this changelog:
+            </p>
+            <ul style={{ listStyle: "none", padding: 0, margin: "0 0 1rem 0", borderRadius: 6, border: "1px solid var(--border-dim, rgba(255,255,255,0.12))" }}>
+                {rows.map((row) => (
+                    <li
+                        key={row.workshopId || `skip-${row.title}`}
                         style={{
-                            width: "100%",
-                            padding: "0.5rem",
-                            background: "rgba(0,0,0,0.25)",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "0.5rem 0.85rem",
+                            borderTop: "1px solid rgba(255,255,255,0.05)",
+                            gap: "1rem",
+                            opacity: row.status === "skipped" ? 0.55 : 1,
+                        }}
+                    >
+                        {phase === "confirming" && row.workshopId && row.status !== "skipped" && (
+                            <input
+                                type="checkbox"
+                                checked={row.selected}
+                                onChange={() => toggleSelected(row.workshopId)}
+                                aria-label={`Include ${row.title} in the batch`}
+                                style={{ cursor: "pointer", flexShrink: 0 }}
+                            />
+                        )}
+                        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {row.title}
+                            {row.workshopId && <code style={{ marginLeft: "0.5rem", color: "var(--text-dim)" }}>{row.workshopId}</code>}
+                        </span>
+                        <StatusBadge row={row} />
+                    </li>
+                ))}
+            </ul>
+
+            {errorMessage && (
+                <div
+                    style={{
+                        padding: "0.75rem 1rem",
+                        marginBottom: "1rem",
+                        background: "rgba(239,68,68,0.15)",
+                        color: "#ff8a8a",
+                        border: "1px solid rgba(239,68,68,0.3)",
+                        borderRadius: 6,
+                        lineHeight: 1.4,
+                    }}
+                >
+                    {errorMessage}
+                </div>
+            )}
+
+            {(isRunning || isDone) && (
+                <div style={{ marginBottom: "1rem" }}>
+                    <div style={{ color: "var(--text-dim)", marginBottom: "0.4rem" }}>
+                        {isRunning && currentId ? `Live SteamCMD log (${rows.find((r) => r.workshopId === currentId)?.title ?? currentId}):` : "Live SteamCMD log:"}
+                    </div>
+                    <pre
+                        ref={scrollRef}
+                        style={{
+                            background: "rgba(0,0,0,0.45)",
                             color: "var(--text-main)",
-                            border: "1px solid var(--border-dim, rgba(255,255,255,0.15))",
+                            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                            fontSize: "0.8rem",
+                            padding: "0.75rem",
+                            margin: 0,
                             borderRadius: 6,
-                            fontFamily: "inherit",
-                            fontSize: "0.9rem",
-                            resize: "vertical",
-                            boxSizing: "border-box",
-                        }}
-                        placeholder="e.g. Resync against latest game patch"
-                    />
-                </label>
-
-                <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "var(--text-dim)" }}>
-                    This will publish {selectedEligible.length} {selectedEligible.length === 1 ? "mod" : "mods"} to the Steam Workshop sharing this changelog:
-                </p>
-                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 1rem 0", borderRadius: 6, border: "1px solid var(--border-dim, rgba(255,255,255,0.12))" }}>
-                    {rows.map((row) => (
-                        <li
-                            key={row.workshopId || `skip-${row.title}`}
-                            style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                padding: "0.5rem 0.85rem",
-                                borderTop: "1px solid rgba(255,255,255,0.05)",
-                                gap: "1rem",
-                                opacity: row.status === "skipped" ? 0.55 : 1,
-                            }}
-                        >
-                            {phase === "confirming" && row.workshopId && row.status !== "skipped" && (
-                                <input
-                                    type="checkbox"
-                                    checked={row.selected}
-                                    onChange={() => toggleSelected(row.workshopId)}
-                                    aria-label={`Include ${row.title} in the batch`}
-                                    style={{ cursor: "pointer", flexShrink: 0 }}
-                                />
-                            )}
-                            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {row.title}
-                                {row.workshopId && <code style={{ marginLeft: "0.5rem", color: "var(--text-dim)" }}>{row.workshopId}</code>}
-                            </span>
-                            <StatusBadge row={row} />
-                        </li>
-                    ))}
-                </ul>
-
-                {errorMessage && (
-                    <div
-                        style={{
-                            padding: "0.75rem 1rem",
-                            marginBottom: "1rem",
-                            background: "rgba(239,68,68,0.15)",
-                            color: "#ff8a8a",
-                            border: "1px solid rgba(239,68,68,0.3)",
-                            borderRadius: 6,
-                            lineHeight: 1.4,
+                            border: "1px solid var(--border-dim, rgba(255,255,255,0.12))",
+                            minHeight: "120px",
+                            maxHeight: "240px",
+                            overflow: "auto",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
                         }}
                     >
-                        {errorMessage}
-                    </div>
-                )}
-
-                {(isRunning || isDone) && (
-                    <div style={{ marginBottom: "1rem" }}>
-                        <div style={{ color: "var(--text-dim)", marginBottom: "0.4rem" }}>
-                            {isRunning && currentId ? `Live SteamCMD log (${rows.find((r) => r.workshopId === currentId)?.title ?? currentId}):` : "Live SteamCMD log:"}
-                        </div>
-                        <pre
-                            ref={scrollRef}
-                            style={{
-                                background: "rgba(0,0,0,0.45)",
-                                color: "var(--text-main)",
-                                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                                fontSize: "0.8rem",
-                                padding: "0.75rem",
-                                margin: 0,
-                                borderRadius: 6,
-                                border: "1px solid var(--border-dim, rgba(255,255,255,0.12))",
-                                minHeight: "120px",
-                                maxHeight: "240px",
-                                overflow: "auto",
-                                whiteSpace: "pre-wrap",
-                                wordBreak: "break-word",
-                            }}
-                        >
-                            {currentLog.length === 0 ? <span style={{ color: "var(--text-dim)" }}>(waiting for SteamCMD output...)</span> : currentLog.map((l) => <div key={l.seq}>{l.line}</div>)}
-                        </pre>
-                    </div>
-                )}
-
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
-                    {phase === "confirming" && (
-                        <>
-                            <button onClick={handleClose} className="btn" style={{ padding: "0.55rem 1.1rem" }}>
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handlePublishAll}
-                                disabled={changenote.trim().length === 0 || selectedEligible.length === 0}
-                                className="btn btn-primary"
-                                style={{ padding: "0.55rem 1.1rem" }}
-                            >
-                                Publish All
-                            </button>
-                        </>
-                    )}
-                    {(isRunning || isDone) && (
-                        <button onClick={handleClose} disabled={isRunning} className="btn" style={{ padding: "0.55rem 1.1rem" }}>
-                            Close
-                        </button>
-                    )}
+                        {currentLog.length === 0 ? <span style={{ color: "var(--text-dim)" }}>(waiting for SteamCMD output...)</span> : currentLog.map((l) => <div key={l.seq}>{l.line}</div>)}
+                    </pre>
                 </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
+                {phase === "confirming" && (
+                    <>
+                        <button onClick={handleClose} className="btn btn-outline">
+                            Cancel
+                        </button>
+                        <button onClick={handlePublishAll} disabled={changenote.trim().length === 0 || selectedEligible.length === 0} className="btn btn-primary">
+                            Publish All
+                        </button>
+                    </>
+                )}
+                {(isRunning || isDone) && (
+                    <button onClick={handleClose} disabled={isRunning} className="btn btn-outline">
+                        Close
+                    </button>
+                )}
             </div>
-        </div>
+        </Modal>
     )
 }
 
