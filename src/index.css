@@ -588,6 +588,33 @@ body {
     min-height: 0;
 }
 
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Loading and error states (src/ui/LoadingState.tsx, src/ui/ErrorState.tsx) */
+.loading-state {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 60vh;
+}
+
+.loading-state h2 {
+    color: var(--text-dim);
+    animation: pulse 2s infinite;
+}
+
+.error-state {
+    max-width: 640px;
+    margin: 4rem auto;
+    padding: 2rem;
+    text-align: center;
+}
+
+.error-state p {
+    color: var(--text-dim);
+    margin: 0.75rem 0 1.5rem;
+}
+
 /* Native selects draw their arrow jammed against the right border. Reset appearance and supply a custom chevron with a fixed gap and reserved padding. */
 .app-select {
     -webkit-appearance: none;

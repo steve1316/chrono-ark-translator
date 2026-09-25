@@ -33,6 +33,8 @@ interface Backend {
     suggestions?: (typeof SUGGESTION)[][]
     /** Number reported by POST glossary/suggestions/scan. */
     scanNew?: number
+    /** HTTP status for GET /mods/{id}. Defaults to 200. */
+    modStatus?: number
 }
 
 /**
@@ -48,7 +50,10 @@ function mockBackend(backend: Backend = {}) {
         const url = String(input)
         const method = init?.method ?? "GET"
         if (url.endsWith("/settings")) return json({ provider: "claude" })
-        if (url.endsWith(`/mods/${MOD_ID}`)) return json({ strings: [STRING], name: "Roland", author: "Author", preview_image: null, url: null })
+        if (url.endsWith(`/mods/${MOD_ID}`))
+            return backend.modStatus && backend.modStatus !== 200
+                ? Promise.resolve(new Response(JSON.stringify({ detail: "Mod not found" }), { status: backend.modStatus }))
+                : json({ strings: [STRING], name: "Roland", author: "Author", preview_image: null, url: null })
         if (url.endsWith("/export-status")) return json(backend.exportStatus ?? { has_changes: true, has_previous_sync: true })
         if (url.endsWith("/glossary/suggestions/scan") && method === "POST") return json({ status: "success", new: backend.scanNew ?? 0 })
         if (url.endsWith("/glossary/suggestions")) return json(suggestionQueue.length > 1 ? suggestionQueue.shift() : suggestionQueue[0])
@@ -152,5 +157,12 @@ describe("Chrono Ark Details page", () => {
         const dialog = await screen.findByRole("dialog", { name: "Mod Glossary" })
         expect(dialog).toHaveClass("dialog-xl")
         expect(within(dialog).getByText("Roland")).toBeInTheDocument()
+    })
+
+    it("shows a not-found state with a way back when the mod does not exist", async () => {
+        mockBackend({ modStatus: 404 })
+        renderPage()
+        expect(await screen.findByRole("heading", { name: "Mod not found" })).toBeInTheDocument()
+        expect(screen.getByRole("button", { name: "Back to Dashboard" })).toBeInTheDocument()
     })
 })

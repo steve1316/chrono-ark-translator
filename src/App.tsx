@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react"
-import { Routes, Route, Navigate, useParams, useMatch } from "react-router-dom"
+import { Routes, Route, Navigate, useParams, useMatch, useLocation } from "react-router-dom"
 import Sidebar from "./components/Sidebar"
+import ErrorBoundary from "./ui/ErrorBoundary"
+import LoadingState from "./ui/LoadingState"
 import { getBranding } from "./components/GameSwitcher/branding"
 import SettingsPage from "./pages/Settings"
 import { API_BASE } from "./config"
@@ -28,6 +30,7 @@ function GameSubtree() {
 function App() {
     const [defaultGameId, setDefaultGameId] = useState<string>("chrono_ark")
     const [loading, setLoading] = useState(true)
+    const location = useLocation()
 
     // The persisted game id only picks the default redirect target for "/". The URL is the source of truth thereafter.
     useEffect(() => {
@@ -67,20 +70,20 @@ function App() {
             {/* Detail pages get the wider container-fluid for the string table. */}
             <main className={isDetailPage ? "container-fluid" : "container"}>
                 {loading ? (
-                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
-                        <h2 style={{ color: "var(--text-dim)", animation: "pulse 2s infinite" }}>Loading resources...</h2>
-                    </div>
+                    <LoadingState message="Loading resources..." />
                 ) : (
-                    <Routes>
-                        {/* --- Cross-game Settings: provider configuration, game path --- */}
-                        <Route path="/settings" element={<SettingsPage />} />
+                    <ErrorBoundary key={location.pathname}>
+                        <Routes>
+                            {/* --- Cross-game Settings: provider configuration, game path --- */}
+                            <Route path="/settings" element={<SettingsPage />} />
 
-                        {/* --- Active game's subtree, namespaced by URL slug --- */}
-                        <Route path="/:gameSlug/*" element={<GameSubtree />} />
+                            {/* --- Active game's subtree, namespaced by URL slug --- */}
+                            <Route path="/:gameSlug/*" element={<GameSubtree />} />
 
-                        {/* --- Root + unknown paths redirect to the persisted game's dashboard --- */}
-                        <Route path="*" element={<Navigate to={`/${defaultSlug}/dashboard`} replace />} />
-                    </Routes>
+                            {/* --- Root + unknown paths redirect to the persisted game's dashboard --- */}
+                            <Route path="*" element={<Navigate to={`/${defaultSlug}/dashboard`} replace />} />
+                        </Routes>
+                    </ErrorBoundary>
                 )}
             </main>
         </>

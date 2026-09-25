@@ -13,6 +13,8 @@ import BackupHistoryModal from "../../components/BackupHistoryModal"
 import ChronoArkGlossaryModal from "../../components/ChronoArkGlossaryModal"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { TranslationPage } from "../../../../translation/TranslationPage"
+import ErrorState from "../../../../ui/ErrorState"
+import LoadingState from "../../../../ui/LoadingState"
 import { BatchReviewBanner } from "../../../../translation/BatchReviewBanner"
 import { ContextPanel, type ContextFields } from "../../../../translation/ContextPanel"
 import { SyncButton } from "../../../../translation/SyncButton"
@@ -47,6 +49,7 @@ const ModDetail: React.FC = () => {
     const [modPreviewImage, setModPreviewImage] = useState<string | null>(null)
     const [modUrl, setModUrl] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState<string | null>(null)
 
     const [filter, setFilter] = useState<"all" | "missing" | "untouched" | "pending" | "synced">("all")
     const [search, setSearch] = useState("")
@@ -243,6 +246,11 @@ const ModDetail: React.FC = () => {
         if (!silent) setLoading(true)
         try {
             const res = await gameApi("chrono_ark").get(`/mods/${modId}`)
+            if (!res.ok) {
+                if (!silent) setLoadError(res.status === 404 ? "not-found" : `The server returned HTTP ${res.status}.`)
+                return
+            }
+            setLoadError(null)
             const data = await res.json()
             setStrings(data.strings)
             setModName(data.name ?? "")
@@ -253,6 +261,7 @@ const ModDetail: React.FC = () => {
             setTargetLangOverride(data.target_language_override ?? null)
         } catch (err) {
             console.error("Failed to fetch mod detail:", err)
+            if (!silent) setLoadError("Could not reach the server.")
         } finally {
             setLoading(false)
         }
@@ -503,15 +512,19 @@ const ModDetail: React.FC = () => {
         }
     }
 
-    if (loading) {
+    if (loading) return <LoadingState message="Loading mod details..." />
+
+    if (!modId || loadError === "not-found") {
         return (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
-                <h2 style={{ color: "var(--text-dim)", animation: "pulse 2s infinite" }}>Loading mod details...</h2>
-            </div>
+            <ErrorState
+                title="Mod not found"
+                message={`No Chrono Ark mod with ID ${modId ?? ""} was found. It may have been unsubscribed or moved.`}
+                action={{ label: "Back to Dashboard", onClick: onBack }}
+            />
         )
     }
 
-    if (!modId) return <div>Mod ID not found.</div>
+    if (loadError) return <ErrorState title="Could not load this mod" message={loadError} action={{ label: "Back to Dashboard", onClick: onBack }} />
 
     const columns: ColumnDef<LocString>[] = [
         { field: "is_translated", label: "Status", width: columnWidths.is_translated ?? 120, sortable: true, render: (s) => <StatusBadge status={getRowStatus(s)} reason={s.untranslatable_reason} /> },
