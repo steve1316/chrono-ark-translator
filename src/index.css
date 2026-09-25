@@ -227,6 +227,35 @@ body {
     color: #fbbf24;
 }
 
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Language controls (src/translation/LanguageControls.tsx) */
+.language-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.language-controls-label {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+}
+
+.language-controls-arrow {
+    margin: 0 0.3rem;
+    color: var(--text-dim);
+}
+
+.lang-select {
+    padding: 0.3rem 0.5rem;
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    font-size: 0.85rem;
+}
+
 .title-group p {
     color: var(--text-dim);
     margin-top: 0.5rem;

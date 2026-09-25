@@ -14,6 +14,7 @@ import BackupHistoryModal from "../../components/BackupHistoryModal"
 import ChronoArkGlossaryPanel from "../../components/ChronoArkGlossaryPanel"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { TranslationPage } from "../../../../translation/TranslationPage"
+import { LanguageControls } from "../../../../translation/LanguageControls"
 import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../translation/TitleAdornments"
 import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationCell } from "../../../../translation/TranslationCell"
@@ -696,49 +697,7 @@ const ModDetail: React.FC = () => {
             }
             subtitle={modAuthor ? `by ${modAuthor}` : undefined}
             languageControls={
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
-                    <label style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>Source Language:</label>
-                    <select
-                        value={sourceLangOverride || "Chinese"}
-                        onChange={(e) => saveSourceLanguage(e.target.value)}
-                        style={{
-                            padding: "0.3rem 0.5rem",
-                            borderRadius: "6px",
-                            background: "rgba(0,0,0,0.2)",
-                            border: "1px solid var(--glass-border)",
-                            color: "var(--text-main)",
-                            fontSize: "0.85rem",
-                        }}
-                    >
-                        <option value="Chinese">Chinese</option>
-                        <option value="Korean">Korean</option>
-                        <option value="Japanese">Japanese</option>
-                        <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
-                        <option value="English">English</option>
-                    </select>
-                    {sourceLangOverride === "English" && (
-                        <>
-                            <span style={{ margin: "0 0.3rem", color: "var(--text-dim)" }}>→</span>
-                            <select
-                                value={targetLangOverride || "Chinese"}
-                                onChange={(e) => saveTargetLanguage(e.target.value)}
-                                style={{
-                                    padding: "0.3rem 0.5rem",
-                                    borderRadius: "6px",
-                                    background: "rgba(0,0,0,0.2)",
-                                    border: "1px solid var(--glass-border)",
-                                    color: "var(--text-main)",
-                                    fontSize: "0.85rem",
-                                }}
-                            >
-                                <option value="Chinese">Chinese</option>
-                                <option value="Korean">Korean</option>
-                                <option value="Japanese">Japanese</option>
-                                <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
-                            </select>
-                        </>
-                    )}
-                </div>
+                <LanguageControls source={sourceLangOverride || "Chinese"} target={targetLangOverride || "Chinese"} onSourceChange={saveSourceLanguage} onTargetChange={saveTargetLanguage} />
             }
             progressLabel={`${strings.filter((s) => s.source.trim() && !s.untranslatable_reason && s.is_translated).length} / ${strings.filter((s) => s.source.trim() && !s.untranslatable_reason).length} total strings translated`}
             toolbar={

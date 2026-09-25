@@ -8,6 +8,7 @@ import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslati
 import { useGameSlug } from "../../../useGameSlug"
 import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationPage } from "../../../../translation/TranslationPage"
+import { LanguageControls } from "../../../../translation/LanguageControls"
 import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../translation/TitleAdornments"
 import { TranslationCell } from "../../../../translation/TranslationCell"
 import { canonicalRowStyle } from "../../../../translation/rowStyle"
@@ -450,46 +451,12 @@ const TranslationDetailsPage: React.FC = () => {
     )
 
     const languageControls = (
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
-            <label htmlFor="source-lang-select" style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>
-                Source Language:
-            </label>
-            <select
-                id="source-lang-select"
-                value={modContext.source_language_override ?? mod?.source_language ?? "Chinese"}
-                onChange={(e) => saveSourceLanguage(e.target.value)}
-                style={{ padding: "0.3rem 0.5rem", borderRadius: "6px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--glass-border)", color: "var(--text-main)", fontSize: "0.85rem" }}
-            >
-                <option value="Chinese">Chinese</option>
-                <option value="Korean">Korean</option>
-                <option value="Japanese">Japanese</option>
-                <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
-                <option value="English">English</option>
-            </select>
-            {(modContext.source_language_override ?? mod?.source_language) === "English" && (
-                <>
-                    <span style={{ margin: "0 0.3rem", color: "var(--text-dim)" }}>&rarr;</span>
-                    <select
-                        aria-label="Target Language"
-                        value={modContext.target_language_override ?? mod?.target_language ?? "Chinese"}
-                        onChange={(e) => saveTargetLanguage(e.target.value)}
-                        style={{
-                            padding: "0.3rem 0.5rem",
-                            borderRadius: "6px",
-                            background: "rgba(0,0,0,0.2)",
-                            border: "1px solid var(--glass-border)",
-                            color: "var(--text-main)",
-                            fontSize: "0.85rem",
-                        }}
-                    >
-                        <option value="Chinese">Chinese</option>
-                        <option value="Korean">Korean</option>
-                        <option value="Japanese">Japanese</option>
-                        <option value="Chinese-TW [zh-tw]">Chinese-TW</option>
-                    </select>
-                </>
-            )}
-        </div>
+        <LanguageControls
+            source={modContext.source_language_override ?? mod?.source_language ?? "Chinese"}
+            target={modContext.target_language_override ?? mod?.target_language ?? "Chinese"}
+            onSourceChange={saveSourceLanguage}
+            onTargetChange={saveTargetLanguage}
+        />
     )
 
     const toolbar = (
