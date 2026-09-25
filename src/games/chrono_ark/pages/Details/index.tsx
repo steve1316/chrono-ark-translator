@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useGameSlug } from "../../../useGameSlug"
 import type { GlossaryTerm, LocString } from "../../../../shared_types"
@@ -50,6 +50,8 @@ const ModDetail: React.FC = () => {
     const [modUrl, setModUrl] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     const [loadError, setLoadError] = useState<string | null>(null)
+    // Only the first load may replace the page with an error. A failed refresh after an action keeps the page the user is looking at.
+    const hasLoadedRef = useRef(false)
 
     const [filter, setFilter] = useState<"all" | "missing" | "untouched" | "pending" | "synced">("all")
     const [search, setSearch] = useState("")
@@ -247,10 +249,11 @@ const ModDetail: React.FC = () => {
         try {
             const res = await gameApi("chrono_ark").get(`/mods/${modId}`)
             if (!res.ok) {
-                if (!silent) setLoadError(res.status === 404 ? "not-found" : `The server returned HTTP ${res.status}.`)
+                if (!silent && !hasLoadedRef.current) setLoadError(res.status === 404 ? "not-found" : `The server returned HTTP ${res.status}.`)
                 return
             }
             setLoadError(null)
+            hasLoadedRef.current = true
             const data = await res.json()
             setStrings(data.strings)
             setModName(data.name ?? "")
@@ -261,7 +264,7 @@ const ModDetail: React.FC = () => {
             setTargetLangOverride(data.target_language_override ?? null)
         } catch (err) {
             console.error("Failed to fetch mod detail:", err)
-            if (!silent) setLoadError("Could not reach the server.")
+            if (!silent && !hasLoadedRef.current) setLoadError("Could not reach the server.")
         } finally {
             setLoading(false)
         }

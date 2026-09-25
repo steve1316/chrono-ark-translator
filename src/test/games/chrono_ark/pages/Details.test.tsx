@@ -165,4 +165,22 @@ describe("Chrono Ark Details page", () => {
         expect(await screen.findByRole("heading", { name: "Mod not found" })).toBeInTheDocument()
         expect(screen.getByRole("button", { name: "Back to Dashboard" })).toBeInTheDocument()
     })
+
+    it("keeps the page when the refresh after a sync fails", async () => {
+        const fetchSpy = mockBackend()
+        const base = fetchSpy.getMockImplementation()!
+        let modLoads = 0
+        fetchSpy.mockImplementation((input, init) => {
+            if (String(input).endsWith(`/mods/${MOD_ID}`) && ++modLoads > 1) return Promise.resolve(new Response("{}", { status: 500 }))
+            return base(input, init)
+        })
+        renderPage()
+        await screen.findByText("Mook Workshop")
+        await userEvent.click(screen.getByRole("button", { name: /Sync Changes/ }))
+        await userEvent.click(within(screen.getByRole("dialog", { name: "Sync Changes" })).getByRole("button", { name: /^Sync$/ }))
+        expect(await screen.findByText(/Synced 1 translation/)).toBeInTheDocument()
+        await waitFor(() => expect(modLoads).toBeGreaterThan(1))
+        expect(screen.queryByRole("heading", { name: "Could not load this mod" })).not.toBeInTheDocument()
+        expect(screen.getByText("Mook Workshop")).toBeInTheDocument()
+    })
 })
