@@ -1364,3 +1364,92 @@ th {
     line-height: 1.6;
     white-space: pre-wrap;
 }
+
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Banners (src/ui/Banner.tsx) */
+.glass-card.banner,
+.glass-card.banner:hover {
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    white-space: pre-wrap;
+    transform: none;
+}
+
+.glass-card.banner-success,
+.glass-card.banner-success:hover {
+    background: rgba(52, 211, 153, 0.1);
+    color: var(--tone-success);
+}
+
+.glass-card.banner-error,
+.glass-card.banner-error:hover {
+    background: rgba(248, 113, 113, 0.1);
+    color: var(--tone-error-text);
+}
+
+.glass-card.banner-info,
+.glass-card.banner-info:hover {
+    background: rgba(125, 211, 252, 0.08);
+    color: var(--text-main);
+}
+
+.glass-card.banner-warning,
+.glass-card.banner-warning:hover {
+    background: rgba(250, 204, 21, 0.08);
+    color: #facc15;
+}
+
+.banner-dismiss {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+}
+
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Search input (src/ui/SearchInput.tsx) */
+.search-input {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+
+.search-input-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    pointer-events: none;
+}
+
+/* Chrono Ark's search field used the browser's smaller input font, which keeps it level with the 42px filter pills. */
+.input.search-input-field {
+    padding: 0.75rem 2.5rem;
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    line-height: normal;
+}
+
+.search-input-clear {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.25rem;
+    line-height: 1;
+}

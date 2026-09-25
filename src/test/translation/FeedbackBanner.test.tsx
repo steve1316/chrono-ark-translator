@@ -14,10 +14,10 @@ describe("FeedbackBanner", () => {
         expect(onDismiss).toHaveBeenCalledTimes(1)
     })
 
-    it("uses the success color for success and the error color for error", () => {
+    it("uses the success tone for success and the error tone for error", () => {
         const { rerender } = render(<FeedbackBanner type="success" message="ok" onDismiss={vi.fn()} />)
-        expect(screen.getByText("ok").parentElement).toHaveStyle({ color: "rgb(52, 211, 153)" })
+        expect(screen.getByText("ok").closest(".banner")).toHaveClass("banner-success")
         rerender(<FeedbackBanner type="error" message="bad" onDismiss={vi.fn()} />)
-        expect(screen.getByText("bad").parentElement).toHaveStyle({ color: "rgb(248, 113, 113)" })
+        expect(screen.getByText("bad").closest(".banner")).toHaveClass("banner-error")
     })
 })

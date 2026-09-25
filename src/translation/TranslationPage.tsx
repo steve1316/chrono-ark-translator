@@ -4,6 +4,7 @@ import { StringsTable } from "./StringsTable"
 import { FeedbackBanner } from "./FeedbackBanner"
 import { TranslatingBanner } from "./TranslatingBanner"
 import type { ColumnDef } from "./types"
+import SearchInput from "../ui/SearchInput"
 
 /** One status filter pill. */
 interface StatusFilter {
@@ -169,38 +170,7 @@ export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
 
             <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "2rem" }}>
                 <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-                    <div style={{ flex: 1, position: "relative" }}>
-                        <input
-                            type="text"
-                            className="btn-outline"
-                            placeholder="Search keys or text..."
-                            value={search}
-                            onChange={(e) => onSearchChange(e.target.value)}
-                            style={{ width: "100%", padding: "0.75rem", paddingRight: "2.5rem", borderRadius: "8px", background: "rgba(0, 0, 0, 0.2)", boxSizing: "border-box" }}
-                        />
-                        {search && (
-                            <button
-                                type="button"
-                                onClick={() => onSearchChange("")}
-                                title="Clear search"
-                                style={{
-                                    position: "absolute",
-                                    right: "0.5rem",
-                                    top: "50%",
-                                    transform: "translateY(-50%)",
-                                    background: "none",
-                                    border: "none",
-                                    color: "var(--text-dim)",
-                                    cursor: "pointer",
-                                    fontSize: "1.1rem",
-                                    padding: "0.25rem",
-                                    lineHeight: 1,
-                                }}
-                            >
-                                &times;
-                            </button>
-                        )}
-                    </div>
+                    <SearchInput value={search} onChange={onSearchChange} placeholder="Search keys or text..." />
                     <div style={{ display: "flex", gap: "0.5rem" }}>
                         {statusFilters.map((f) => (
                             <button key={f.value} className={`filter-pill btn ${activeFilter === f.value ? "btn-primary" : "btn-outline"}`} onClick={() => onFilterChange(f.value)}>
