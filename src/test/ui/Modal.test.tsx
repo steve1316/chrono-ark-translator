@@ -115,6 +115,25 @@ describe("Modal", () => {
         expect(onClose).not.toHaveBeenCalled()
     })
 
+    it("stacks a dialog opened from the footer above its parent", () => {
+        render(
+            <Modal
+                title="Outer"
+                onClose={vi.fn()}
+                footer={
+                    <Modal title="Inner" onClose={vi.fn()}>
+                        y
+                    </Modal>
+                }
+            >
+                x
+            </Modal>
+        )
+        const outer = screen.getByRole("dialog", { name: "Outer" }).parentElement as HTMLElement
+        const inner = screen.getByRole("dialog", { name: "Inner" }).parentElement as HTMLElement
+        expect(Number(inner.style.zIndex)).toBeGreaterThan(Number(outer.style.zIndex))
+    })
+
     it("renders the subtitle, header actions and footer slots", () => {
         render(
             <Modal title="Suggested terms" subtitle="Batch 1 of 3" headerActions={<button>Apply all</button>} footer={<button>Done</button>} onClose={vi.fn()}>

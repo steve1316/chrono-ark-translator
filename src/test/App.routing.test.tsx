@@ -45,13 +45,14 @@ describe("App game accent", () => {
         // Unmount before unstubbing so no pending effect reaches the missing global.
         cleanup()
         vi.unstubAllGlobals()
+        document.documentElement.style.removeProperty("--game-accent")
+        document.documentElement.style.removeProperty("--game-accent-gradient")
     })
 
     /**
      * Render the app at a URL with every endpoint returning an empty payload.
      *
      * @param path Initial URL to render.
-     * @returns The `<main>` element.
      */
     function renderAt(path: string) {
         vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
@@ -59,28 +60,28 @@ describe("App game accent", () => {
             if (url.endsWith("/settings")) return Promise.resolve(jsonResponse({ active_game: "chrono_ark" }))
             return Promise.resolve(jsonResponse([]))
         })
-        const { container } = render(
+        render(
             <MemoryRouter initialEntries={[path]}>
                 <App />
             </MemoryRouter>
         )
-        return container.querySelector("main") as HTMLElement
     }
 
-    it("sets the WH3 accent on main for warhammer_3 routes", async () => {
-        const main = renderAt("/warhammer_3/dashboard")
-        await waitFor(() => expect(main.style.getPropertyValue("--game-accent-gradient")).toContain("#dc2626"))
-        expect(main.style.getPropertyValue("--game-accent")).toBe("#dc2626")
+    it("sets the WH3 accent on the root element so portaled dialogs inherit it", async () => {
+        renderAt("/warhammer_3/dashboard")
+        const root = document.documentElement.style
+        await waitFor(() => expect(root.getPropertyValue("--game-accent-gradient")).toContain("#dc2626"))
+        expect(root.getPropertyValue("--game-accent")).toBe("#dc2626")
     })
 
-    it("sets the Chrono Ark accent on main for chrono_ark routes", async () => {
-        const main = renderAt("/chrono_ark/dashboard")
-        await waitFor(() => expect(main.style.getPropertyValue("--game-accent-gradient")).toContain("#38bdf8"))
+    it("sets the Chrono Ark accent on the root element for chrono_ark routes", async () => {
+        renderAt("/chrono_ark/dashboard")
+        await waitFor(() => expect(document.documentElement.style.getPropertyValue("--game-accent-gradient")).toContain("#38bdf8"))
     })
 
-    it("leaves the accent at its CSS default on /settings", async () => {
-        const main = renderAt("/settings")
-        await waitFor(() => expect(main).toBeInTheDocument())
-        expect(main.style.getPropertyValue("--game-accent-gradient")).toBe("")
+    it("clears a previous game's accent on /settings so the CSS default applies", async () => {
+        document.documentElement.style.setProperty("--game-accent-gradient", "linear-gradient(#dc2626, #f97316)")
+        renderAt("/settings")
+        await waitFor(() => expect(document.documentElement.style.getPropertyValue("--game-accent-gradient")).toBe(""))
     })
 })

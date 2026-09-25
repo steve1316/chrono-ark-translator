@@ -117,24 +117,24 @@ export default function Modal({ title, subtitle, size = "md", onClose, closeDisa
         // Deeper dialogs paint above their parents, the same order Escape closes them in.
         <div className="dialog-backdrop" style={{ zIndex: 1000 + depth }} onMouseDown={onBackdropMouseDown} onClick={onBackdropClick}>
             <div className={`glass-card dialog-panel dialog-${size}${fill ? " dialog-fill" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-                <div className="dialog-header">
-                    <div className="dialog-title-group">
-                        <h2 id={titleId} className="dialog-title">
-                            {title}
-                        </h2>
-                        {subtitle && <div className="dialog-subtitle">{subtitle}</div>}
+                <DialogDepth.Provider value={depth + 1}>
+                    <div className="dialog-header">
+                        <div className="dialog-title-group">
+                            <h2 id={titleId} className="dialog-title">
+                                {title}
+                            </h2>
+                            {subtitle && <div className="dialog-subtitle">{subtitle}</div>}
+                        </div>
+                        <div className="dialog-header-actions">
+                            {headerActions}
+                            <button type="button" className="dialog-close" onClick={onClose} disabled={closeDisabled} aria-label="Close" title={closeDisabled ? closeDisabledReason : "Close"}>
+                                &times;
+                            </button>
+                        </div>
                     </div>
-                    <div className="dialog-header-actions">
-                        {headerActions}
-                        <button type="button" className="dialog-close" onClick={onClose} disabled={closeDisabled} aria-label="Close" title={closeDisabled ? closeDisabledReason : "Close"}>
-                            &times;
-                        </button>
-                    </div>
-                </div>
-                <div className="dialog-body">
-                    <DialogDepth.Provider value={depth + 1}>{children}</DialogDepth.Provider>
-                </div>
-                {footer && <div className="dialog-footer">{footer}</div>}
+                    <div className="dialog-body">{children}</div>
+                    {footer && <div className="dialog-footer">{footer}</div>}
+                </DialogDepth.Provider>
             </div>
         </div>,
         document.body
