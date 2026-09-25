@@ -2,6 +2,7 @@ import React, { useState } from "react"
 import { FaCheck, FaTimes, FaCheckDouble, FaTimesCircle } from "react-icons/fa"
 import type { TermSuggestion } from "../../shared_types"
 import { gameApi } from "../../api/games"
+import Modal from "../../ui/Modal"
 
 /**
  * Props for the {@link GlossarySuggestionModal} component.
@@ -107,145 +108,106 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ gameI
     }
 
     return (
-        // Backdrop overlay: clicking directly on the backdrop (not a child) closes the modal.
-        <div
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose()
-            }}
-        >
-            <div className="glass-card" style={{ width: "700px", maxHeight: "80vh", overflow: "auto", padding: "2rem" }}>
-                {/* Modal header with title, batch progress, and close button */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-                    <div>
-                        <h2 style={{ margin: 0 }}>Suggested Glossary Terms</h2>
-                        {isBatchMode && (
-                            <div style={{ color: "var(--text-dim)", fontSize: "0.9rem", marginTop: "0.25rem" }}>
-                                Batch {batchProgress!.current} of {batchProgress!.total}
-                            </div>
-                        )}
-                    </div>
-                    <button
-                        onClick={onClose}
-                        style={{
-                            background: "none",
-                            border: "none",
-                            color: "var(--text-dim)",
-                            fontSize: "2rem",
-                            lineHeight: 1,
-                            cursor: "pointer",
-                            padding: "0.25rem 0.5rem",
-                            borderRadius: "4px",
-                        }}
-                        title="Close"
-                    >
-                        &times;
-                    </button>
-                </div>
-
-                {pending.length === 0 ? (
-                    // Empty state shown once all suggestions have been accepted or dismissed.
-                    <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>No pending suggestions.</p>
-                ) : (
-                    <>
-                        {/* Bulk action buttons: accept all or dismiss all at once. */}
-                        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-                            <button
-                                className="btn btn-primary"
-                                disabled={processing}
-                                onClick={() => handleAccept(pending.map((s) => s.english))}
-                                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-                            >
-                                <FaCheckDouble /> Accept All ({pending.length})
-                            </button>
-                            <button
-                                className="btn btn-outline"
-                                disabled={processing}
-                                onClick={() => handleDismiss([], true)}
-                                style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
-                            >
-                                <FaTimesCircle /> Dismiss All
-                            </button>
-                        </div>
-
-                        {/* Individual suggestion cards. */}
-                        {pending.map((suggestion) => (
-                            <div
-                                key={suggestion.english}
-                                style={{ padding: "1rem", marginBottom: "0.75rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}
-                            >
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                                    {/* Left side: term details. flex:1 + minWidth:0 lets long text wrap instead of pushing the buttons off-screen. */}
-                                    <div data-testid="suggestion-details" style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
-                                        {/* English translation proposed by the AI, or edit showing old → new. */}
-                                        <div style={{ fontWeight: 600, fontSize: "1.1rem" }}>
-                                            {suggestion.edit_of ? (
-                                                <>
-                                                    <span style={{ textDecoration: "line-through", color: "var(--text-dim)" }}>{suggestion.edit_of}</span>
-                                                    <span style={{ margin: "0 0.5rem", color: "var(--text-dim)" }}>&rarr;</span>
-                                                    {suggestion.english}
-                                                </>
-                                            ) : (
-                                                suggestion.english
-                                            )}
-                                        </div>
-                                        {/* Original source text and its language. */}
-                                        <div style={{ color: "var(--text-dim)", marginTop: "0.25rem" }}>
-                                            {suggestion.source_lang}: {suggestion.source}
-                                        </div>
-                                        {/* AI-generated reasoning for why this term should be in the glossary. */}
-                                        <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem", fontStyle: "italic" }}>{suggestion.reason}</div>
-                                        {/* Category badge (e.g. "skill", "character", "item"). */}
-                                        <span
-                                            style={{
-                                                display: "inline-block",
-                                                marginTop: "0.5rem",
-                                                padding: "0.15rem 0.5rem",
-                                                borderRadius: "4px",
-                                                fontSize: "0.75rem",
-                                                textTransform: "capitalize",
-                                                background: "rgba(138,180,248,0.15)",
-                                                color: "var(--accent-primary)",
-                                            }}
-                                        >
-                                            {suggestion.category}
-                                        </span>
-                                    </div>
-                                    {/* Right side: per-term accept/dismiss buttons. */}
-                                    <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
-                                        <button
-                                            className="btn btn-primary"
-                                            disabled={processing}
-                                            onClick={() => handleAccept([suggestion.english])}
-                                            style={{ padding: "0.25rem 0.75rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
-                                        >
-                                            <FaCheck /> Accept
-                                        </button>
-                                        <button
-                                            className="btn btn-outline"
-                                            disabled={processing}
-                                            onClick={() => handleDismiss([suggestion.english])}
-                                            style={{ padding: "0.25rem 0.75rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
-                                        >
-                                            <FaTimes /> Dismiss
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </>
-                )}
-
-                {/* Batch-mode: Continue to next batch / finish button */}
-                {isBatchMode && onContinue && (
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--glass-border)" }}>
-                        <button className="btn btn-primary" disabled={processing} onClick={onContinue} style={{ padding: "0.5rem 1.5rem", fontSize: "1rem" }}>
-                            {batchProgress!.current >= batchProgress!.total ? "Finish" : pending.length === 0 ? "Continue to Next Batch" : "Skip & Continue to Next Batch"}
+        <Modal title="Suggested Glossary Terms" size="md" subtitle={isBatchMode ? `Batch ${batchProgress!.current} of ${batchProgress!.total}` : undefined} onClose={onClose}>
+            {pending.length === 0 ? (
+                // Empty state shown once all suggestions have been accepted or dismissed.
+                <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>No pending suggestions.</p>
+            ) : (
+                <>
+                    {/* Bulk action buttons: accept all or dismiss all at once. */}
+                    <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+                        <button
+                            className="btn btn-primary"
+                            disabled={processing}
+                            onClick={() => handleAccept(pending.map((s) => s.english))}
+                            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+                        >
+                            <FaCheckDouble /> Accept All ({pending.length})
+                        </button>
+                        <button
+                            className="btn btn-outline"
+                            disabled={processing}
+                            onClick={() => handleDismiss([], true)}
+                            style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#ff4444", borderColor: "rgba(255,68,68,0.3)" }}
+                        >
+                            <FaTimesCircle /> Dismiss All
                         </button>
                     </div>
-                )}
-            </div>
-        </div>
+
+                    {/* Individual suggestion cards. */}
+                    {pending.map((suggestion) => (
+                        <div key={suggestion.english} style={{ padding: "1rem", marginBottom: "0.75rem", background: "rgba(0,0,0,0.2)", borderRadius: "8px", border: "1px solid var(--glass-border)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                {/* Left side: term details. flex:1 + minWidth:0 lets long text wrap instead of pushing the buttons off-screen. */}
+                                <div data-testid="suggestion-details" style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
+                                    {/* English translation proposed by the AI, or edit showing old → new. */}
+                                    <div style={{ fontWeight: 600, fontSize: "1.1rem" }}>
+                                        {suggestion.edit_of ? (
+                                            <>
+                                                <span style={{ textDecoration: "line-through", color: "var(--text-dim)" }}>{suggestion.edit_of}</span>
+                                                <span style={{ margin: "0 0.5rem", color: "var(--text-dim)" }}>&rarr;</span>
+                                                {suggestion.english}
+                                            </>
+                                        ) : (
+                                            suggestion.english
+                                        )}
+                                    </div>
+                                    {/* Original source text and its language. */}
+                                    <div style={{ color: "var(--text-dim)", marginTop: "0.25rem" }}>
+                                        {suggestion.source_lang}: {suggestion.source}
+                                    </div>
+                                    {/* AI-generated reasoning for why this term should be in the glossary. */}
+                                    <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem", fontStyle: "italic" }}>{suggestion.reason}</div>
+                                    {/* Category badge (e.g. "skill", "character", "item"). */}
+                                    <span
+                                        style={{
+                                            display: "inline-block",
+                                            marginTop: "0.5rem",
+                                            padding: "0.15rem 0.5rem",
+                                            borderRadius: "4px",
+                                            fontSize: "0.75rem",
+                                            textTransform: "capitalize",
+                                            background: "rgba(138,180,248,0.15)",
+                                            color: "var(--accent-primary)",
+                                        }}
+                                    >
+                                        {suggestion.category}
+                                    </span>
+                                </div>
+                                {/* Right side: per-term accept/dismiss buttons. */}
+                                <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+                                    <button
+                                        className="btn btn-primary"
+                                        disabled={processing}
+                                        onClick={() => handleAccept([suggestion.english])}
+                                        style={{ padding: "0.25rem 0.75rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                                    >
+                                        <FaCheck /> Accept
+                                    </button>
+                                    <button
+                                        className="btn btn-outline"
+                                        disabled={processing}
+                                        onClick={() => handleDismiss([suggestion.english])}
+                                        style={{ padding: "0.25rem 0.75rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                                    >
+                                        <FaTimes /> Dismiss
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </>
+            )}
+
+            {/* Batch-mode: Continue to next batch / finish button */}
+            {isBatchMode && onContinue && (
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--glass-border)" }}>
+                    <button className="btn btn-primary" disabled={processing} onClick={onContinue} style={{ padding: "0.5rem 1.5rem", fontSize: "1rem" }}>
+                        {batchProgress!.current >= batchProgress!.total ? "Finish" : pending.length === 0 ? "Continue to Next Batch" : "Skip & Continue to Next Batch"}
+                    </button>
+                </div>
+            )}
+        </Modal>
     )
 }
 
