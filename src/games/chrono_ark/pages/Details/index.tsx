@@ -14,6 +14,7 @@ import BackupHistoryModal from "../../components/BackupHistoryModal"
 import ChronoArkGlossaryPanel from "../../components/ChronoArkGlossaryPanel"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { TranslationPage } from "../../../../translation/TranslationPage"
+import SplitButton from "../../../../ui/SplitButton"
 import { LanguageControls } from "../../../../translation/LanguageControls"
 import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../translation/TitleAdornments"
 import { StatusBadge } from "../../../../translation/StatusBadge"
@@ -187,7 +188,6 @@ const ModDetail: React.FC = () => {
     const [showGlossaryPanel, setShowGlossaryPanel] = useState(false)
     const [translateBanner, setTranslateBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
-    const [showTranslateDropdown, setShowTranslateDropdown] = useState(false)
     const [showCharacterContext, setShowCharacterContext] = useState(false)
     const [hasCharacterContext, setHasCharacterContext] = useState(false)
     const handleHasContextChange = useCallback((has: boolean) => setHasCharacterContext(has), [])
@@ -808,52 +808,13 @@ const ModDetail: React.FC = () => {
 
                     {/* Translation trigger and CSV sync. */}
                     <div className="mod-actions-group">
-                        <div style={{ position: "relative", display: "inline-flex" }}>
-                            <button
-                                className="btn btn-primary"
-                                onClick={() => handleTranslateClick("")}
-                                disabled={batchState.phase === "translating" || batchState.phase === "reviewing"}
-                                style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
-                            >
-                                Translate{activeProvider ? ` (${activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})` : ""}
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                onClick={() => setShowTranslateDropdown((v) => !v)}
-                                disabled={batchState.phase === "translating" || batchState.phase === "reviewing"}
-                                style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeft: "1px solid rgba(255,255,255,0.2)", padding: "0.5rem 0.4rem" }}
-                            >
-                                &#9662;
-                            </button>
-                            {showTranslateDropdown && (
-                                <div
-                                    style={{
-                                        position: "absolute",
-                                        top: "100%",
-                                        left: 0,
-                                        marginTop: "4px",
-                                        background: "var(--glass-bg)",
-                                        border: "1px solid var(--glass-border)",
-                                        borderRadius: "8px",
-                                        padding: "0.25rem 0",
-                                        zIndex: 20,
-                                        minWidth: "100%",
-                                        whiteSpace: "nowrap",
-                                    }}
-                                >
-                                    <button
-                                        className="btn btn-primary"
-                                        style={{ width: "100%", textAlign: "left", borderRadius: "6px", padding: "0.5rem 1rem" }}
-                                        onClick={() => {
-                                            setShowTranslateDropdown(false)
-                                            handleTranslateClick("", true)
-                                        }}
-                                    >
-                                        Re-Translate All
-                                    </button>
-                                </div>
-                            )}
-                        </div>
+                        <SplitButton
+                            label={`Translate${activeProvider ? ` (${activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})` : ""}`}
+                            onClick={() => handleTranslateClick("")}
+                            disabled={batchState.phase === "translating" || batchState.phase === "reviewing"}
+                            menuLabel="Translate options"
+                            items={[{ label: "Re-Translate All", onSelect: () => handleTranslateClick("", true) }]}
+                        />
                         {hasExportChanges ? (
                             <button className="btn btn-primary" onClick={() => handleExportConfirm(false)} disabled={exporting} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                                 <FaFileExport />

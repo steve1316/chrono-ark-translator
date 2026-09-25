@@ -392,6 +392,46 @@ body {
     box-shadow: 0 4px 15px color-mix(in srgb, var(--game-accent) 30%, transparent);
 }
 
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Split button (src/ui/SplitButton.tsx) */
+.split-button {
+    position: relative;
+    display: inline-flex;
+}
+
+.split-button-main {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.split-button-toggle {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.5rem 0.4rem;
+}
+
+.split-button-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    padding: 0.25rem 0;
+    z-index: 20;
+    min-width: 100%;
+    white-space: nowrap;
+}
+
+.split-button-item {
+    width: 100%;
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 1rem;
+}
+
 /* Native selects draw their arrow jammed against the right border. Reset appearance and supply a custom chevron with a fixed gap and reserved padding. */
 .app-select {
     -webkit-appearance: none;

@@ -8,6 +8,7 @@ import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslati
 import { useGameSlug } from "../../../useGameSlug"
 import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationPage } from "../../../../translation/TranslationPage"
+import SplitButton from "../../../../ui/SplitButton"
 import { LanguageControls } from "../../../../translation/LanguageControls"
 import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../translation/TitleAdornments"
 import { TranslationCell } from "../../../../translation/TranslationCell"
@@ -96,7 +97,6 @@ const TranslationDetailsPage: React.FC = () => {
     })
     const [glossaryCount, setGlossaryCount] = useState<number>(0)
     const [activeProvider, setActiveProvider] = useState<string>("claude")
-    const [showTranslateDropdown, setShowTranslateDropdown] = useState<boolean>(false)
     const [preview, setPreview] = useState<WH3TranslationPreview | null>(null)
     const [pendingProvider, setPendingProvider] = useState<string>("")
     const [sortConfig, setSortConfig] = useState<{ key: SortField; direction: "asc" | "desc" | null }>({ key: "key", direction: null })
@@ -499,60 +499,14 @@ const TranslationDetailsPage: React.FC = () => {
                 >
                     Translate Names
                 </button>
-                <div style={{ position: "relative", display: "inline-flex" }}>
-                    <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => handleTranslateClick()}
-                        disabled={isTranslating || translateCount === 0}
-                        style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
-                    >
-                        Translate ({activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-primary"
-                        aria-label="Translate provider menu"
-                        onClick={() => setShowTranslateDropdown((v) => !v)}
-                        disabled={isTranslating}
-                        style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeft: "1px solid rgba(255,255,255,0.2)", padding: "0.5rem 0.4rem" }}
-                    >
-                        &#9662;
-                    </button>
-                    {showTranslateDropdown && (
-                        <div
-                            role="menu"
-                            style={{
-                                position: "absolute",
-                                top: "100%",
-                                right: 0,
-                                marginTop: "0.25rem",
-                                background: "var(--bg-color)",
-                                border: "1px solid var(--glass-border)",
-                                borderRadius: "6px",
-                                padding: "0.25rem",
-                                zIndex: 20,
-                                minWidth: "120px",
-                            }}
-                        >
-                            {["claude"].map((p) => (
-                                <button
-                                    key={p}
-                                    type="button"
-                                    role="menuitem"
-                                    className="btn btn-outline"
-                                    onClick={() => {
-                                        setActiveProvider(p)
-                                        setShowTranslateDropdown(false)
-                                    }}
-                                    style={{ width: "100%", justifyContent: "flex-start" }}
-                                >
-                                    {p.charAt(0).toUpperCase() + p.slice(1)}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                <SplitButton
+                    label={`Translate (${activeProvider.charAt(0).toUpperCase() + activeProvider.slice(1)})`}
+                    onClick={() => handleTranslateClick()}
+                    disabled={isTranslating || translateCount === 0}
+                    menuDisabled={isTranslating}
+                    menuLabel="Translate provider menu"
+                    items={["claude"].map((p) => ({ label: p.charAt(0).toUpperCase() + p.slice(1), onSelect: () => setActiveProvider(p) }))}
+                />
                 <button type="button" className="btn btn-primary" onClick={onSyncChanges}>
                     {progress?.has_unsynced_changes ? "Re-sync Changes" : "Sync Changes"}
                 </button>
