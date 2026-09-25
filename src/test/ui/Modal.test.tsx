@@ -91,6 +91,30 @@ describe("Modal", () => {
         expect(outerClose).not.toHaveBeenCalled()
     })
 
+    it("stacks a nested dialog above its parent so the one Escape closes is the one on top", () => {
+        render(
+            <Modal title="Outer" onClose={vi.fn()}>
+                <Modal title="Inner" onClose={vi.fn()}>
+                    y
+                </Modal>
+            </Modal>
+        )
+        const outer = screen.getByRole("dialog", { name: "Outer" }).parentElement as HTMLElement
+        const inner = screen.getByRole("dialog", { name: "Inner" }).parentElement as HTMLElement
+        expect(Number(inner.style.zIndex)).toBeGreaterThan(Number(outer.style.zIndex))
+    })
+
+    it("ignores Escape while an IME composition is in progress", () => {
+        const onClose = vi.fn()
+        render(
+            <Modal title="A" onClose={onClose}>
+                <input aria-label="source" />
+            </Modal>
+        )
+        fireEvent.keyDown(screen.getByLabelText("source"), { key: "Escape", isComposing: true })
+        expect(onClose).not.toHaveBeenCalled()
+    })
+
     it("renders the subtitle, header actions and footer slots", () => {
         render(
             <Modal title="Suggested terms" subtitle="Batch 1 of 3" headerActions={<button>Apply all</button>} footer={<button>Done</button>} onClose={vi.fn()}>

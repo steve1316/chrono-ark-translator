@@ -88,7 +88,8 @@ export default function Modal({ title, subtitle, size = "md", onClose, closeDisa
     useEffect(() => {
         openDialogs.push({ id, depth, order: ++mountCounter })
         const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key !== "Escape" || !isTopDialog(id) || closeDisabledRef.current) return
+            // Escape during IME composition cancels the composition, not the dialog.
+            if (e.key !== "Escape" || e.isComposing || !isTopDialog(id) || closeDisabledRef.current) return
             onCloseRef.current()
         }
         document.addEventListener("keydown", onKeyDown)
@@ -113,7 +114,8 @@ export default function Modal({ title, subtitle, size = "md", onClose, closeDisa
     }
 
     return createPortal(
-        <div className="dialog-backdrop" onMouseDown={onBackdropMouseDown} onClick={onBackdropClick}>
+        // Deeper dialogs paint above their parents, the same order Escape closes them in.
+        <div className="dialog-backdrop" style={{ zIndex: 1000 + depth }} onMouseDown={onBackdropMouseDown} onClick={onBackdropClick}>
             <div className={`glass-card dialog-panel dialog-${size}${fill ? " dialog-fill" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
                 <div className="dialog-header">
                     <div className="dialog-title-group">
