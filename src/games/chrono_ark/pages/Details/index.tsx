@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { useGameSlug } from "../../../useGameSlug"
 import { FaBook } from "react-icons/fa"
-import type { GlossaryTerm, LocString, TermSuggestion } from "../../../../shared_types"
+import type { GlossaryTerm, LocString } from "../../../../shared_types"
 import { getRowStatus, filterStrings, sortStrings } from "../../../../utils/stringFilters"
 import type { SortField, SortDirection } from "../../../../utils/stringFilters"
 import { gameApi } from "../../../../api/games"
@@ -15,6 +15,7 @@ import ChronoArkGlossaryPanel from "../../components/ChronoArkGlossaryPanel"
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { TranslationPage } from "../../../../translation/TranslationPage"
 import { SyncButton } from "../../../../translation/SyncButton"
+import { usePendingSuggestions } from "../../../../translation/usePendingSuggestions"
 import SplitButton from "../../../../ui/SplitButton"
 import { LanguageControls } from "../../../../translation/LanguageControls"
 import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../translation/TitleAdornments"
@@ -177,7 +178,6 @@ const ModDetail: React.FC = () => {
     const [hasExportChanges, setHasExportChanges] = useState(false)
     const [hasPreviousSync, setHasPreviousSync] = useState(false)
 
-    const [suggestions, setSuggestions] = useState<TermSuggestion[]>([])
     const [showSuggestionModal, setShowSuggestionModal] = useState(false)
     const [showReviewModal, setShowReviewModal] = useState(false)
     const [modGlossary, setModGlossary] = useState<Record<string, GlossaryTerm>>({})
@@ -188,6 +188,7 @@ const ModDetail: React.FC = () => {
     const [activeProvider, setActiveProvider] = useState<string>("")
     const [showGlossaryPanel, setShowGlossaryPanel] = useState(false)
     const [translateBanner, setTranslateBanner] = useState<{ type: "success" | "error"; message: string } | null>(null)
+    const { suggestions, refresh: fetchSuggestions, scan, scanning } = usePendingSuggestions("chrono_ark", modId ?? "", setTranslateBanner)
 
     const [showCharacterContext, setShowCharacterContext] = useState(false)
     const [hasCharacterContext, setHasCharacterContext] = useState(false)
@@ -208,7 +209,6 @@ const ModDetail: React.FC = () => {
     const [sourceLangOverride, setSourceLangOverride] = useState<string | null>(null)
     const [targetLangOverride, setTargetLangOverride] = useState<string | null>(null)
 
-    const [scanning, setScanning] = useState(false)
     const [showApiResponses, setShowApiResponses] = useState(false)
     const [showHistory, setShowHistory] = useState(false)
     const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
@@ -318,22 +318,6 @@ const ModDetail: React.FC = () => {
     }
 
     /**
-     * Fetches AI-generated glossary term suggestions for this mod.
-     * GET `/api/mods/:modId/glossary/suggestions` -> `TermSuggestion[]`.
-     * Suggestions are shown as a badge on the "Suggestions" button.
-     */
-    const fetchSuggestions = async () => {
-        if (!modId) return
-        try {
-            const res = await gameApi("chrono_ark").get(`/mods/${modId}/glossary/suggestions`)
-            if (res.ok) {
-                const data = await res.json()
-                setSuggestions(data)
-            }
-        } catch {}
-    }
-
-    /**
      * Fetches the mod-specific glossary terms.
      * GET `/api/mods/:modId/glossary` -> `{ terms: Record<string, { category, source_mappings }> }`.
      * Called when the glossary panel is opened.
@@ -404,7 +388,6 @@ const ModDetail: React.FC = () => {
     useEffect(() => {
         fetchModDetail()
         fetchExportStatus()
-        fetchSuggestions()
         fetchModGlossary()
         fetch(`${API_BASE}/settings`)
             .then((r) => r.json())
@@ -732,30 +715,7 @@ const ModDetail: React.FC = () => {
                                 </span>
                             </button>
                         )}
-                        <button
-                            className="btn btn-outline"
-                            disabled={scanning}
-                            onClick={async () => {
-                                setScanning(true)
-                                try {
-                                    const res = await gameApi("chrono_ark").post(`/mods/${modId}/glossary/suggestions/scan`)
-                                    if (res.ok) {
-                                        const data = await res.json()
-                                        if (data.new > 0) {
-                                            fetchSuggestions()
-                                            setTranslateBanner({ type: "success", message: `Found ${data.new} new glossary term suggestion(s).` })
-                                        } else {
-                                            setTranslateBanner({ type: "success", message: "No new glossary terms found." })
-                                        }
-                                    }
-                                } catch (err) {
-                                    console.error("Failed to scan for terms:", err)
-                                } finally {
-                                    setScanning(false)
-                                }
-                            }}
-                            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-                        >
+                        <button className="btn btn-outline" disabled={scanning} onClick={scan} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             <FaBook /> {scanning ? "Scanning..." : "Scan for Terms"}
                         </button>
                         <button className="btn btn-outline" onClick={() => setShowApiResponses(true)} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
