@@ -1240,3 +1240,117 @@ th {
     background-position: right 0.6rem center;
     background-size: 0.9rem;
 }
+
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Dialogs (src/ui/Modal.tsx, Chrono Ark styling) */
+.dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Dialog panels are glass cards that never lift on hover and never clip nested fixed content. */
+.glass-card.dialog-panel,
+.glass-card.dialog-panel:hover {
+    display: flex;
+    flex-direction: column;
+    max-width: 92vw;
+    max-height: 80vh;
+    padding: 2rem;
+    overflow: hidden;
+    transform: none;
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
+    will-change: auto;
+    contain: none;
+    content-visibility: visible;
+}
+
+.dialog-sm {
+    width: 500px;
+}
+
+.dialog-md {
+    width: 700px;
+}
+
+.dialog-lg {
+    width: 900px;
+}
+
+.glass-card.dialog-panel.dialog-xl {
+    width: 75vw;
+    height: 75vh;
+    max-height: 75vh;
+}
+
+.dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    flex-shrink: 0;
+}
+
+.dialog-title {
+    margin: 0;
+}
+
+.dialog-subtitle {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin-top: 0.25rem;
+}
+
+.dialog-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.dialog-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 2rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+.dialog-close:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.dialog-close:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.dialog-fill .dialog-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    flex-shrink: 0;
+}
