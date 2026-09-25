@@ -1,5 +1,6 @@
 import { useState } from "react"
 import type { ReactNode } from "react"
+import Modal from "../ui/Modal"
 
 /** One normalized history/snapshot entry rendered by the shared modal. Each game maps its own backup/snapshot shape onto this. */
 export interface HistoryModalEntry {
@@ -64,79 +65,62 @@ export default function HistoryModal({ title = "History Backups", entries, onSav
     }
 
     return (
-        <div
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose()
-            }}
-        >
-            <div className="glass-card" style={{ width: "700px", maxHeight: "80vh", overflow: "auto", padding: "2rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-                    <h2 style={{ margin: 0 }}>{title}</h2>
-                    <button
-                        onClick={onClose}
-                        style={{ background: "none", border: "none", color: "var(--text-dim)", fontSize: "2rem", lineHeight: 1, cursor: "pointer", padding: "0.25rem 0.5rem", borderRadius: "4px" }}
-                        title="Close"
-                    >
-                        &times;
-                    </button>
-                </div>
-                {error && <p style={{ color: "var(--tone-danger)", marginTop: 0, marginBottom: "1rem" }}>{error}</p>}
-                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
-                    <input
-                        type="text"
-                        placeholder="Snapshot label..."
-                        value={label}
-                        onChange={(e) => setLabel(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" && !saving) handleSave()
-                        }}
-                        style={{ flex: 1, padding: "0.5rem 0.75rem", borderRadius: "4px", border: "1px solid var(--glass-border)", background: "rgba(0,0,0,0.2)", color: "var(--text-main)" }}
-                    />
-                    <button className="btn btn-primary" onClick={handleSave} disabled={saving} style={{ padding: "0.5rem 1rem", whiteSpace: "nowrap" }}>
-                        {saving ? "Saving..." : "Save snapshot"}
-                    </button>
-                </div>
-                {entries.length === 0 ? (
-                    <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>{emptyMessage ?? "No snapshots yet."}</p>
-                ) : (
-                    <div>
-                        {entries.map((entry) => (
-                            <div
-                                key={entry.id}
-                                data-testid="snapshot-row"
-                                style={{
-                                    padding: "1rem",
-                                    marginBottom: "0.75rem",
-                                    background: "rgba(0,0,0,0.2)",
-                                    borderRadius: "8px",
-                                    border: "1px solid var(--glass-border)",
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                }}
-                            >
-                                <div>
-                                    <div style={{ fontWeight: 500, display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                                        <span className={`snapshot-kind ${entry.kind}`}>{entry.kind}</span>
-                                        {entry.title}
-                                    </div>
-                                    <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem" }}>{new Date(entry.createdAt).toLocaleString()}</div>
-                                    {entry.subtitle != null && <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.15rem" }}>{entry.subtitle}</div>}
-                                </div>
-                                <div style={{ display: "flex", gap: "0.35rem", flexShrink: 0 }}>
-                                    <button className="btn btn-primary btn-sm" onClick={() => onRestore(entry)}>
-                                        Restore
-                                    </button>
-                                    <button className="btn btn-outline btn-sm tone-danger" onClick={() => onDelete(entry)}>
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+        <Modal title={title} size="md" onClose={onClose}>
+            {error && <p style={{ color: "var(--tone-danger)", marginTop: 0, marginBottom: "1rem" }}>{error}</p>}
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
+                <input
+                    type="text"
+                    placeholder="Snapshot label..."
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" && !saving) handleSave()
+                    }}
+                    style={{ flex: 1, padding: "0.5rem 0.75rem", borderRadius: "4px", border: "1px solid var(--glass-border)", background: "rgba(0,0,0,0.2)", color: "var(--text-main)" }}
+                />
+                <button className="btn btn-primary" onClick={handleSave} disabled={saving} style={{ padding: "0.5rem 1rem", whiteSpace: "nowrap" }}>
+                    {saving ? "Saving..." : "Save snapshot"}
+                </button>
             </div>
-        </div>
+            {entries.length === 0 ? (
+                <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>{emptyMessage ?? "No snapshots yet."}</p>
+            ) : (
+                <div>
+                    {entries.map((entry) => (
+                        <div
+                            key={entry.id}
+                            data-testid="snapshot-row"
+                            style={{
+                                padding: "1rem",
+                                marginBottom: "0.75rem",
+                                background: "rgba(0,0,0,0.2)",
+                                borderRadius: "8px",
+                                border: "1px solid var(--glass-border)",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                            }}
+                        >
+                            <div>
+                                <div style={{ fontWeight: 500, display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                                    <span className={`snapshot-kind ${entry.kind}`}>{entry.kind}</span>
+                                    {entry.title}
+                                </div>
+                                <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginTop: "0.25rem" }}>{new Date(entry.createdAt).toLocaleString()}</div>
+                                {entry.subtitle != null && <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.15rem" }}>{entry.subtitle}</div>}
+                            </div>
+                            <div style={{ display: "flex", gap: "0.35rem", flexShrink: 0 }}>
+                                <button className="btn btn-primary btn-sm" onClick={() => onRestore(entry)}>
+                                    Restore
+                                </button>
+                                <button className="btn btn-outline btn-sm tone-danger" onClick={() => onDelete(entry)}>
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </Modal>
     )
 }
