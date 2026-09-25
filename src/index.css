@@ -1335,10 +1335,13 @@ th {
     cursor: not-allowed;
 }
 
+/* The body scrolls under a pinned header. The negative margin moves its scrollbar into the panel padding, off the content. */
 .dialog-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
+    margin-right: -1.25rem;
+    padding-right: 1.25rem;
 }
 
 .dialog-fill .dialog-body {
