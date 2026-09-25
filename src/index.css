@@ -130,6 +130,65 @@ body {
     letter-spacing: -0.02em;
 }
 
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Page header (src/ui/PageHeader.tsx) */
+.page-back {
+    margin-bottom: 1rem;
+}
+
+.page-header-identity {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.page-header-image {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-lg);
+    object-fit: cover;
+    border: 1px solid var(--glass-border);
+    flex-shrink: 0;
+}
+
+.page-header-text {
+    min-width: 0;
+}
+
+/* The title shrinks and wraps inside itself so the adornments stay beside it. */
+.page-header-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.title-group h1.page-header-title {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.page-header-adornments {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Scoped under .title-group so it outranks the generic .title-group p margin. */
+.title-group .page-header-subtitle,
+.title-group .page-header-progress {
+    margin-top: 0.25rem;
+}
+
+.page-header-subtitle {
+    color: var(--text-dim);
+}
+
 .title-group p {
     color: var(--text-dim);
     margin-top: 0.5rem;

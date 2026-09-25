@@ -1,9 +1,9 @@
 import type { CSSProperties, ReactNode } from "react"
-import { FaArrowLeft } from "react-icons/fa"
 import { StringsTable } from "./StringsTable"
 import { FeedbackBanner } from "./FeedbackBanner"
 import { TranslatingBanner } from "./TranslatingBanner"
 import type { ColumnDef } from "./types"
+import PageHeader from "../ui/PageHeader"
 import SearchInput from "../ui/SearchInput"
 
 /** One status filter pill. */
@@ -132,33 +132,21 @@ export function TranslationPage<Row>(props: TranslationPageProps<Row>) {
     } = props
     return (
         <div className="mod-detail">
-            {onBack && (
-                <button className="btn btn-outline" onClick={() => onBack()} style={{ marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <FaArrowLeft /> Back to Dashboard
-                </button>
-            )}
-
-            <div className="dashboard-header">
-                <div className="title-group" style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
-                    {previewImage && (
-                        <img
-                            src={previewImage}
-                            alt={title}
-                            style={{ width: "80px", height: "80px", borderRadius: "12px", objectFit: "cover", border: "1px solid var(--glass-border)", flexShrink: 0 }}
-                        />
-                    )}
-                    <div>
-                        <h1 style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-                            {title}
-                            {titleBadges}
-                        </h1>
-                        {subtitle && <p style={{ marginTop: "0.25rem", color: "var(--text-dim)" }}>{subtitle}</p>}
+            <PageHeader
+                title={title}
+                onBack={onBack}
+                image={previewImage}
+                imageAlt={title}
+                adornments={titleBadges}
+                subtitle={subtitle}
+                meta={
+                    <>
                         {languageControls}
-                        <p style={{ marginTop: "0.25rem" }}>{progressLabel}</p>
-                    </div>
-                </div>
-                {toolbar && <div className="mod-actions">{toolbar}</div>}
-            </div>
+                        <p className="page-header-progress">{progressLabel}</p>
+                    </>
+                }
+                actions={toolbar}
+            />
 
             {translating && <TranslatingBanner batchIndex={translating.batchIndex} totalBatches={translating.totalBatches} streaming={translating.streaming} onCancel={() => onCancelTranslate?.()} />}
 
