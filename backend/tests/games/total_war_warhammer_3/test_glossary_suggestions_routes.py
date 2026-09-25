@@ -173,3 +173,22 @@ def test_accepting_an_edit_suggestion_renames_the_old_term(client: TestClient):
 
 def test_scan_returns_404_for_an_unknown_mod(client: TestClient, fake_claude):
     assert client.post("/api/games/total_war_warhammer_3/mods/999/glossary/suggestions/scan").status_code == 404
+
+
+def test_suggest_edits_keeps_a_refinement_of_an_existing_term_and_accept_updates_it(client: TestClient, fake_claude):
+    # The real provider never sends `edit_of`, so the route must work it out from the existing glossary.
+    glossary_store.add_term(MOD_ID, {"english": "Lord", "source": "卿", "category": "custom"})
+    fake_claude.suggestions = [{"english": "Lord", "source": "卿", "source_lang": "Chinese", "category": "title", "reason": "better category"}]
+    assert client.post(f"{BASE}/glossary/suggest-edits").json()["new"] == 1
+    assert client.post(f"{BASE}/glossary/suggestions/accept", json={"all": True}).status_code == 200
+    assert glossary_store.load_glossary(MOD_ID)["Lord"]["category"] == "title"
+
+
+def test_suggest_edits_treats_a_new_name_for_the_same_source_as_a_rename(client: TestClient, fake_claude):
+    glossary_store.add_term(MOD_ID, {"english": "Chongtang", "source": "祟唐", "category": "character"})
+    fake_claude.suggestions = [{"english": "Suitang", "source": "祟唐", "source_lang": "Chinese", "category": "character", "reason": "correct reading"}]
+    assert client.post(f"{BASE}/glossary/suggest-edits").json()["new"] == 1
+    client.post(f"{BASE}/glossary/suggestions/accept", json={"all": True})
+    glossary = glossary_store.load_glossary(MOD_ID)
+    assert "Chongtang" not in glossary
+    assert glossary["Suitang"]["source"] == "祟唐"

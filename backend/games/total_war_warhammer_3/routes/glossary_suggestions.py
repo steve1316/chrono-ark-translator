@@ -203,6 +203,35 @@ def _save_new_suggestions(mod_id: str, suggestions: list[dict]) -> int:
     return len(fresh)
 
 
+def _mark_edits(mod_id: str, suggestions: list[dict]) -> list[dict]:
+    """Link Claude's glossary suggestions to the terms they change, since the provider never sends `edit_of` itself.
+
+    A suggestion whose English matches a glossary term refines that term, and one whose source text matches a term under a new English name renames
+    it. Both get `edit_of` so accepting them updates the term in place. Suggestions identical to their existing term are dropped.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        suggestions: Suggestions from Claude.
+
+    Returns:
+        The suggestions worth reviewing, with `edit_of` set where they change an existing term.
+    """
+    glossary = glossary_store.load_glossary(mod_id)
+    by_english = {k.lower(): k for k in glossary}
+    by_source = {v.get("source"): k for k, v in glossary.items() if v.get("source")}
+    kept: list[dict] = []
+    for s in suggestions:
+        english = (s.get("english") or "").strip()
+        existing = s.get("edit_of") or by_english.get(english.lower()) or by_source.get(s.get("source"))
+        if existing and existing in glossary:
+            current = glossary[existing]
+            if existing == english and current.get("source") == s.get("source") and current.get("category") == s.get("category"):
+                continue
+            s = {**s, "edit_of": existing}
+        kept.append(s)
+    return kept
+
+
 @router.get("/mods/{mod_id}/glossary/suggestions")
 def get_suggestions(mod_id: str) -> list[dict]:
     """List the mod's pending glossary suggestions.
@@ -258,4 +287,4 @@ def suggest_edits(mod_id: str) -> dict:
     glossary_section = json.dumps(glossary_store.load_glossary(mod_id), ensure_ascii=False, indent=2)
     suggestions = _ask_claude_for_terms(mod, entries, f"Current glossary (suggest improvements via suggested_terms only):\n{glossary_section}")
     _log_call(mod_id, "suggest-edits", [k for k, _ in entries], suggestions)
-    return {"status": "success", "new": _save_new_suggestions(mod_id, suggestions)}
+    return {"status": "success", "new": _save_new_suggestions(mod_id, _mark_edits(mod_id, suggestions))}
