@@ -13,6 +13,27 @@
     --danger: #ef4444;
     --card-radius: 16px;
     --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Tone text colors, deduplicated from Chrono Ark's inline styles. */
+    --tone-danger: #ff4444;
+    --tone-warning: #ffaa44;
+    --tone-teal: #81e6d9;
+    --tone-success: #34d399;
+    --tone-error-text: #f87171;
+
+    /* Surfaces and borders. --border and --surface were referenced by the WH3 sections but never defined. */
+    --border: var(--glass-border);
+    --border-dim: rgba(255, 255, 255, 0.15);
+    --surface: rgba(0, 0, 0, 0.2);
+
+    /* Radius scale (the card radius above is the largest step). */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+
+    /* Per-game accent for page titles and active filter pills. App.tsx overrides these on <main> for each game. */
+    --game-accent: var(--accent-primary);
+    --game-accent-gradient: var(--accent-gradient);
 }
 
 * {
