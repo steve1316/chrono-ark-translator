@@ -11,6 +11,8 @@ interface Props {
     label: string
     /** Optional inline style overrides applied to the rendered button. */
     style?: React.CSSProperties
+    /** Extra classes appended to the button (e.g. `btn-compact`). */
+    className?: string
 }
 
 /**
@@ -20,9 +22,10 @@ interface Props {
  * @param scriptId Backend script id to run.
  * @param label Button label shown when idle.
  * @param style Optional inline style overrides for the button element.
+ * @param className Extra classes appended after `btn btn-primary`.
  * @returns A `button` element wired up to start a TW3 script run.
  */
-export default function ScriptRunButton({ scriptId, label, style }: Props) {
+export default function ScriptRunButton({ scriptId, label, style, className }: Props) {
     const run = useCurrentRun()
     const navigate = useNavigate()
     const slug = useGameSlug()
@@ -40,7 +43,7 @@ export default function ScriptRunButton({ scriptId, label, style }: Props) {
     }
 
     return (
-        <button className="btn btn-primary" disabled={disabled} onClick={handleClick} style={style}>
+        <button className={`btn btn-primary${className ? ` ${className}` : ""}`} disabled={disabled} onClick={handleClick} style={style}>
             {disabled ? "Run in progress..." : label}
         </button>
     )

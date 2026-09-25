@@ -192,6 +192,74 @@ body {
     border-color: var(--text-dim);
 }
 
+/* Button sizes. Chrono Ark uses three compact scales plus a 42px row height for card actions. */
+.btn-xs {
+    padding: 0.15rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.btn-compact {
+    height: 42px;
+    padding: 0 0.9rem;
+    font-size: 0.875rem;
+}
+
+.btn-icon {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    color: var(--text-main);
+    text-decoration: none;
+}
+
+/* Solid-tint buttons for destructive or cautionary confirms. */
+.btn-danger {
+    background: rgba(239, 68, 68, 0.25);
+    color: #ff6b6b;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.btn-caution {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+.btn-danger:hover,
+.btn-caution:hover {
+    filter: brightness(1.15);
+}
+
+/* Outline tones keep their tinted border on hover, matching the old inline styles. */
+.btn-outline.tone-danger,
+.btn-outline.tone-danger:hover {
+    color: var(--tone-danger);
+    border-color: rgba(255, 68, 68, 0.3);
+}
+
+.btn-outline.tone-warning,
+.btn-outline.tone-warning:hover {
+    color: var(--tone-warning);
+    border-color: rgba(255, 170, 68, 0.3);
+}
+
+.btn-outline.tone-teal,
+.btn-outline.tone-teal:hover {
+    color: var(--tone-teal);
+    border-color: rgba(129, 230, 217, 0.3);
+}
+
+.btn-outline.tone-accent,
+.btn-outline.tone-accent:hover {
+    color: var(--accent-primary);
+    border-color: rgba(138, 180, 248, 0.3);
+}
+
 /* Active filter pill follows the game accent (CA keeps its blue gradient, WH3 turns red to orange). */
 .filter-pill.btn-primary {
     background: var(--game-accent-gradient);

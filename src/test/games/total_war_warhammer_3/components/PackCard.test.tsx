@@ -25,6 +25,13 @@ afterEach(() => {
 })
 
 describe("PackCard", () => {
+    it("uses the shared compact and icon button classes in the action row", async () => {
+        render(wrap(<PackCard pack={BASE_PACK} />))
+        expect(await screen.findByRole("button", { name: /^Publish$/ })).toHaveClass("btn-compact")
+        expect(screen.getByRole("button", { name: /Open local pack folder/ })).toHaveClass("btn-icon")
+        expect(screen.getByRole("link", { name: /Open Steam workshop page/ })).toHaveClass("btn-icon")
+    })
+
     it("renders the pack title and the workshopId in the badge", () => {
         render(wrap(<PackCard pack={BASE_PACK} />))
         expect(screen.getByRole("heading", { name: BASE_PACK.title, level: 3 })).toBeInTheDocument()

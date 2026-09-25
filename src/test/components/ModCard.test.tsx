@@ -34,6 +34,12 @@ function baseProps(overrides: Partial<React.ComponentProps<typeof ModCard>> = {}
 const wrap = (ui: React.ReactNode) => <MemoryRouter>{ui}</MemoryRouter>
 
 describe("ModCard", () => {
+    it("uses the shared icon-button class for the Steam and rescan actions", () => {
+        render(wrap(<ModCard {...baseProps({ steamUrl: "https://example.com", onSync: () => undefined })} />))
+        expect(screen.getByTitle("Open mod page")).toHaveClass("btn-icon")
+        expect(screen.getByTitle("Rescan workshop folder")).toHaveClass("btn-icon")
+    })
+
     it("renders title, subtitle, and the left progress label", () => {
         render(wrap(<ModCard {...baseProps()} />))
         expect(screen.getByText("Test Mod")).toBeInTheDocument()

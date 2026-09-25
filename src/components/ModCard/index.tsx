@@ -127,28 +127,12 @@ const ModCard: React.FC<ModCardProps> = React.memo((props) => {
                         </button>
                     )}
                     {steamUrl && (
-                        <a
-                            href={steamUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-outline"
-                            title="Open mod page"
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: "42px",
-                                height: "42px",
-                                textDecoration: "none",
-                                color: "var(--text-main)",
-                                padding: "0",
-                            }}
-                        >
+                        <a href={steamUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-icon" title="Open mod page">
                             <FaSteam size={20} />
                         </a>
                     )}
                     {onSync && (
-                        <button className="btn btn-outline" onClick={onSync} title="Rescan workshop folder">
+                        <button className="btn btn-outline btn-icon" onClick={onSync} title="Rescan workshop folder">
                             <FaSync />
                         </button>
                     )}

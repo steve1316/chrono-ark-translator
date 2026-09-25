@@ -80,63 +80,27 @@ const PackCardComponent = ({ pack }: PackCardProps) => {
                 {pack.sharedNote && <p style={{ fontSize: "0.85em", color: "var(--text-dim)", margin: "0.5rem 0" }}>{pack.sharedNote}</p>}
                 <div className="mod-actions" style={{ flexWrap: "nowrap", gap: "0.5rem" }}>
                     {pack.scriptId ? (
-                        <ScriptRunButton scriptId={pack.scriptId} label="Rebuild" style={{ height: "42px", padding: "0 0.9rem", fontSize: "0.875rem" }} />
+                        <ScriptRunButton scriptId={pack.scriptId} label="Rebuild" className="btn-compact" />
                     ) : (
-                        <button
-                            type="button"
-                            className="btn btn-primary"
-                            disabled
-                            title="No rebuild script associated with this mod"
-                            style={{ height: "42px", padding: "0 0.9rem", fontSize: "0.875rem" }}
-                        >
+                        <button type="button" className="btn btn-primary btn-compact" disabled title="No rebuild script associated with this mod">
                             Rebuild
                         </button>
                     )}
-                    <button
-                        className="btn btn-outline"
-                        onClick={() => setPublishOpen(true)}
-                        title="Push the local pack to the Steam Workshop"
-                        style={{ height: "42px", padding: "0 0.9rem", fontSize: "0.875rem" }}
-                    >
+                    <button className="btn btn-outline btn-compact" onClick={() => setPublishOpen(true)} title="Push the local pack to the Steam Workshop">
                         Publish
                     </button>
                     <button
                         type="button"
-                        className="btn btn-outline"
+                        className="btn btn-outline btn-icon"
                         onClick={() => {
                             fetch(`${API_BASE}/games/total_war_warhammer_3/packs/${pack.workshopId}/open`, { method: "POST" }).catch(() => {})
                         }}
                         aria-label="Open local pack folder"
                         title="Open local pack folder"
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: "42px",
-                            height: "42px",
-                            padding: "0",
-                        }}
                     >
                         <FaFolderOpen size={18} />
                     </button>
-                    <a
-                        href={workshopUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-outline"
-                        aria-label="Open Steam workshop page"
-                        title="Open Steam workshop page"
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: "42px",
-                            height: "42px",
-                            textDecoration: "none",
-                            color: "var(--text-main)",
-                            padding: "0",
-                        }}
-                    >
+                    <a href={workshopUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-icon" aria-label="Open Steam workshop page" title="Open Steam workshop page">
                         <FaSteam size={20} />
                     </a>
                 </div>
