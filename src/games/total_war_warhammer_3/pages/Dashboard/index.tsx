@@ -2,15 +2,18 @@ import { useEffect, useMemo, useRef, useState } from "react"
 
 import DashboardHeader from "../../../../dashboard/DashboardHeader"
 import DashboardSection from "../../../../dashboard/DashboardSection"
+import { progressLabel } from "../../../../dashboard/progressLabel"
 import { useCardWidth } from "../../../../dashboard/useCardWidth"
-import type { WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
+import type { WH3TranslationModSummary } from "../../../../shared_types"
+import Banner from "../../../../ui/Banner"
 import Panel from "../../../../ui/Panel"
 import { matchesSearch } from "../../../../utils/modFilters"
 import PackCard, { type PackEntry } from "../../components/PackCard"
 import PublishAllDialog from "../../components/PublishAllDialog"
 import ScriptRunButton from "../../components/ScriptRunButton"
 import TranslationModCard from "../../components/TranslationModCard"
-import { listTranslationMods, rescanMod } from "../../translationApi"
+import { useRescanAll } from "../../hooks/useRescanAll"
+import { listTranslationMods } from "../../translationApi"
 
 const PACKS: PackEntry[] = [
     { title: "Nanu's Dynamic RoR Compat", workshopId: "3513364573", scriptId: "update_dynamic_rors" },
@@ -34,38 +37,50 @@ const PACKS: PackEntry[] = [
 export default function DashboardPage() {
     // `null` until the list request settles, so the section can show a skeleton instead of an empty grid.
     const [translationMods, setTranslationMods] = useState<WH3TranslationModSummary[] | null>(null)
-    const [progressByMod, setProgressByMod] = useState<Record<string, WH3RescanSummary | null>>({})
-    const [translationLoadError, setTranslationLoadError] = useState<string | null>(null)
+    const [loadError, setLoadError] = useState<string | null>(null)
+    const [refreshError, setRefreshError] = useState<string | null>(null)
+    const [listing, setListing] = useState(false)
     const [publishAllOpen, setPublishAllOpen] = useState(false)
     const [search, setSearch] = useState("")
     const gridWrapperRef = useRef<HTMLDivElement>(null)
+    // True once a translation list has arrived. After that a failed refresh keeps the cards and shows a banner instead.
+    const hasLoadedRef = useRef(false)
+    const rescans = useRescanAll()
+    const refreshing = listing || rescans.running
 
-    useEffect(() => {
-        let cancelled = false
-        listTranslationMods()
-            .then((mods) => {
-                if (cancelled) return
-                // Read the ids before storing the list, so a malformed response fails here instead of while rendering.
-                const initialProgress = Object.fromEntries(mods.map((m) => [m.workshop_id, null]))
-                setTranslationMods(mods)
-                setProgressByMod(initialProgress)
-                mods.forEach((mod, i) => {
-                    setTimeout(async () => {
-                        try {
-                            const summary = await rescanMod(mod.workshop_id)
-                            if (!cancelled) setProgressByMod((prev) => ({ ...prev, [mod.workshop_id]: summary }))
-                        } catch {
-                            /* leave at null; card shows "Not yet scanned" */
-                        }
-                    }, i * 200)
-                })
-            })
-            .catch((e) => {
-                if (!cancelled) setTranslationLoadError((e as Error).message)
-            })
-        return () => {
-            cancelled = true
+    /**
+     * Lists the translation mods, then rescans each one in turn so the cards fill in with fresh counts. Runs on open, on Refresh and on Retry.
+     */
+    const refresh = async () => {
+        setListing(true)
+        setRefreshError(null)
+        try {
+            const mods = await listTranslationMods()
+            // Read the ids before storing the list, so a malformed response fails here instead of while rendering.
+            const ids = mods.map((mod) => mod.workshop_id)
+            hasLoadedRef.current = true
+            setTranslationMods(mods)
+            setLoadError(null)
+            setListing(false)
+            await rescans.rescanAll(ids)
+        } catch (e) {
+            const message = (e as Error).message
+            if (hasLoadedRef.current) setRefreshError(`Could not refresh translation mods: ${message}`)
+            else setLoadError(`Failed to load translation mods: ${message}`)
+            setListing(false)
         }
+    }
+
+    /** Clears the load error, which brings the skeleton back, and tries the first load again. */
+    const retryLoad = () => {
+        setLoadError(null)
+        refresh()
+    }
+
+    // Load and rescan once on open.
+    useEffect(() => {
+        refresh()
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on open
     }, [])
 
     const query = search.trim()
@@ -84,6 +99,9 @@ export default function DashboardPage() {
                 searchWidth={cardWidth}
                 actions={
                     <>
+                        <button type="button" className="btn btn-outline" onClick={refresh} disabled={refreshing}>
+                            {progressLabel("Refresh", "Refreshing", refreshing, rescans.progress)}
+                        </button>
                         <ScriptRunButton scriptId="update" label="Rebuild All" />
                         <button type="button" className="btn btn-primary" onClick={() => setPublishAllOpen(true)}>
                             Publish All
@@ -102,6 +120,12 @@ export default function DashboardPage() {
                 }
             />
 
+            {refreshError && (
+                <Banner tone="error" onDismiss={() => setRefreshError(null)}>
+                    {refreshError}
+                </Banner>
+            )}
+
             <div ref={gridWrapperRef}>
                 <DashboardSection title="Pack Mods" loading={false} empty={visiblePacks.length === 0} emptyMessage={`No packs match "${query}".`}>
                     <div className="mod-grid">
@@ -116,26 +140,14 @@ export default function DashboardPage() {
                     loading={translationMods === null}
                     skeletonCount={3}
                     skeletonLabel="Loading translation mods"
-                    error={translationLoadError ? `Failed to load translation mods: ${translationLoadError}` : null}
+                    error={loadError}
+                    onRetry={retryLoad}
                     empty={visibleMods.length === 0}
                     emptyMessage={query ? `No translation mods match "${query}".` : "No translation mods found."}
                 >
                     <div className="mod-grid">
                         {visibleMods.map((mod) => (
-                            <TranslationModCard
-                                key={mod.workshop_id}
-                                mod={mod}
-                                searchQuery={query}
-                                progress={progressByMod[mod.workshop_id] ?? null}
-                                onRescan={async (workshopId) => {
-                                    try {
-                                        const summary = await rescanMod(workshopId)
-                                        setProgressByMod((prev) => ({ ...prev, [workshopId]: summary }))
-                                    } catch {
-                                        /* swallow - card stays on stale progress */
-                                    }
-                                }}
-                            />
+                            <TranslationModCard key={mod.workshop_id} mod={mod} searchQuery={query} progress={rescans.progressByMod[mod.workshop_id] ?? null} onRescan={rescans.rescanOne} />
                         ))}
                     </div>
                 </DashboardSection>

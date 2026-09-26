@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react"
+import { act, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -36,6 +36,27 @@ function mockListOnly(list: () => Promise<Response>) {
         if (url.endsWith("/rescan")) return new Promise<Response>(() => {})
         return Promise.resolve(json({ status: "idle" }))
     })
+}
+
+/**
+ * Answers the translation list with `list()`, holds each rescan until released, and returns an idle body for everything else.
+ *
+ * @param list Produces the translation list response for each call.
+ * @returns The held rescans (release in order) and the rescan URLs requested so far.
+ */
+function mockDashboardFetch(list: () => Promise<Response>) {
+    const pendingRescans: Array<() => void> = []
+    const rescanCalls: string[] = []
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+        const url = String(input)
+        if (url.endsWith("/translation/mods")) return list()
+        if (url.endsWith("/rescan")) {
+            rescanCalls.push(url)
+            return new Promise<Response>((resolve) => pendingRescans.push(() => resolve(json({ mod_id: "x", counts: { translated: 1, untranslated: 0, stale: 0, orphan: 0 } }))))
+        }
+        return Promise.resolve(json({ status: "idle" }))
+    })
+    return { pendingRescans, rescanCalls }
 }
 
 describe("Dashboard page", () => {
@@ -124,5 +145,69 @@ describe("Dashboard page", () => {
         const intro = screen.getByRole("heading", { name: /about the compat packs/i }).closest(".panel")
         expect(intro).toHaveClass("glass-card", "static")
         expect(screen.getByRole("button", { name: /^publish all$/i })).not.toHaveAttribute("style")
+    })
+
+    it("counts through the rescan on open in the Refresh label, then re-enables it", async () => {
+        const { pendingRescans, rescanCalls } = mockDashboardFetch(() => Promise.resolve(json([MOD_A, MOD_B])))
+        render(wrap(<DashboardPage />))
+        expect(await screen.findByRole("button", { name: "Refreshing (1/2)\u2026" })).toBeDisabled()
+        await act(async () => pendingRescans.shift()!())
+        expect(await screen.findByRole("button", { name: "Refreshing (2/2)\u2026" })).toBeDisabled()
+        await act(async () => pendingRescans.shift()!())
+        expect(await screen.findByRole("button", { name: "Refresh" })).toBeEnabled()
+        expect(rescanCalls).toHaveLength(2)
+    })
+
+    it("re-lists and rescans every translation mod when Refresh is clicked", async () => {
+        const list = vi.fn(() => Promise.resolve(json([MOD_A])))
+        const { pendingRescans, rescanCalls } = mockDashboardFetch(list)
+        const user = userEvent.setup()
+        render(wrap(<DashboardPage />))
+        await waitFor(() => expect(pendingRescans).toHaveLength(1))
+        await act(async () => pendingRescans.shift()!())
+        await user.click(await screen.findByRole("button", { name: "Refresh" }))
+        await waitFor(() => expect(rescanCalls).toHaveLength(2))
+        expect(list).toHaveBeenCalledTimes(2)
+    })
+
+    it("shows Retry when the translation list fails to load, and Retry loads it", async () => {
+        const list = vi
+            .fn()
+            .mockImplementationOnce(() => Promise.resolve(json({ detail: "registry unreadable" }, 500)))
+            .mockImplementation(() => Promise.resolve(json([MOD_A])))
+        mockDashboardFetch(list)
+        const user = userEvent.setup()
+        render(wrap(<DashboardPage />))
+        expect(await screen.findByRole("alert")).toHaveTextContent("Failed to load translation mods: registry unreadable")
+        await user.click(screen.getByRole("button", { name: "Retry" }))
+        expect(await screen.findByRole("heading", { name: "Whc's Cathay translation" })).toBeInTheDocument()
+    })
+
+    it("keeps the cards and shows a dismissible banner when a Refresh cannot list the mods", async () => {
+        const list = vi
+            .fn()
+            .mockImplementationOnce(() => Promise.resolve(json([MOD_A])))
+            .mockImplementation(() => Promise.resolve(json({ detail: "registry unreadable" }, 500)))
+        const { pendingRescans } = mockDashboardFetch(list)
+        const user = userEvent.setup()
+        render(wrap(<DashboardPage />))
+        await waitFor(() => expect(pendingRescans).toHaveLength(1))
+        await act(async () => pendingRescans.shift()!())
+        await user.click(await screen.findByRole("button", { name: "Refresh" }))
+        expect(await screen.findByText("Could not refresh translation mods: registry unreadable")).toBeInTheDocument()
+        expect(screen.getByRole("heading", { name: "Whc's Cathay translation" })).toBeInTheDocument()
+        await user.click(screen.getByRole("button", { name: "Dismiss" }))
+        expect(screen.queryByText("Could not refresh translation mods: registry unreadable")).not.toBeInTheDocument()
+    })
+
+    it("stops rescanning when the user leaves the dashboard", async () => {
+        const { pendingRescans, rescanCalls } = mockDashboardFetch(() => Promise.resolve(json([MOD_A, MOD_B])))
+        const { unmount } = render(wrap(<DashboardPage />))
+        await waitFor(() => expect(rescanCalls).toHaveLength(1))
+        unmount()
+        await act(async () => pendingRescans.shift()!())
+        // Longer than the old 200ms stagger between rescans, so a leftover timer would have fired by now.
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        expect(rescanCalls).toHaveLength(1)
     })
 })

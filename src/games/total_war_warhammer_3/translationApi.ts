@@ -44,11 +44,12 @@ export async function listTranslationMods(): Promise<WH3TranslationModSummary[]>
  * Re-extract parent strings, re-read local translations, recompute drift.
  *
  * @param workshopId Steam Workshop ID of the translation mod.
+ * @param signal Optional abort signal that cancels the request, e.g. when the dashboard unmounts.
  * @returns Per-status counts and the scan timestamp.
  * @throws `RegistryError` On any non-2xx response.
  */
-export async function rescanMod(workshopId: string): Promise<WH3RescanSummary> {
-    const res = await api.post(`/translation/mods/${encodeURIComponent(workshopId)}/rescan`)
+export async function rescanMod(workshopId: string, signal?: AbortSignal): Promise<WH3RescanSummary> {
+    const res = await api.post(`/translation/mods/${encodeURIComponent(workshopId)}/rescan`, undefined, { signal })
     if (!res.ok) throw await registryError(res)
     return res.json()
 }

@@ -42,8 +42,8 @@ describe("DashboardHeader", () => {
 describe("progressLabel", () => {
     it("shows the idle label, then the verb, then the verb with a count", () => {
         expect(progressLabel("Refresh", "Refreshing", false, null)).toBe("Refresh")
-        expect(progressLabel("Refresh", "Refreshing", true, null)).toBe("Refreshing…")
-        expect(progressLabel("Refresh", "Refreshing", true, { current: 3, total: 5 })).toBe("Refreshing (3/5)…")
+        expect(progressLabel("Refresh", "Refreshing", true, null)).toBe("Refreshing\u2026")
+        expect(progressLabel("Refresh", "Refreshing", true, { current: 3, total: 5 })).toBe("Refreshing (3/5)\u2026")
     })
 
     it("ignores stale progress once the task is idle", () => {

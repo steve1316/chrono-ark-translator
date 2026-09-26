@@ -17,5 +17,5 @@ export interface TaskProgress {
  */
 export function progressLabel(idleLabel: string, busyVerb: string, busy: boolean, progress: TaskProgress | null): string {
     if (!busy) return idleLabel
-    return progress ? `${busyVerb} (${progress.current}/${progress.total})…` : `${busyVerb}…`
+    return progress ? `${busyVerb} (${progress.current}/${progress.total})\u2026` : `${busyVerb}\u2026`
 }
