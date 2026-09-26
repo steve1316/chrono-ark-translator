@@ -28,4 +28,11 @@ describe("PageHeader", () => {
         expect(screen.getByText("152 / 152")).toBeInTheDocument()
         expect(screen.getByRole("button", { name: "Sync" }).closest(".mod-actions")).not.toBeNull()
     })
+
+    it("uses the given class for the action row instead of the translation toolbar row", () => {
+        render(<PageHeader title="Workshop Dashboard" actions={<button>Refresh</button>} actionsClassName="dashboard-toolbar" />)
+        const button = screen.getByRole("button", { name: "Refresh" })
+        expect(button.closest(".dashboard-toolbar")).not.toBeNull()
+        expect(button.closest(".mod-actions")).toBeNull()
+    })
 })

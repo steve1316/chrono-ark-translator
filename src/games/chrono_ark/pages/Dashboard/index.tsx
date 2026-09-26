@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { useGameSlug } from "../../../useGameSlug"
-import { FaSearch } from "react-icons/fa"
 import ModGrid from "../../../../components/ModGrid"
 import ModGridSkeleton from "../../../../components/ModGridSkeleton"
 import EstimateTotalCostModal from "../../../../components/EstimateTotalCostModal"
 import type { ModStatus } from "../../../../shared_types"
 import { gameApi } from "../../../../api/games"
 import { filterMods } from "../../../../utils/modFilters"
+import DashboardHeader from "../../../../dashboard/DashboardHeader"
+import { progressLabel } from "../../../../dashboard/progressLabel"
 import { useCardWidth } from "../../../../dashboard/useCardWidth"
 import { rememberScrollTarget, useScrollRestore } from "../../../../dashboard/useScrollRestore"
 
@@ -239,32 +240,24 @@ const DashboardPage: React.FC = () => {
 
     return (
         <>
-            <div className="dashboard-header">
-                <div className="title-group">
-                    <h1>Workshop Dashboard</h1>
-                    <p>Manage and translate your Chrono Ark mods</p>
-                </div>
-                {/* Search bar width matches the mod-grid card column; Refresh sits beside it. */}
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                    <div style={{ position: "relative", width: cardWidth ?? 320 }}>
-                        <FaSearch style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }} />
-                        <input
-                            type="text"
-                            placeholder="Search by name or author..."
-                            className="btn-outline"
-                            style={{ width: "100%", padding: "0.75rem 0.75rem 0.75rem 2.5rem", borderRadius: "8px", background: "rgba(0,0,0,0.2)" }}
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
-                    </div>
-                    <button className="btn btn-outline" onClick={handleRefresh} disabled={refreshing}>
-                        {refreshing && refreshProgress ? `Refreshing (${refreshProgress.current}/${refreshProgress.total})…` : refreshing ? "Refreshing…" : "Refresh"}
-                    </button>
-                    <button className="btn btn-outline" onClick={handleEstimate} disabled={estimating || refreshing}>
-                        {estimating && estimateProgress ? `Estimating (${estimateProgress.current}/${estimateProgress.total})…` : estimating ? "Estimating…" : "Estimate Total Cost"}
-                    </button>
-                </div>
-            </div>
+            <DashboardHeader
+                title="Workshop Dashboard"
+                tagline="Manage and translate your Chrono Ark mods"
+                search={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Search by name or author..."
+                searchWidth={cardWidth}
+                actions={
+                    <>
+                        <button className="btn btn-outline" onClick={handleRefresh} disabled={refreshing}>
+                            {progressLabel("Refresh", "Refreshing", refreshing, refreshProgress)}
+                        </button>
+                        <button className="btn btn-outline" onClick={handleEstimate} disabled={estimating || refreshing}>
+                            {progressLabel("Estimate Total Cost", "Estimating", estimating, estimateProgress)}
+                        </button>
+                    </>
+                }
+            />
 
             <div ref={gridWrapperRef}>{mods === null ? <ModGridSkeleton /> : <ModGrid mods={filteredMods} onModSelect={handleModSelect} onModSync={handleModSync} searchQuery={search.trim()} />}</div>
             {showEstimateModal && <EstimateTotalCostModal results={estimateResults} onClose={() => setShowEstimateModal(false)} />}

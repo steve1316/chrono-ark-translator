@@ -21,6 +21,8 @@ interface PageHeaderProps {
     meta?: ReactNode
     /** Action row rendered under the identity block. */
     actions?: ReactNode
+    /** Class for the action row. Defaults to `mod-actions`, the translation toolbar row. Dashboards pass `dashboard-toolbar`. */
+    actionsClassName?: string
 }
 
 /**
@@ -36,9 +38,10 @@ interface PageHeaderProps {
  * @param subtitle Dim line under the title.
  * @param meta Extra lines under the subtitle.
  * @param actions Action row.
+ * @param actionsClassName Class for the action row.
  * @returns The header.
  */
-export default function PageHeader({ title, onBack, backLabel = "Back to Dashboard", image, imageAlt = "", adornments, subtitle, meta, actions }: PageHeaderProps) {
+export default function PageHeader({ title, onBack, backLabel = "Back to Dashboard", image, imageAlt = "", adornments, subtitle, meta, actions, actionsClassName = "mod-actions" }: PageHeaderProps) {
     return (
         <>
             {onBack && (
@@ -58,7 +61,7 @@ export default function PageHeader({ title, onBack, backLabel = "Back to Dashboa
                         {meta}
                     </div>
                 </div>
-                {actions && <div className="mod-actions">{actions}</div>}
+                {actions && <div className={actionsClassName}>{actions}</div>}
             </div>
         </>
     )
