@@ -8,6 +8,8 @@ import EstimateTotalCostModal from "../../../../components/EstimateTotalCostModa
 import type { ModStatus } from "../../../../shared_types"
 import { gameApi } from "../../../../api/games"
 import { filterMods } from "../../../../utils/modFilters"
+import { useCardWidth } from "../../../../dashboard/useCardWidth"
+import { rememberScrollTarget, useScrollRestore } from "../../../../dashboard/useScrollRestore"
 
 /**
  * The dashboard page displays a grid of all mods and their translation progress.
@@ -23,7 +25,6 @@ const DashboardPage: React.FC = () => {
     // `null` until the first fetch settles, so the grid can show a skeleton instead of an empty page.
     const [mods, setMods] = useState<ModStatus[] | null>(null)
     const [search, setSearch] = useState("")
-    const [cardWidth, setCardWidth] = useState<number | undefined>(undefined)
     const [refreshing, setRefreshing] = useState(false)
     const [refreshProgress, setRefreshProgress] = useState<{ current: number; total: number; mod_name: string } | null>(null)
     const abortRef = useRef<AbortController | null>(null)
@@ -218,34 +219,11 @@ const DashboardPage: React.FC = () => {
 
     const filteredMods = useMemo(() => filterMods(mods ?? [], search), [mods, search])
 
-    // Scroll to the mod card the user was last viewing when returning from the detail page.
-    useEffect(() => {
-        // Wait for the real list. Consuming the saved id on the initial empty render would leave no card to scroll to.
-        if (mods === null) return
-        const lastMod = sessionStorage.getItem("lastViewedMod")
-        if (!lastMod) return
-        sessionStorage.removeItem("lastViewedMod")
-        requestAnimationFrame(() => {
-            const card = document.querySelector(`[data-mod-id="${lastMod}"]`)
-            card?.scrollIntoView({ behavior: "instant", block: "center" })
-        })
-    }, [mods, filteredMods])
+    // Scroll back to the card the user opened once the real list is on screen.
+    useScrollRestore(mods !== null)
 
-    // Observe the first mod card's width so the search bar can match it exactly.
-    useEffect(() => {
-        const wrapper = gridWrapperRef.current
-        if (!wrapper) return
-
-        const updateWidth = () => {
-            const firstCard = wrapper.querySelector(".mod-card")
-            if (firstCard) setCardWidth(firstCard.getBoundingClientRect().width)
-        }
-
-        updateWidth()
-        const observer = new ResizeObserver(updateWidth)
-        observer.observe(wrapper)
-        return () => observer.disconnect()
-    }, [filteredMods.length])
+    // The search field matches the width of one card column.
+    const cardWidth = useCardWidth(gridWrapperRef, filteredMods.length)
 
     /**
      * Remembers the selected mod for the dashboard scroll-restore effect, then
@@ -255,7 +233,7 @@ const DashboardPage: React.FC = () => {
      *     modId: The unique identifier of the mod the user clicked.
      */
     const handleModSelect = (modId: string) => {
-        sessionStorage.setItem("lastViewedMod", modId)
+        rememberScrollTarget(modId)
         navigate(`/${slug}/translation/${modId}`)
     }
 
