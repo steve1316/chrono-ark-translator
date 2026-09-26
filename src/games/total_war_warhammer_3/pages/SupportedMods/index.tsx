@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from "react"
-import { useGameSlug } from "../../../useGameSlug"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
+
+import DashboardHeader from "../../../../dashboard/DashboardHeader"
+import DashboardSection from "../../../../dashboard/DashboardSection"
+import { useCardWidth } from "../../../../dashboard/useCardWidth"
+import PageHeader from "../../../../ui/PageHeader"
+import { matchesSearch } from "../../../../utils/modFilters"
+import { useGameSlug } from "../../../useGameSlug"
 import { fetchSupportedMods, RegistryError } from "../../api"
 import type { SupportedMod, ValidationIssue } from "../../api"
 import RegistryErrorBanner from "../../components/RegistryErrorBanner"
@@ -9,19 +15,21 @@ import ValidationPanel from "../../components/ValidationPanel"
 import { useValidation } from "../../hooks/useValidation"
 
 /**
- * Card grid over `SUPPORTED_MODS` from the configured helper_scripts directory. Supports add, edit,
- * and delete via the `+ Add Mod` button and the per-card Edit button. Search filters across `name`
- * and `package_name`. A `ValidationPanel` above the grid lists any broken registry references.
+ * Card grid over `SUPPORTED_MODS` from the configured helper_scripts directory. Supports add, edit, and delete via the `+ Add Mod` button and
+ * the per-card Edit button. Search filters across `name` and `package_name`. A `ValidationPanel` above the grid lists any broken registry references.
  *
- * @returns A page that renders a searchable card grid of TW3 supported mods, or a
- *     `RegistryErrorBanner` when the backend reports a configuration error.
+ * @returns A page that renders a searchable card grid of TW3 supported mods, or a `RegistryErrorBanner` when the backend reports a configuration error.
  */
 export default function SupportedModsPage() {
     const navigate = useNavigate()
     const slug = useGameSlug()
     const [mods, setMods] = useState<SupportedMod[] | null>(null)
     const [error, setError] = useState<RegistryError | null>(null)
+    // A load failure that is not a registry error, e.g. the backend is down. Shown in the section with Retry.
+    const [loadError, setLoadError] = useState<string | null>(null)
+    const [attempt, setAttempt] = useState(0)
     const [search, setSearch] = useState("")
+    const gridWrapperRef = useRef<HTMLDivElement>(null)
     const { issues: validationIssues, refresh: refreshValidation } = useValidation()
 
     useEffect(() => {
@@ -31,12 +39,14 @@ export default function SupportedModsPage() {
                 if (!cancelled) setMods(data)
             })
             .catch((err: unknown) => {
-                if (!cancelled && err instanceof RegistryError) setError(err)
+                if (cancelled) return
+                if (err instanceof RegistryError) setError(err)
+                else setLoadError(`Could not load supported mods: ${err instanceof Error ? err.message : String(err)}`)
             })
         return () => {
             cancelled = true
         }
-    }, [])
+    }, [attempt])
 
     const issuesByMod = useMemo(() => {
         const map = new Map<string, ValidationIssue[]>()
@@ -48,18 +58,20 @@ export default function SupportedModsPage() {
         return map
     }, [validationIssues])
 
-    const filtered = useMemo(() => {
-        if (!mods) return []
-        const visible = mods.filter((m) => m.package_name !== "vanilla")
-        const q = search.trim().toLowerCase()
-        if (!q) return visible
-        return visible.filter((m) => m.name.toLowerCase().includes(q) || m.package_name.toLowerCase().includes(q))
-    }, [mods, search])
+    const filtered = useMemo(() => (mods ?? []).filter((m) => m.package_name !== "vanilla" && matchesSearch(search, m.name, m.package_name)), [mods, search])
+    const cardWidth = useCardWidth(gridWrapperRef, filtered.length)
+    const query = search.trim()
+
+    /** Clears the load error, which brings the skeleton back, and loads again. */
+    const retry = () => {
+        setLoadError(null)
+        setAttempt((n) => n + 1)
+    }
 
     if (error) {
         return (
             <>
-                <h1>Supported Mods</h1>
+                <PageHeader title="Supported Mods" />
                 <RegistryErrorBanner detail={error.detail} missing={error.missing} />
             </>
         )
@@ -67,28 +79,39 @@ export default function SupportedModsPage() {
 
     return (
         <>
-            <div className="dashboard-header">
-                <div className="title-group">
-                    <h1>Supported Mods</h1>
-                    <p>Manage `SUPPORTED_MODS` entries in helper_scripts/supported_mods.py.</p>
-                </div>
-                <input
-                    type="text"
-                    className="btn-outline"
-                    placeholder="Search by name or package_name..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    style={{ width: 320, padding: "0.5rem 0.75rem", borderRadius: 8 }}
-                />
-                <button type="button" className="btn btn-primary" onClick={() => navigate(`/${slug}/supported-mods/new`)} style={{ marginLeft: "0.5rem" }}>
-                    + Add Mod
-                </button>
-            </div>
+            <DashboardHeader
+                title="Supported Mods"
+                tagline="Manage `SUPPORTED_MODS` entries in helper_scripts/supported_mods.py."
+                search={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Search by name or package_name..."
+                searchWidth={cardWidth}
+                actions={
+                    <button type="button" className="btn btn-primary" onClick={() => navigate(`/${slug}/supported-mods/new`)}>
+                        + Add Mod
+                    </button>
+                }
+            />
             <ValidationPanel issues={validationIssues} onRefresh={refreshValidation} />
-            <div className="mod-grid">
-                {filtered.map((m) => (
-                    <SupportedModCard key={m.package_name} mod={m} issues={issuesByMod.get(m.package_name) ?? []} onEdit={(pn) => navigate(`/${slug}/supported-mods/edit/${encodeURIComponent(pn)}`)} />
-                ))}
+            <div ref={gridWrapperRef}>
+                <DashboardSection
+                    loading={mods === null}
+                    error={loadError}
+                    onRetry={retry}
+                    empty={filtered.length === 0}
+                    emptyMessage={query ? `No mods match "${query}".` : "No supported mods yet. Use + Add Mod to add one."}
+                >
+                    <div className="mod-grid">
+                        {filtered.map((m) => (
+                            <SupportedModCard
+                                key={m.package_name}
+                                mod={m}
+                                issues={issuesByMod.get(m.package_name) ?? []}
+                                onEdit={(pn) => navigate(`/${slug}/supported-mods/edit/${encodeURIComponent(pn)}`)}
+                            />
+                        ))}
+                    </div>
+                </DashboardSection>
             </div>
         </>
     )

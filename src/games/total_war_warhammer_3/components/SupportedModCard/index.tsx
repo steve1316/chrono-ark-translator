@@ -56,14 +56,14 @@ const SupportedModCard = ({ mod, issues, onEdit }: Props) => {
                     {(onEdit || mod.workshop_id) && (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
                             {onEdit && (
-                                <button type="button" className="btn btn-outline" onClick={() => onEdit(mod.package_name)} style={{ fontSize: "0.85em" }}>
+                                <button type="button" className="btn btn-outline btn-compact" onClick={() => onEdit(mod.package_name)}>
                                     Edit
                                 </button>
                             )}
                             {mod.workshop_id && (
                                 <button
                                     type="button"
-                                    className="btn btn-outline"
+                                    className="btn btn-outline btn-compact"
                                     onClick={async () => {
                                         try {
                                             await fetch(`${API_BASE}/games/total_war_warhammer_3/packs/${mod.workshop_id}/open`, { method: "POST" })
@@ -71,7 +71,6 @@ const SupportedModCard = ({ mod, issues, onEdit }: Props) => {
                                             console.error("Failed to open workshop folder:", err)
                                         }
                                     }}
-                                    style={{ fontSize: "0.85em" }}
                                 >
                                     Open Workshop Folder
                                 </button>

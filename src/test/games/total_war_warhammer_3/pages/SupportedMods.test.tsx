@@ -133,4 +133,40 @@ describe("SupportedMods page", () => {
         await waitFor(() => expect(screen.getByText("Clean Mod")).toBeInTheDocument())
         expect(screen.queryByLabelText(/validation issue/)).not.toBeInTheDocument()
     })
+
+    it("shows skeleton cards while the mods load", () => {
+        defaultHook()
+        vi.spyOn(globalThis, "fetch").mockImplementation(() => new Promise<Response>(() => {}))
+        render(withRouter(<SupportedModsPage />))
+        expect(screen.getByRole("status", { name: /loading mods/i })).toBeInTheDocument()
+    })
+
+    it("puts the search field and + Add Mod in one toolbar row", async () => {
+        defaultHook()
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ mods: [] }), { status: 200 }))
+        render(withRouter(<SupportedModsPage />))
+        const toolbar = screen.getByPlaceholderText(/search by name or package_name/i).closest(".dashboard-toolbar")
+        expect(toolbar).toContainElement(screen.getByRole("button", { name: "+ Add Mod" }))
+        expect(await screen.findByText("No supported mods yet. Use + Add Mod to add one.")).toBeInTheDocument()
+    })
+
+    it("says no mods match when the search hides every card", async () => {
+        defaultHook()
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ mods: [{ name: "Apple Mod", package_name: "apple", path: "/a", modified_attributes: [] }] }), { status: 200 }))
+        render(withRouter(<SupportedModsPage />))
+        await waitFor(() => expect(screen.getByText("Apple Mod")).toBeInTheDocument())
+        await userEvent.type(screen.getByPlaceholderText(/search/i), "zzz")
+        expect(screen.getByText('No mods match "zzz".')).toBeInTheDocument()
+    })
+
+    it("shows an error with Retry on a network failure, and Retry loads the mods", async () => {
+        defaultHook()
+        vi.spyOn(globalThis, "fetch")
+            .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+            .mockResolvedValueOnce(new Response(JSON.stringify({ mods: [{ name: "Mod A", package_name: "mod_a", path: "/a", modified_attributes: [] }] }), { status: 200 }))
+        render(withRouter(<SupportedModsPage />))
+        expect(await screen.findByRole("alert")).toHaveTextContent("Could not load supported mods: Failed to fetch")
+        await userEvent.click(screen.getByRole("button", { name: "Retry" }))
+        expect(await screen.findByText("Mod A")).toBeInTheDocument()
+    })
 })
