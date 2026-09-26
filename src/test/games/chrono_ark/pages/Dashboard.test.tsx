@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -71,5 +72,40 @@ describe("Chrono Ark Dashboard page", () => {
         await screen.findByText("Zerooz Cathy")
         await waitFor(() => expect(sessionStorage.getItem("lastViewedMod")).toBeNull())
         await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "instant", block: "center" }))
+    })
+
+    it("shows an error with Retry when the first load fails, and Retry loads the mods", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {})
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(new Response("boom", { status: 500 }))
+            .mockResolvedValueOnce(new Response(JSON.stringify([MOD]), { status: 200 }))
+        render(wrap(<DashboardPage />))
+        expect(await screen.findByRole("alert")).toHaveTextContent("Could not load mods: HTTP 500")
+        await userEvent.click(screen.getByRole("button", { name: "Retry" }))
+        expect(await screen.findByText("Zerooz Cathy")).toBeInTheDocument()
+        expect(fetchSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it("says no mods match when the search hides every card", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([MOD]), { status: 200 }))
+        render(wrap(<DashboardPage />))
+        await screen.findByText("Zerooz Cathy")
+        await userEvent.type(screen.getByPlaceholderText("Search by name or author..."), "zzz")
+        expect(screen.getByText('No mods match "zzz".')).toBeInTheDocument()
+    })
+
+    it("keeps the cards and shows a dismissible banner when Refresh fails", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {})
+        vi.spyOn(globalThis, "fetch").mockImplementation((input) =>
+            Promise.resolve(String(input).endsWith("/mods/refresh") ? new Response("boom", { status: 500 }) : new Response(JSON.stringify([MOD]), { status: 200 }))
+        )
+        render(wrap(<DashboardPage />))
+        await screen.findByText("Zerooz Cathy")
+        await userEvent.click(screen.getByRole("button", { name: "Refresh" }))
+        expect(await screen.findByText("Refresh failed: HTTP 500")).toBeInTheDocument()
+        expect(screen.getByText("Zerooz Cathy")).toBeInTheDocument()
+        await userEvent.click(screen.getByRole("button", { name: "Dismiss" }))
+        expect(screen.queryByText("Refresh failed: HTTP 500")).not.toBeInTheDocument()
     })
 })

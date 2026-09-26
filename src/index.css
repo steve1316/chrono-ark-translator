@@ -209,6 +209,25 @@ body {
     gap: 0.75rem;
 }
 
+.dashboard-section + .dashboard-section {
+    margin-top: 2.5rem;
+}
+
+.dashboard-section-title {
+    margin-bottom: 1rem;
+}
+
+.dashboard-section-empty {
+    color: var(--text-dim);
+}
+
+.dashboard-section-error {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--tone-error-text);
+}
+
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* Title adornments (src/translation/TitleAdornments.tsx) */

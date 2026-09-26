@@ -2,15 +2,16 @@ import React, { useState, useMemo, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { useGameSlug } from "../../../useGameSlug"
 import ModGrid from "../../../../components/ModGrid"
-import ModGridSkeleton from "../../../../components/ModGridSkeleton"
 import EstimateTotalCostModal from "../../../../components/EstimateTotalCostModal"
 import type { ModStatus } from "../../../../shared_types"
 import { gameApi } from "../../../../api/games"
 import { filterMods } from "../../../../utils/modFilters"
 import DashboardHeader from "../../../../dashboard/DashboardHeader"
+import DashboardSection from "../../../../dashboard/DashboardSection"
 import { progressLabel } from "../../../../dashboard/progressLabel"
 import { useCardWidth } from "../../../../dashboard/useCardWidth"
 import { rememberScrollTarget, useScrollRestore } from "../../../../dashboard/useScrollRestore"
+import Banner from "../../../../ui/Banner"
 
 /**
  * The dashboard page displays a grid of all mods and their translation progress.
@@ -25,6 +26,10 @@ const DashboardPage: React.FC = () => {
     const slug = useGameSlug()
     // `null` until the first fetch settles, so the grid can show a skeleton instead of an empty page.
     const [mods, setMods] = useState<ModStatus[] | null>(null)
+    const [loadError, setLoadError] = useState<string | null>(null)
+    const [refreshError, setRefreshError] = useState<string | null>(null)
+    // True once any mod list has arrived. After that a failed fetch keeps the cards and shows a banner instead.
+    const hasLoadedRef = useRef(false)
     const [search, setSearch] = useState("")
     const [refreshing, setRefreshing] = useState(false)
     const [refreshProgress, setRefreshProgress] = useState<{ current: number; total: number; mod_name: string } | null>(null)
@@ -47,20 +52,29 @@ const DashboardPage: React.FC = () => {
     /**
      * Fetches the list of all mods from the Chrono Ark game API.
      *
-     * Hits `GET /api/games/chrono_ark/mods` and replaces local state with the
-     * returned array of `ModStatus` objects. Errors are logged but do not
-     * surface to the UI. The existing list is preserved on failure, or an empty list is set if nothing had loaded yet.
+     * Hits `GET /api/games/chrono_ark/mods` and replaces local state with the returned array of `ModStatus` objects. A failed first load
+     * shows an error with Retry in place of the grid. A failed reload after that keeps the cards and shows an error banner.
      */
     const fetchMods = async () => {
         try {
             const res = await gameApi("chrono_ark").get("/mods")
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const data = await res.json()
+            hasLoadedRef.current = true
             setMods(data)
+            setLoadError(null)
         } catch (err) {
             console.error("Failed to fetch mods:", err)
-            // Leave the loading state so a failed first load shows an empty grid rather than a skeleton forever.
-            setMods((prev) => prev ?? [])
+            const message = (err as Error).message
+            if (hasLoadedRef.current) setRefreshError(`Could not reload mods: ${message}`)
+            else setLoadError(`Could not load mods: ${message}`)
         }
+    }
+
+    /** Clears the load error, which brings the skeleton back, and tries the first load again. */
+    const retryLoad = () => {
+        setLoadError(null)
+        fetchMods()
     }
 
     // Fetch mods on first mount.
@@ -116,9 +130,11 @@ const DashboardPage: React.FC = () => {
 
         setRefreshing(true)
         setRefreshProgress(null)
+        setRefreshError(null)
 
         try {
             const res = await gameApi("chrono_ark").post("/mods/refresh", undefined, { signal: controller.signal })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const reader = res.body?.getReader()
             const decoder = new TextDecoder()
             if (!reader) return
@@ -132,6 +148,7 @@ const DashboardPage: React.FC = () => {
                     try {
                         const event = JSON.parse(line.slice(6))
                         if (event.done) {
+                            hasLoadedRef.current = true
                             setMods(event.results)
                         } else {
                             setRefreshProgress(event)
@@ -144,6 +161,7 @@ const DashboardPage: React.FC = () => {
         } catch (err) {
             if ((err as Error).name !== "AbortError") {
                 console.error("Failed to refresh mods:", err)
+                setRefreshError(`Refresh failed: ${(err as Error).message}`)
             }
         } finally {
             setRefreshing(false)
@@ -259,7 +277,23 @@ const DashboardPage: React.FC = () => {
                 }
             />
 
-            <div ref={gridWrapperRef}>{mods === null ? <ModGridSkeleton /> : <ModGrid mods={filteredMods} onModSelect={handleModSelect} onModSync={handleModSync} searchQuery={search.trim()} />}</div>
+            {refreshError && (
+                <Banner tone="error" onDismiss={() => setRefreshError(null)}>
+                    {refreshError}
+                </Banner>
+            )}
+
+            <div ref={gridWrapperRef}>
+                <DashboardSection
+                    loading={mods === null}
+                    error={loadError}
+                    onRetry={retryLoad}
+                    empty={filteredMods.length === 0}
+                    emptyMessage={search.trim() ? `No mods match "${search.trim()}".` : "No mods found."}
+                >
+                    <ModGrid mods={filteredMods} onModSelect={handleModSelect} onModSync={handleModSync} searchQuery={search.trim()} />
+                </DashboardSection>
+            </div>
             {showEstimateModal && <EstimateTotalCostModal results={estimateResults} onClose={() => setShowEstimateModal(false)} />}
         </>
     )
