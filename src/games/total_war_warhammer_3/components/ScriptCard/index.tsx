@@ -34,9 +34,9 @@ interface Props {
  */
 export default function ScriptCard({ script, running, disabled, onRun, onCancel }: Props) {
     return (
-        <div className="glass-card" style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <h3 style={{ margin: 0 }}>{script.label}</h3>
-            <p style={{ margin: 0, color: "var(--text-dim, #777)", fontSize: "0.9rem", flexGrow: 1 }}>{script.description}</p>
+        <div className="glass-card script-card">
+            <h3 className="script-card-title">{script.label}</h3>
+            <p className="script-card-description">{script.description}</p>
             {running ? (
                 <button className="btn btn-outline" onClick={onCancel}>
                     Cancel

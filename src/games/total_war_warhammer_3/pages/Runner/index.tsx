@@ -4,6 +4,7 @@ import { kickPoll, useCurrentRun } from "../../hooks/useCurrentRun"
 import { appendLine } from "../../hooks/useRunnerLog"
 import ScriptCard, { type ScriptEntry } from "../../components/ScriptCard"
 import RunnerLogTerminal from "../../components/RunnerLogTerminal"
+import PageHeader from "../../../../ui/PageHeader"
 
 /** The set of registered helper scripts shown on the Runner page. */
 const SCRIPTS: ScriptEntry[] = [
@@ -128,13 +129,8 @@ export default function RunnerPage() {
     const runningScriptId = run.status === "running" ? run.script_id : null
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 4rem)" }}>
-            <div className="dashboard-header">
-                <div className="title-group">
-                    <h1>Runner</h1>
-                    <p>Run any of the helper_scripts/update_*.py scripts. Output accumulates in the terminal below across runs.</p>
-                </div>
-            </div>
+        <div className="page-fill">
+            <PageHeader title="Runner" meta={<p>Run any of the helper_scripts/update_*.py scripts. Output accumulates in the terminal below across runs.</p>} />
             <div className="mod-grid">
                 {SCRIPTS.map((s) => (
                     <ScriptCard key={s.id} script={s} running={runningScriptId === s.id} disabled={runningScriptId !== null && runningScriptId !== s.id} onRun={handleStart} onCancel={handleCancel} />

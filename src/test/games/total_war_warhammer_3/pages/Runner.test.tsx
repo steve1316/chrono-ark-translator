@@ -137,4 +137,13 @@ describe("Runner page", () => {
         render(wrap(<RunnerPage />))
         await waitFor(() => expect(FakeEventSource.instances.length).toBe(1))
     })
+
+    it("fills the viewport under a shared page header and renders each script as a script card", async () => {
+        const { container } = render(wrap(<RunnerPage />))
+        await waitFor(() => expect(screen.getAllByRole("button", { name: /^run$/i })).toHaveLength(7))
+        const page = container.querySelector(".page-fill")
+        expect(page).not.toBeNull()
+        expect(page).toContainElement(screen.getByRole("heading", { level: 1, name: "Runner" }))
+        expect(container.querySelectorAll(".script-card")).toHaveLength(7)
+    })
 })

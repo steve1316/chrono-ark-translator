@@ -437,6 +437,34 @@ body {
 
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Runner (src/games/total_war_warhammer_3/pages/Runner) */
+/* A page whose last child (the log terminal) stretches to the bottom of the viewport. */
+.page-fill {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 4rem);
+}
+
+.script-card {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.script-card-title {
+    margin: 0;
+}
+
+.script-card-description {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    flex-grow: 1;
+}
+
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* Title adornments (src/translation/TitleAdornments.tsx) */
 .icon-action {
     display: flex;
