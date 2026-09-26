@@ -540,25 +540,30 @@ body {
 
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
-/* Context panel (src/translation/ContextPanel.tsx) */
+/* Panel (src/ui/Panel.tsx) and context panel (src/translation/ContextPanel.tsx) */
 .help-text {
     color: var(--text-dim);
     font-size: 0.85rem;
 }
 
-.context-panel {
+.panel {
     padding: 1.5rem;
     margin-bottom: 1rem;
 }
 
-.context-panel-title {
+.panel-title {
     margin-top: 0;
     margin-bottom: 0.5rem;
 }
 
-.context-panel-help {
+.panel-help {
     margin-top: 0;
     margin-bottom: 1rem;
+}
+
+/* A panel that is only a title and help line, like the WH3 dashboard intro, has no gap under the help line. */
+.panel-help:last-child {
+    margin-bottom: 0;
 }
 
 .context-panel-row {

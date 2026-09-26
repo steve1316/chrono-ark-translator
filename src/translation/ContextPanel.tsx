@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react"
 import type { ChangeEvent } from "react"
 
 import Field from "../ui/Field"
+import Panel from "../ui/Panel"
 
 /** The three free-text context fields sent with every translation prompt. */
 export interface ContextFields {
@@ -98,9 +99,7 @@ export function ContextPanel({
     }
 
     return (
-        <div className="glass-card static context-panel">
-            <h3 className="context-panel-title">{title}</h3>
-            <p className="help-text context-panel-help">{description}</p>
+        <Panel title={title} help={description} className="context-panel">
             <div className="context-panel-row">
                 <Field label="Source Game" htmlFor={`${id}-source-game`} className="context-panel-field">
                     <input id={`${id}-source-game`} type="text" className="input" placeholder={hints.source_game} value={draft.source_game} onChange={update("source_game")} />
@@ -119,6 +118,6 @@ export function ContextPanel({
                     Save Context
                 </button>
             </div>
-        </div>
+        </Panel>
     )
 }
