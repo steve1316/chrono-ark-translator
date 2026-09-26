@@ -65,4 +65,43 @@ describe("SettingsPage", () => {
         await userEvent.click(screen.getByRole("button", { name: "Retry" }))
         expect(await screen.findByRole("heading", { name: "Translation Provider" })).toBeInTheDocument()
     })
+
+    it("links every always-visible settings field to its label", async () => {
+        mockSettingsFetch()
+        render(<SettingsPage />)
+        await screen.findByRole("heading", { name: "Translation Provider" })
+        for (const label of [
+            "Source Language",
+            "Model",
+            "Claude API Key",
+            "OpenAI API Key",
+            "DeepL API Key",
+            "Batch size",
+            "Workshop mod ID",
+            "helper_scripts directory",
+            "rpfm_cli.exe path (optional, defaults to helper_scripts/rpfm_cli.exe)",
+            "Steam library drive (e.g., F:)",
+            "SteamCMD path (steamcmd.exe)",
+            "Steam username",
+        ]) {
+            expect(screen.getByLabelText(label)).toBeInTheDocument()
+        }
+        expect(screen.getByLabelText("helper_scripts directory")).toHaveValue("C:/helper")
+    })
+
+    it("links the llama.cpp advanced fields to their labels", async () => {
+        mockSettingsFetch(() => Promise.resolve(json({ ...SETTINGS, provider: "llamacpp" })))
+        render(<SettingsPage />)
+        await userEvent.click(await screen.findByRole("button", { name: "Advanced Settings" }))
+        for (const label of ["Model Path (override)", "GPU Layers", "Context Size", "Server URL", "Binary Path", "Display Name"]) {
+            expect(screen.getByLabelText(label)).toBeInTheDocument()
+        }
+    })
+
+    it("links the Ollama URL field to its label", async () => {
+        mockSettingsFetch(() => Promise.resolve(json({ ...SETTINGS, provider: "ollama" })))
+        render(<SettingsPage />)
+        await userEvent.click(await screen.findByRole("button", { name: "Advanced Settings" }))
+        expect(screen.getByLabelText("Ollama URL")).toHaveValue("http://localhost:11434")
+    })
 })

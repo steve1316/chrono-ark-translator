@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react"
+import React, { useEffect, useId, useState } from "react"
 import { FaEye, FaEyeSlash, FaCheck, FaExclamationTriangle, FaChevronDown, FaChevronRight, FaDownload, FaPlay, FaStop, FaTimes } from "react-icons/fa"
 import { API_BASE } from "../../config"
 import { gameApi } from "../../api/games"
 import ErrorState from "../../ui/ErrorState"
+import Field from "../../ui/Field"
 import LoadingState from "../../ui/LoadingState"
 import PageHeader from "../../ui/PageHeader"
 import Panel from "../../ui/Panel"
@@ -92,6 +93,8 @@ const GGUF_TIERS = [
  * effect immediately without a server restart.
  */
 const SettingsPage: React.FC = () => {
+    // Prefix for every field id on the page, so each label can point at its control.
+    const fieldId = useId()
     const [provider, setProvider] = useState("claude")
     const [originalProvider, setOriginalProvider] = useState("claude")
     const [batchSize, setBatchSize] = useState(100)
@@ -743,14 +746,11 @@ const SettingsPage: React.FC = () => {
 
             {/* System Prompt Preview */}
             <Panel className="settings-panel" title="System Prompt Preview" help="View the system prompt sent to the translation provider. Uses the base glossary and current provider settings.">
-                <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", marginBottom: "1rem" }}>
-                    <label style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>Source Language:</label>
-                    <select
-                        value={promptSourceLang}
-                        onChange={(e) => setPromptSourceLang(e.target.value)}
-                        className="btn-outline app-select"
-                        style={{ padding: "0.4rem 2.25rem 0.4rem 0.75rem", borderRadius: "6px", backgroundColor: "rgba(0,0,0,0.2)" }}
-                    >
+                <div className="settings-inline-row">
+                    <label className="field-label" htmlFor={`${fieldId}-prompt-lang`}>
+                        Source Language
+                    </label>
+                    <select id={`${fieldId}-prompt-lang`} value={promptSourceLang} onChange={(e) => setPromptSourceLang(e.target.value)} className="select select-auto">
                         <option value="Chinese">Chinese</option>
                         <option value="Korean">Korean</option>
                         <option value="Japanese">Japanese</option>
@@ -813,21 +813,11 @@ const SettingsPage: React.FC = () => {
                     <select
                         value={provider === "claude" ? claudeModel : openaiModel}
                         onChange={(e) => (provider === "claude" ? setClaudeModel(e.target.value) : setOpenaiModel(e.target.value))}
-                        className="app-select"
-                        style={{
-                            width: "100%",
-                            padding: "0.75rem 2.5rem 0.75rem 1rem",
-                            backgroundColor: "rgba(255, 255, 255, 0.05)",
-                            border: "1px solid rgba(255, 255, 255, 0.1)",
-                            borderRadius: "8px",
-                            color: "var(--text-main)",
-                            fontSize: "0.9rem",
-                            cursor: "pointer",
-                            outline: "none",
-                        }}
+                        aria-label="Model"
+                        className="select"
                     >
                         {(provider === "claude" ? claudeModels : openaiModels).map((m) => (
-                            <option key={m.id} value={m.id} style={{ background: "#1a1a2e", color: "var(--text-main)" }}>
+                            <option key={m.id} value={m.id}>
                                 {m.label} — ${m.input_per_mtok} / ${m.output_per_mtok} per MTok (in/out)
                             </option>
                         ))}
@@ -1004,34 +994,26 @@ const SettingsPage: React.FC = () => {
                             Advanced Settings
                         </button>
                         {showOllamaAdvanced && (
-                            <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                                <div>
-                                    <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.85rem", display: "block", marginBottom: "0.25rem" }}>Ollama URL</label>
+                            <div className="settings-advanced">
+                                <Field label="Ollama URL" htmlFor={`${fieldId}-ollama-url`}>
                                     <input
+                                        id={`${fieldId}-ollama-url`}
                                         type="text"
+                                        className="input input-medium"
                                         value={ollamaBaseUrl}
                                         onChange={(e) => setOllamaBaseUrl(e.target.value)}
                                         placeholder="http://localhost:11434"
-                                        style={{
-                                            padding: "0.6rem 0.75rem",
-                                            borderRadius: "8px",
-                                            border: "1px solid var(--glass-border)",
-                                            background: "rgba(0, 0, 0, 0.2)",
-                                            color: "var(--text-main)",
-                                            fontSize: "0.85rem",
-                                            width: "320px",
-                                        }}
                                     />
-                                </div>
-                                <div>
-                                    <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.85rem", display: "block", marginBottom: "0.25rem" }}>Model (override)</label>
-                                    <p style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginBottom: "0.25rem" }}>Use an installed model instead of the recommended one above.</p>
+                                </Field>
+                                <Field label="Model (override)" htmlFor={`${fieldId}-ollama-override`}>
+                                    <p className="field-help">Use an installed model instead of the recommended one above.</p>
                                     {(() => {
                                         const overrideModels = ollamaModels.filter((m) => !VRAM_TIERS.some((t) => t.model === m))
                                         return overrideModels.length > 0 ? (
                                             <select
+                                                id={`${fieldId}-ollama-override`}
                                                 value={isModelOverride ? ollamaModel : ""}
-                                                className="app-select"
+                                                className="select input-medium"
                                                 onChange={(e) => {
                                                     const val = e.target.value
                                                     if (val === "") {
@@ -1042,15 +1024,6 @@ const SettingsPage: React.FC = () => {
                                                         setOllamaModel(val)
                                                     }
                                                 }}
-                                                style={{
-                                                    padding: "0.6rem 2.25rem 0.6rem 0.75rem",
-                                                    borderRadius: "8px",
-                                                    border: "1px solid var(--glass-border)",
-                                                    backgroundColor: "rgba(0, 0, 0, 0.2)",
-                                                    color: "var(--text-main)",
-                                                    fontSize: "0.85rem",
-                                                    width: "340px",
-                                                }}
                                             >
                                                 <option value="">None (use recommended)</option>
                                                 {overrideModels.map((m) => (
@@ -1060,10 +1033,10 @@ const SettingsPage: React.FC = () => {
                                                 ))}
                                             </select>
                                         ) : (
-                                            <span style={{ color: "var(--text-dim)", fontSize: "0.85rem" }}>{ollamaStatus === "running" ? "No other models installed" : "Ollama not running"}</span>
+                                            <span className="note">{ollamaStatus === "running" ? "No other models installed" : "Ollama not running"}</span>
                                         )
                                     })()}
-                                </div>
+                                </Field>
                             </div>
                         )}
                     </div>
@@ -1269,132 +1242,80 @@ const SettingsPage: React.FC = () => {
                             Advanced Settings
                         </button>
                         {showLlamacppAdvanced && (
-                            <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                                <div>
-                                    <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.85rem", display: "block", marginBottom: "0.25rem" }}>Model Path (override)</label>
-                                    <p style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginBottom: "0.25rem" }}>
-                                        Auto-filled when you download a model. Override to use a different GGUF file.
-                                    </p>
+                            <div className="settings-advanced">
+                                <Field label="Model Path (override)" htmlFor={`${fieldId}-llamacpp-model-path`}>
+                                    <p className="field-help">Auto-filled when you download a model. Override to use a different GGUF file.</p>
                                     <input
+                                        id={`${fieldId}-llamacpp-model-path`}
                                         type="text"
+                                        className="input input-wide"
                                         value={llamacppModelPath}
                                         onChange={(e) => setLlamacppModelPath(e.target.value)}
                                         placeholder="Auto-filled on download"
-                                        style={{
-                                            padding: "0.6rem 0.75rem",
-                                            borderRadius: "8px",
-                                            border: "1px solid var(--glass-border)",
-                                            background: "rgba(0, 0, 0, 0.2)",
-                                            color: "var(--text-main)",
-                                            fontSize: "0.85rem",
-                                            width: "100%",
-                                            maxWidth: "500px",
-                                        }}
                                     />
-                                </div>
-                                <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-                                    <div>
-                                        <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.85rem", display: "block", marginBottom: "0.25rem" }}>GPU Layers</label>
-                                        <p style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginBottom: "0.25rem" }}>-1 = offload all layers to GPU</p>
+                                </Field>
+                                <div className="settings-field-row">
+                                    <Field label="GPU Layers" htmlFor={`${fieldId}-llamacpp-gpu-layers`}>
+                                        <p className="field-help">-1 = offload all layers to GPU</p>
                                         <input
+                                            id={`${fieldId}-llamacpp-gpu-layers`}
                                             type="number"
+                                            className="input input-number"
                                             value={llamacppGpuLayers}
                                             onChange={(e) => {
                                                 const val = parseInt(e.target.value, 10)
                                                 if (!isNaN(val)) setLlamacppGpuLayers(val)
                                             }}
-                                            style={{
-                                                padding: "0.6rem 0.75rem",
-                                                borderRadius: "8px",
-                                                border: "1px solid var(--glass-border)",
-                                                background: "rgba(0, 0, 0, 0.2)",
-                                                color: "var(--text-main)",
-                                                fontSize: "0.85rem",
-                                                width: "120px",
-                                            }}
                                         />
-                                    </div>
-                                    <div>
-                                        <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.85rem", display: "block", marginBottom: "0.25rem" }}>Context Size</label>
-                                        <p style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginBottom: "0.25rem" }}>Tokens for prompt + response</p>
+                                    </Field>
+                                    <Field label="Context Size" htmlFor={`${fieldId}-llamacpp-ctx-size`}>
+                                        <p className="field-help">Tokens for prompt + response</p>
                                         <input
+                                            id={`${fieldId}-llamacpp-ctx-size`}
                                             type="number"
                                             min={512}
                                             step={1024}
+                                            className="input input-number"
                                             value={llamacppCtxSize}
                                             onChange={(e) => {
                                                 const val = parseInt(e.target.value, 10)
                                                 if (!isNaN(val)) setLlamacppCtxSize(val)
                                             }}
-                                            style={{
-                                                padding: "0.6rem 0.75rem",
-                                                borderRadius: "8px",
-                                                border: "1px solid var(--glass-border)",
-                                                background: "rgba(0, 0, 0, 0.2)",
-                                                color: "var(--text-main)",
-                                                fontSize: "0.85rem",
-                                                width: "120px",
-                                            }}
                                         />
-                                    </div>
+                                    </Field>
                                 </div>
-                                <div>
-                                    <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.85rem", display: "block", marginBottom: "0.25rem" }}>Server URL</label>
+                                <Field label="Server URL" htmlFor={`${fieldId}-llamacpp-url`}>
                                     <input
+                                        id={`${fieldId}-llamacpp-url`}
                                         type="text"
+                                        className="input input-medium"
                                         value={llamacppBaseUrl}
                                         onChange={(e) => setLlamacppBaseUrl(e.target.value)}
                                         placeholder="http://localhost:8080"
-                                        style={{
-                                            padding: "0.6rem 0.75rem",
-                                            borderRadius: "8px",
-                                            border: "1px solid var(--glass-border)",
-                                            background: "rgba(0, 0, 0, 0.2)",
-                                            color: "var(--text-main)",
-                                            fontSize: "0.85rem",
-                                            width: "320px",
-                                        }}
                                     />
-                                </div>
-                                <div>
-                                    <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.85rem", display: "block", marginBottom: "0.25rem" }}>Binary Path</label>
-                                    <p style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginBottom: "0.25rem" }}>Path to the llama-server binary. Default assumes it is on PATH.</p>
+                                </Field>
+                                <Field label="Binary Path" htmlFor={`${fieldId}-llamacpp-binary`}>
+                                    <p className="field-help">Path to the llama-server binary. Default assumes it is on PATH.</p>
                                     <input
+                                        id={`${fieldId}-llamacpp-binary`}
                                         type="text"
+                                        className="input input-wide"
                                         value={llamacppBinaryPath}
                                         onChange={(e) => setLlamacppBinaryPath(e.target.value)}
                                         placeholder="llama-server"
-                                        style={{
-                                            padding: "0.6rem 0.75rem",
-                                            borderRadius: "8px",
-                                            border: "1px solid var(--glass-border)",
-                                            background: "rgba(0, 0, 0, 0.2)",
-                                            color: "var(--text-main)",
-                                            fontSize: "0.85rem",
-                                            width: "100%",
-                                            maxWidth: "500px",
-                                        }}
                                     />
-                                </div>
-                                <div>
-                                    <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.85rem", display: "block", marginBottom: "0.25rem" }}>Display Name</label>
-                                    <p style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginBottom: "0.25rem" }}>Label shown in the UI during translation. Auto-filled from tier selection.</p>
+                                </Field>
+                                <Field label="Display Name" htmlFor={`${fieldId}-llamacpp-display-name`}>
+                                    <p className="field-help">Label shown in the UI during translation. Auto-filled from tier selection.</p>
                                     <input
+                                        id={`${fieldId}-llamacpp-display-name`}
                                         type="text"
+                                        className="input input-medium"
                                         value={llamacppModel}
                                         onChange={(e) => setLlamacppModel(e.target.value)}
                                         placeholder="e.g. Qwen2.5-14B-Instruct"
-                                        style={{
-                                            padding: "0.6rem 0.75rem",
-                                            borderRadius: "8px",
-                                            border: "1px solid var(--glass-border)",
-                                            background: "rgba(0, 0, 0, 0.2)",
-                                            color: "var(--text-main)",
-                                            fontSize: "0.85rem",
-                                            width: "320px",
-                                        }}
                                     />
-                                </div>
+                                </Field>
                             </div>
                         )}
                     </div>
@@ -1422,7 +1343,9 @@ const SettingsPage: React.FC = () => {
                                 }}
                             >
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                                    <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.9rem" }}>{p.label} API Key</label>
+                                    <label className="field-label" htmlFor={`${fieldId}-key-${field}`}>
+                                        {p.label} API Key
+                                    </label>
                                     <span className={`key-status ${isConfigured ? "configured" : "missing"}`}>
                                         {isConfigured ? (
                                             <>
@@ -1437,6 +1360,7 @@ const SettingsPage: React.FC = () => {
                                 </div>
                                 <div className="key-input-wrapper">
                                     <input
+                                        id={`${fieldId}-key-${field}`}
                                         type={keyVisible[field] ? "text" : "password"}
                                         value={apiKeys[field]}
                                         onChange={(e) => setApiKeys((prev) => ({ ...prev, [field]: e.target.value }))}
@@ -1463,19 +1387,12 @@ const SettingsPage: React.FC = () => {
                     type="number"
                     min={1}
                     max={500}
+                    aria-label="Batch size"
+                    className="input input-number"
                     value={batchSize}
                     onChange={(e) => {
                         const val = parseInt(e.target.value, 10)
                         if (!isNaN(val)) setBatchSize(val)
-                    }}
-                    style={{
-                        padding: "0.75rem",
-                        borderRadius: "8px",
-                        border: "1px solid var(--glass-border)",
-                        background: "rgba(0, 0, 0, 0.2)",
-                        color: "var(--text-main)",
-                        fontSize: "0.9rem",
-                        width: "120px",
                     }}
                 />
             </Panel>
@@ -1486,9 +1403,11 @@ const SettingsPage: React.FC = () => {
                 title="Ignored Mods"
                 help="Workshop mod IDs listed here will be hidden from the dashboard. Useful for system mods, English-only mods, or mods you don't need to translate."
             >
-                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                <div className="settings-inline-row">
                     <input
                         type="text"
+                        aria-label="Workshop mod ID"
+                        className="input"
                         placeholder="Workshop mod ID"
                         value={newIgnoredMod}
                         onChange={(e) => setNewIgnoredMod(e.target.value.trim())}
@@ -1497,15 +1416,6 @@ const SettingsPage: React.FC = () => {
                                 setIgnoredMods([...ignoredMods, newIgnoredMod])
                                 setNewIgnoredMod("")
                             }
-                        }}
-                        style={{
-                            padding: "0.75rem",
-                            borderRadius: "8px",
-                            border: "1px solid var(--glass-border)",
-                            background: "rgba(0, 0, 0, 0.2)",
-                            color: "var(--text-main)",
-                            fontSize: "0.9rem",
-                            flex: 1,
                         }}
                     />
                     <button
@@ -1563,35 +1473,31 @@ const SettingsPage: React.FC = () => {
 
             {/* Total War: Warhammer III */}
             <Panel className="settings-panel" title="Total War: Warhammer III" help="Paths used by the helper_scripts script runner. Required before triggering rebuilds from the Runner page.">
-                <label style={{ display: "block", marginBottom: "0.5rem", color: "var(--text-dim)" }}>helper_scripts directory</label>
-                <input
-                    type="text"
-                    className="btn-outline"
-                    placeholder="C:\path\to\totalwar-modding\helper_scripts"
-                    value={tw3HelperPath}
-                    onChange={(e) => setTw3HelperPath(e.target.value)}
-                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "0.75rem" }}
-                />
-
-                <label style={{ display: "block", marginBottom: "0.5rem", color: "var(--text-dim)" }}>rpfm_cli.exe path (optional, defaults to helper_scripts/rpfm_cli.exe)</label>
-                <input
-                    type="text"
-                    className="btn-outline"
-                    placeholder="leave blank to use default"
-                    value={tw3RpfmCliPath}
-                    onChange={(e) => setTw3RpfmCliPath(e.target.value)}
-                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "0.75rem" }}
-                />
-
-                <label style={{ display: "block", marginBottom: "0.5rem", color: "var(--text-dim)" }}>Steam library drive (e.g., F:)</label>
-                <input
-                    type="text"
-                    className="btn-outline"
-                    placeholder="F:"
-                    value={tw3SteamLibraryDrive}
-                    onChange={(e) => setTw3SteamLibraryDrive(e.target.value)}
-                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8 }}
-                />
+                <div className="form-stack">
+                    <Field label="helper_scripts directory" htmlFor={`${fieldId}-tw3-helper`}>
+                        <input
+                            id={`${fieldId}-tw3-helper`}
+                            type="text"
+                            className="input"
+                            placeholder="C:\path\to\totalwar-modding\helper_scripts"
+                            value={tw3HelperPath}
+                            onChange={(e) => setTw3HelperPath(e.target.value)}
+                        />
+                    </Field>
+                    <Field label="rpfm_cli.exe path (optional, defaults to helper_scripts/rpfm_cli.exe)" htmlFor={`${fieldId}-tw3-rpfm`}>
+                        <input
+                            id={`${fieldId}-tw3-rpfm`}
+                            type="text"
+                            className="input"
+                            placeholder="leave blank to use default"
+                            value={tw3RpfmCliPath}
+                            onChange={(e) => setTw3RpfmCliPath(e.target.value)}
+                        />
+                    </Field>
+                    <Field label="Steam library drive (e.g., F:)" htmlFor={`${fieldId}-tw3-drive`}>
+                        <input id={`${fieldId}-tw3-drive`} type="text" className="input" placeholder="F:" value={tw3SteamLibraryDrive} onChange={(e) => setTw3SteamLibraryDrive(e.target.value)} />
+                    </Field>
+                </div>
             </Panel>
 
             {/* Steam Account (Publish to Workshop) */}
@@ -1605,8 +1511,10 @@ const SettingsPage: React.FC = () => {
                     </>
                 }
             >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.5rem" }}>
-                    <label style={{ color: "var(--text-dim)" }}>SteamCMD path (steamcmd.exe)</label>
+                <div className="field-label-row">
+                    <label className="field-label" htmlFor={`${fieldId}-steamcmd`}>
+                        SteamCMD path (steamcmd.exe)
+                    </label>
                     <button
                         className="btn btn-outline"
                         onClick={async () => {
@@ -1647,24 +1555,25 @@ const SettingsPage: React.FC = () => {
                     </div>
                 )}
                 <input
+                    id={`${fieldId}-steamcmd`}
                     type="text"
-                    className="btn-outline"
+                    className="input settings-field-gap"
                     placeholder="C:\\steamcmd\\steamcmd.exe"
                     value={steamcmdPath}
                     onChange={(e) => setSteamcmdPath(e.target.value)}
-                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "1rem" }}
                 />
 
-                <label style={{ display: "block", marginBottom: "0.5rem", color: "var(--text-dim)" }}>Steam username</label>
-                <input
-                    type="text"
-                    className="btn-outline"
-                    placeholder="your_steam_username"
-                    value={steamUsername}
-                    onChange={(e) => setSteamUsername(e.target.value)}
-                    autoComplete="off"
-                    style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8 }}
-                />
+                <Field label="Steam username" htmlFor={`${fieldId}-steam-username`}>
+                    <input
+                        id={`${fieldId}-steam-username`}
+                        type="text"
+                        className="input"
+                        placeholder="your_steam_username"
+                        value={steamUsername}
+                        onChange={(e) => setSteamUsername(e.target.value)}
+                        autoComplete="off"
+                    />
+                </Field>
             </Panel>
 
             {/* Save */}

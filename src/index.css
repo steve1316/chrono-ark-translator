@@ -471,6 +471,69 @@ body {
     margin-bottom: 1.5rem;
 }
 
+.field-help {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+}
+
+.field-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.5rem;
+}
+
+/* Compound selectors so these beat the base .input and .select rules, which come later in this file. */
+.select.select-auto {
+    width: auto;
+}
+
+/* Dark dropdown lists so option text stays readable on Windows. */
+.select option {
+    background: #1a1a2e;
+    color: var(--text-main);
+}
+
+.input.input-number {
+    width: 120px;
+}
+
+.input-medium {
+    max-width: 340px;
+}
+
+.input-wide {
+    max-width: 500px;
+}
+
+.settings-inline-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.settings-inline-row > .input {
+    flex: 1;
+}
+
+.settings-advanced {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.settings-field-row {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.settings-field-gap {
+    margin-bottom: 1rem;
+}
+
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* Title adornments (src/translation/TitleAdornments.tsx) */
