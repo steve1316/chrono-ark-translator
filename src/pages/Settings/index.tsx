@@ -3,6 +3,7 @@ import { FaEye, FaEyeSlash, FaCheck, FaExclamationTriangle, FaChevronDown, FaChe
 import { API_BASE } from "../../config"
 import { gameApi } from "../../api/games"
 import ErrorState from "../../ui/ErrorState"
+import DownloadProgress from "../../ui/DownloadProgress"
 import Field from "../../ui/Field"
 import LoadingState from "../../ui/LoadingState"
 import PageHeader from "../../ui/PageHeader"
@@ -725,8 +726,10 @@ const SettingsPage: React.FC = () => {
     const tierDefault = VRAM_TIERS.find((t) => t.tier === ollamaVramTier)?.model || ""
     const isModelOverride = ollamaModel !== "" && ollamaModel !== tierDefault
 
-    /** Status dot color based on Ollama status. */
-    const statusColor = ollamaStatus === "running" ? "var(--success)" : ollamaStatus === "stopped" ? "var(--warning)" : ollamaStatus === "unknown" ? "var(--text-dim)" : "var(--danger)"
+    /** Status dot tone based on Ollama status. */
+    const ollamaTone = ollamaStatus === "running" ? "success" : ollamaStatus === "stopped" ? "warning" : ollamaStatus === "unknown" ? "dim" : "danger"
+    /** Status dot tone for llama.cpp: ready once installed with a model, even before the server starts. */
+    const llamacppTone = llamacppStatus === "running" || (llamacppInstalled && llamacppModelPath) ? "success" : llamacppStatus === "unknown" ? "dim" : "danger"
     const statusLabel = ollamaStatus === "running" ? "Running" : ollamaStatus === "stopped" ? "Stopped (not running)" : ollamaStatus === "unknown" ? "Checking..." : "Not Installed"
 
     if (loading) return <LoadingState message="Loading settings..." />
@@ -849,47 +852,22 @@ const SettingsPage: React.FC = () => {
             {provider === "ollama" && (
                 <Panel className="settings-panel" title="Ollama Configuration">
                     {/* Status Indicator + Start/Stop */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1.25rem" }}>
-                        <div
-                            className="ollama-status-dot"
-                            style={{
-                                width: "10px",
-                                height: "10px",
-                                borderRadius: "50%",
-                                background: statusColor,
-                                boxShadow: `0 0 6px ${statusColor}`,
-                            }}
-                        />
-                        <span style={{ color: "var(--text-main)", fontSize: "0.9rem", fontWeight: 500 }}>{statusLabel}</span>
+                    <div className="status-row">
+                        <span className={`status-dot status-dot-${ollamaTone}`} aria-hidden="true" />
+                        <span className="status-label">{statusLabel}</span>
                         {ollamaStatus === "stopped" && (
-                            <button className="btn btn-primary" disabled={ollamaStarting} onClick={handleOllamaStart} style={{ marginLeft: "0.75rem", padding: "0.25rem 0.75rem", fontSize: "0.8rem" }}>
-                                <FaPlay style={{ marginRight: "0.4rem", fontSize: "0.65rem" }} />
+                            <button className="btn btn-primary btn-sm status-action" disabled={ollamaStarting} onClick={handleOllamaStart}>
+                                <FaPlay />
                                 {ollamaStarting ? "Starting..." : "Start"}
                             </button>
                         )}
                         {ollamaStatus === "running" && ollamaManaged && (
-                            <button
-                                className="btn"
-                                disabled={ollamaStopping}
-                                onClick={handleOllamaStop}
-                                style={{
-                                    marginLeft: "0.75rem",
-                                    padding: "0.25rem 0.75rem",
-                                    fontSize: "0.8rem",
-                                    background: "var(--danger)",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                <FaStop style={{ marginRight: "0.4rem", fontSize: "0.65rem" }} />
+                            <button className="btn btn-danger btn-sm status-action" disabled={ollamaStopping} onClick={handleOllamaStop}>
+                                <FaStop />
                                 {ollamaStopping ? "Stopping..." : "Stop"}
                             </button>
                         )}
-                        {ollamaStatus === "running" && !ollamaManaged && (
-                            <span style={{ marginLeft: "0.75rem", color: "var(--text-dim)", fontSize: "0.75rem", fontStyle: "italic" }}>Started externally</span>
-                        )}
+                        {ollamaStatus === "running" && !ollamaManaged && <span className="note status-action">Started externally</span>}
                     </div>
 
                     {/* Install Button */}
@@ -897,7 +875,7 @@ const SettingsPage: React.FC = () => {
                         <div style={{ marginBottom: "1.25rem" }}>
                             <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginBottom: "0.75rem" }}>Ollama is not installed. Click below to download and install it automatically.</p>
                             <button className="btn btn-primary" disabled={ollamaInstalling} onClick={handleOllamaInstall}>
-                                <FaDownload style={{ marginRight: "0.5rem" }} />
+                                <FaDownload />
                                 {ollamaInstalling ? "Downloading installer..." : "Install Ollama"}
                             </button>
                         </div>
@@ -943,7 +921,7 @@ const SettingsPage: React.FC = () => {
 
                             {ollamaStatus === "running" && !isModelDownloaded && !ollamaPulling && (
                                 <button className="btn btn-primary" onClick={() => handleOllamaPull(ollamaModel)}>
-                                    <FaDownload style={{ marginRight: "0.5rem" }} />
+                                    <FaDownload />
                                     Download Model
                                 </button>
                             )}
@@ -951,17 +929,7 @@ const SettingsPage: React.FC = () => {
                             {ollamaPulling && ollamaPullProgress && (
                                 <div style={{ marginTop: "0.5rem" }}>
                                     <div style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "0.25rem" }}>{ollamaPullProgress.status}...</div>
-                                    {ollamaPullProgress.total && ollamaPullProgress.total > 0 && (
-                                        <div className="ollama-progress-bar">
-                                            <div className="ollama-progress-fill" style={{ width: `${Math.round(((ollamaPullProgress.completed || 0) / ollamaPullProgress.total) * 100)}%` }} />
-                                        </div>
-                                    )}
-                                    {ollamaPullProgress.total && ollamaPullProgress.total > 0 && (
-                                        <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.25rem" }}>
-                                            {Math.round(((ollamaPullProgress.completed || 0) / ollamaPullProgress.total) * 100)}% ({Math.round((ollamaPullProgress.completed || 0) / 1024 / 1024)} /{" "}
-                                            {Math.round(ollamaPullProgress.total / 1024 / 1024)} MB)
-                                        </div>
-                                    )}
+                                    {(ollamaPullProgress.total ?? 0) > 0 && <DownloadProgress completed={ollamaPullProgress.completed || 0} total={ollamaPullProgress.total ?? 0} />}
                                 </div>
                             )}
                             {ollamaPulling && !ollamaPullProgress && <div style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>Starting download...</div>}
@@ -969,27 +937,11 @@ const SettingsPage: React.FC = () => {
                     )}
 
                     {/* Info Note */}
-                    <p style={{ color: "var(--text-dim)", fontSize: "0.8rem", fontStyle: "italic", marginBottom: "1rem" }}>
-                        Smaller models may produce lower quality translations. Consider reducing batch size for models under 14B parameters.
-                    </p>
+                    <p className="note">Smaller models may produce lower quality translations. Consider reducing batch size for models under 14B parameters.</p>
 
                     {/* Advanced Section */}
                     <div>
-                        <button
-                            type="button"
-                            onClick={() => setShowOllamaAdvanced(!showOllamaAdvanced)}
-                            style={{
-                                background: "none",
-                                border: "none",
-                                color: "var(--text-dim)",
-                                cursor: "pointer",
-                                fontSize: "0.85rem",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.4rem",
-                                padding: 0,
-                            }}
-                        >
+                        <button type="button" className="disclosure-btn" aria-expanded={showOllamaAdvanced} onClick={() => setShowOllamaAdvanced(!showOllamaAdvanced)}>
                             {showOllamaAdvanced ? <FaChevronDown /> : <FaChevronRight />}
                             Advanced Settings
                         </button>
@@ -1046,30 +998,13 @@ const SettingsPage: React.FC = () => {
             {/* llama.cpp Configuration */}
             {provider === "llamacpp" && (
                 <Panel className="settings-panel" title="llama.cpp Configuration">
-                    {/* Status Indicator + Start/Stop */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1.25rem" }}>
-                        <div
-                            style={{
-                                width: "10px",
-                                height: "10px",
-                                borderRadius: "50%",
-                                background:
-                                    llamacppStatus === "running"
-                                        ? "var(--success)"
-                                        : llamacppInstalled && llamacppModelPath
-                                          ? "var(--success)"
-                                          : llamacppStatus === "unknown"
-                                            ? "var(--text-dim)"
-                                            : "var(--danger)",
-                                boxShadow: `0 0 6px ${llamacppStatus === "running" ? "var(--success)" : llamacppInstalled && llamacppModelPath ? "var(--success)" : llamacppStatus === "unknown" ? "var(--text-dim)" : "var(--danger)"}`,
-                            }}
-                        />
-                        <span style={{ color: "var(--text-main)", fontSize: "0.9rem", fontWeight: 500 }}>
+                    {/* Status Indicator */}
+                    <div className="status-row">
+                        <span className={`status-dot status-dot-${llamacppTone}`} aria-hidden="true" />
+                        <span className="status-label">
                             {llamacppStatus === "running" ? "Running" : llamacppInstalled && llamacppModelPath ? "Ready" : llamacppStatus === "unknown" ? "Checking..." : "Not Configured"}
                         </span>
-                        {llamacppInstalled && llamacppModelPath && llamacppStatus !== "running" && (
-                            <span style={{ marginLeft: "0.75rem", color: "var(--text-dim)", fontSize: "0.75rem", fontStyle: "italic" }}>Server starts automatically when translating</span>
-                        )}
+                        {llamacppInstalled && llamacppModelPath && llamacppStatus !== "running" && <span className="note status-action">Server starts automatically when translating</span>}
                     </div>
 
                     {/* Install llama-server */}
@@ -1079,23 +1014,19 @@ const SettingsPage: React.FC = () => {
                             <p style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "0.75rem" }}>Select your GPU type to download the correct llama-server build.</p>
                             <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                                 <button className="btn btn-primary" onClick={() => handleLlamacppInstall("cuda-13")}>
-                                    <FaDownload style={{ marginRight: "0.5rem" }} />
+                                    <FaDownload />
                                     NVIDIA RTX 40/50 series
                                 </button>
-                                <button className="btn btn-primary" onClick={() => handleLlamacppInstall("cuda-12")} style={{ background: "var(--accent-secondary, #8b5cf6)" }}>
-                                    <FaDownload style={{ marginRight: "0.5rem" }} />
+                                <button className="btn btn-outline" onClick={() => handleLlamacppInstall("cuda-12")}>
+                                    <FaDownload />
                                     NVIDIA RTX 20/30 series
                                 </button>
-                                <button className="btn btn-primary" onClick={() => handleLlamacppInstall("vulkan")} style={{ background: "var(--accent-secondary, #6366f1)" }}>
-                                    <FaDownload style={{ marginRight: "0.5rem" }} />
+                                <button className="btn btn-outline" onClick={() => handleLlamacppInstall("vulkan")}>
+                                    <FaDownload />
                                     Any GPU (Vulkan)
                                 </button>
-                                <button
-                                    className="btn"
-                                    onClick={() => handleLlamacppInstall("cpu")}
-                                    style={{ background: "var(--glass-border)", color: "var(--text-main)", border: "none", borderRadius: "8px", padding: "0.5rem 1rem", cursor: "pointer" }}
-                                >
-                                    <FaDownload style={{ marginRight: "0.5rem" }} />
+                                <button className="btn btn-outline" onClick={() => handleLlamacppInstall("cpu")}>
+                                    <FaDownload />
                                     CPU Only
                                 </button>
                             </div>
@@ -1109,16 +1040,8 @@ const SettingsPage: React.FC = () => {
                                 {llamacppInstallProgress?.status === "extracting" && "Extracting..."}
                                 {!llamacppInstallProgress && "Starting install..."}
                             </div>
-                            {llamacppInstallProgress?.total && llamacppInstallProgress.total > 0 && (
-                                <>
-                                    <div className="ollama-progress-bar">
-                                        <div className="ollama-progress-fill" style={{ width: `${Math.round(((llamacppInstallProgress.completed || 0) / llamacppInstallProgress.total) * 100)}%` }} />
-                                    </div>
-                                    <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.25rem" }}>
-                                        {Math.round(((llamacppInstallProgress.completed || 0) / llamacppInstallProgress.total) * 100)}% (
-                                        {Math.round((llamacppInstallProgress.completed || 0) / 1024 / 1024)} / {Math.round(llamacppInstallProgress.total / 1024 / 1024)} MB)
-                                    </div>
-                                </>
+                            {llamacppInstallProgress && (llamacppInstallProgress.total ?? 0) > 0 && (
+                                <DownloadProgress completed={llamacppInstallProgress.completed || 0} total={llamacppInstallProgress.total ?? 0} />
                             )}
                         </div>
                     )}
@@ -1167,7 +1090,7 @@ const SettingsPage: React.FC = () => {
 
                                     {!isDownloaded && !llamacppDownloading && (
                                         <button className="btn btn-primary" onClick={() => handleGgufDownload(selectedTier)}>
-                                            <FaDownload style={{ marginRight: "0.5rem" }} />
+                                            <FaDownload />
                                             Download Model ({selectedTier.size})
                                         </button>
                                     )}
@@ -1177,38 +1100,15 @@ const SettingsPage: React.FC = () => {
                                             <div style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "0.25rem" }}>
                                                 {llamacppDownloadProgress.status === "connecting" ? "Connecting to HuggingFace..." : "Downloading..."}
                                             </div>
-                                            {llamacppDownloadProgress.total && llamacppDownloadProgress.total > 0 && (
-                                                <div className="ollama-progress-bar">
-                                                    <div
-                                                        className="ollama-progress-fill"
-                                                        style={{ width: `${Math.round(((llamacppDownloadProgress.completed || 0) / llamacppDownloadProgress.total) * 100)}%` }}
-                                                    />
-                                                </div>
-                                            )}
-                                            {llamacppDownloadProgress.total && llamacppDownloadProgress.total > 0 && (
-                                                <div style={{ color: "var(--text-dim)", fontSize: "0.75rem", marginTop: "0.25rem" }}>
-                                                    {Math.round(((llamacppDownloadProgress.completed || 0) / llamacppDownloadProgress.total) * 100)}% (
-                                                    {Math.round((llamacppDownloadProgress.completed || 0) / 1024 / 1024)} / {Math.round(llamacppDownloadProgress.total / 1024 / 1024)} MB)
-                                                </div>
+                                            {(llamacppDownloadProgress.total ?? 0) > 0 && (
+                                                <DownloadProgress completed={llamacppDownloadProgress.completed || 0} total={llamacppDownloadProgress.total ?? 0} />
                                             )}
                                         </div>
                                     )}
                                     {llamacppDownloading && !llamacppDownloadProgress && <div style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>Connecting...</div>}
 
                                     {isDownloaded && (
-                                        <button
-                                            onClick={() => handleGgufDelete(selectedTier.filename)}
-                                            style={{
-                                                background: "none",
-                                                border: "none",
-                                                color: "var(--text-dim)",
-                                                fontSize: "0.75rem",
-                                                cursor: "pointer",
-                                                textDecoration: "underline",
-                                                padding: 0,
-                                                marginTop: "0.5rem",
-                                            }}
-                                        >
+                                        <button type="button" className="btn-link settings-subrow" onClick={() => handleGgufDelete(selectedTier.filename)}>
                                             Delete downloaded model
                                         </button>
                                     )}
@@ -1217,27 +1117,11 @@ const SettingsPage: React.FC = () => {
                         })()}
 
                     {/* Info Note */}
-                    <p style={{ color: "var(--text-dim)", fontSize: "0.8rem", fontStyle: "italic", marginBottom: "1rem" }}>
-                        Smaller models may produce lower quality translations. Consider reducing batch size for models under 14B parameters.
-                    </p>
+                    <p className="note">Smaller models may produce lower quality translations. Consider reducing batch size for models under 14B parameters.</p>
 
                     {/* Advanced Section */}
                     <div>
-                        <button
-                            type="button"
-                            onClick={() => setShowLlamacppAdvanced(!showLlamacppAdvanced)}
-                            style={{
-                                background: "none",
-                                border: "none",
-                                color: "var(--text-dim)",
-                                cursor: "pointer",
-                                fontSize: "0.85rem",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.4rem",
-                                padding: 0,
-                            }}
-                        >
+                        <button type="button" className="disclosure-btn" aria-expanded={showLlamacppAdvanced} onClick={() => setShowLlamacppAdvanced(!showLlamacppAdvanced)}>
                             {showLlamacppAdvanced ? <FaChevronDown /> : <FaChevronRight />}
                             Advanced Settings
                         </button>
@@ -1516,7 +1400,7 @@ const SettingsPage: React.FC = () => {
                         SteamCMD path (steamcmd.exe)
                     </label>
                     <button
-                        className="btn btn-outline"
+                        className="btn btn-outline btn-sm"
                         onClick={async () => {
                             setSteamcmdInstalling(true)
                             setSteamcmdInstallError(null)
@@ -1533,7 +1417,6 @@ const SettingsPage: React.FC = () => {
                             }
                         }}
                         disabled={steamcmdInstalling}
-                        style={{ fontSize: "0.85rem", padding: "0.25rem 0.75rem" }}
                         title="Download and extract steamcmd.zip into backend storage, then auto-fill the path below."
                     >
                         {steamcmdInstalling ? "Installing..." : "Install SteamCMD"}

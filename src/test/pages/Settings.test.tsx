@@ -104,4 +104,21 @@ describe("SettingsPage", () => {
         await userEvent.click(await screen.findByRole("button", { name: "Advanced Settings" }))
         expect(screen.getByLabelText("Ollama URL")).toHaveValue("http://localhost:11434")
     })
+
+    it("uses the danger button to stop a managed Ollama server", async () => {
+        mockSettingsFetch(() => Promise.resolve(json({ ...SETTINGS, provider: "ollama" })), {
+            "/ollama/status": () => Promise.resolve(json({ status: "running", models: [{ name: "qwen2.5:7b" }], managed: true })),
+        })
+        render(<SettingsPage />)
+        expect(await screen.findByRole("button", { name: "Stop" })).toHaveClass("btn", "btn-danger", "btn-sm")
+    })
+
+    it("reports whether the advanced settings are expanded", async () => {
+        mockSettingsFetch(() => Promise.resolve(json({ ...SETTINGS, provider: "ollama" })))
+        render(<SettingsPage />)
+        const toggle = await screen.findByRole("button", { name: "Advanced Settings" })
+        expect(toggle).toHaveAttribute("aria-expanded", "false")
+        await userEvent.click(toggle)
+        expect(toggle).toHaveAttribute("aria-expanded", "true")
+    })
 })
