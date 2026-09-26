@@ -2,6 +2,10 @@ import React, { useState, useEffect } from "react"
 import { FaEye, FaEyeSlash, FaCheck, FaExclamationTriangle, FaChevronDown, FaChevronRight, FaDownload, FaPlay, FaStop, FaTimes } from "react-icons/fa"
 import { API_BASE } from "../../config"
 import { gameApi } from "../../api/games"
+import ErrorState from "../../ui/ErrorState"
+import LoadingState from "../../ui/LoadingState"
+import PageHeader from "../../ui/PageHeader"
+import Panel from "../../ui/Panel"
 
 /** Tracks user-entered API key values (empty string = no pending change). */
 interface KeyState {
@@ -109,6 +113,10 @@ const SettingsPage: React.FC = () => {
     const [saving, setSaving] = useState(false)
     const [saveSuccess, setSaveSuccess] = useState(false)
     const [loading, setLoading] = useState(true)
+    // Why the settings could not be loaded. While set, the page shows an error with Retry instead of a form of defaults.
+    const [loadError, setLoadError] = useState<string | null>(null)
+    // Bumped by Retry to run the load effect again.
+    const [loadAttempt, setLoadAttempt] = useState(0)
 
     // Ignored mods state
     const [ignoredMods, setIgnoredMods] = useState<string[]>([])
@@ -202,13 +210,16 @@ const SettingsPage: React.FC = () => {
         steamcmdPath !== originalSteamcmdPath ||
         steamUsername !== originalSteamUsername
 
-    // Fetch current settings from the backend on mount.
+    // Fetch current settings from the backend on open and on Retry.
     // Uses AbortController so React StrictMode's double-mount doesn't
     // let a stale response overwrite user interactions.
     useEffect(() => {
         const controller = new AbortController()
         fetch(`${API_BASE}/settings`, { signal: controller.signal })
-            .then((res) => res.json())
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                return res.json()
+            })
             .then((data) => {
                 setProvider(data.provider)
                 setOriginalProvider(data.provider)
@@ -277,11 +288,19 @@ const SettingsPage: React.FC = () => {
             .catch((err) => {
                 if (err.name !== "AbortError") {
                     console.error("Failed to fetch settings:", err)
+                    setLoadError(err.message)
                     setLoading(false)
                 }
             })
         return () => controller.abort()
-    }, [])
+    }, [loadAttempt])
+
+    /** Clears the load error, shows the loading state again and reloads the settings. */
+    const retryLoad = () => {
+        setLoadError(null)
+        setLoading(true)
+        setLoadAttempt((n) => n + 1)
+    }
 
     // Fetch model catalogs for Claude and OpenAI on mount.
     useEffect(() => {
@@ -707,34 +726,23 @@ const SettingsPage: React.FC = () => {
     const statusColor = ollamaStatus === "running" ? "var(--success)" : ollamaStatus === "stopped" ? "var(--warning)" : ollamaStatus === "unknown" ? "var(--text-dim)" : "var(--danger)"
     const statusLabel = ollamaStatus === "running" ? "Running" : ollamaStatus === "stopped" ? "Stopped (not running)" : ollamaStatus === "unknown" ? "Checking..." : "Not Installed"
 
-    if (loading) {
+    if (loading) return <LoadingState message="Loading settings..." />
+    if (loadError) {
         return (
-            <div className="settings-view">
-                <div className="dashboard-header">
-                    <div className="title-group">
-                        <h1>Settings</h1>
-                        <p>Loading...</p>
-                    </div>
-                </div>
-            </div>
+            <ErrorState
+                title="Could not load settings"
+                message={`${loadError}. Nothing has been changed. Check that the backend is running, then retry.`}
+                action={{ label: "Retry", onClick: retryLoad }}
+            />
         )
     }
 
     return (
         <div className="settings-view">
-            <div className="dashboard-header">
-                <div className="title-group">
-                    <h1>Settings</h1>
-                    <p>API Keys and Provider Configuration</p>
-                </div>
-            </div>
+            <PageHeader title="Settings" meta={<p>API Keys and Provider Configuration</p>} />
 
             {/* System Prompt Preview */}
-            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                <h2 style={{ marginBottom: "1rem" }}>System Prompt Preview</h2>
-                <p style={{ color: "var(--text-dim)", fontSize: "0.9rem", marginBottom: "1rem" }}>
-                    View the system prompt sent to the translation provider. Uses the base glossary and current provider settings.
-                </p>
+            <Panel className="settings-panel" title="System Prompt Preview" help="View the system prompt sent to the translation provider. Uses the base glossary and current provider settings.">
                 <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", marginBottom: "1rem" }}>
                     <label style={{ color: "var(--text-dim)", fontSize: "0.9rem" }}>Source Language:</label>
                     <select
@@ -785,11 +793,10 @@ const SettingsPage: React.FC = () => {
                         {systemPrompt}
                     </pre>
                 )}
-            </div>
+            </Panel>
 
             {/* Provider Selection */}
-            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-main)" }}>Translation Provider</h3>
+            <Panel className="settings-panel" title="Translation Provider">
                 <div className="provider-cards">
                     {PROVIDERS.map((p) => (
                         <div key={p.id} className={`provider-card ${provider === p.id ? "active" : ""}`} onClick={() => setProvider(p.id)}>
@@ -798,12 +805,11 @@ const SettingsPage: React.FC = () => {
                         </div>
                     ))}
                 </div>
-            </div>
+            </Panel>
 
             {/* Model Selection for Claude / OpenAI */}
             {(provider === "claude" || provider === "openai") && (
-                <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                    <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-main)" }}>Model</h3>
+                <Panel className="settings-panel" title="Model">
                     <select
                         value={provider === "claude" ? claudeModel : openaiModel}
                         onChange={(e) => (provider === "claude" ? setClaudeModel(e.target.value) : setOpenaiModel(e.target.value))}
@@ -826,13 +832,12 @@ const SettingsPage: React.FC = () => {
                             </option>
                         ))}
                     </select>
-                </div>
+                </Panel>
             )}
 
             {/* Manual Provider Info */}
             {provider === "manual" && (
-                <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                    <h3 style={{ margin: "0 0 0.75rem 0", color: "var(--text-main)" }}>Manual Translation Mode</h3>
+                <Panel className="settings-panel" title="Manual Translation Mode">
                     <div style={{ color: "var(--text-dim)", fontSize: "0.9rem", lineHeight: 1.6 }}>
                         <p style={{ marginBottom: "0.75rem" }}>
                             Manual mode exports untranslated strings to a JSON file (<code style={{ color: "var(--accent-primary)" }}>manual_edit.json</code>) in your storage directory. You translate
@@ -847,14 +852,12 @@ const SettingsPage: React.FC = () => {
                             providers handle poorly.
                         </p>
                     </div>
-                </div>
+                </Panel>
             )}
 
             {/* Ollama Configuration */}
             {provider === "ollama" && (
-                <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                    <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-main)" }}>Ollama Configuration</h3>
-
+                <Panel className="settings-panel" title="Ollama Configuration">
                     {/* Status Indicator + Start/Stop */}
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1.25rem" }}>
                         <div
@@ -1064,14 +1067,12 @@ const SettingsPage: React.FC = () => {
                             </div>
                         )}
                     </div>
-                </div>
+                </Panel>
             )}
 
             {/* llama.cpp Configuration */}
             {provider === "llamacpp" && (
-                <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                    <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-main)" }}>llama.cpp Configuration</h3>
-
+                <Panel className="settings-panel" title="llama.cpp Configuration">
                     {/* Status Indicator + Start/Stop */}
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1.25rem" }}>
                         <div
@@ -1397,13 +1398,12 @@ const SettingsPage: React.FC = () => {
                             </div>
                         )}
                     </div>
-                </div>
+                </Panel>
             )}
 
             {/* API Keys */}
             {provider !== "manual" && provider !== "ollama" && provider !== "llamacpp" && (
-                <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                    <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-main)" }}>API Keys</h3>
+                <Panel className="settings-panel" title="API Keys">
                     {PROVIDERS.filter((p) => p.keyField !== null).map((p) => {
                         const field = p.keyField!
                         const isSelected = provider === p.id
@@ -1454,15 +1454,11 @@ const SettingsPage: React.FC = () => {
                             </div>
                         )
                     })}
-                </div>
+                </Panel>
             )}
 
             {/* Batch Size */}
-            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                <h3 style={{ margin: "0 0 0.5rem 0", color: "var(--text-main)" }}>Batch Size</h3>
-                <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginBottom: "1rem" }}>
-                    Number of strings sent per API request. Larger batches are more cost-efficient but may hit token limits.
-                </p>
+            <Panel className="settings-panel" title="Batch Size" help="Number of strings sent per API request. Larger batches are more cost-efficient but may hit token limits.">
                 <input
                     type="number"
                     min={1}
@@ -1482,14 +1478,14 @@ const SettingsPage: React.FC = () => {
                         width: "120px",
                     }}
                 />
-            </div>
+            </Panel>
 
             {/* Ignored Mods */}
-            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                <h3 style={{ margin: "0 0 0.5rem 0", color: "var(--text-main)" }}>Ignored Mods</h3>
-                <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginBottom: "1rem" }}>
-                    Workshop mod IDs listed here will be hidden from the dashboard. Useful for system mods, English-only mods, or mods you don't need to translate.
-                </p>
+            <Panel
+                className="settings-panel"
+                title="Ignored Mods"
+                help="Workshop mod IDs listed here will be hidden from the dashboard. Useful for system mods, English-only mods, or mods you don't need to translate."
+            >
                 <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
                     <input
                         type="text"
@@ -1563,13 +1559,10 @@ const SettingsPage: React.FC = () => {
                         ))}
                     </div>
                 )}
-            </div>
+            </Panel>
 
             {/* Total War: Warhammer III */}
-            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-main)" }}>Total War: Warhammer III</h3>
-                <p style={{ color: "var(--text-dim)", marginBottom: "1rem" }}>Paths used by the helper_scripts script runner. Required before triggering rebuilds from the Runner page.</p>
-
+            <Panel className="settings-panel" title="Total War: Warhammer III" help="Paths used by the helper_scripts script runner. Required before triggering rebuilds from the Runner page.">
                 <label style={{ display: "block", marginBottom: "0.5rem", color: "var(--text-dim)" }}>helper_scripts directory</label>
                 <input
                     type="text"
@@ -1599,16 +1592,19 @@ const SettingsPage: React.FC = () => {
                     onChange={(e) => setTw3SteamLibraryDrive(e.target.value)}
                     style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8 }}
                 />
-            </div>
+            </Panel>
 
             {/* Steam Account (Publish to Workshop) */}
-            <div className="glass-card" style={{ padding: "1.5rem", marginBottom: "1.5rem" }}>
-                <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-main)" }}>Steam Account</h3>
-                <p style={{ color: "var(--text-dim)", marginBottom: "1rem" }}>
-                    Used by the Publish to Workshop button on the TW3 Dashboard. After saving, run <code>steamcmd +login &lt;username&gt;</code> once in a terminal to complete Steam Guard
-                    authentication. SteamCMD will cache the session for ~2 weeks.
-                </p>
-
+            <Panel
+                className="settings-panel"
+                title="Steam Account"
+                help={
+                    <>
+                        Used by the Publish to Workshop button on the TW3 Dashboard. After saving, run <code>steamcmd +login &lt;username&gt;</code> once in a terminal to complete Steam Guard
+                        authentication. SteamCMD will cache the session for ~2 weeks.
+                    </>
+                }
+            >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.5rem" }}>
                     <label style={{ color: "var(--text-dim)" }}>SteamCMD path (steamcmd.exe)</label>
                     <button
@@ -1669,7 +1665,7 @@ const SettingsPage: React.FC = () => {
                     autoComplete="off"
                     style={{ width: "100%", padding: "0.5rem 0.75rem", borderRadius: 8 }}
                 />
-            </div>
+            </Panel>
 
             {/* Save */}
             <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
