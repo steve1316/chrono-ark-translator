@@ -339,6 +339,104 @@ body {
 
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* Forms (SupportedModForm, Settings) */
+.form-page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Buttons in a column stack keep their own width instead of stretching. */
+.form-stack > .btn {
+    align-self: flex-start;
+}
+
+.form-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.form-row > .input,
+.form-row > .field {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+}
+
+.form-row > .form-grow-2 {
+    flex-grow: 2;
+}
+
+.form-row > .form-grow-3 {
+    flex-grow: 3;
+}
+
+.form-group-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    border-top: 1px solid var(--glass-border);
+    padding-top: 0.75rem;
+}
+
+.form-subheading {
+    margin: 0;
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.input-mono {
+    font-family: monospace;
+}
+
+.form-preview-image {
+    max-width: 240px;
+    border-radius: var(--radius-sm);
+}
+
+.chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    font-size: 0.85rem;
+}
+
+.chip-remove {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
+/* //////////////////////////////////////////////////////////////////////////////////////////////// */
 /* Title adornments (src/translation/TitleAdornments.tsx) */
 .icon-action {
     display: flex;
@@ -673,6 +771,24 @@ body {
 /* A panel that is only a title and help line, like the WH3 dashboard intro, has no gap under the help line. */
 .panel-help:last-child {
     margin-bottom: 0;
+}
+
+/* A fieldset panel drops the browser's groove border and inline margin, and floats its legend inside the card like an h3. */
+fieldset.panel {
+    min-width: 0;
+    margin-inline: 0;
+}
+
+.panel-legend {
+    float: left;
+    width: 100%;
+    padding: 0;
+    font-size: 1.17em;
+    font-weight: 700;
+}
+
+.panel-legend + * {
+    clear: both;
 }
 
 .context-panel-row {

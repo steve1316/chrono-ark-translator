@@ -26,4 +26,16 @@ describe("Panel", () => {
         expect(screen.queryByRole("heading")).not.toBeInTheDocument()
         expect(container.querySelector(".panel-help")).toBeNull()
     })
+
+    it("renders as a fieldset whose legend names the group", () => {
+        render(
+            <Panel as="fieldset" title="Basics">
+                <input aria-label="Name" />
+            </Panel>
+        )
+        const group = screen.getByRole("group", { name: "Basics" })
+        expect(group.tagName).toBe("FIELDSET")
+        expect(group).toHaveClass("glass-card", "static", "panel")
+        expect(group).toContainElement(screen.getByRole("textbox", { name: "Name" }))
+    })
 })

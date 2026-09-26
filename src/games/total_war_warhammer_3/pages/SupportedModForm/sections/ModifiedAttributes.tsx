@@ -1,4 +1,7 @@
 import { useState } from "react"
+import { FaTimes } from "react-icons/fa"
+
+import Panel from "../../../../../ui/Panel"
 
 /** Props for `ModifiedAttributesSection`. */
 interface Props {
@@ -32,45 +35,43 @@ const ModifiedAttributesSection = ({ value, suggestions, onChange }: Props) => {
         setDraft("")
     }
     return (
-        <fieldset className="glass-card" style={{ padding: "1rem", border: "1px solid var(--glass-border)", borderRadius: 8, marginTop: "1rem" }}>
-            <legend style={{ padding: "0 0.5rem" }}>Modified Attributes</legend>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                {value.map((attr) => (
-                    <span key={attr} className="id-badge" style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
-                        {attr}
-                        <button
-                            type="button"
-                            aria-label={`Remove ${attr}`}
-                            onClick={() => onChange(value.filter((v) => v !== attr))}
-                            style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}
-                        >
-                            x
-                        </button>
-                    </span>
-                ))}
+        <Panel as="fieldset" title="Modified Attributes">
+            <div className="form-stack">
+                {value.length > 0 && (
+                    <div className="chip-list">
+                        {value.map((attr) => (
+                            <span key={attr} className="chip">
+                                {attr}
+                                <button type="button" className="chip-remove" aria-label={`Remove ${attr}`} onClick={() => onChange(value.filter((v) => v !== attr))}>
+                                    <FaTimes />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                )}
+                <input
+                    className="input"
+                    type="text"
+                    list="modified-attribute-suggestions"
+                    aria-label="Add attribute"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                            e.preventDefault()
+                            commit()
+                        }
+                    }}
+                    onBlur={commit}
+                    placeholder="Add attribute (Enter to commit)"
+                />
+                <datalist id="modified-attribute-suggestions">
+                    {suggestions.map((s) => (
+                        <option key={s} value={s} />
+                    ))}
+                </datalist>
             </div>
-            <input
-                className="btn-outline"
-                type="text"
-                list="modified-attribute-suggestions"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                        e.preventDefault()
-                        commit()
-                    }
-                }}
-                onBlur={commit}
-                placeholder="Add attribute (Enter to commit)"
-                style={{ width: "100%", padding: "0.5rem" }}
-            />
-            <datalist id="modified-attribute-suggestions">
-                {suggestions.map((s) => (
-                    <option key={s} value={s} />
-                ))}
-            </datalist>
-        </fieldset>
+        </Panel>
     )
 }
 

@@ -1,3 +1,5 @@
+import Panel from "../../../../../ui/Panel"
+
 /** One pattern -> faction mapping row. */
 export interface PatternOverrideRow {
     /** Pattern key (e.g. `"*"`). */
@@ -25,35 +27,22 @@ interface Props {
 const PatternOverridesSection = ({ value, onChange }: Props) => {
     const update = (idx: number, patch: Partial<PatternOverrideRow>) => onChange(value.map((row, i) => (i === idx ? { ...row, ...patch } : row)))
     return (
-        <fieldset className="glass-card" style={{ padding: "1rem", border: "1px solid var(--glass-border)", borderRadius: 8, marginTop: "1rem" }}>
-            <legend style={{ padding: "0 0.5rem" }}>Pattern Overrides</legend>
-            {value.map((row, idx) => (
-                <div key={idx} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                    <input
-                        className="btn-outline"
-                        type="text"
-                        value={row.pattern}
-                        onChange={(e) => update(idx, { pattern: e.target.value })}
-                        placeholder="pattern"
-                        style={{ flex: 1, padding: "0.5rem" }}
-                    />
-                    <input
-                        className="btn-outline"
-                        type="text"
-                        value={row.faction}
-                        onChange={(e) => update(idx, { faction: e.target.value })}
-                        placeholder="faction"
-                        style={{ flex: 1, padding: "0.5rem" }}
-                    />
-                    <button type="button" className="btn btn-outline" onClick={() => onChange(value.filter((_, i) => i !== idx))}>
-                        Remove
-                    </button>
-                </div>
-            ))}
-            <button type="button" className="btn btn-outline" onClick={() => onChange([...value, { pattern: "", faction: "" }])}>
-                + Add row
-            </button>
-        </fieldset>
+        <Panel as="fieldset" title="Pattern Overrides">
+            <div className="form-stack">
+                {value.map((row, idx) => (
+                    <div key={idx} className="form-row">
+                        <input className="input" type="text" aria-label={`Pattern ${idx + 1}`} value={row.pattern} onChange={(e) => update(idx, { pattern: e.target.value })} placeholder="pattern" />
+                        <input className="input" type="text" aria-label={`Faction ${idx + 1}`} value={row.faction} onChange={(e) => update(idx, { faction: e.target.value })} placeholder="faction" />
+                        <button type="button" className="btn btn-outline btn-sm" onClick={() => onChange(value.filter((_, i) => i !== idx))}>
+                            Remove
+                        </button>
+                    </div>
+                ))}
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => onChange([...value, { pattern: "", faction: "" }])}>
+                    + Add row
+                </button>
+            </div>
+        </Panel>
     )
 }
 

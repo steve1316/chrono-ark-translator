@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import SupportedModFormPage from "../../../../games/total_war_warhammer_3/pages/SupportedModForm"
+import { emptyBasicsState } from "../../../../games/total_war_warhammer_3/pages/SupportedModForm/sections/basicsState"
 
 afterEach(() => {
     vi.restoreAllMocks()
@@ -83,5 +84,33 @@ describe("SupportedModFormPage", () => {
             expect(body.entry.package_name).toBe("my_mod.pack")
             expect(body.entry.workshop_id).toBe("12345")
         })
+    })
+
+    it("renders the five sections as named panel groups", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ categories: [] }), { status: 200 }))
+        renderForm("/supported-mods/new")
+        for (const name of ["Basics", "Modified Attributes", "Pattern Overrides", "Character Overrides", "Misc"]) {
+            expect((await screen.findByRole("group", { name })).closest(".panel")).not.toBeNull()
+        }
+    })
+
+    it("shows a validation error in an error banner", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ categories: [] }), { status: 200 }))
+        renderForm("/supported-mods/new")
+        await userEvent.click(await screen.findByRole("button", { name: /Save/i }))
+        expect(screen.getByText("Name is required").closest(".banner-error")).not.toBeNull()
+    })
+
+    it("adds and removes a modified attribute chip", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ categories: [] }), { status: 200 }))
+        renderForm("/supported-mods/new")
+        await userEvent.type(await screen.findByRole("combobox", { name: "Add attribute" }), "melee_attack{Enter}")
+        expect(screen.getByText("melee_attack").closest(".chip")).not.toBeNull()
+        await userEvent.click(screen.getByRole("button", { name: "Remove melee_attack" }))
+        expect(screen.queryByText("melee_attack")).not.toBeInTheDocument()
+    })
+
+    it("keeps the empty Basics state in its own module", () => {
+        expect(emptyBasicsState).toEqual({ name: "", package_name: "", workshop_id: "", custom_path: false, path: "" })
     })
 })

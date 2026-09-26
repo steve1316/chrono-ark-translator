@@ -4,7 +4,10 @@ import { useGameSlug } from "../../../useGameSlug"
 
 import ConfirmModal from "../../../../components/ConfirmModal"
 import { createSupportedMod, deleteSupportedMod, fetchSupportedEffectsCategories, fetchSupportedMods, updateSupportedMod } from "../../api"
-import BasicsSection, { emptyBasicsState, type BasicsState } from "./sections/Basics"
+import Banner from "../../../../ui/Banner"
+import PageHeader from "../../../../ui/PageHeader"
+import BasicsSection from "./sections/Basics"
+import { emptyBasicsState, type BasicsState } from "./sections/basicsState"
 import CharacterOverridesSection, { type CharacterRow, type FactionEntry } from "./sections/CharacterOverrides"
 import ModifiedAttributesSection from "./sections/ModifiedAttributes"
 import PatternOverridesSection, { type PatternOverrideRow } from "./sections/PatternOverrides"
@@ -139,24 +142,30 @@ const SupportedModFormPage = () => {
     }
 
     return (
-        <div style={{ maxWidth: 720, margin: "0 auto", padding: "1rem" }}>
-            <div className="dashboard-header">
-                <h1>{isEdit ? `Edit Mod: ${packageName}` : "Add Mod"}</h1>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                    {isEdit && (
-                        <button type="button" className="btn btn-danger" onClick={() => setConfirmDelete(true)} disabled={submitting}>
-                            Delete
+        <div className="form-page">
+            <PageHeader
+                title={isEdit ? `Edit Mod: ${packageName}` : "Add Mod"}
+                actions={
+                    <>
+                        {isEdit && (
+                            <button type="button" className="btn btn-danger" onClick={() => setConfirmDelete(true)} disabled={submitting}>
+                                Delete
+                            </button>
+                        )}
+                        <button type="button" className="btn btn-primary" onClick={handleSave} disabled={submitting}>
+                            {submitting ? "Saving..." : "Save"}
                         </button>
-                    )}
-                    <button type="button" className="btn btn-primary" onClick={handleSave} disabled={submitting}>
-                        {submitting ? "Saving..." : "Save"}
-                    </button>
-                    <button type="button" className="btn btn-outline" onClick={() => navigate(`/${slug}/supported-mods`)} disabled={submitting}>
-                        Cancel
-                    </button>
-                </div>
-            </div>
-            {errorMessage && <p style={{ color: "var(--warning)" }}>{errorMessage}</p>}
+                        <button type="button" className="btn btn-outline" onClick={() => navigate(`/${slug}/supported-mods`)} disabled={submitting}>
+                            Cancel
+                        </button>
+                    </>
+                }
+            />
+            {errorMessage && (
+                <Banner tone="error" onDismiss={() => setErrorMessage(null)}>
+                    {errorMessage}
+                </Banner>
+            )}
             <BasicsSection value={basics} onChange={setBasics} lockPackageName={isEdit} />
             <ModifiedAttributesSection value={modifiedAttributes} suggestions={effectCategories} onChange={setModifiedAttributes} />
             <PatternOverridesSection value={patternOverrides} onChange={setPatternOverrides} />
