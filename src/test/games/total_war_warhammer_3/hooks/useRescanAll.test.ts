@@ -36,7 +36,7 @@ describe("useRescanAll", () => {
     it("rescans one mod at a time and reports its position while running", async () => {
         const release = holdRescans()
         const { result } = renderHook(() => useRescanAll())
-        let done: Promise<void> = Promise.resolve()
+        let done: Promise<number> = Promise.resolve(0)
         act(() => {
             done = result.current.rescanAll(["a", "b"])
         })
@@ -105,5 +105,19 @@ describe("useRescanAll", () => {
         expect(result.current.progressByMod.a).toEqual(summary("a"))
         await act(() => result.current.rescanOne("a"))
         expect(result.current.progressByMod.a).toEqual(summary("a"))
+    })
+
+    it("reports how many rescans failed and keeps the failed mod's earlier result", async () => {
+        rescan.mockResolvedValueOnce(summary("a")).mockRejectedValueOnce(new Error("boom")).mockResolvedValueOnce(summary("b"))
+        const { result } = renderHook(() => useRescanAll())
+        await act(() => result.current.rescanOne("a"))
+        let failed = -1
+        await act(async () => {
+            failed = await result.current.rescanAll(["a", "b"])
+        })
+        expect(failed).toBe(1)
+        expect(result.current.progressByMod.a).toEqual(summary("a"))
+        expect(result.current.progressByMod.b).toEqual(summary("b"))
+        expect(rescan.mock.calls.map((call) => call[0])).toEqual(["a", "a", "b"])
     })
 })

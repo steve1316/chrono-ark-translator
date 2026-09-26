@@ -12,8 +12,8 @@ export interface RescanAll {
     progress: TaskProgress | null
     /** True while a batch is running. */
     running: boolean
-    /** Rescans the given mods one at a time, cancelling any batch already running. */
-    rescanAll: (ids: string[]) => Promise<void>
+    /** Rescans the given mods one at a time, cancelling any batch already running. Resolves to how many rescans failed (0 when cancelled). */
+    rescanAll: (ids: string[]) => Promise<number>
     /** Rescans one mod outside any batch, e.g. from a card's rescan button. A failure leaves its card as it was. */
     rescanOne: (id: string) => Promise<void>
 }
@@ -40,28 +40,31 @@ export function useRescanAll(): RescanAll {
     }, [])
 
     const rescanAll = useCallback(async (ids: string[]) => {
-        if (unmountedRef.current) return
+        if (unmountedRef.current) return 0
         controllerRef.current?.abort()
         const controller = new AbortController()
         controllerRef.current = controller
         setRunning(true)
+        let failed = 0
 
         for (let i = 0; i < ids.length; i++) {
             const id = ids[i]
             setProgress({ current: i + 1, total: ids.length })
             try {
                 const summary = await rescanMod(id, controller.signal)
-                if (controller.signal.aborted) return
+                if (controller.signal.aborted) return 0
                 setProgressByMod((prev) => ({ ...prev, [id]: summary }))
             } catch {
-                if (controller.signal.aborted) return
+                if (controller.signal.aborted) return 0
                 // A failed rescan leaves that card on its previous result. The rest of the batch still runs.
+                failed++
             }
         }
 
         controllerRef.current = null
         setRunning(false)
         setProgress(null)
+        return failed
     }, [])
 
     const rescanOne = useCallback(async (id: string) => {

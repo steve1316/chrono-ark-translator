@@ -51,6 +51,7 @@ export default function DashboardPage() {
 
     /**
      * Lists the translation mods, then rescans each one in turn so the cards fill in with fresh counts. Runs on open, on Refresh and on Retry.
+     * Rescans that fail are counted into the error banner, and those cards keep their previous numbers.
      */
     const refresh = async () => {
         setListing(true)
@@ -63,7 +64,8 @@ export default function DashboardPage() {
             setTranslationMods(mods)
             setLoadError(null)
             setListing(false)
-            await rescans.rescanAll(ids)
+            const failed = await rescans.rescanAll(ids)
+            if (failed > 0) setRefreshError(`Could not rescan ${failed} translation mod${failed === 1 ? "" : "s"}.`)
         } catch (e) {
             const message = (e as Error).message
             if (hasLoadedRef.current) setRefreshError(`Could not refresh translation mods: ${message}`)

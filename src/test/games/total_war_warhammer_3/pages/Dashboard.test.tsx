@@ -221,4 +221,17 @@ describe("Dashboard page", () => {
         expect(sessionStorage.getItem("lastViewedMod")).toBeNull()
         Reflect.deleteProperty(Element.prototype, "scrollIntoView")
     })
+
+    it("tells the user when some translation mods could not be rescanned", async () => {
+        vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+            const url = String(input)
+            if (url.endsWith("/translation/mods")) return Promise.resolve(json([MOD_A, MOD_B]))
+            if (url.endsWith(`/${MOD_A.workshop_id}/rescan`)) return Promise.resolve(json({ detail: "parent folder missing" }, 500))
+            if (url.endsWith("/rescan")) return Promise.resolve(json({ mod_id: "x", counts: { translated: 1, untranslated: 0, stale: 0, orphan: 0 } }))
+            return Promise.resolve(json({ status: "idle" }))
+        })
+        render(wrap(<DashboardPage />))
+        expect(await screen.findByText("Could not rescan 1 translation mod.")).toBeInTheDocument()
+        expect(screen.getByRole("heading", { name: "Zerooz Cathy translation" })).toBeInTheDocument()
+    })
 })
