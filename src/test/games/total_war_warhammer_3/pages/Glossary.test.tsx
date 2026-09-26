@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import GlossaryPage from "../../../../games/total_war_warhammer_3/pages/Glossary"
@@ -43,5 +44,29 @@ describe("WH3 GlossaryPage", () => {
         fireEvent.click(screen.getByRole("button", { name: "regions" }))
         await waitFor(() => expect(screen.queryByText("Armour")).not.toBeInTheDocument())
         expect(screen.getByText("The Black Pit")).toBeInTheDocument()
+    })
+
+    it("shows a dash when a term has no Korean mapping", async () => {
+        mockGlossaryFetch()
+        render(<GlossaryPage />)
+        await screen.findByText("The Black Pit")
+        expect(screen.getByText("—")).toBeInTheDocument()
+    })
+
+    it("marks the active category as a game-accent filter pill", async () => {
+        mockGlossaryFetch()
+        render(<GlossaryPage />)
+        await userEvent.click(await screen.findByRole("button", { name: "regions" }))
+        expect(screen.getByRole("button", { name: "regions" })).toHaveClass("filter-pill", "btn-primary")
+    })
+
+    it("shows an error with Retry when the glossary fails to load, and Retry loads it", async () => {
+        vi.spyOn(globalThis, "fetch")
+            .mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify({ detail: "vanilla_text missing" }), { status: 500 })))
+            .mockImplementation(() => Promise.resolve(new Response(JSON.stringify(GLOSSARY), { status: 200 })))
+        render(<GlossaryPage />)
+        expect(await screen.findByRole("alert")).toHaveTextContent("vanilla_text missing")
+        await userEvent.click(screen.getByRole("button", { name: "Retry" }))
+        expect(await screen.findByText("Armour")).toBeInTheDocument()
     })
 })
