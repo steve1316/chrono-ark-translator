@@ -3,6 +3,7 @@ import { FaEye, FaEyeSlash, FaCheck, FaExclamationTriangle, FaChevronDown, FaChe
 import { API_BASE } from "../../config"
 import { gameApi } from "../../api/games"
 import ErrorState from "../../ui/ErrorState"
+import Banner from "../../ui/Banner"
 import DownloadProgress from "../../ui/DownloadProgress"
 import Field from "../../ui/Field"
 import LoadingState from "../../ui/LoadingState"
@@ -778,24 +779,7 @@ const SettingsPage: React.FC = () => {
                         {promptLoading ? "Loading..." : "Load Prompt"}
                     </button>
                 </div>
-                {systemPrompt && (
-                    <pre
-                        style={{
-                            background: "rgba(0,0,0,0.3)",
-                            border: "1px solid var(--glass-border)",
-                            borderRadius: "8px",
-                            padding: "1rem",
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                            fontSize: "0.85rem",
-                            color: "var(--text-main)",
-                            maxHeight: "500px",
-                            overflow: "auto",
-                        }}
-                    >
-                        {systemPrompt}
-                    </pre>
-                )}
+                {systemPrompt && <pre className="code-block">{systemPrompt}</pre>}
             </Panel>
 
             {/* Provider Selection */}
@@ -803,8 +787,8 @@ const SettingsPage: React.FC = () => {
                 <div className="provider-cards">
                     {PROVIDERS.map((p) => (
                         <div key={p.id} className={`provider-card ${provider === p.id ? "active" : ""}`} onClick={() => setProvider(p.id)}>
-                            <div style={{ fontWeight: 600, color: "var(--text-main)", marginBottom: "0.25rem" }}>{p.label}</div>
-                            <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>{p.description}</div>
+                            <div className="provider-card-title">{p.label}</div>
+                            <div className="provider-card-description">{p.description}</div>
                         </div>
                     ))}
                 </div>
@@ -831,16 +815,16 @@ const SettingsPage: React.FC = () => {
             {/* Manual Provider Info */}
             {provider === "manual" && (
                 <Panel className="settings-panel" title="Manual Translation Mode">
-                    <div style={{ color: "var(--text-dim)", fontSize: "0.9rem", lineHeight: 1.6 }}>
-                        <p style={{ marginBottom: "0.75rem" }}>
-                            Manual mode exports untranslated strings to a JSON file (<code style={{ color: "var(--accent-primary)" }}>manual_edit.json</code>) in your storage directory. You translate
-                            each entry by hand, then the tool reads your translations back in.
+                    <div className="settings-prose">
+                        <p>
+                            Manual mode exports untranslated strings to a JSON file (<code className="accent-text">manual_edit.json</code>) in your storage directory. You translate each entry by hand,
+                            then the tool reads your translations back in.
                         </p>
-                        <p style={{ marginBottom: "0.75rem" }}>
-                            Each entry in the file contains the original source text, source language, and an empty <code style={{ color: "var(--accent-primary)" }}>translation</code> field for you to
-                            fill in. Leave the field blank to skip an entry.
+                        <p>
+                            Each entry in the file contains the original source text, source language, and an empty <code className="accent-text">translation</code> field for you to fill in. Leave the
+                            field blank to skip an entry.
                         </p>
-                        <p style={{ marginBottom: "0" }}>
+                        <p>
                             This mode has no API cost and requires no API keys. It is useful when you want full control over every translation or when working with languages/terminology that automated
                             providers handle poorly.
                         </p>
@@ -872,8 +856,8 @@ const SettingsPage: React.FC = () => {
 
                     {/* Install Button */}
                     {ollamaStatus === "not_installed" && (
-                        <div style={{ marginBottom: "1.25rem" }}>
-                            <p style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginBottom: "0.75rem" }}>Ollama is not installed. Click below to download and install it automatically.</p>
+                        <div className="settings-block">
+                            <p className="settings-block-help">Ollama is not installed. Click below to download and install it automatically.</p>
                             <button className="btn btn-primary" disabled={ollamaInstalling} onClick={handleOllamaInstall}>
                                 <FaDownload />
                                 {ollamaInstalling ? "Downloading installer..." : "Install Ollama"}
@@ -882,16 +866,16 @@ const SettingsPage: React.FC = () => {
                     )}
 
                     {/* VRAM Tier Selector */}
-                    <div style={{ marginBottom: "1.25rem" }}>
-                        <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.9rem", display: "block", marginBottom: "0.5rem" }}>GPU VRAM Tier</label>
-                        <p style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "0.75rem" }}>Select your GPU's VRAM to get the best model recommendation for translation quality.</p>
+                    <div className="settings-block">
+                        <h4 className="settings-subheading">GPU VRAM Tier</h4>
+                        <p className="settings-block-help">Select your GPU's VRAM to get the best model recommendation for translation quality.</p>
                         <div className="vram-tier-cards">
                             {VRAM_TIERS.map((t) => (
                                 <div key={t.tier} className={`vram-tier-card ${ollamaVramTier === t.tier ? "active" : ""}`} onClick={() => handleVramTierSelect(t)}>
-                                    <div style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "0.85rem" }}>{t.label}</div>
-                                    <div style={{ fontSize: "0.75rem", color: "var(--accent-primary)", marginTop: "0.15rem" }}>{t.model}</div>
-                                    <div style={{ fontSize: "0.7rem", color: "var(--text-dim)", marginTop: "0.15rem" }}>{t.description}</div>
-                                    <div style={{ fontSize: "0.7rem", color: "var(--text-dim)", marginTop: "0.15rem" }}>{t.size} download</div>
+                                    <div className="tier-card-title">{t.label}</div>
+                                    <div className="tier-card-model">{t.model}</div>
+                                    <div className="tier-card-meta">{t.description}</div>
+                                    <div className="tier-card-meta">{t.size} download</div>
                                 </div>
                             ))}
                         </div>
@@ -899,10 +883,10 @@ const SettingsPage: React.FC = () => {
 
                     {/* Model Status & Download */}
                     {ollamaVramTier && (
-                        <div style={{ marginBottom: "1.25rem" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
-                                <span style={{ color: "var(--text-main)", fontSize: "0.9rem" }}>
-                                    Selected model: <strong style={{ color: "var(--accent-primary)" }}>{ollamaModel}</strong>
+                        <div className="settings-block">
+                            <div className="settings-selected-row">
+                                <span className="settings-selected-label">
+                                    Selected model: <strong className="accent-text">{ollamaModel}</strong>
                                 </span>
                                 {ollamaStatus === "running" && (
                                     <span className={`key-status ${isModelDownloaded ? "configured" : "missing"}`}>
@@ -927,12 +911,12 @@ const SettingsPage: React.FC = () => {
                             )}
 
                             {ollamaPulling && ollamaPullProgress && (
-                                <div style={{ marginTop: "0.5rem" }}>
-                                    <div style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "0.25rem" }}>{ollamaPullProgress.status}...</div>
+                                <div className="settings-subrow">
+                                    <div className="progress-status">{ollamaPullProgress.status}...</div>
                                     {(ollamaPullProgress.total ?? 0) > 0 && <DownloadProgress completed={ollamaPullProgress.completed || 0} total={ollamaPullProgress.total ?? 0} />}
                                 </div>
                             )}
-                            {ollamaPulling && !ollamaPullProgress && <div style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>Starting download...</div>}
+                            {ollamaPulling && !ollamaPullProgress && <div className="progress-status">Starting download...</div>}
                         </div>
                     )}
 
@@ -1009,10 +993,10 @@ const SettingsPage: React.FC = () => {
 
                     {/* Install llama-server */}
                     {!llamacppInstalled && !llamacppInstalling && llamacppStatus !== "running" && (
-                        <div style={{ marginBottom: "1.25rem" }}>
-                            <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.9rem", display: "block", marginBottom: "0.5rem" }}>Install llama-server</label>
-                            <p style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "0.75rem" }}>Select your GPU type to download the correct llama-server build.</p>
-                            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                        <div className="settings-block">
+                            <h4 className="settings-subheading">Install llama-server</h4>
+                            <p className="settings-block-help">Select your GPU type to download the correct llama-server build.</p>
+                            <div className="settings-button-row">
                                 <button className="btn btn-primary" onClick={() => handleLlamacppInstall("cuda-13")}>
                                     <FaDownload />
                                     NVIDIA RTX 40/50 series
@@ -1033,8 +1017,8 @@ const SettingsPage: React.FC = () => {
                         </div>
                     )}
                     {llamacppInstalling && (
-                        <div style={{ marginBottom: "1.25rem" }}>
-                            <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", marginBottom: "0.5rem" }}>
+                        <div className="settings-block">
+                            <div className="progress-status">
                                 {llamacppInstallProgress?.status === "fetching_release" && "Finding latest release..."}
                                 {llamacppInstallProgress?.status === "downloading" && `Downloading ${llamacppInstallProgress.file || ""}...`}
                                 {llamacppInstallProgress?.status === "extracting" && "Extracting..."}
@@ -1047,18 +1031,16 @@ const SettingsPage: React.FC = () => {
                     )}
 
                     {/* VRAM Tier Selector */}
-                    <div style={{ marginBottom: "1.25rem" }}>
-                        <label style={{ fontWeight: 500, color: "var(--text-main)", fontSize: "0.9rem", display: "block", marginBottom: "0.5rem" }}>GPU VRAM Tier</label>
-                        <p style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
-                            Select your GPU's VRAM to get the best model recommendation. The model will be downloaded automatically.
-                        </p>
+                    <div className="settings-block">
+                        <h4 className="settings-subheading">GPU VRAM Tier</h4>
+                        <p className="settings-block-help">Select your GPU's VRAM to get the best model recommendation. The model will be downloaded automatically.</p>
                         <div className="vram-tier-cards">
                             {GGUF_TIERS.map((t) => (
                                 <div key={t.tier} className={`vram-tier-card ${llamacppVramTier === t.tier ? "active" : ""}`} onClick={() => handleGgufTierSelect(t)}>
-                                    <div style={{ fontWeight: 600, color: "var(--text-main)", fontSize: "0.85rem" }}>{t.label}</div>
-                                    <div style={{ fontSize: "0.75rem", color: "var(--accent-primary)", marginTop: "0.15rem" }}>{t.model}</div>
-                                    <div style={{ fontSize: "0.7rem", color: "var(--text-dim)", marginTop: "0.15rem" }}>{t.description}</div>
-                                    <div style={{ fontSize: "0.7rem", color: "var(--text-dim)", marginTop: "0.15rem" }}>{t.size} download</div>
+                                    <div className="tier-card-title">{t.label}</div>
+                                    <div className="tier-card-model">{t.model}</div>
+                                    <div className="tier-card-meta">{t.description}</div>
+                                    <div className="tier-card-meta">{t.size} download</div>
                                 </div>
                             ))}
                         </div>
@@ -1070,10 +1052,10 @@ const SettingsPage: React.FC = () => {
                             const selectedTier = GGUF_TIERS.find((t) => t.tier === llamacppVramTier)!
                             const isDownloaded = llamacppLocalModels.some((m) => m.name === selectedTier.filename)
                             return (
-                                <div style={{ marginBottom: "1.25rem" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
-                                        <span style={{ color: "var(--text-main)", fontSize: "0.9rem" }}>
-                                            Selected model: <strong style={{ color: "var(--accent-primary)" }}>{selectedTier.filename}</strong>
+                                <div className="settings-block">
+                                    <div className="settings-selected-row">
+                                        <span className="settings-selected-label">
+                                            Selected model: <strong className="accent-text">{selectedTier.filename}</strong>
                                         </span>
                                         <span className={`key-status ${isDownloaded ? "configured" : "missing"}`}>
                                             {isDownloaded ? (
@@ -1096,16 +1078,14 @@ const SettingsPage: React.FC = () => {
                                     )}
 
                                     {llamacppDownloading && llamacppDownloadProgress && (
-                                        <div style={{ marginTop: "0.5rem" }}>
-                                            <div style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "0.25rem" }}>
-                                                {llamacppDownloadProgress.status === "connecting" ? "Connecting to HuggingFace..." : "Downloading..."}
-                                            </div>
+                                        <div className="settings-subrow">
+                                            <div className="progress-status">{llamacppDownloadProgress.status === "connecting" ? "Connecting to HuggingFace..." : "Downloading..."}</div>
                                             {(llamacppDownloadProgress.total ?? 0) > 0 && (
                                                 <DownloadProgress completed={llamacppDownloadProgress.completed || 0} total={llamacppDownloadProgress.total ?? 0} />
                                             )}
                                         </div>
                                     )}
-                                    {llamacppDownloading && !llamacppDownloadProgress && <div style={{ color: "var(--text-dim)", fontSize: "0.8rem" }}>Connecting...</div>}
+                                    {llamacppDownloading && !llamacppDownloadProgress && <div className="progress-status">Connecting...</div>}
 
                                     {isDownloaded && (
                                         <button type="button" className="btn-link settings-subrow" onClick={() => handleGgufDelete(selectedTier.filename)}>
@@ -1216,17 +1196,8 @@ const SettingsPage: React.FC = () => {
                         const isConfigured = status !== ""
 
                         return (
-                            <div
-                                key={field}
-                                style={{
-                                    marginBottom: "1.25rem",
-                                    padding: "1rem",
-                                    borderRadius: "8px",
-                                    background: isSelected ? "rgba(56, 189, 248, 0.05)" : "transparent",
-                                    border: isSelected ? "1px solid rgba(56, 189, 248, 0.2)" : "1px solid transparent",
-                                }}
-                            >
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                            <div key={field} className={`key-row${isSelected ? " selected" : ""}`}>
+                                <div className="key-row-header">
                                     <label className="field-label" htmlFor={`${fieldId}-key-${field}`}>
                                         {p.label} API Key
                                     </label>
@@ -1316,37 +1287,11 @@ const SettingsPage: React.FC = () => {
                     </button>
                 </div>
                 {ignoredMods.length > 0 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                    <div className="chip-list">
                         {ignoredMods.map((id) => (
-                            <span
-                                key={id}
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "0.4rem",
-                                    padding: "0.35rem 0.6rem",
-                                    borderRadius: "6px",
-                                    background: "rgba(255, 255, 255, 0.08)",
-                                    border: "1px solid var(--glass-border)",
-                                    color: "var(--text-main)",
-                                    fontSize: "0.85rem",
-                                }}
-                            >
+                            <span key={id} className="chip">
                                 {id}
-                                <button
-                                    onClick={() => setIgnoredMods(ignoredMods.filter((m) => m !== id))}
-                                    style={{
-                                        background: "none",
-                                        border: "none",
-                                        color: "var(--text-dim)",
-                                        cursor: "pointer",
-                                        padding: "0",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        fontSize: "0.75rem",
-                                    }}
-                                    title="Remove"
-                                >
+                                <button type="button" className="chip-remove" aria-label={`Remove ${id}`} title="Remove" onClick={() => setIgnoredMods(ignoredMods.filter((m) => m !== id))}>
                                     <FaTimes />
                                 </button>
                             </span>
@@ -1423,19 +1368,9 @@ const SettingsPage: React.FC = () => {
                     </button>
                 </div>
                 {steamcmdInstallError && (
-                    <div
-                        style={{
-                            padding: "0.5rem 0.75rem",
-                            marginBottom: "0.5rem",
-                            background: "rgba(239,68,68,0.15)",
-                            color: "#ff8a8a",
-                            border: "1px solid rgba(239,68,68,0.3)",
-                            borderRadius: 6,
-                            fontSize: "0.85rem",
-                        }}
-                    >
+                    <Banner tone="error" onDismiss={() => setSteamcmdInstallError(null)}>
                         Install failed: {steamcmdInstallError}
-                    </div>
+                    </Banner>
                 )}
                 <input
                     id={`${fieldId}-steamcmd`}
@@ -1460,11 +1395,11 @@ const SettingsPage: React.FC = () => {
             </Panel>
 
             {/* Save */}
-            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div className="settings-save-row">
                 <button className="btn btn-primary" disabled={!isChanged || saving} onClick={handleSave}>
                     {saving ? "Saving..." : "Save Settings"}
                 </button>
-                {saveSuccess && <span style={{ color: "var(--success)", fontSize: "0.9rem" }}>Settings saved successfully</span>}
+                {saveSuccess && <span className="text-success">Settings saved successfully</span>}
             </div>
         </div>
     )

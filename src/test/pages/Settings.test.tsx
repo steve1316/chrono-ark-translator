@@ -121,4 +121,22 @@ describe("SettingsPage", () => {
         await userEvent.click(toggle)
         expect(toggle).toHaveAttribute("aria-expanded", "true")
     })
+
+    it("removes an ignored mod from its chip, which enables Save", async () => {
+        mockSettingsFetch()
+        render(<SettingsPage />)
+        const remove = await screen.findByRole("button", { name: "Remove 2945863327" })
+        expect(remove.closest(".chip")).not.toBeNull()
+        expect(screen.getByRole("button", { name: "Save Settings" })).toBeDisabled()
+        await userEvent.click(remove)
+        expect(screen.queryByText("2945863327")).not.toBeInTheDocument()
+        expect(screen.getByRole("button", { name: "Save Settings" })).toBeEnabled()
+    })
+
+    it("shows a failed SteamCMD install in an error banner", async () => {
+        mockSettingsFetch(undefined, { "/steamcmd/install": () => Promise.resolve(json({ detail: "no network" }, 500)) })
+        render(<SettingsPage />)
+        await userEvent.click(await screen.findByRole("button", { name: "Install SteamCMD" }))
+        expect((await screen.findByText("Install failed: no network")).closest(".banner-error")).not.toBeNull()
+    })
 })
