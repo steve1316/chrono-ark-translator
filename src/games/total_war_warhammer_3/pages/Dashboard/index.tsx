@@ -4,6 +4,7 @@ import DashboardHeader from "../../../../dashboard/DashboardHeader"
 import DashboardSection from "../../../../dashboard/DashboardSection"
 import { progressLabel } from "../../../../dashboard/progressLabel"
 import { useCardWidth } from "../../../../dashboard/useCardWidth"
+import { useScrollRestore } from "../../../../dashboard/useScrollRestore"
 import type { WH3TranslationModSummary } from "../../../../shared_types"
 import Banner from "../../../../ui/Banner"
 import Panel from "../../../../ui/Panel"
@@ -87,6 +88,9 @@ export default function DashboardPage() {
     const visiblePacks = useMemo(() => PACKS.filter((pack) => matchesSearch(search, pack.title, pack.workshopId)), [search])
     const visibleMods = useMemo(() => (translationMods ?? []).filter((mod) => matchesSearch(search, mod.display_name, mod.workshop_id)), [translationMods, search])
     const cardWidth = useCardWidth(gridWrapperRef, visiblePacks.length + visibleMods.length)
+
+    // Scroll back to the translation mod the user opened once the list is on screen.
+    useScrollRestore(translationMods !== null)
 
     return (
         <>

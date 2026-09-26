@@ -210,4 +210,15 @@ describe("Dashboard page", () => {
         await new Promise((resolve) => setTimeout(resolve, 300))
         expect(rescanCalls).toHaveLength(1)
     })
+
+    it("scrolls back to the translation mod the user opened", async () => {
+        const scrollIntoView = vi.fn()
+        Element.prototype.scrollIntoView = scrollIntoView
+        sessionStorage.setItem("lastViewedMod", MOD_B.workshop_id)
+        mockListOnly(() => Promise.resolve(json([MOD_A, MOD_B])))
+        render(wrap(<DashboardPage />))
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "instant", block: "center" }))
+        expect(sessionStorage.getItem("lastViewedMod")).toBeNull()
+        Reflect.deleteProperty(Element.prototype, "scrollIntoView")
+    })
 })

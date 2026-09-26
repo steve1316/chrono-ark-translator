@@ -4,6 +4,7 @@ import { useGameSlug } from "../../../useGameSlug"
 
 import ModCard, { NeedsSyncBadge, type ModCardProgressSegment, type ModCardStat } from "../../../../components/ModCard"
 import { API_BASE } from "../../../../config"
+import { rememberScrollTarget } from "../../../../dashboard/useScrollRestore"
 import { highlightMatch } from "../../../../utils/text"
 import type { WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
 
@@ -99,7 +100,10 @@ const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, 
             primaryAction={{
                 label: "View Strings",
                 variant: untranslated > 0 ? "warning" : "primary",
-                onClick: () => navigate(`/${slug}/translation/${mod.workshop_id}`),
+                onClick: () => {
+                    rememberScrollTarget(mod.workshop_id)
+                    navigate(`/${slug}/translation/${mod.workshop_id}`)
+                },
             }}
             steamUrl={steamUrl}
             onSync={() => onRescan(mod.workshop_id)}

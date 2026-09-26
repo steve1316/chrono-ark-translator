@@ -131,4 +131,11 @@ describe("TranslationModCard", () => {
         expect(img).not.toBeNull()
         expect(img).toHaveAttribute("src", expect.stringContaining("/games/total_war_warhammer_3/translation/mods/3315737452/preview"))
     })
+
+    it("remembers the card before opening it so the dashboard can scroll back to it", () => {
+        render(wrap(<TranslationModCard mod={MOD} progress={null} onRescan={vi.fn()} />))
+        fireEvent.click(screen.getByRole("button", { name: "View Strings" }))
+        expect(sessionStorage.getItem("lastViewedMod")).toBe(MOD.workshop_id)
+        sessionStorage.clear()
+    })
 })
