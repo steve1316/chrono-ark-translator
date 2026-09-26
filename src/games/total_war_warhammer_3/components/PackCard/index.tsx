@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { FaSteam, FaFolderOpen } from "react-icons/fa"
 import WorkshopCard from "../../../../components/WorkshopCard"
 import { API_BASE } from "../../../../config"
+import { highlightMatch } from "../../../../utils/text"
 import PublishWorkshopDialog from "../PublishWorkshopDialog"
 import ScriptRunButton from "../ScriptRunButton"
 
@@ -41,6 +42,8 @@ export interface PackEntry {
 interface PackCardProps {
     /** A single entry from the TW3 `PACKS` array. */
     pack: PackEntry
+    /** Trimmed dashboard search text. The matching part of the title is highlighted. */
+    searchQuery?: string
 }
 
 /**
@@ -49,9 +52,10 @@ interface PackCardProps {
  * Rebuild `ScriptRunButton`, and a Steam workshop link.
  *
  * @param pack The pack metadata to render.
+ * @param searchQuery Trimmed search text to highlight in the title.
  * @returns The rendered TW3 pack card.
  */
-const PackCardComponent = ({ pack }: PackCardProps) => {
+const PackCardComponent = ({ pack, searchQuery = "" }: PackCardProps) => {
     const [publishOpen, setPublishOpen] = useState(false)
     const [lastModifiedUnix, setLastModifiedUnix] = useState<number | null>(null)
     const previewImageUrl = `${API_BASE}/games/total_war_warhammer_3/packs/${pack.workshopId}/preview`
@@ -76,7 +80,7 @@ const PackCardComponent = ({ pack }: PackCardProps) => {
 
     return (
         <>
-            <WorkshopCard previewImageUrl={previewImageUrl} previewAlt={pack.title} title={pack.title} idBadge={pack.workshopId} subtitle={subtitle}>
+            <WorkshopCard previewImageUrl={previewImageUrl} previewAlt={pack.title} title={highlightMatch(pack.title, searchQuery)} idBadge={pack.workshopId} subtitle={subtitle}>
                 {pack.sharedNote && <p style={{ fontSize: "0.85em", color: "var(--text-dim)", margin: "0.5rem 0" }}>{pack.sharedNote}</p>}
                 <div className="mod-actions" style={{ flexWrap: "nowrap", gap: "0.5rem" }}>
                     {pack.scriptId ? (

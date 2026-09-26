@@ -4,6 +4,7 @@ import { useGameSlug } from "../../../useGameSlug"
 
 import ModCard, { NeedsSyncBadge, type ModCardProgressSegment, type ModCardStat } from "../../../../components/ModCard"
 import { API_BASE } from "../../../../config"
+import { highlightMatch } from "../../../../utils/text"
 import type { WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
 
 /** Props for TranslationModCard. */
@@ -14,6 +15,8 @@ export interface TranslationModCardProps {
     progress: WH3RescanSummary | null
     /** Called when the user clicks the rescan icon button. Receives the mod's workshop id. */
     onRescan: (workshopId: string) => void
+    /** Trimmed dashboard search text. The matching part of the title is highlighted. */
+    searchQuery?: string
 }
 
 /**
@@ -27,9 +30,10 @@ export interface TranslationModCardProps {
  * @param mod The translation mod registry summary.
  * @param progress Latest rescan result, or `null` when not yet scanned.
  * @param onRescan Callback fired when the rescan icon is clicked.
+ * @param searchQuery Trimmed search text to highlight in the title.
  * @returns The rendered card.
  */
-const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, onRescan }) => {
+const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, onRescan, searchQuery = "" }) => {
     const navigate = useNavigate()
     const slug = useGameSlug()
     const parents = mod.parent_workshop_ids
@@ -71,7 +75,7 @@ const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, 
     return (
         <ModCard
             id={mod.workshop_id}
-            title={mod.display_name}
+            title={highlightMatch(mod.display_name, searchQuery)}
             idBadge={mod.workshop_id}
             subtitle={
                 singleParent ? (

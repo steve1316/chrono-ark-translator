@@ -1,4 +1,4 @@
-import { filterMods } from "../../utils/modFilters"
+import { filterMods, matchesSearch } from "../../utils/modFilters"
 import type { ModStatus } from "../../shared_types"
 
 function makeMod(overrides: Partial<ModStatus> = {}): ModStatus {
@@ -42,5 +42,17 @@ describe("filterMods", () => {
 
     it("returns empty when no matches", () => {
         expect(filterMods(mods, "nonexistent")).toEqual([])
+    })
+})
+
+describe("matchesSearch", () => {
+    it("matches any field case-insensitively and skips null fields", () => {
+        expect(matchesSearch("velo", "Double Projectile Velocity Compat", "3311361464")).toBe(true)
+        expect(matchesSearch("3311361464", "Double Projectile Velocity Compat", "3311361464")).toBe(true)
+        expect(matchesSearch("zzz", "Double Projectile Velocity Compat", null, undefined)).toBe(false)
+    })
+
+    it("matches everything for blank or whitespace-only search text", () => {
+        expect(matchesSearch("   ", "anything")).toBe(true)
     })
 })

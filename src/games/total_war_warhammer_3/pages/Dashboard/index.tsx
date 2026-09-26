@@ -1,11 +1,15 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
-import ModGridSkeleton from "../../../../components/ModGridSkeleton"
+import DashboardHeader from "../../../../dashboard/DashboardHeader"
+import DashboardSection from "../../../../dashboard/DashboardSection"
+import { useCardWidth } from "../../../../dashboard/useCardWidth"
+import type { WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
+import Panel from "../../../../ui/Panel"
+import { matchesSearch } from "../../../../utils/modFilters"
 import PackCard, { type PackEntry } from "../../components/PackCard"
 import PublishAllDialog from "../../components/PublishAllDialog"
 import ScriptRunButton from "../../components/ScriptRunButton"
 import TranslationModCard from "../../components/TranslationModCard"
-import type { WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
 import { listTranslationMods, rescanMod } from "../../translationApi"
 
 const PACKS: PackEntry[] = [
@@ -22,11 +26,10 @@ const PACKS: PackEntry[] = [
 ]
 
 /**
- * TW3 Dashboard: pack cards + translation mod cards + a Rebuild All button.
+ * TW3 Dashboard: a searchable header with Rebuild All and Publish All, an intro panel, then the pack cards and the translation mod cards.
  * Last-run timestamps are session-only.
  *
- * @returns A page that renders pack cards, translation mod cards, and a
- *     `ScriptRunButton`.
+ * @returns The WH3 dashboard page.
  */
 export default function DashboardPage() {
     // `null` until the list request settles, so the section can show a skeleton instead of an empty grid.
@@ -34,14 +37,18 @@ export default function DashboardPage() {
     const [progressByMod, setProgressByMod] = useState<Record<string, WH3RescanSummary | null>>({})
     const [translationLoadError, setTranslationLoadError] = useState<string | null>(null)
     const [publishAllOpen, setPublishAllOpen] = useState(false)
+    const [search, setSearch] = useState("")
+    const gridWrapperRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         let cancelled = false
         listTranslationMods()
             .then((mods) => {
                 if (cancelled) return
+                // Read the ids before storing the list, so a malformed response fails here instead of while rendering.
+                const initialProgress = Object.fromEntries(mods.map((m) => [m.workshop_id, null]))
                 setTranslationMods(mods)
-                setProgressByMod(Object.fromEntries(mods.map((m) => [m.workshop_id, null])))
+                setProgressByMod(initialProgress)
                 mods.forEach((mod, i) => {
                     setTimeout(async () => {
                         try {
@@ -61,51 +68,64 @@ export default function DashboardPage() {
         }
     }, [])
 
+    const query = search.trim()
+    const visiblePacks = useMemo(() => PACKS.filter((pack) => matchesSearch(search, pack.title, pack.workshopId)), [search])
+    const visibleMods = useMemo(() => (translationMods ?? []).filter((mod) => matchesSearch(search, mod.display_name, mod.workshop_id)), [translationMods, search])
+    const cardWidth = useCardWidth(gridWrapperRef, visiblePacks.length + visibleMods.length)
+
     return (
         <>
-            <div className="dashboard-header">
-                <div className="title-group">
-                    <h1>Warhammer III Workshop</h1>
-                    <p>Manage and rebuild your compat packs.</p>
-                </div>
-                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                    <ScriptRunButton scriptId="update" label="Rebuild All" />
-                    <button className="btn btn-primary" style={{ padding: "0.55rem 1.1rem" }} onClick={() => setPublishAllOpen(true)}>
-                        Publish All
-                    </button>
-                </div>
-            </div>
-            <div className="glass-card" style={{ padding: "1rem", marginBottom: "1rem" }}>
-                <h3 style={{ marginTop: 0 }}>About the Compat Packs</h3>
-                <p style={{ margin: 0, color: "var(--text-dim)" }}>
-                    Each card below is one compat pack you maintain on the Steam Workshop. The <strong>Rebuild</strong> button regenerates that pack by running the matching helper script against your
-                    local mod files. Use <strong>Rebuild All</strong> to run every pipeline in sequence.
-                </p>
-            </div>
+            <DashboardHeader
+                title="Warhammer III Workshop"
+                tagline="Manage and rebuild your compat packs."
+                search={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Search by name or workshop ID..."
+                searchWidth={cardWidth}
+                actions={
+                    <>
+                        <ScriptRunButton scriptId="update" label="Rebuild All" />
+                        <button type="button" className="btn btn-primary" onClick={() => setPublishAllOpen(true)}>
+                            Publish All
+                        </button>
+                    </>
+                }
+            />
 
-            <section>
-                <h2 style={{ marginBottom: "1rem" }}>Pack Mods</h2>
-                <div className="mod-grid">
-                    {PACKS.map((pack) => (
-                        <PackCard key={pack.workshopId} pack={pack} />
-                    ))}
-                </div>
-            </section>
+            <Panel
+                title="About the Compat Packs"
+                help={
+                    <>
+                        Each card below is one compat pack you maintain on the Steam Workshop. The <strong>Rebuild</strong> button regenerates that pack by running the matching helper script against
+                        your local mod files. Use <strong>Rebuild All</strong> to run every pipeline in sequence.
+                    </>
+                }
+            />
 
-            <section className="translation-mods-section">
-                <h2>Translation Mods</h2>
-                {translationLoadError ? (
-                    <p style={{ color: "var(--danger)" }}>Failed to load translation mods: {translationLoadError}</p>
-                ) : translationMods === null ? (
-                    <ModGridSkeleton count={3} label="Loading translation mods" />
-                ) : translationMods.length === 0 ? (
-                    <p style={{ color: "var(--text-dim)" }}>No translation mods found.</p>
-                ) : (
+            <div ref={gridWrapperRef}>
+                <DashboardSection title="Pack Mods" loading={false} empty={visiblePacks.length === 0} emptyMessage={`No packs match "${query}".`}>
                     <div className="mod-grid">
-                        {translationMods.map((mod) => (
+                        {visiblePacks.map((pack) => (
+                            <PackCard key={pack.workshopId} pack={pack} searchQuery={query} />
+                        ))}
+                    </div>
+                </DashboardSection>
+
+                <DashboardSection
+                    title="Translation Mods"
+                    loading={translationMods === null}
+                    skeletonCount={3}
+                    skeletonLabel="Loading translation mods"
+                    error={translationLoadError ? `Failed to load translation mods: ${translationLoadError}` : null}
+                    empty={visibleMods.length === 0}
+                    emptyMessage={query ? `No translation mods match "${query}".` : "No translation mods found."}
+                >
+                    <div className="mod-grid">
+                        {visibleMods.map((mod) => (
                             <TranslationModCard
                                 key={mod.workshop_id}
                                 mod={mod}
+                                searchQuery={query}
                                 progress={progressByMod[mod.workshop_id] ?? null}
                                 onRescan={async (workshopId) => {
                                     try {
@@ -118,8 +138,8 @@ export default function DashboardPage() {
                             />
                         ))}
                     </div>
-                )}
-            </section>
+                </DashboardSection>
+            </div>
 
             {publishAllOpen && <PublishAllDialog packs={PACKS} onClose={() => setPublishAllOpen(false)} />}
         </>
