@@ -117,6 +117,8 @@ const SettingsPage: React.FC = () => {
 
     const [saving, setSaving] = useState(false)
     const [saveSuccess, setSaveSuccess] = useState(false)
+    // Why the last Save failed, shown in a banner above the Save button until dismissed or the next Save.
+    const [saveError, setSaveError] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
     // Why the settings could not be loaded. While set, the page shows an error with Retry instead of a form of defaults.
     const [loadError, setLoadError] = useState<string | null>(null)
@@ -307,7 +309,7 @@ const SettingsPage: React.FC = () => {
         setLoadAttempt((n) => n + 1)
     }
 
-    // Fetch model catalogs for Claude and OpenAI on mount.
+    // Fetch model catalogs for Claude and OpenAI on open, and again on Retry so a backend that was down fills the Model dropdown.
     useEffect(() => {
         fetch(`${API_BASE}/models/claude`)
             .then((r) => r.json())
@@ -317,7 +319,7 @@ const SettingsPage: React.FC = () => {
             .then((r) => r.json())
             .then((d) => setOpenaiModels(d.models))
             .catch(() => {})
-    }, [])
+    }, [loadAttempt])
 
     // Poll Ollama status when the Ollama provider is selected.
     useEffect(() => {
@@ -364,6 +366,7 @@ const SettingsPage: React.FC = () => {
     const handleSave = async () => {
         setSaving(true)
         setSaveSuccess(false)
+        setSaveError(null)
 
         const payload: Record<string, unknown> = {}
         if (provider !== originalProvider) payload.provider = provider
@@ -451,6 +454,7 @@ const SettingsPage: React.FC = () => {
             setTimeout(() => setSaveSuccess(false), 3000)
         } catch (err) {
             console.error("Failed to save settings:", err)
+            setSaveError(`Could not save settings: ${err instanceof Error ? err.message : String(err)}`)
         } finally {
             setSaving(false)
         }
@@ -1395,6 +1399,11 @@ const SettingsPage: React.FC = () => {
             </Panel>
 
             {/* Save */}
+            {saveError && (
+                <Banner tone="error" onDismiss={() => setSaveError(null)}>
+                    {saveError}
+                </Banner>
+            )}
             <div className="settings-save-row">
                 <button className="btn btn-primary" disabled={!isChanged || saving} onClick={handleSave}>
                     {saving ? "Saving..." : "Save Settings"}

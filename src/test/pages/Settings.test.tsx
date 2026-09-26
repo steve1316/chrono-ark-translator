@@ -139,4 +139,32 @@ describe("SettingsPage", () => {
         await userEvent.click(await screen.findByRole("button", { name: "Install SteamCMD" }))
         expect((await screen.findByText("Install failed: no network")).closest(".banner-error")).not.toBeNull()
     })
+
+    it("reloads the model list on Retry, so the Model dropdown is filled once the backend is back", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {})
+        let settingsCalls = 0
+        let modelCalls = 0
+        mockSettingsFetch(() => Promise.resolve(++settingsCalls === 1 ? json({ detail: "down" }, 500) : json(SETTINGS)), {
+            "/models/claude": () =>
+                ++modelCalls === 1
+                    ? Promise.reject(new TypeError("Failed to fetch"))
+                    : Promise.resolve(json({ models: [{ id: "claude-sonnet-5", label: "Sonnet 5", input_per_mtok: 3, output_per_mtok: 15 }] })),
+        })
+        render(<SettingsPage />)
+        await userEvent.click(await screen.findByRole("button", { name: "Retry" }))
+        expect(await screen.findByRole("option", { name: /Sonnet 5/ })).toBeInTheDocument()
+    })
+
+    it("shows a failed save in an error banner", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {})
+        let rejectSave = false
+        mockSettingsFetch(() => Promise.resolve(rejectSave ? json({ detail: "batch size too large" }, 400) : json(SETTINGS)))
+        render(<SettingsPage />)
+        const batch = await screen.findByLabelText("Batch size")
+        rejectSave = true
+        await userEvent.clear(batch)
+        await userEvent.type(batch, "60")
+        await userEvent.click(screen.getByRole("button", { name: "Save Settings" }))
+        expect((await screen.findByText("Could not save settings: batch size too large")).closest(".banner-error")).not.toBeNull()
+    })
 })
