@@ -1,57 +1,66 @@
 import React, { useEffect, useState } from "react"
-import type { Stats } from "../../../../shared_types"
+
 import { API_BASE } from "../../../../config"
+import type { Stats } from "../../../../shared_types"
+import ErrorState from "../../../../ui/ErrorState"
+import LoadingState from "../../../../ui/LoadingState"
+import PageHeader from "../../../../ui/PageHeader"
 
 /**
  * The statistics page displays the translation memory and global progress.
  *
- * Fetches its own stats from `GET /api/stats` (a cross-game endpoint exposed
- * by the settings router) on mount. Renders a placeholder while the fetch is
- * in flight or if it fails.
+ * Fetches its own stats from `GET /api/stats` (a cross-game endpoint exposed by the settings router) on open and on Retry.
  *
- * @returns A React component that displays the translation memory and global progress.
+ * @returns The statistics page, its loading state, or an error with Retry.
  */
 const StatisticsPage: React.FC = () => {
     const [stats, setStats] = useState<Stats | null>(null)
+    const [error, setError] = useState<string | null>(null)
+    const [attempt, setAttempt] = useState(0)
 
     useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const res = await fetch(`${API_BASE}/stats`)
-                const data = await res.json()
-                setStats(data)
-            } catch (err) {
-                console.error("Failed to fetch stats:", err)
-            }
+        let cancelled = false
+        fetch(`${API_BASE}/stats`)
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                return res.json()
+            })
+            .then((data: Stats) => {
+                if (!cancelled) setStats(data)
+            })
+            .catch((err: unknown) => {
+                if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+            })
+        return () => {
+            cancelled = true
         }
-        fetchStats()
-    }, [])
+    }, [attempt])
 
-    if (!stats) {
-        return <div>No statistics available.</div>
+    /** Clears the error, which brings the loading state back, and loads again. */
+    const retry = () => {
+        setError(null)
+        setAttempt((n) => n + 1)
     }
+
+    if (error) return <ErrorState title="Could not load statistics" message={`${error}. Check that the backend is running, then retry.`} action={{ label: "Retry", onClick: retry }} />
+    if (!stats) return <LoadingState message="Loading statistics..." />
 
     return (
         <div className="stats-view animate-fade-in">
-            <div className="dashboard-header">
-                <div className="title-group">
-                    <h1>System Statistics</h1>
-                    <p>Translation memory and global progress</p>
-                </div>
-            </div>
+            <PageHeader title="System Statistics" meta={<p>Translation memory and global progress</p>} />
 
             <div className="mod-grid">
-                <div className="glass-card stat-card" style={{ padding: "2rem", textAlign: "center" }}>
-                    <h2 style={{ fontSize: "3rem", color: "var(--accent-primary)" }}>{stats.global_progress}%</h2>
-                    <p style={{ color: "var(--text-dim)" }}>Global Progress</p>
+                <div className="glass-card stat-tile">
+                    <h2 className="stat-tile-value stat-tile-primary">{stats.global_progress}%</h2>
+                    <p className="stat-tile-label">Global Progress</p>
                 </div>
-                <div className="glass-card stat-card" style={{ padding: "2rem", textAlign: "center" }}>
-                    <h2 style={{ fontSize: "3rem", color: "var(--accent-secondary)" }}>{stats.tm_entries}</h2>
-                    <p style={{ color: "var(--text-dim)" }}>Translation Memory Entries</p>
+                <div className="glass-card stat-tile">
+                    <h2 className="stat-tile-value stat-tile-secondary">{stats.tm_entries}</h2>
+                    <p className="stat-tile-label">Translation Memory Entries</p>
                 </div>
-                <div className="glass-card stat-card" style={{ padding: "2rem", textAlign: "center" }}>
-                    <h2 style={{ fontSize: "3rem", color: "var(--success)" }}>{stats.tm_hits}</h2>
-                    <p style={{ color: "var(--text-dim)" }}>Total Cache Hits</p>
+                <div className="glass-card stat-tile">
+                    <h2 className="stat-tile-value stat-tile-success">{stats.tm_hits}</h2>
+                    <p className="stat-tile-label">Total Cache Hits</p>
                 </div>
             </div>
         </div>
