@@ -150,6 +150,7 @@ const DashboardPage: React.FC = () => {
                         if (event.done) {
                             hasLoadedRef.current = true
                             setMods(event.results)
+                            setLoadError(null)
                         } else {
                             setRefreshProgress(event)
                         }

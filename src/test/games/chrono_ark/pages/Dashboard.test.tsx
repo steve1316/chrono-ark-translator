@@ -108,4 +108,18 @@ describe("Chrono Ark Dashboard page", () => {
         await userEvent.click(screen.getByRole("button", { name: "Dismiss" }))
         expect(screen.queryByText("Refresh failed: HTTP 500")).not.toBeInTheDocument()
     })
+
+    it("clears the load error when a Refresh succeeds after a failed first load", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => {})
+        vi.spyOn(globalThis, "fetch").mockImplementation((input) =>
+            Promise.resolve(
+                String(input).endsWith("/mods/refresh") ? new Response(`data: ${JSON.stringify({ done: true, results: [MOD] })}\n\n`, { status: 200 }) : new Response("boom", { status: 500 })
+            )
+        )
+        render(wrap(<DashboardPage />))
+        expect(await screen.findByRole("alert")).toHaveTextContent("Could not load mods: HTTP 500")
+        await userEvent.click(screen.getByRole("button", { name: "Refresh" }))
+        expect(await screen.findByText("Zerooz Cathy")).toBeInTheDocument()
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    })
 })
