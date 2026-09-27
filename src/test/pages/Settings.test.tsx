@@ -184,4 +184,14 @@ describe("SettingsPage", () => {
         expect(await screen.findByText("CA PROMPT")).toBeInTheDocument()
         expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/games/chrono_ark/translate/system-prompt"))).toBe(true)
     })
+
+    it("turns Load Prompt into Unload Prompt, which closes the prompt", async () => {
+        mockSettingsFetch(undefined, { "/translate/system-prompt?source_lang=Chinese": () => Promise.resolve(json({ system_prompt: "CA PROMPT" })) })
+        render(<SettingsPage gameId="chrono_ark" />)
+        await userEvent.click(await screen.findByRole("button", { name: "Load Prompt" }))
+        expect(await screen.findByText("CA PROMPT")).toBeInTheDocument()
+        await userEvent.click(screen.getByRole("button", { name: "Unload Prompt" }))
+        expect(screen.queryByText("CA PROMPT")).not.toBeInTheDocument()
+        expect(screen.getByRole("button", { name: "Load Prompt" })).toBeInTheDocument()
+    })
 })

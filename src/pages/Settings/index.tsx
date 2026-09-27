@@ -780,6 +780,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ gameId }) => {
                     <button
                         className="btn btn-outline"
                         onClick={async () => {
+                            // A loaded prompt turns the button into Unload, which closes it.
+                            if (systemPrompt) {
+                                setSystemPrompt("")
+                                return
+                            }
                             setPromptLoading(true)
                             try {
                                 const res = await gameApi(gameId).get(`/translate/system-prompt?source_lang=${encodeURIComponent(promptSourceLang)}`)
@@ -794,7 +799,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ gameId }) => {
                         }}
                         disabled={promptLoading}
                     >
-                        {promptLoading ? "Loading..." : "Load Prompt"}
+                        {promptLoading ? "Loading..." : systemPrompt ? "Unload Prompt" : "Load Prompt"}
                     </button>
                 </div>
                 {systemPrompt && <pre className="code-block">{systemPrompt}</pre>}
