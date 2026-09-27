@@ -7,7 +7,6 @@ so monkeypatched test fakes and any future changes stay in one place. The provid
 
 from __future__ import annotations
 
-import json
 import re
 from datetime import datetime, timezone
 
@@ -20,7 +19,7 @@ from backend.games.total_war_warhammer_3.name_keys import NAME_STAGES, classify_
 from backend.games.total_war_warhammer_3.name_spacing import space_pinyin_names
 from backend.games.total_war_warhammer_3.routes import translation as _t
 from backend.routes.models import BatchTranslationRequest, TranslationRequest
-from backend.translation.orchestrator import run_batch
+from backend.translation.orchestrator import chunk_entries, run_batch
 
 GAME_ID = "total_war_warhammer_3"
 
@@ -195,6 +194,7 @@ async def preview(req: TranslationRequest) -> dict:
         return {"total_strings": 0, "message": message, "previews": {}}
 
     batch_size = _t.config.BATCH_SIZE
+    max_chars = _t.config.BATCH_MAX_CHARS
     chunks: list[list[tuple[str, str]]] = []
     stages: list[dict] = []
     if names_only:
@@ -203,7 +203,7 @@ async def preview(req: TranslationRequest) -> dict:
             stage_entries = [e for e in entries if classify_name_key(e[0]) in stage["categories"]]
             if not stage_entries:
                 continue
-            stage_chunks = [stage_entries[i : i + batch_size] for i in range(0, len(stage_entries), batch_size)]
+            stage_chunks = chunk_entries(stage_entries, batch_size, max_chars)
             chunks.extend(stage_chunks)
             stages.append(
                 {
@@ -216,7 +216,7 @@ async def preview(req: TranslationRequest) -> dict:
             )
         entries = [e for c in chunks for e in c]
     else:
-        chunks = [entries[i : i + batch_size] for i in range(0, len(entries), batch_size)]
+        chunks = chunk_entries(entries, batch_size, max_chars)
 
     provider = _t.ClaudeProvider()
     adapter = _t.TotalWarWarhammer3Adapter()
@@ -272,6 +272,27 @@ async def preview(req: TranslationRequest) -> dict:
     return result
 
 
+def _log_batch_call(mod_id: str, keys: list[str], raw_responses: list[dict], error: str | None = None) -> None:
+    """Record a translate-batch Claude call in the mod's API-responses log, with Claude's raw reply text.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        keys: Keys that were sent.
+        raw_responses: The provider's raw response records for this batch.
+        error: Error message when the call failed.
+    """
+    _t.api_responses_store.append(
+        mod_id,
+        {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "kind": "translate-batch",
+            "provider": "claude",
+            **_t.api_responses_store.provider_call_fields(raw_responses, error=error),
+            "keys_or_inputs": keys,
+        },
+    )
+
+
 @router.post("/batch")
 async def translate_batch(req: BatchTranslationRequest) -> dict:
     """Translate one batch of keys via Claude and persist into translations.json.
@@ -307,6 +328,8 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
     adapter = _t.TotalWarWarhammer3Adapter()
     glossary_prompt = _glossary_prompt(req.mod_id, source_lang, target_lang, mod=mod)
     provider = _t.ClaudeProvider()
+    provider.last_raw_responses = []
+    keys = [k for k, _ in entries]
 
     try:
         translations, _suggestions = await run_batch(
@@ -321,6 +344,7 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
             target_lang=target_lang,
         )
     except Exception as e:
+        _log_batch_call(req.mod_id, keys, provider.last_raw_responses, error=str(e))
         raise HTTPException(status_code=502, detail=str(e))
 
     # Split joined pinyin names ("Miaoying" -> "Miao Ying") in the translations and suggested terms before anything is saved. The API log keeps
@@ -343,20 +367,7 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
         raw[key] = {"text": text, "created_at": existing.get("created_at") or now, "updated_at": now, "provider": "claude"}
     _t.store.save_translations_raw(req.mod_id, raw)
 
-    _t.api_responses_store.append(
-        req.mod_id,
-        {
-            "timestamp": now,
-            "kind": "translate-batch",
-            "provider": "claude",
-            "model": "claude",
-            "input_tokens": None,
-            "output_tokens": None,
-            "cost_usd": None,
-            "keys_or_inputs": [k for k, _ in entries],
-            "raw_response": json.dumps(translations, ensure_ascii=False),
-        },
-    )
+    _log_batch_call(req.mod_id, keys, provider.last_raw_responses)
 
     return {"status": "success", "translated": len(spaced), "translations": spaced, "suggestions": suggestions}
 

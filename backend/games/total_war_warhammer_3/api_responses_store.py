@@ -62,3 +62,34 @@ def list_entries(mod_id: str) -> list[dict]:
         List of audit entries; empty if no log exists.
     """
     return list(reversed(_load(mod_id)))
+
+
+def provider_call_fields(raw_responses: list[dict], error: str | None = None) -> dict:
+    """Summarize a provider's raw responses into the model, usage, cost, and raw-text fields of a log entry.
+
+    A batch Claude split after a truncated reply has several raw responses. Their usage and cost are summed and their text joined.
+
+    Args:
+        raw_responses: The provider's `last_raw_responses` records for one batch.
+        error: Error message when the call failed. It leads the raw text so the log shows why the batch produced nothing.
+
+    Returns:
+        Dict with `model`, `input_tokens`, `output_tokens`, `cost_usd`, and `raw_response`.
+    """
+
+    def total(field: str):
+        values = [r.get(field) for r in raw_responses]
+        return sum(values) if values and all(v is not None for v in values) else None
+
+    texts = [r.get("raw_text") or "" for r in raw_responses]
+    if len(texts) > 1:
+        texts = [f"--- Response {i + 1} (stop_reason: {r.get('stop_reason')}) ---\n{t}" for i, (r, t) in enumerate(zip(raw_responses, texts))]
+    if error:
+        texts.insert(0, f"ERROR: {error}")
+    return {
+        "model": raw_responses[0].get("model", "claude") if raw_responses else "claude",
+        "input_tokens": total("input_tokens"),
+        "output_tokens": total("output_tokens"),
+        "cost_usd": total("cost_usd"),
+        "raw_response": "\n\n".join(texts),
+    }

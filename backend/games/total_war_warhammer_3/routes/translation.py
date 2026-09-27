@@ -7,7 +7,6 @@ tests can monkeypatch them in isolation.
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
@@ -607,6 +606,7 @@ def translate_batch(mod_id: str, req: TranslateBatchRequest) -> dict:
         glossary_prompt = "No glossary available."
 
     provider = ClaudeProvider()
+    provider.last_raw_responses = []
     translations, suggested_terms = provider.translate_batch(
         entries,
         mod.source_language,
@@ -637,12 +637,8 @@ def translate_batch(mod_id: str, req: TranslateBatchRequest) -> dict:
             "timestamp": now,
             "kind": "translate-batch",
             "provider": "claude",
-            "model": "claude",  # provider doesn't expose the model id back through this path
-            "input_tokens": None,
-            "output_tokens": None,
-            "cost_usd": None,
+            **api_responses_store.provider_call_fields(getattr(provider, "last_raw_responses", [])),
             "keys_or_inputs": list(src.keys()),
-            "raw_response": json.dumps(translations, ensure_ascii=False),
         },
     )
 

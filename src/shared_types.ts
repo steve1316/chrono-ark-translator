@@ -278,7 +278,7 @@ export interface WH3ApiResponseEntry {
     kind: "translate-batch" | "scan-terms" | "suggest-edits"
     /** Provider that fielded the call (e.g. `"claude"`). */
     provider: string
-    /** Model identifier (currently always `"claude"`, placeholder for future expansion). */
+    /** Model identifier (e.g. `"claude-sonnet-5"`), or `"claude"` for calls that do not report one. */
     model: string
     /** Token usage in. `null` when the provider does not report it. */
     input_tokens: number | null
@@ -288,7 +288,7 @@ export interface WH3ApiResponseEntry {
     cost_usd: number | null
     /** Keys (translate-batch) or input strings (scan-terms / suggest-edits) sent to the provider. */
     keys_or_inputs: string[]
-    /** Raw JSON response body as returned by the provider. */
+    /** Raw text the provider returned. A failed call leads with an `ERROR:` line. */
     raw_response: string
 }
 

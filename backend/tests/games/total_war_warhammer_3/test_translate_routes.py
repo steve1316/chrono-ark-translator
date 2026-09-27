@@ -136,6 +136,70 @@ def test_batch_persists_and_returns_new_glossary_suggestions(client: TestClient,
     assert persisted == {"Cathay"}
 
 
+def test_preview_splits_batches_by_source_character_budget(client: TestClient, monkeypatch):
+    """Long strings get fewer keys per batch so the reply fits Claude's output cap."""
+
+    def long_parent(mod):
+        return {"units.loc.tsv": {k: LocRow(k, "长" * 60, True) for k in ("k2", "k3", "k4")}}
+
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", long_parent)
+    monkeypatch.setattr("backend.config.BATCH_MAX_CHARS", 100)
+    body = client.post(f"{PREFIX}/preview", json={"mod_id": "3315737452"}).json()
+    assert [b["keys"] for b in body["batch_plan"]] == [["k2"], ["k3"], ["k4"]]
+    assert body["total_batches"] == 3
+
+
+def _log_entries(tmp_path: Path) -> list[dict]:
+    """Read the test mod's API-responses log.
+
+    Args:
+        tmp_path: The isolated storage root.
+
+    Returns:
+        The logged entries.
+    """
+    path = tmp_path / "games" / "total_war_warhammer_3" / "mods" / "3315737452" / "api_responses.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_batch_logs_claudes_raw_text_model_and_usage(client: TestClient, monkeypatch, tmp_path: Path):
+    """The log keeps what Claude actually returned, not the parsed translations."""
+
+    def fake_translate_batch(self, entries, source_lang, glossary_prompt, **kwargs):
+        self.last_raw_responses = [
+            {"model": "claude-sonnet-5", "input_tokens": 100, "output_tokens": 40, "cost_usd": 0.001, "stop_reason": "end_turn", "raw_text": "RAW-1"},
+            {"model": "claude-sonnet-5", "input_tokens": 50, "output_tokens": 20, "cost_usd": 0.0005, "stop_reason": "end_turn", "raw_text": "RAW-2"},
+        ]
+        return ({"k2": "New Translation"}, [])
+
+    monkeypatch.setattr("backend.translator.claude_provider.ClaudeProvider.translate_batch", fake_translate_batch)
+    client.post(f"{PREFIX}/batch", json={"mod_id": "3315737452", "provider": "claude", "keys": ["k2"], "source_lang": "Chinese", "is_first_batch": True})
+
+    entry = _log_entries(tmp_path)[-1]
+    assert entry["model"] == "claude-sonnet-5"
+    assert entry["input_tokens"] == 150
+    assert entry["output_tokens"] == 60
+    assert entry["cost_usd"] == pytest.approx(0.0015)
+    assert "RAW-1" in entry["raw_response"] and "RAW-2" in entry["raw_response"]
+
+
+def test_batch_logs_a_failed_call_with_its_error(client: TestClient, monkeypatch, tmp_path: Path):
+    """A failed batch is still logged, with the error and whatever Claude returned, and the route returns 502."""
+
+    def fake_translate_batch(self, entries, source_lang, glossary_prompt, **kwargs):
+        self.last_raw_responses = [{"model": "claude-sonnet-5", "input_tokens": 10, "output_tokens": 5, "cost_usd": 0.0, "stop_reason": "end_turn", "raw_text": "not json"}]
+        raise ValueError("Could not parse any translations from Claude's response")
+
+    monkeypatch.setattr("backend.translator.claude_provider.ClaudeProvider.translate_batch", fake_translate_batch)
+    resp = client.post(f"{PREFIX}/batch", json={"mod_id": "3315737452", "provider": "claude", "keys": ["k2"], "source_lang": "Chinese", "is_first_batch": True})
+    assert resp.status_code == 502
+
+    entry = _log_entries(tmp_path)[-1]
+    assert entry["raw_response"].startswith("ERROR: Could not parse any translations")
+    assert "not json" in entry["raw_response"]
+    assert entry["keys_or_inputs"] == ["k2"]
+
+
 def test_batch_rejects_keys_with_no_source_text(client: TestClient):
     """A batch whose keys have no source text returns 400, matching Chrono Ark."""
     resp = client.post(
