@@ -95,6 +95,53 @@ async def update_mod_glossary(mod_id: str, term: ModGlossaryTerm):
     return {"status": "success"}
 
 
+def _find_term_key(terms: dict, term: str) -> str | None:
+    """Find a mod glossary entry's key from its key or its English.
+
+    Terms with source text are keyed by that text, while the frontend refers to terms by their English.
+
+    Args:
+        terms: The glossary's `terms` dict.
+        term: The entry's key or English.
+
+    Returns:
+        The matching key, or None when no entry matches.
+    """
+    if term in terms:
+        return term
+    return next((key for key, info in terms.items() if info.get("english") == term), None)
+
+
+@router.put("/mods/{mod_id}/glossary/{term:path}")
+async def edit_mod_glossary_term(mod_id: str, term: str, entry: ModGlossaryTerm):
+    """Replace a mod glossary term with edited values.
+
+    A new English also replaces the old English in every translation whose source contains one of the term's old source texts.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        term: The existing term's key or English.
+        entry: The edited English, per-language source mappings, and category.
+
+    Returns:
+        A dict with `status` and the count of translations the rename `replaced`.
+    """
+    glossary = load_mod_glossary(mod_id)
+    terms = glossary.setdefault("terms", {})
+    key = _find_term_key(terms, term)
+    old = terms.pop(key) if key else {}
+    create_backup(mod_id, f"Before editing glossary term '{term}'")
+    add_glossary_term(glossary, entry.english, entry.source_mappings, entry.category)
+    save_mod_glossary(mod_id, glossary)
+
+    old_english = old.get("english") or term
+    replaced = 0
+    if old and entry.english != old_english:
+        for source in set((old.get("source_mappings") or {}).values()):
+            replaced += _rename_in_translations(mod_id, source, old_english, entry.english)
+    return {"status": "success", "replaced": replaced}
+
+
 @router.delete("/mods/{mod_id}/glossary/{term:path}")
 async def delete_mod_glossary_term(mod_id: str, term: str):
     """Remove a term from a mod's glossary.
@@ -103,15 +150,16 @@ async def delete_mod_glossary_term(mod_id: str, term: str):
 
     Args:
         mod_id: The workshop identifier of the mod.
-        term: The English term string to delete.
+        term: The term's key or English.
 
     Returns:
         A dict with `{"status": "success"}`.
     """
     glossary = load_mod_glossary(mod_id)
-    if term in glossary.get("terms", {}):
+    key = _find_term_key(glossary.get("terms", {}), term)
+    if key:
         create_backup(mod_id, f"Before removing glossary term '{term}'")
-        del glossary["terms"][term]
+        del glossary["terms"][key]
         save_mod_glossary(mod_id, glossary)
     return {"status": "success"}
 
@@ -138,10 +186,11 @@ async def delete_mod_glossary_terms(mod_id: str, action: SuggestionAction):
     else:
         count = 0
         for term in action.terms:
-            if term in terms:
+            key = _find_term_key(terms, term)
+            if key:
                 if count == 0:
                     create_backup(mod_id, "Before removing glossary term(s)")
-                del terms[term]
+                del terms[key]
                 count += 1
     save_mod_glossary(mod_id, glossary)
     return {"status": "success", "deleted": count}

@@ -330,6 +330,83 @@ def test_glossary_delete_all_on_an_empty_glossary_takes_no_snapshot(client: Test
     assert list_snapshots(mod_id) == []
 
 
+def _seed_edit_rows(monkeypatch, tmp_path: Path, parent: dict[str, str], saved: dict[str, str], pack: dict[str, str] | None = None) -> Path:
+    """Stub the mod's parent and pack strings and write its translations.json.
+
+    Args:
+        monkeypatch: The pytest monkeypatch fixture.
+        tmp_path: The isolated storage root.
+        parent: Key -> source text.
+        saved: Key -> English saved in translations.json.
+        pack: Key -> English already in the translation pack's `.loc.tsv`.
+
+    Returns:
+        The path to translations.json.
+    """
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", lambda mod: {"units.loc.tsv": {k: LocRow(k, v, True) for k, v in parent.items()}})
+    monkeypatch.setattr(routes_module, "_extract_translation_strings", lambda mod: {"units.loc.tsv": {k: LocRow(k, v, True) for k, v in (pack or {}).items()}})
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / "3315737452"
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    path = mod_dir / "translations.json"
+    path.write_text(json.dumps({k: {"text": v, "provider": "claude"} for k, v in saved.items()}), encoding="utf-8")
+    return path
+
+
+def _saved_text(path: Path) -> dict[str, str]:
+    """Return key -> English saved in translations.json.
+
+    Args:
+        path: The translations.json path.
+
+    Returns:
+        The saved English by key.
+    """
+    return {k: v["text"] for k, v in json.loads(path.read_text(encoding="utf-8")).items()}
+
+
+def test_glossary_edit_renames_english_in_translations_with_that_source(client: TestClient, monkeypatch, tmp_path: Path):
+    """Renaming a term's English replaces it in every translation whose source contains the term's source, including pack-only rows."""
+    base = "/api/games/total_war_warhammer_3/translation/mods/3315737452"
+    path = _seed_edit_rows(
+        monkeypatch,
+        tmp_path,
+        parent={"city": "南皋城", "hub": "南皋", "packed": "南皋关", "other": "北方"},
+        saved={"city": "Nangao City", "hub": "Nangao", "other": "Nangao is only mentioned here"},
+        pack={"packed": "Nangao Pass"},
+    )
+    client.post(f"{base}/glossary", json={"english": "Nangao", "source": "南皋", "category": "location"})
+
+    resp = client.put(f"{base}/glossary/Nangao", json={"english": "Nangau", "source": "南皋", "category": "location"})
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok", "replaced": 3}
+    assert _saved_text(path) == {"city": "Nangau City", "hub": "Nangau", "packed": "Nangau Pass", "other": "Nangao is only mentioned here"}
+    assert list_snapshots("3315737452")[0]["label"] == "Before renaming glossary term Nangao"
+
+
+def test_glossary_edit_finds_rows_by_the_old_source_when_both_change(client: TestClient, monkeypatch, tmp_path: Path):
+    """When the English and source both change, rows are found by the old source, where the old English was used."""
+    base = "/api/games/total_war_warhammer_3/translation/mods/3315737452"
+    path = _seed_edit_rows(monkeypatch, tmp_path, parent={"hub": "南皋"}, saved={"hub": "Nangao"})
+    client.post(f"{base}/glossary", json={"english": "Nangao", "source": "南皋", "category": "location"})
+
+    resp = client.put(f"{base}/glossary/Nangao", json={"english": "Nangau", "source": "南皋城", "category": "location"})
+    assert resp.json()["replaced"] == 1
+    assert _saved_text(path) == {"hub": "Nangau"}
+
+
+def test_glossary_edit_without_an_english_change_leaves_translations_alone(client: TestClient, monkeypatch, tmp_path: Path):
+    """A category-only edit changes the glossary but no translation, and takes no snapshot."""
+    base = "/api/games/total_war_warhammer_3/translation/mods/3315737452"
+    path = _seed_edit_rows(monkeypatch, tmp_path, parent={"hub": "南皋"}, saved={"hub": "Nangao"})
+    client.post(f"{base}/glossary", json={"english": "Nangao", "source": "南皋", "category": "location"})
+
+    resp = client.put(f"{base}/glossary/Nangao", json={"english": "Nangao", "source": "南皋", "category": "places"})
+    assert resp.json() == {"status": "ok", "replaced": 0}
+    assert client.get(f"{base}/glossary").json()["Nangao"]["category"] == "places"
+    assert _saved_text(path) == {"hub": "Nangao"}
+    assert list_snapshots("3315737452") == []
+
+
 def test_glossary_apply_all_renames_existing_translations(client: TestClient, tmp_path: Path):
     mod_id = "3315737452"
     mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id

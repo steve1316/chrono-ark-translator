@@ -284,16 +284,19 @@ export async function addGlossaryTerm(workshopId: string, entry: WH3GlossaryEntr
 }
 
 /**
- * Update one glossary entry (handles rename).
+ * Update one glossary entry. A new English also renames the old English in translations whose source contains the term's source.
  *
  * @param workshopId Steam Workshop ID of the translation mod.
  * @param oldEnglish The current English key.
  * @param entry New entry (may have a different `english` value to trigger rename).
+ * @returns How many translations the rename changed.
  * @throws `RegistryError` On any non-2xx response.
  */
-export async function updateGlossaryTerm(workshopId: string, oldEnglish: string, entry: WH3GlossaryEntry): Promise<void> {
+export async function updateGlossaryTerm(workshopId: string, oldEnglish: string, entry: WH3GlossaryEntry): Promise<{ replaced: number }> {
     const res = await api.put(`/translation/mods/${encodeURIComponent(workshopId)}/glossary/${encodeURIComponent(oldEnglish)}`, entry)
     if (!res.ok) throw await registryError(res)
+    const body = await res.json().catch(() => ({}))
+    return { replaced: typeof body?.replaced === "number" ? body.replaced : 0 }
 }
 
 /**

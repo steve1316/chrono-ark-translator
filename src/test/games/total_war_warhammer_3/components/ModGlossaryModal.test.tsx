@@ -95,6 +95,26 @@ describe("ModGlossaryModal", () => {
         expect(JSON.parse((init as RequestInit).body as string).english).toBe("Phoenix Lord")
     })
 
+    it("reports and reloads the translations an edited English renamed", async () => {
+        const fetchSpy = vi.spyOn(globalThis, "fetch")
+        fetchSpy.mockResolvedValueOnce(mockJson(GLOSSARY))
+        fetchSpy.mockResolvedValueOnce(mockJson({ status: "ok", replaced: 3 })) // PUT
+        fetchSpy.mockResolvedValueOnce(mockJson(GLOSSARY)) // refresh
+        const onTranslationsChanged = vi.fn()
+
+        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} onSuggestionsChanged={vi.fn()} onTranslationsChanged={onTranslationsChanged} />)
+        await waitFor(() => screen.getByText("Phoenix"))
+        const phoenixRow = screen.getByText("Phoenix").closest(".glossary-row") as HTMLElement
+        fireEvent.click(within(phoenixRow).getByRole("button", { name: /Edit/i }))
+        fireEvent.change(screen.getByDisplayValue("Phoenix"), { target: { value: "Phoenix Lord" } })
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: /^Save$/ }))
+        })
+
+        await waitFor(() => expect(screen.getByText("Phoenix Lord: updated 3 translations.")).toBeInTheDocument())
+        expect(onTranslationsChanged).toHaveBeenCalled()
+    })
+
     it("saves suggested edits for review and reports how many were added", async () => {
         const fetchSpy = vi.spyOn(globalThis, "fetch")
         fetchSpy.mockResolvedValueOnce(mockJson(GLOSSARY))

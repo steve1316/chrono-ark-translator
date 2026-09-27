@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 
 from backend.data import suggestion_manager
-from backend.data.glossary_manager import replace_whole_term
 from backend.games.storage_paths import game_storage_path
 from backend.games.total_war_warhammer_3 import api_responses_store, glossary_store, snapshot_store
 from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
@@ -44,44 +43,6 @@ def _require_mod(mod_id: str):
     if mod is None:
         raise HTTPException(status_code=404, detail=f"translation mod not found: {mod_id}")
     return mod
-
-
-def _rename_in_translations(mod, mod_id: str, source: str, old_english: str, new_english: str) -> int:
-    """Rename `old_english` to `new_english` in every translation whose source text contains `source`.
-
-    Rows are read from the translation pack with translations.json overlaid, so a translation that is only in the pack is renamed too. Changed rows are
-    saved to translations.json and show as pending until the next Sync.
-
-    Args:
-        mod: The resolved `WH3TranslationMod`.
-        mod_id: Steam Workshop ID of the WH3 translation mod.
-        source: The term's source text. Nothing is renamed when it is empty.
-        old_english: The English to replace, matched as a whole term.
-        new_english: The English to put in its place.
-
-    Returns:
-        The number of translations that changed.
-    """
-    if not source or old_english == new_english:
-        return 0
-    parent = _tr._extract_all_parent_strings(mod)
-    drift = _tr.compute_drift(parent=parent, translation=_tr._extract_translation_strings(mod), snapshot=_tr.store.load_parent_snapshot(mod_id))
-    raw = _tr.store.load_translations_raw(mod_id)
-
-    now = datetime.now(timezone.utc).isoformat()
-    changed = 0
-    for row in _tr._overlay_translations(drift, raw):
-        if not row.translation_text or source not in (row.parent_text or ""):
-            continue
-        new_text, count = replace_whole_term(row.translation_text, old_english, new_english)
-        if count == 0:
-            continue
-        existing = raw.get(row.key) if isinstance(raw.get(row.key), dict) else {}
-        raw[row.key] = {"text": new_text, "created_at": existing.get("created_at") or now, "updated_at": now, "provider": existing.get("provider") or row.provider or "manual"}
-        changed += 1
-    if changed:
-        _tr.store.save_translations_raw(mod_id, raw)
-    return changed
 
 
 @router.post("/mods/{mod_id}/glossary/suggestions/accept")
@@ -119,7 +80,7 @@ def accept_suggestions(mod_id: str, action: SuggestionAction) -> dict:
                     glossary_store.update_term(mod_id, edit_of, entry)
                 else:
                     glossary_store.add_term(mod_id, entry)
-                replaced += _rename_in_translations(mod, mod_id, s.get("source", ""), s["english"], english)
+                replaced += _tr._rename_in_translations(mod, mod_id, s.get("source", ""), s["english"], english)
         suggestion_manager.remove_suggestions(mod_id, list(terms_to_accept), storage_path)
 
     return {"status": "success", "accepted": len(terms_to_accept), "replaced": replaced}

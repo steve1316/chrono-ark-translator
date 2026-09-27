@@ -767,6 +767,10 @@ const ModDetail: React.FC = () => {
                                 fetchModDetail(true)
                                 fetchExportStatus()
                             }}
+                            onTranslationsChanged={() => {
+                                fetchModDetail(true)
+                                fetchExportStatus()
+                            }}
                             onRequestDeleteAll={() => setConfirmModal({ type: "delete-all-glossary", message: `Delete all ${Object.keys(modGlossary).length} glossary term(s)?` })}
                             onSuggestionsChanged={fetchSuggestions}
                         />

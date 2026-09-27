@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from backend import config
-from backend.data.glossary_manager import get_combined_glossary_prompt
+from backend.data.glossary_manager import get_combined_glossary_prompt, replace_whole_term
 from backend.games.total_war_warhammer_3 import translation_context as tc
 from backend.data.mod_settings import (
     load_source_language_override,
@@ -909,9 +909,49 @@ def post_glossary_term(mod_id: str, entry: GlossaryEntry) -> dict:
     return {"status": "ok"}
 
 
+def _rename_in_translations(mod, mod_id: str, source: str, old_english: str, new_english: str) -> int:
+    """Rename `old_english` to `new_english` in every translation whose source text contains `source`.
+
+    Rows are read from the translation pack with translations.json overlaid, so a translation that is only in the pack is renamed too. Changed rows are
+    saved to translations.json and show as pending until the next Sync.
+
+    Args:
+        mod: The resolved `WH3TranslationMod`.
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        source: The term's source text. Nothing is renamed when it is empty.
+        old_english: The English to replace, matched as a whole term.
+        new_english: The English to put in its place.
+
+    Returns:
+        The number of translations that changed.
+    """
+    if not source or old_english == new_english:
+        return 0
+    parent = _extract_all_parent_strings(mod)
+    drift = compute_drift(parent=parent, translation=_extract_translation_strings(mod), snapshot=store.load_parent_snapshot(mod_id))
+    raw = store.load_translations_raw(mod_id)
+
+    now = datetime.now(timezone.utc).isoformat()
+    changed = 0
+    for row in _overlay_translations(drift, raw):
+        if not row.translation_text or source not in (row.parent_text or ""):
+            continue
+        new_text, count = replace_whole_term(row.translation_text, old_english, new_english)
+        if count == 0:
+            continue
+        existing = raw.get(row.key) if isinstance(raw.get(row.key), dict) else {}
+        raw[row.key] = {"text": new_text, "created_at": existing.get("created_at") or now, "updated_at": now, "provider": existing.get("provider") or row.provider or "manual"}
+        changed += 1
+    if changed:
+        store.save_translations_raw(mod_id, raw)
+    return changed
+
+
 @router.put("/mods/{mod_id}/glossary/{english}")
 def put_glossary_term(mod_id: str, english: str, entry: GlossaryEntry) -> dict:
     """Update (and optionally rename) a glossary entry.
+
+    A new English also replaces the old English in every translation whose source contains the term's old source, after a restorable snapshot.
 
     Args:
         mod_id: Steam Workshop ID of the WH3 translation mod.
@@ -919,11 +959,16 @@ def put_glossary_term(mod_id: str, english: str, entry: GlossaryEntry) -> dict:
         entry: New `{english, source, category}` values. A different `english` renames the entry.
 
     Returns:
-        `{"status": "ok"}` on success.
+        `{"status": "ok", "replaced": N}`, where N counts the translations the rename changed.
     """
-    _require_mod(mod_id)
+    mod = _require_mod(mod_id)
+    old_source = (glossary_store.load_glossary(mod_id).get(english) or {}).get("source", "")
+    renaming = bool(old_source) and entry.english != english
+    if renaming:
+        snapshot_store.create_snapshot(mod_id, label=f"Before renaming glossary term {english}", kind="auto", local_source_dir=mod.local_source_dir)
     glossary_store.update_term(mod_id, english, entry.model_dump())
-    return {"status": "ok"}
+    replaced = _rename_in_translations(mod, mod_id, old_source, english, entry.english) if renaming else 0
+    return {"status": "ok", "replaced": replaced}
 
 
 @router.delete("/mods/{mod_id}/glossary")

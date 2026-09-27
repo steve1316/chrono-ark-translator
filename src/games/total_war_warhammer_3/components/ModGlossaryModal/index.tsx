@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react"
 
 import { GlossaryEditor, type GlossaryEditorTerm } from "../../../../translation/GlossaryEditor"
+import { renameNotice } from "../../../../translation/renameNotice"
 import { addGlossaryTerm, deleteAllGlossaryTerms, deleteGlossaryTerm, glossaryApplyAll, glossarySuggestEdits, loadGlossary, updateGlossaryTerm } from "../../translationApi"
 import Modal from "../../../../ui/Modal"
 import { useConfirm } from "../../../../ui/useConfirm"
@@ -13,6 +14,8 @@ interface ModGlossaryModalProps {
     onClose: () => void
     /** Called with how many edit suggestions were saved, so the page refreshes its Suggestions count. */
     onSuggestionsChanged: (added: number) => void
+    /** Called after an edit or Apply All changed existing translations, so the page reloads its rows. */
+    onTranslationsChanged?: () => void
 }
 
 /** Read the single source text from an editor term's mappings (WH3 stores one source per term). */
@@ -26,9 +29,10 @@ function sourceOf(term: GlossaryEditorTerm): string {
  * @param workshopId - Steam Workshop ID whose glossary to edit.
  * @param onClose - Called when the modal is closed.
  * @param onSuggestionsChanged - Called with how many edit suggestions were saved.
+ * @param onTranslationsChanged - Called after an edit or Apply All changed existing translations.
  * @returns The rendered modal.
  */
-const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose, onSuggestionsChanged }) => {
+const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose, onSuggestionsChanged, onTranslationsChanged }) => {
     const [terms, setTerms] = useState<GlossaryEditorTerm[]>([])
     const [error, setError] = useState("")
     const [notice, setNotice] = useState("")
@@ -63,8 +67,10 @@ const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose
 
     const handleUpdate = async (oldEnglish: string, term: GlossaryEditorTerm) => {
         try {
-            await updateGlossaryTerm(workshopId, oldEnglish, { english: term.english, source: sourceOf(term), category: term.category })
+            const { replaced } = await updateGlossaryTerm(workshopId, oldEnglish, { english: term.english, source: sourceOf(term), category: term.category })
             await refresh()
+            if (term.english !== oldEnglish) setNotice(renameNotice(term.english, replaced))
+            if (replaced > 0) onTranslationsChanged?.()
         } catch (e) {
             setError((e as Error).message)
         }
@@ -111,6 +117,7 @@ const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose
         try {
             const result = await glossaryApplyAll(workshopId, applyAllOld, applyAllNew)
             setApplyResult(`Replaced ${result.replaced} occurrences`)
+            if (result.replaced > 0) onTranslationsChanged?.()
             setApplyAllOld("")
             setApplyAllNew("")
         } catch (e) {
