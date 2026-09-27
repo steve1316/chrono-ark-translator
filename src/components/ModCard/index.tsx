@@ -39,6 +39,16 @@ export type ModCardPrimaryAction = {
     variant?: "primary" | "warning"
 } & ({ to: string; onClick?: never } | { onClick: () => void; to?: never })
 
+/** Optional second button rendered next to the primary action with outline styling. */
+export interface ModCardSecondaryAction {
+    /** Button text. */
+    label: ReactNode
+    /** Called when the button is clicked. */
+    onClick: () => void
+    /** Optional tooltip text. */
+    title?: string
+}
+
 /** Props for ModCard. */
 interface ModCardProps {
     /** Unique mod identifier (used for the `data-mod-id` attribute). */
@@ -59,6 +69,8 @@ interface ModCardProps {
     badges?: ReactNode
     /** Primary action - rendered as a `<Link>` when `to` is set, otherwise as a `<button>`. */
     primaryAction: ModCardPrimaryAction
+    /** Optional second button (e.g. `Publish`) rendered next to the primary action. */
+    secondaryAction?: ModCardSecondaryAction
     /** Optional external URL rendered as a Steam icon link. */
     steamUrl?: string | null
     /** Optional sync action. When undefined, the sync icon button is hidden. */
@@ -77,7 +89,7 @@ interface ModCardProps {
  * @returns The rendered mod card.
  */
 const ModCard: React.FC<ModCardProps> = React.memo((props) => {
-    const { id, title, idBadge, subtitle, previewImageUrl, progress, stats, badges, primaryAction, steamUrl, onSync } = props
+    const { id, title, idBadge, subtitle, previewImageUrl, progress, stats, badges, primaryAction, secondaryAction, steamUrl, onSync } = props
     const variantClass = primaryAction.variant === "warning" ? "btn-warning" : "btn-primary"
     return (
         <WorkshopCard data-mod-id={id} previewImageUrl={previewImageUrl ?? null} previewAlt={typeof title === "string" ? title : "Mod"} title={title} idBadge={idBadge} subtitle={subtitle}>
@@ -124,6 +136,11 @@ const ModCard: React.FC<ModCardProps> = React.memo((props) => {
                     ) : (
                         <button className={`btn ${variantClass}`} style={{ flex: 1 }} onClick={primaryAction.onClick}>
                             {primaryAction.label}
+                        </button>
+                    )}
+                    {secondaryAction && (
+                        <button className="btn btn-outline" style={{ flex: 1 }} onClick={secondaryAction.onClick} title={secondaryAction.title}>
+                            {secondaryAction.label}
                         </button>
                     )}
                     {steamUrl && (

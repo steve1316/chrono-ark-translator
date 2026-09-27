@@ -1,6 +1,16 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { publishPack, publishStreamUrl, RegistryError } from "../../api"
 import Modal from "../../../../ui/Modal"
+
+/** A step the dialog runs before spawning SteamCMD, such as syncing a translation mod. */
+export interface PublishPrepareStep {
+    /** Note shown under the dialog description explaining what will run first. */
+    note: ReactNode
+    /** Status line logged while the step runs. */
+    status: string
+    /** Runs the step. Throwing aborts the publish and shows the error's message. */
+    run: () => Promise<void>
+}
 
 /** Props for PublishWorkshopDialog. */
 interface PublishWorkshopDialogProps {
@@ -10,6 +20,8 @@ interface PublishWorkshopDialogProps {
     title: string
     /** Called when the user dismisses the dialog. */
     onClose: () => void
+    /** Optional step run before the publish starts. */
+    prepare?: PublishPrepareStep
 }
 
 /** One line of streamed SteamCMD output. */
@@ -31,9 +43,10 @@ type Phase = "idle" | "publishing" | "done" | "error"
  * @param workshopId Numeric Steam Workshop item id of the pack being published.
  * @param title Display title of the pack, shown in the dialog header.
  * @param onClose Called when the user dismisses the dialog.
+ * @param prepare Optional step run before the publish starts.
  * @returns The rendered modal overlay.
  */
-const PublishWorkshopDialog = ({ workshopId, title, onClose }: PublishWorkshopDialogProps) => {
+const PublishWorkshopDialog = ({ workshopId, title, onClose, prepare }: PublishWorkshopDialogProps) => {
     const [changenote, setChangenote] = useState("")
     const [phase, setPhase] = useState<Phase>("idle")
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -66,6 +79,18 @@ const PublishWorkshopDialog = ({ workshopId, title, onClose }: PublishWorkshopDi
         setExitCode(null)
         setLog([])
         seqRef.current = 0
+
+        if (prepare) {
+            append(prepare.status, true)
+            try {
+                await prepare.run()
+            } catch (err) {
+                setErrorMessage((err as Error).message || "Failed to prepare the publish.")
+                setPhase("error")
+                return
+            }
+        }
+
         append(`Spawning SteamCMD for workshop item ${workshopId}...`, true)
 
         try {
@@ -126,6 +151,7 @@ const PublishWorkshopDialog = ({ workshopId, title, onClose }: PublishWorkshopDi
             <p style={{ color: "var(--text-dim)", marginTop: 0, marginBottom: "1rem", lineHeight: 1.5 }}>
                 Pushes the local workshop folder for item <code>{workshopId}</code> to Steam as an update. Existing title, description, visibility, tags, and preview are preserved.
             </p>
+            {prepare && <p style={{ color: "var(--text-dim)", marginTop: 0, marginBottom: "1rem", lineHeight: 1.5 }}>{prepare.note}</p>}
 
             <label style={{ display: "block", marginBottom: "1rem" }}>
                 <span style={{ display: "block", marginBottom: "0.4rem", color: "var(--text-main)" }}>Changenote (shown in the Workshop changelog)</span>

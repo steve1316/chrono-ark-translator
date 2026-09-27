@@ -26,7 +26,7 @@ function baseProps(overrides: Partial<React.ComponentProps<typeof ModCard>> = {}
             { value: 25, label: "Remaining" },
             { value: "CSV", label: "Format" },
         ],
-        primaryAction: { label: "View Strings", variant: "warning", onClick: () => undefined },
+        primaryAction: { label: "View", variant: "warning", onClick: () => undefined },
         ...overrides,
     }
 }
@@ -95,9 +95,25 @@ describe("ModCard", () => {
     it("calls primaryAction.onClick when the button is clicked", async () => {
         const user = userEvent.setup()
         const onClick = vi.fn()
-        render(wrap(<ModCard {...baseProps({ primaryAction: { label: "View Strings", variant: "warning", onClick } })} />))
-        await user.click(screen.getByText("View Strings"))
+        render(wrap(<ModCard {...baseProps({ primaryAction: { label: "View", variant: "warning", onClick } })} />))
+        await user.click(screen.getByText("View"))
         expect(onClick).toHaveBeenCalled()
+    })
+
+    it("renders the secondary action as an outline button and fires its onClick", async () => {
+        const user = userEvent.setup()
+        const onClick = vi.fn()
+        render(wrap(<ModCard {...baseProps({ secondaryAction: { label: "Publish", onClick, title: "Push to Steam" } })} />))
+        const button = screen.getByRole("button", { name: "Publish" })
+        expect(button).toHaveClass("btn-outline")
+        expect(button).toHaveAttribute("title", "Push to Steam")
+        await user.click(button)
+        expect(onClick).toHaveBeenCalled()
+    })
+
+    it("omits the secondary action when it is not set", () => {
+        render(wrap(<ModCard {...baseProps()} />))
+        expect(screen.queryByRole("button", { name: "Publish" })).not.toBeInTheDocument()
     })
 
     it("renders the primary action as a Link when primaryAction.to is set", () => {

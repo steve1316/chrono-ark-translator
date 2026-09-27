@@ -69,7 +69,7 @@ const ModGrid: React.FC<ModGridProps> = ({ mods, onModSelect, onModSync, searchQ
                         ]}
                         badges={mod.has_changes ? <NeedsSyncBadge /> : undefined}
                         primaryAction={{
-                            label: "View Strings",
+                            label: "View",
                             variant: mod.untranslated > 0 ? "warning" : "primary",
                             onClick: () => onModSelect(mod.id),
                         }}

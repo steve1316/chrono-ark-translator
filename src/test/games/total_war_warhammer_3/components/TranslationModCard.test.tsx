@@ -1,9 +1,38 @@
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { publishPack } from "../../../../games/total_war_warhammer_3/api"
 import TranslationModCard from "../../../../games/total_war_warhammer_3/components/TranslationModCard"
+import { syncChanges } from "../../../../games/total_war_warhammer_3/translationApi"
 import type { WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
+
+vi.mock("../../../../games/total_war_warhammer_3/api", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("../../../../games/total_war_warhammer_3/api")>()),
+    publishPack: vi.fn(),
+}))
+
+vi.mock("../../../../games/total_war_warhammer_3/translationApi", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("../../../../games/total_war_warhammer_3/translationApi")>()),
+    syncChanges: vi.fn(),
+}))
+
+/** Minimal `EventSource` stand-in, since jsdom does not provide one. */
+class FakeEventSource {
+    onmessage: ((evt: MessageEvent) => void) | null = null
+    onerror: (() => void) | null = null
+    addEventListener() {}
+    close() {}
+}
+
+const NEEDS_SYNC: WH3RescanSummary = {
+    mod_id: "3315737452",
+    counts: { translated: 5, untranslated: 0, stale: 0, orphan: 0 },
+    canonical_counts: { synced: 5, untouched: 0, pending: 0, missing: 0, untranslatable: 0 },
+    scanned_at: "2026-05-24T00:00:00Z",
+    has_unsynced_changes: true,
+    has_mod_context: false,
+}
 
 const MOD: WH3TranslationModSummary = {
     workshop_id: "3315737452",
@@ -25,6 +54,9 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.restoreAllMocks()
+    vi.mocked(publishPack).mockReset()
+    vi.mocked(syncChanges).mockReset()
+    vi.unstubAllGlobals()
 })
 
 describe("TranslationModCard", () => {
@@ -86,10 +118,46 @@ describe("TranslationModCard", () => {
         expect(formatStat).toHaveTextContent("LOC")
     })
 
-    it("renders the View Strings button (not 'Translate ->')", () => {
+    it("renders the View and Publish buttons (not 'Translate ->')", () => {
         render(wrap(<TranslationModCard mod={MOD} progress={null} onRescan={vi.fn()} />))
-        expect(screen.getByRole("button", { name: /View Strings/i })).toBeInTheDocument()
+        expect(screen.getByRole("button", { name: "View" })).toBeInTheDocument()
+        expect(screen.getByRole("button", { name: "Publish" })).toBeInTheDocument()
         expect(screen.queryByText(/Translate ->/)).not.toBeInTheDocument()
+    })
+
+    it("publishes without syncing when there are no unsynced changes", async () => {
+        vi.stubGlobal("EventSource", FakeEventSource)
+        vi.mocked(publishPack).mockResolvedValue({ publish_id: "p", workshop_id: MOD.workshop_id, started_at: "" })
+        render(wrap(<TranslationModCard mod={MOD} progress={{ ...NEEDS_SYNC, has_unsynced_changes: false }} onRescan={vi.fn()} />))
+        fireEvent.click(screen.getByRole("button", { name: "Publish" }))
+        expect(screen.queryByText(/will be synced/)).not.toBeInTheDocument()
+        fireEvent.click(screen.getAllByRole("button", { name: "Publish" }).at(-1)!)
+        await waitFor(() => expect(publishPack).toHaveBeenCalledWith(MOD.workshop_id, ""))
+        expect(syncChanges).not.toHaveBeenCalled()
+    })
+
+    it("syncs before publishing when the mod needs a sync", async () => {
+        vi.stubGlobal("EventSource", FakeEventSource)
+        vi.mocked(syncChanges).mockResolvedValue({ per_file: { a: 1 }, removed_orphans: 0, pack_built: true, pack_error: null })
+        vi.mocked(publishPack).mockResolvedValue({ publish_id: "p", workshop_id: MOD.workshop_id, started_at: "" })
+        const onRescan = vi.fn()
+        render(wrap(<TranslationModCard mod={MOD} progress={NEEDS_SYNC} onRescan={onRescan} />))
+        fireEvent.click(screen.getByRole("button", { name: "Publish" }))
+        expect(screen.getByText(/will be synced and the pack rebuilt/)).toBeInTheDocument()
+        fireEvent.click(screen.getAllByRole("button", { name: "Publish" }).at(-1)!)
+        await waitFor(() => expect(publishPack).toHaveBeenCalledWith(MOD.workshop_id, ""))
+        expect(syncChanges).toHaveBeenCalledWith(MOD.workshop_id)
+        expect(vi.mocked(syncChanges).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(publishPack).mock.invocationCallOrder[0])
+        expect(onRescan).toHaveBeenCalledWith(MOD.workshop_id)
+    })
+
+    it("stops the publish when the pack rebuild during sync fails", async () => {
+        vi.mocked(syncChanges).mockResolvedValue({ per_file: { a: 1 }, removed_orphans: 0, pack_built: false, pack_error: "RPFM not configured" })
+        render(wrap(<TranslationModCard mod={MOD} progress={NEEDS_SYNC} onRescan={vi.fn()} />))
+        fireEvent.click(screen.getByRole("button", { name: "Publish" }))
+        fireEvent.click(screen.getAllByRole("button", { name: "Publish" }).at(-1)!)
+        expect(await screen.findByText(/pack rebuild failed so the publish was stopped: RPFM not configured/)).toBeInTheDocument()
+        expect(publishPack).not.toHaveBeenCalled()
     })
 
     it("renders the rescan icon button and fires onRescan when clicked", () => {
@@ -136,7 +204,7 @@ describe("TranslationModCard", () => {
 
     it("remembers the card before opening it so the dashboard can scroll back to it", () => {
         render(wrap(<TranslationModCard mod={MOD} progress={null} onRescan={vi.fn()} />))
-        fireEvent.click(screen.getByRole("button", { name: "View Strings" }))
+        fireEvent.click(screen.getByRole("button", { name: "View" }))
         expect(sessionStorage.getItem("lastViewedMod")).toBe(MOD.workshop_id)
         sessionStorage.clear()
     })

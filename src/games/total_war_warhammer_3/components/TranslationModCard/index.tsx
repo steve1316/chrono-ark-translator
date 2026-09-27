@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useGameSlug } from "../../../useGameSlug"
 
@@ -7,6 +7,8 @@ import { API_BASE } from "../../../../config"
 import { rememberScrollTarget } from "../../../../dashboard/useScrollRestore"
 import { highlightMatch } from "../../../../utils/text"
 import type { WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
+import { syncChanges } from "../../translationApi"
+import PublishWorkshopDialog, { type PublishPrepareStep } from "../PublishWorkshopDialog"
 
 /** Props for TranslationModCard. */
 export interface TranslationModCardProps {
@@ -25,7 +27,7 @@ export interface TranslationModCardProps {
  * the layout matches Chrono Ark's mod card exactly: preview image, title + workshop-id badge,
  * optional parent-mod-link subtitle, progress bar (translated gradient + untouched gray, from the same statuses as the strings table),
  * stat boxes (`Remaining` + `Format`), optional `Needs Sync` badge, and an action row with a
- * `View Strings` button (warning color when untranslated rows remain), the parent mod's Steam
+ * `View` button (warning color when untranslated rows remain), a `Publish` button that syncs first when needed, the mod's Steam
  * link, and a rescan icon button.
  *
  * @param mod The translation mod registry summary.
@@ -37,6 +39,8 @@ export interface TranslationModCardProps {
 const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, onRescan, searchQuery = "" }) => {
     const navigate = useNavigate()
     const slug = useGameSlug()
+    // Whether the open publish dialog syncs first, fixed when it opens so the post-sync rescan does not drop the step. Null while closed.
+    const [publishSyncFirst, setPublishSyncFirst] = useState<boolean | null>(null)
     const parents = mod.parent_workshop_ids
     // Use the strings table's statuses so the card never shows a count the table has no filter for.
     const counts = progress?.canonical_counts ?? null
@@ -74,41 +78,63 @@ const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, 
         { value: "LOC", label: "Format" },
     ]
 
+    const needsSync = progress?.has_unsynced_changes ?? false
+    // Sync writes the translations into the loose files and rebuilds the .pack, so the publish pushes the latest strings.
+    const syncStep: PublishPrepareStep | undefined = publishSyncFirst
+        ? {
+              note: "This mod has unsynced translation changes. They will be synced and the pack rebuilt before publishing.",
+              status: "Syncing translations and rebuilding the pack...",
+              run: async () => {
+                  const result = await syncChanges(mod.workshop_id)
+                  onRescan(mod.workshop_id)
+                  if (result.pack_error) throw new Error(`Translations were synced, but the pack rebuild failed so the publish was stopped: ${result.pack_error}`)
+              },
+          }
+        : undefined
+
     return (
-        <ModCard
-            id={mod.workshop_id}
-            title={highlightMatch(mod.display_name, searchQuery)}
-            idBadge={mod.workshop_id}
-            subtitle={
-                singleParent ? (
-                    <a href={parentSteamUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="translation-parent-link" aria-label={`parent mod ${singleParent}`}>
-                        Parent mod
-                    </a>
-                ) : parents.length > 1 ? (
-                    <span className="translation-parent-link" title={parents.join(", ")}>
-                        Translates {parents.length} mods
-                    </span>
-                ) : undefined
-            }
-            previewImageUrl={mod.preview_image_url ? `${API_BASE}${mod.preview_image_url}` : null}
-            progress={{
-                leftLabel: counts ? `${percent}% Translated` : "Not yet scanned",
-                rightLabel: counts ? `${done} / ${total} strings` : undefined,
-                segments,
-            }}
-            stats={stats}
-            badges={progress?.has_unsynced_changes ? <NeedsSyncBadge /> : undefined}
-            primaryAction={{
-                label: "View Strings",
-                variant: untranslated > 0 ? "warning" : "primary",
-                onClick: () => {
-                    rememberScrollTarget(mod.workshop_id)
-                    navigate(`/${slug}/translation/${mod.workshop_id}`)
-                },
-            }}
-            steamUrl={steamUrl}
-            onSync={() => onRescan(mod.workshop_id)}
-        />
+        <>
+            <ModCard
+                id={mod.workshop_id}
+                title={highlightMatch(mod.display_name, searchQuery)}
+                idBadge={mod.workshop_id}
+                subtitle={
+                    singleParent ? (
+                        <a href={parentSteamUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="translation-parent-link" aria-label={`parent mod ${singleParent}`}>
+                            Parent mod
+                        </a>
+                    ) : parents.length > 1 ? (
+                        <span className="translation-parent-link" title={parents.join(", ")}>
+                            Translates {parents.length} mods
+                        </span>
+                    ) : undefined
+                }
+                previewImageUrl={mod.preview_image_url ? `${API_BASE}${mod.preview_image_url}` : null}
+                progress={{
+                    leftLabel: counts ? `${percent}% Translated` : "Not yet scanned",
+                    rightLabel: counts ? `${done} / ${total} strings` : undefined,
+                    segments,
+                }}
+                stats={stats}
+                badges={progress?.has_unsynced_changes ? <NeedsSyncBadge /> : undefined}
+                primaryAction={{
+                    label: "View",
+                    variant: untranslated > 0 ? "warning" : "primary",
+                    onClick: () => {
+                        rememberScrollTarget(mod.workshop_id)
+                        navigate(`/${slug}/translation/${mod.workshop_id}`)
+                    },
+                }}
+                secondaryAction={{
+                    label: "Publish",
+                    onClick: () => setPublishSyncFirst(needsSync),
+                    title: needsSync ? "Sync the translations, rebuild the pack, then push it to the Steam Workshop" : "Push the local pack to the Steam Workshop",
+                }}
+                steamUrl={steamUrl}
+                onSync={() => onRescan(mod.workshop_id)}
+            />
+            {publishSyncFirst !== null && <PublishWorkshopDialog workshopId={mod.workshop_id} title={mod.display_name} prepare={syncStep} onClose={() => setPublishSyncFirst(null)} />}
+        </>
     )
 }
 
