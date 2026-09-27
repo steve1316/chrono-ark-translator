@@ -47,7 +47,7 @@ afterEach(() => {
 describe("SettingsPage", () => {
     it("shows a loading state, then every Claude-provider panel as a static settings panel", async () => {
         mockSettingsFetch()
-        render(<SettingsPage />)
+        render(<SettingsPage gameId="chrono_ark" />)
         expect(screen.getByText("Loading settings...")).toBeInTheDocument()
         for (const name of ["System Prompt Preview", "Translation Provider", "Model", "API Keys", "Batch Size", "Ignored Mods", "Total War: Warhammer III", "Steam Account"]) {
             const heading = await screen.findByRole("heading", { name })
@@ -59,7 +59,7 @@ describe("SettingsPage", () => {
         vi.spyOn(console, "error").mockImplementation(() => {})
         let calls = 0
         mockSettingsFetch(() => Promise.resolve(++calls === 1 ? json({ detail: "boom" }, 500) : json(SETTINGS)))
-        render(<SettingsPage />)
+        render(<SettingsPage gameId="chrono_ark" />)
         expect(await screen.findByRole("alert")).toHaveTextContent("Could not load settings")
         expect(screen.queryByRole("button", { name: "Save Settings" })).not.toBeInTheDocument()
         await userEvent.click(screen.getByRole("button", { name: "Retry" }))
@@ -68,7 +68,7 @@ describe("SettingsPage", () => {
 
     it("links every always-visible settings field to its label", async () => {
         mockSettingsFetch()
-        render(<SettingsPage />)
+        render(<SettingsPage gameId="chrono_ark" />)
         await screen.findByRole("heading", { name: "Translation Provider" })
         for (const label of [
             "Source Language",
@@ -91,7 +91,7 @@ describe("SettingsPage", () => {
 
     it("links the llama.cpp advanced fields to their labels", async () => {
         mockSettingsFetch(() => Promise.resolve(json({ ...SETTINGS, provider: "llamacpp" })))
-        render(<SettingsPage />)
+        render(<SettingsPage gameId="chrono_ark" />)
         await userEvent.click(await screen.findByRole("button", { name: "Advanced Settings" }))
         for (const label of ["Model Path (override)", "GPU Layers", "Context Size", "Server URL", "Binary Path", "Display Name"]) {
             expect(screen.getByLabelText(label)).toBeInTheDocument()
@@ -100,7 +100,7 @@ describe("SettingsPage", () => {
 
     it("links the Ollama URL field to its label", async () => {
         mockSettingsFetch(() => Promise.resolve(json({ ...SETTINGS, provider: "ollama" })))
-        render(<SettingsPage />)
+        render(<SettingsPage gameId="chrono_ark" />)
         await userEvent.click(await screen.findByRole("button", { name: "Advanced Settings" }))
         expect(screen.getByLabelText("Ollama URL")).toHaveValue("http://localhost:11434")
     })
@@ -109,13 +109,13 @@ describe("SettingsPage", () => {
         mockSettingsFetch(() => Promise.resolve(json({ ...SETTINGS, provider: "ollama" })), {
             "/ollama/status": () => Promise.resolve(json({ status: "running", models: [{ name: "qwen2.5:7b" }], managed: true })),
         })
-        render(<SettingsPage />)
+        render(<SettingsPage gameId="chrono_ark" />)
         expect(await screen.findByRole("button", { name: "Stop" })).toHaveClass("btn", "btn-danger", "btn-sm")
     })
 
     it("reports whether the advanced settings are expanded", async () => {
         mockSettingsFetch(() => Promise.resolve(json({ ...SETTINGS, provider: "ollama" })))
-        render(<SettingsPage />)
+        render(<SettingsPage gameId="chrono_ark" />)
         const toggle = await screen.findByRole("button", { name: "Advanced Settings" })
         expect(toggle).toHaveAttribute("aria-expanded", "false")
         await userEvent.click(toggle)
@@ -124,7 +124,7 @@ describe("SettingsPage", () => {
 
     it("removes an ignored mod from its chip, which enables Save", async () => {
         mockSettingsFetch()
-        render(<SettingsPage />)
+        render(<SettingsPage gameId="chrono_ark" />)
         const remove = await screen.findByRole("button", { name: "Remove 2945863327" })
         expect(remove.closest(".chip")).not.toBeNull()
         expect(screen.getByRole("button", { name: "Save Settings" })).toBeDisabled()
@@ -135,7 +135,7 @@ describe("SettingsPage", () => {
 
     it("shows a failed SteamCMD install in an error banner", async () => {
         mockSettingsFetch(undefined, { "/steamcmd/install": () => Promise.resolve(json({ detail: "no network" }, 500)) })
-        render(<SettingsPage />)
+        render(<SettingsPage gameId="chrono_ark" />)
         await userEvent.click(await screen.findByRole("button", { name: "Install SteamCMD" }))
         expect((await screen.findByText("Install failed: no network")).closest(".banner-error")).not.toBeNull()
     })
@@ -150,7 +150,7 @@ describe("SettingsPage", () => {
                     ? Promise.reject(new TypeError("Failed to fetch"))
                     : Promise.resolve(json({ models: [{ id: "claude-sonnet-5", label: "Sonnet 5", input_per_mtok: 3, output_per_mtok: 15 }] })),
         })
-        render(<SettingsPage />)
+        render(<SettingsPage gameId="chrono_ark" />)
         await userEvent.click(await screen.findByRole("button", { name: "Retry" }))
         expect(await screen.findByRole("option", { name: /Sonnet 5/ })).toBeInTheDocument()
     })
@@ -159,12 +159,29 @@ describe("SettingsPage", () => {
         vi.spyOn(console, "error").mockImplementation(() => {})
         let rejectSave = false
         mockSettingsFetch(() => Promise.resolve(rejectSave ? json({ detail: "batch size too large" }, 400) : json(SETTINGS)))
-        render(<SettingsPage />)
+        render(<SettingsPage gameId="chrono_ark" />)
         const batch = await screen.findByLabelText("Batch size")
         rejectSave = true
         await userEvent.clear(batch)
         await userEvent.type(batch, "60")
         await userEvent.click(screen.getByRole("button", { name: "Save Settings" }))
         expect((await screen.findByText("Could not save settings: batch size too large")).closest(".banner-error")).not.toBeNull()
+    })
+
+    it("loads the Warhammer III system prompt when Settings is in WH3", async () => {
+        const fetchSpy = mockSettingsFetch(undefined, { "/translate/system-prompt?source_lang=Chinese": () => Promise.resolve(json({ system_prompt: "WH3 PROMPT" })) })
+        render(<SettingsPage gameId="total_war_warhammer_3" />)
+        await userEvent.click(await screen.findByRole("button", { name: "Load Prompt" }))
+        expect(await screen.findByText("WH3 PROMPT")).toBeInTheDocument()
+        expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/games/total_war_warhammer_3/translate/system-prompt"))).toBe(true)
+        expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/games/chrono_ark/translate/system-prompt"))).toBe(false)
+    })
+
+    it("loads the Chrono Ark system prompt when Settings is in Chrono Ark", async () => {
+        const fetchSpy = mockSettingsFetch(undefined, { "/translate/system-prompt?source_lang=Chinese": () => Promise.resolve(json({ system_prompt: "CA PROMPT" })) })
+        render(<SettingsPage gameId="chrono_ark" />)
+        await userEvent.click(await screen.findByRole("button", { name: "Load Prompt" }))
+        expect(await screen.findByText("CA PROMPT")).toBeInTheDocument()
+        expect(fetchSpy.mock.calls.some(([url]) => String(url).includes("/games/chrono_ark/translate/system-prompt"))).toBe(true)
     })
 })

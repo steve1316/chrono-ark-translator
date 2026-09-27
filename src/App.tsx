@@ -74,7 +74,7 @@ function App() {
                     <ErrorBoundary key={location.pathname}>
                         <Routes>
                             {/* --- Cross-game Settings: provider configuration, game path --- */}
-                            <Route path="/settings" element={<SettingsPage />} />
+                            <Route path="/settings" element={<SettingsPage gameId={activeGameId} />} />
 
                             {/* --- Active game's subtree, namespaced by URL slug --- */}
                             <Route path="/:gameSlug/*" element={<GameSubtree />} />

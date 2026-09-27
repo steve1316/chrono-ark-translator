@@ -249,3 +249,21 @@ def test_name_suggestions_skips_terms_already_in_glossary(client: TestClient, mo
     resp = client.post(f"{PREFIX}/name-suggestions", json={"mod_id": mod_id})
     assert resp.status_code == 200
     assert resp.json()["suggestions"] == []
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# GET /translate/system-prompt
+
+
+def test_system_prompt_is_built_from_the_wh3_context_rules_and_claude(client):
+    """The Settings preview shows the prompt a WH3 run would send: WH3 context and format rules, built by Claude, with no Chrono Ark text."""
+    res = client.get("/api/games/total_war_warhammer_3/translate/system-prompt", params={"source_lang": "Chinese"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["provider"] == routes_module.ClaudeProvider().name
+    assert body["source_lang"] == "Chinese"
+    prompt = body["system_prompt"]
+    assert "Total War: Warhammer III" in prompt
+    assert "[Title] Name" in prompt
+    assert "Chrono Ark" not in prompt

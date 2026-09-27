@@ -71,6 +71,36 @@ def _untranslated_entries(mod, mod_id: str, key_filter=None) -> list[tuple[str, 
     return [(r.key, src_by_key.get(r.key, "")) for r in overlaid if r.status == "untranslated" and src_by_key.get(r.key) and (key_filter is None or key_filter(r.key))]
 
 
+@router.get("/system-prompt")
+async def get_system_prompt(source_lang: str = "Chinese", target_lang: str = "English") -> dict:
+    """Return the system prompt a WH3 translation run would send, for the Settings preview.
+
+    Mirrors `preview`: Claude (WH3 always translates with Claude), the WH3 game context, format rules and style examples, and the base glossary
+    filtered to the prompt categories. No mod is involved, so a mod's own glossary terms are not included.
+
+    Args:
+        source_lang: Source language to build the prompt for (e.g. `"Chinese"`).
+        target_lang: Language being translated into.
+
+    Returns:
+        A dict with `provider`, `source_lang` and `system_prompt`.
+    """
+    provider = _t.ClaudeProvider()
+    adapter = _t.TotalWarWarhammer3Adapter()
+    glossary_prompt = adapter.get_base_glossary_prompt(source_lang=source_lang, target_lang=target_lang) or "No glossary available."
+    system_prompt, _ = provider.build_prompt(
+        [("example_unit_description", "示例文本")],
+        source_lang,
+        glossary_prompt,
+        game_context=adapter.get_translation_context(),
+        format_rules=adapter.get_format_preservation_rules(),
+        style_examples=adapter.get_style_examples(source_lang),
+        character_context=None,
+        target_lang=target_lang,
+    )
+    return {"provider": provider.name, "source_lang": source_lang, "system_prompt": system_prompt}
+
+
 @router.post("/preview")
 async def preview(req: TranslationRequest) -> dict:
     """Preview the prompts, cost estimate, and batch plan for translating a WH3 mod's untranslated rows.
