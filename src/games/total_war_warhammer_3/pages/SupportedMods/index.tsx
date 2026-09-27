@@ -81,7 +81,7 @@ export default function SupportedModsPage() {
         <>
             <DashboardHeader
                 title="Supported Mods"
-                tagline="Manage `SUPPORTED_MODS` entries in helper_scripts/supported_mods.py."
+                tagline="Manage `SUPPORTED_MODS` entries in helper_scripts/data/supported_mods.py."
                 search={search}
                 onSearchChange={setSearch}
                 searchPlaceholder="Search by name or package_name..."

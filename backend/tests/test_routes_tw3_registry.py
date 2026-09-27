@@ -10,7 +10,7 @@ from backend.web_server import app
 # POST /supported-mods
 
 
-_FIXTURE_SOURCE = """from utilities import STEAM_LIBRARY_DRIVE
+_FIXTURE_SOURCE = """from core.utilities import STEAM_LIBRARY_DRIVE
 
 SUPPORTED_MODS = [
     {
@@ -21,6 +21,19 @@ SUPPORTED_MODS = [
     },
 ]
 """
+
+
+def _write_layout(helper):
+    """Create the reorganized helper_scripts package folders: `core/` with `utilities.py`, and an empty `data/`.
+
+    Args:
+        helper: The helper_scripts directory to populate.
+    """
+    (helper / "core").mkdir()
+    (helper / "data").mkdir()
+    (helper / "core" / "__init__.py").write_text("")
+    (helper / "core" / "utilities.py").write_text('STEAM_LIBRARY_DRIVE = "F:"\n')
+    (helper / "data" / "__init__.py").write_text("")
 
 
 def _setup_helper(monkeypatch, tmp_path):
@@ -35,8 +48,8 @@ def _setup_helper(monkeypatch, tmp_path):
     """
     helper = tmp_path / "helper_scripts"
     helper.mkdir()
-    (helper / "utilities.py").write_text('STEAM_LIBRARY_DRIVE = "F:"\n')
-    (helper / "supported_mods.py").write_text(_FIXTURE_SOURCE)
+    _write_layout(helper)
+    (helper / "data" / "supported_mods.py").write_text(_FIXTURE_SOURCE)
     monkeypatch.setattr("backend.config.TW3_HELPER_PATH", str(helper))
     return helper
 
@@ -79,7 +92,7 @@ def test_post_supported_mods_returns_503_when_helper_path_unset(monkeypatch):
 # PUT /supported-mods/{package_name}
 
 
-_TWO_ENTRY_FIXTURE = """from utilities import STEAM_LIBRARY_DRIVE
+_TWO_ENTRY_FIXTURE = """from core.utilities import STEAM_LIBRARY_DRIVE
 
 SUPPORTED_MODS = [
     {
@@ -101,8 +114,8 @@ SUPPORTED_MODS = [
 def _setup_helper_with_two(monkeypatch, tmp_path):
     helper = tmp_path / "helper_scripts"
     helper.mkdir()
-    (helper / "utilities.py").write_text('STEAM_LIBRARY_DRIVE = "F:"\n')
-    (helper / "supported_mods.py").write_text(_TWO_ENTRY_FIXTURE)
+    _write_layout(helper)
+    (helper / "data" / "supported_mods.py").write_text(_TWO_ENTRY_FIXTURE)
     monkeypatch.setattr("backend.config.TW3_HELPER_PATH", str(helper))
     return helper
 
@@ -158,7 +171,8 @@ def test_delete_supported_mods_returns_404_when_missing(monkeypatch, tmp_path):
 def test_get_supported_effects_returns_top_level_keys(monkeypatch, tmp_path):
     helper = tmp_path / "helper_scripts"
     helper.mkdir()
-    (helper / "dynamic_rors_effects.py").write_text('SUPPORTED_EFFECTS = {"melee_attack": {"id": 1}, "missile_damage": {"id": 2}}\n')
+    _write_layout(helper)
+    (helper / "data" / "dynamic_rors_effects.py").write_text('SUPPORTED_EFFECTS = {"melee_attack": {"id": 1}, "missile_damage": {"id": 2}}\n')
     monkeypatch.setattr("backend.config.TW3_HELPER_PATH", str(helper))
     res = TestClient(app).get("/api/games/total_war_warhammer_3/supported-effects")
     assert res.status_code == 200

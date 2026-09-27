@@ -103,8 +103,9 @@ def test_get_validation_returns_empty_when_no_issues(monkeypatch, tmp_path):
     helper.mkdir()
     real_pack = tmp_path / "real_a.pack"
     real_pack.write_bytes(b"x")
-    (helper / "supported_mods.py").write_text(f'SUPPORTED_MODS = [{{"name": "OK Mod", "package_name": "ok_mod", "path": "{real_pack.as_posix()}", "modified_attributes": ["infantry"]}}]')
-    (helper / "dynamic_rors_effects.py").write_text('SUPPORTED_EFFECTS = {"infantry": {}}')
+    (helper / "data").mkdir()
+    (helper / "data" / "supported_mods.py").write_text(f'SUPPORTED_MODS = [{{"name": "OK Mod", "package_name": "ok_mod", "path": "{real_pack.as_posix()}", "modified_attributes": ["infantry"]}}]')
+    (helper / "data" / "dynamic_rors_effects.py").write_text('SUPPORTED_EFFECTS = {"infantry": {}}')
     monkeypatch.setattr(config, "TW3_HELPER_PATH", str(helper))
     client = TestClient(app)
     res = client.get("/api/games/total_war_warhammer_3/validation")

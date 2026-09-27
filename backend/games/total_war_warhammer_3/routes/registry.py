@@ -68,7 +68,7 @@ def _write_and_reload(new_source: str) -> list[dict]:
     """
     source_path = supported_mods_source_path(helper_scripts_path())
     if not source_path.is_file():
-        raise HTTPException(status_code=503, detail="supported_mods.py not found")
+        raise HTTPException(status_code=503, detail="data/supported_mods.py not found")
     backup = source_path.with_suffix(".py.bak")
     shutil.copyfile(source_path, backup)
     source_path.write_text(new_source, encoding="utf-8")
@@ -97,7 +97,7 @@ def post_supported_mods(body: SupportedModBody):
     try:
         source_path = supported_mods_source_path(helper_scripts_path())
         if not source_path.is_file():
-            raise HTTPException(status_code=503, detail="supported_mods.py not found")
+            raise HTTPException(status_code=503, detail="data/supported_mods.py not found")
         new_source = add_entry(source_path.read_text(encoding="utf-8"), body.entry)
     except HelperScriptsNotConfiguredError as exc:
         raise HTTPException(status_code=503, detail=f"Registry unavailable: {exc}")
@@ -125,7 +125,7 @@ def put_supported_mods(package_name: str, body: SupportedModBody):
     try:
         source_path = supported_mods_source_path(helper_scripts_path())
         if not source_path.is_file():
-            raise HTTPException(status_code=503, detail="supported_mods.py not found")
+            raise HTTPException(status_code=503, detail="data/supported_mods.py not found")
         new_source = update_entry(source_path.read_text(encoding="utf-8"), package_name, body.entry)
     except HelperScriptsNotConfiguredError as exc:
         raise HTTPException(status_code=503, detail=f"Registry unavailable: {exc}")
@@ -152,7 +152,7 @@ def delete_supported_mods(package_name: str):
     try:
         source_path = supported_mods_source_path(helper_scripts_path())
         if not source_path.is_file():
-            raise HTTPException(status_code=503, detail="supported_mods.py not found")
+            raise HTTPException(status_code=503, detail="data/supported_mods.py not found")
         new_source = remove_entry(source_path.read_text(encoding="utf-8"), package_name)
     except HelperScriptsNotConfiguredError as exc:
         raise HTTPException(status_code=503, detail=f"Registry unavailable: {exc}")

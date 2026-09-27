@@ -106,7 +106,8 @@ def test_derive_workshop_id_returns_none_for_empty_path():
 def test_load_supported_effects_categories_returns_top_level_keys(tmp_path):
     helper = tmp_path / "helper_scripts"
     helper.mkdir()
-    (helper / "dynamic_rors_effects.py").write_text('SUPPORTED_EFFECTS = {"melee_attack": {"id": 1}, "missile_damage": {"id": 2}}\n')
+    (helper / "data").mkdir()
+    (helper / "data" / "dynamic_rors_effects.py").write_text('SUPPORTED_EFFECTS = {"melee_attack": {"id": 1}, "missile_damage": {"id": 2}}\n')
     cats = load_supported_effects_categories(helper)
     assert sorted(cats) == ["melee_attack", "missile_damage"]
 
@@ -114,4 +115,27 @@ def test_load_supported_effects_categories_returns_top_level_keys(tmp_path):
 def test_supported_mods_source_path_returns_expected_filename(tmp_path):
     helper = tmp_path / "helper_scripts"
     helper.mkdir()
-    assert supported_mods_source_path(helper) == helper / "supported_mods.py"
+    assert supported_mods_source_path(helper) == helper / "data" / "supported_mods.py"
+
+
+def test_load_supported_mods_reads_the_reorganized_layout(tmp_path):
+    """The registry lives in `data/` and imports `core.utilities`, as in the reorganized helper_scripts repo."""
+    helper = tmp_path / "helper_scripts"
+    (helper / "core").mkdir(parents=True)
+    (helper / "data").mkdir()
+    (helper / "core" / "__init__.py").write_text("")
+    (helper / "core" / "utilities.py").write_text('STEAM_LIBRARY_DRIVE = "F:"\n')
+    (helper / "data" / "__init__.py").write_text("")
+    (helper / "data" / "supported_mods.py").write_text(
+        'from core.utilities import STEAM_LIBRARY_DRIVE\n\nSUPPORTED_MODS = [{"name": "Layout Mod", "package_name": "layout", "path": STEAM_LIBRARY_DRIVE + "/x.pack"}]\n'
+    )
+    mods = load_supported_mods(helper)
+    assert [m["name"] for m in mods] == ["Layout Mod"]
+    assert mods[0]["path"] == "F:/x.pack"
+
+
+def test_missing_registry_error_names_the_data_folder(tmp_path):
+    """A helper_scripts folder without `data/supported_mods.py` reports that exact path."""
+    with pytest.raises(RegistryFileMissingError) as exc:
+        load_supported_mods(tmp_path)
+    assert str(exc.value) == str(tmp_path / "data" / "supported_mods.py")
