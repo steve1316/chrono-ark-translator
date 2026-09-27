@@ -8,6 +8,7 @@ with glossary enforcement, style examples, and term suggestion.
 import time
 from typing import Optional
 from backend import config
+from backend.translation.orchestrator import chunk_entries
 from backend.translator.base import TranslationProvider
 
 
@@ -20,6 +21,9 @@ CLAUDE_MODELS: dict[str, dict] = {
 }
 
 _DEFAULT_PRICING = CLAUDE_MODELS["claude-sonnet-5"]
+
+# Output token cap per request. A batch whose reply hits it is split in half and retried.
+MAX_OUTPUT_TOKENS = 16384
 
 # Extra request fields per model, sent via `extra_body` so they work on SDK versions that predate them. Translation does not need
 # thinking and thinking tokens bill as output. Sonnet 5 can turn it off. The Opus 5 models think by default (Opus 5.5 cannot disable it),
@@ -94,7 +98,8 @@ class ClaudeProvider(TranslationProvider):
 
         Sends the entries to Claude with the assembled prompt and parses the
         JSON response. Retries automatically on rate-limit and transient API
-        errors (up to 3 attempts with exponential backoff).
+        errors (up to 3 attempts with exponential backoff). A reply cut off at
+        `MAX_OUTPUT_TOKENS` is retried as two half-size batches.
 
         Args:
             entries: List of (key, source_text) tuples to translate.
@@ -112,8 +117,8 @@ class ClaudeProvider(TranslationProvider):
                 mapping key to English text, suggested_terms list of dicts).
 
         Raises:
-            ValueError: If no Anthropic API key is configured.
-            RuntimeError: If all retry attempts are exhausted.
+            ValueError: If no Anthropic API key is configured, or the response has no parseable translations.
+            RuntimeError: If all retry attempts are exhausted, or a single string alone hits `MAX_OUTPUT_TOKENS`.
         """
         import anthropic
 
@@ -133,40 +138,78 @@ class ClaudeProvider(TranslationProvider):
             target_lang=target_lang,
         )
 
+        request = {
+            "model": self._model,
+            "max_tokens": MAX_OUTPUT_TOKENS,
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": user_message}],
+        }
+        if self._model in _MODEL_REQUEST_OPTIONS:
+            request["extra_body"] = _MODEL_REQUEST_OPTIONS[self._model]
+        response = self._create_with_retries(client, request)
+        raw_text = _response_text(response)
+        stop_reason = getattr(response, "stop_reason", None)
+
+        # Store raw response for inspection
+        self.last_raw_responses = getattr(self, "last_raw_responses", [])
+        in_tok = getattr(response.usage, "input_tokens", None)
+        out_tok = getattr(response.usage, "output_tokens", None)
+        cost_usd = None
+        if in_tok is not None and out_tok is not None:
+            pricing = CLAUDE_MODELS.get(self._model, _DEFAULT_PRICING)
+            cost_usd = in_tok / 1_000_000 * pricing["input_per_mtok"] + out_tok / 1_000_000 * pricing["output_per_mtok"]
+        self.last_raw_responses.append(
+            {
+                "batch_index": len(self.last_raw_responses),
+                "model": self._model,
+                "input_tokens": in_tok,
+                "output_tokens": out_tok,
+                "cost_usd": cost_usd,
+                "stop_reason": stop_reason,
+                "raw_text": raw_text,
+            }
+        )
+
+        # A reply cut off at the output cap is unparseable JSON. Retry the batch as two halves until each fits.
+        if stop_reason == "max_tokens":
+            if len(entries) == 1:
+                raise RuntimeError(f"Claude hit max_tokens ({MAX_OUTPUT_TOKENS}) translating a single string ({entries[0][0]})")
+            kwargs = {
+                "game_context": game_context,
+                "format_rules": format_rules,
+                "style_examples": style_examples,
+                "character_context": character_context,
+                "target_lang": target_lang,
+            }
+            mid = len(entries) // 2
+            first, first_suggestions = self.translate_batch(entries[:mid], source_lang, glossary_prompt, **kwargs)
+            second, second_suggestions = self.translate_batch(entries[mid:], source_lang, glossary_prompt, **kwargs)
+            return {**first, **second}, first_suggestions + second_suggestions
+
+        translations, suggestions = self._parse_response(raw_text, entries)
+        if not translations:
+            raise ValueError(f"Could not parse any translations from Claude's response (stop_reason: {stop_reason})")
+        return translations, suggestions
+
+    def _create_with_retries(self, client, request: dict):
+        """Send a Messages API request, retrying on rate limits and transient API errors.
+
+        Args:
+            client: The Anthropic client.
+            request: Keyword arguments for `client.messages.create`.
+
+        Raises:
+            RuntimeError: If all retry attempts are exhausted.
+
+        Returns:
+            The Messages API response.
+        """
+        import anthropic
+
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                request = {
-                    "model": self._model,
-                    "max_tokens": 16384,
-                    "system": system_prompt,
-                    "messages": [{"role": "user", "content": user_message}],
-                }
-                if self._model in _MODEL_REQUEST_OPTIONS:
-                    request["extra_body"] = _MODEL_REQUEST_OPTIONS[self._model]
-                response = client.messages.create(**request)
-                raw_text = _response_text(response)
-                translations, suggestions = self._parse_response(raw_text, entries)
-                # Store raw response for inspection
-                self.last_raw_responses = getattr(self, "last_raw_responses", [])
-                in_tok = getattr(response.usage, "input_tokens", None)
-                out_tok = getattr(response.usage, "output_tokens", None)
-                cost_usd = None
-                if in_tok is not None and out_tok is not None:
-                    pricing = CLAUDE_MODELS.get(self._model, _DEFAULT_PRICING)
-                    cost_usd = in_tok / 1_000_000 * pricing["input_per_mtok"] + out_tok / 1_000_000 * pricing["output_per_mtok"]
-                self.last_raw_responses.append(
-                    {
-                        "batch_index": len(self.last_raw_responses),
-                        "model": self._model,
-                        "input_tokens": in_tok,
-                        "output_tokens": out_tok,
-                        "cost_usd": cost_usd,
-                        "raw_text": raw_text,
-                    }
-                )
-                return translations, suggestions
-
+                return client.messages.create(**request)
             except anthropic.RateLimitError:
                 wait_time = 2**attempt * 5
                 print(f"  Rate limited. Waiting {wait_time}s...")
@@ -212,16 +255,15 @@ class ClaudeProvider(TranslationProvider):
         """
         from backend import config as _cfg
 
-        batch_size = _cfg.BATCH_SIZE
-        num_batches = max(1, (len(entries) + batch_size - 1) // batch_size)
+        batches = chunk_entries(entries, _cfg.BATCH_SIZE, _cfg.BATCH_MAX_CHARS)
+        num_batches = max(1, len(batches))
 
         total_input_tokens = 0
         total_output_tokens = 0
         total_cjk = 0
         total_ascii = 0
 
-        for i in range(0, len(entries), batch_size):
-            batch = entries[i : i + batch_size]
+        for batch in batches:
             system_prompt, user_message = self.build_prompt(
                 batch,
                 source_lang,

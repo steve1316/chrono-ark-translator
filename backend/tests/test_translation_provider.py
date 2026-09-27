@@ -1,4 +1,5 @@
 import json
+import pytest
 from backend.translator.claude_provider import ClaudeProvider
 from backend.translator.base import build_style_examples_section, build_character_context_section
 
@@ -181,3 +182,80 @@ def test_translate_batch_sends_no_extra_options_for_older_models(monkeypatch):
     for model in ("claude-sonnet-4-6", "claude-haiku-4-5"):
         _run_batch(monkeypatch, model, [_Block("text", text=text)])
         assert "extra_body" not in _FakeAnthropic.last_kwargs
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# Truncated and unparseable responses
+
+
+class _ScriptedAnthropic:
+    """Fake client that truncates any request carrying more than `max_keys` entries and translates the rest."""
+
+    max_keys = 1
+    calls: list[list[str]] = []
+
+    def __init__(self, api_key: str):
+        self.messages = self
+
+    def create(self, **kwargs):
+        user_message = kwargs["messages"][0]["content"]
+        keys = [k for k in ("k1", "k2", "k3", "k4") if f"**{k}**" in user_message]
+        _ScriptedAnthropic.calls.append(keys)
+        truncated = len(keys) > _ScriptedAnthropic.max_keys
+        text = '{"translations": {"k1": "Cut off' if truncated else json.dumps({"translations": {k: k.upper() for k in keys}, "suggested_terms": []})
+
+        class _Usage:
+            input_tokens = 10
+            output_tokens = 5
+
+        class _Response:
+            content = [_Block("text", text=text)]
+            usage = _Usage()
+            stop_reason = "max_tokens" if truncated else "end_turn"
+
+        return _Response()
+
+
+def _scripted_provider(monkeypatch, max_keys: int) -> ClaudeProvider:
+    """Build a provider wired to `_ScriptedAnthropic`.
+
+    Args:
+        monkeypatch: The pytest monkeypatch fixture.
+        max_keys: Largest batch the fake client answers without truncating.
+
+    Returns:
+        A `ClaudeProvider` using the scripted client.
+    """
+    import anthropic
+
+    monkeypatch.setattr(anthropic, "Anthropic", _ScriptedAnthropic)
+    _ScriptedAnthropic.max_keys = max_keys
+    _ScriptedAnthropic.calls = []
+    return ClaudeProvider(api_key="test-key", model="claude-sonnet-5")
+
+
+def test_translate_batch_splits_a_truncated_batch_and_merges_the_halves(monkeypatch):
+    provider = _scripted_provider(monkeypatch, max_keys=1)
+    entries = [("k1", "a"), ("k2", "b"), ("k3", "c"), ("k4", "d")]
+    translations, _ = provider.translate_batch(entries, "Chinese", "")
+    assert translations == {"k1": "K1", "k2": "K2", "k3": "K3", "k4": "K4"}
+    assert _ScriptedAnthropic.calls[0] == ["k1", "k2", "k3", "k4"]
+
+
+def test_translate_batch_records_the_truncated_raw_text(monkeypatch):
+    provider = _scripted_provider(monkeypatch, max_keys=1)
+    provider.translate_batch([("k1", "a"), ("k2", "b")], "Chinese", "")
+    assert provider.last_raw_responses[0]["stop_reason"] == "max_tokens"
+    assert provider.last_raw_responses[0]["raw_text"].startswith('{"translations": {"k1": "Cut off')
+
+
+def test_translate_batch_raises_when_a_single_entry_is_truncated(monkeypatch):
+    provider = _scripted_provider(monkeypatch, max_keys=0)
+    with pytest.raises(RuntimeError, match="max_tokens"):
+        provider.translate_batch([("k1", "a")], "Chinese", "")
+
+
+def test_translate_batch_raises_on_an_unparseable_response(monkeypatch):
+    with pytest.raises(ValueError, match="parse"):
+        _run_batch(monkeypatch, "claude-sonnet-5", [_Block("text", text="Sorry, I cannot help with that.")])
