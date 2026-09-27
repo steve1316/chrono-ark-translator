@@ -163,11 +163,41 @@ def _parse_tsv(path: Path) -> dict[str, str]:
     return result
 
 
+# Hand-picked phrasings the vanilla files do not yield as clean terms. They are added after extraction, so a rebuild keeps them.
+CURATED_TERMS: list[dict] = [
+    # Recruitment unlocks read "Unlocks recruitment for ...", close to the base game's "Unlocks recruitment of ..." wording.
+    {"english": "Unlocks recruitment for", "category": "ui_terms", "source_mappings": {"Chinese": "招募许可"}},
+]
+
+
+def add_curated_terms(glossary: dict) -> dict:
+    """Add `CURATED_TERMS` to a glossary, replacing any entry with the same English.
+
+    Args:
+        glossary: A glossary dict of the form `{"terms": {english: {...}}}`. It is updated in place.
+
+    Returns:
+        The same glossary, for chaining.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    for term in CURATED_TERMS:
+        glossary["terms"][term["english"]] = {
+            "english": term["english"],
+            "category": term["category"],
+            "key": "",
+            "source_file": "curated",
+            "source_mappings": dict(term["source_mappings"]),
+            "created_at": now,
+            "updated_at": now,
+        }
+    return glossary
+
+
 def build_glossary(en_db_dir: Path, cn_file: Path, kr_file: Path) -> dict:
     """Build the base-game glossary dict from the vanilla loc files.
 
     Extracts in priority order [stats, attributes, ui_terms, regions], skips empty and excluded
-    English values, and dedupes by normalized (case-insensitive) English so the first occurrence wins.
+    English values, and dedupes by normalized (case-insensitive) English so the first occurrence wins. `CURATED_TERMS` are added last.
 
     Args:
         en_db_dir: Directory holding the English per-table `*.loc.tsv` files.
@@ -233,7 +263,7 @@ def build_glossary(en_db_dir: Path, cn_file: Path, kr_file: Path) -> dict:
             continue
         add(_clean(text), "regions", key, "regions__.loc.tsv", colon=False)
 
-    return {"terms": terms}
+    return add_curated_terms({"terms": terms})
 
 
 def main(argv: list[str] | None = None) -> None:

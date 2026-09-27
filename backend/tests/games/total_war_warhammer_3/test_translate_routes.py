@@ -511,3 +511,10 @@ def test_name_suggestions_split_joined_names(client: TestClient, monkeypatch, tm
     assert [s["english"] for s in sugg] == ["Zhu Long"]
     raw = json.loads((tmp_path / "games" / "total_war_warhammer_3" / "mods" / "3315737452" / "translations.json").read_text(encoding="utf-8"))
     assert raw[key]["text"] == "Zhulong"
+
+
+def test_system_prompt_shows_the_unlocks_recruitment_example(client):
+    """The WH3 prompt carries a worked example of a 获得...招募许可 line."""
+    prompt = client.get("/api/games/total_war_warhammer_3/translate/system-prompt", params={"source_lang": "Chinese"}).json()["system_prompt"]
+    assert "获得『卫土戍卒(斩马剑)』『卫土戍卒(重型连弩)』招募许可" in prompt
+    assert "Unlocks recruitment for Frontier Guards (Zhan Ma Sword) and Frontier Guards (Heavy Repeater)." in prompt

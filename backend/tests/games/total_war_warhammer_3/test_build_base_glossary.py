@@ -181,3 +181,21 @@ def test_build_glossary_splits_fullwidth_colon_in_cn_mapping(tmp_path: Path):
     terms = bbg.build_glossary(en_db, cn, kr)["terms"]
     assert terms["Corruption"]["category"] == "ui_terms"
     assert terms["Corruption"]["source_mappings"]["Chinese"] == "腐蚀"
+
+
+def test_build_glossary_includes_curated_terms(tmp_path: Path):
+    """Hand-picked phrasings are added after extraction, so a rebuild keeps them."""
+    glossary = bbg.build_glossary(*_make_vanilla(tmp_path))
+    term = glossary["terms"]["Unlocks recruitment for"]
+    assert term["category"] == "ui_terms"
+    assert term["source_mappings"] == {"Chinese": "招募许可"}
+
+
+def test_curated_terms_reach_the_prompt_glossary():
+    """Curated terms use a category the WH3 prompt includes, so Claude sees them."""
+    from backend.data.glossary_manager import get_glossary_prompt
+    from backend.games.total_war_warhammer_3.translation_context import BASE_GLOSSARY_PROMPT_CATEGORIES
+
+    prompt = get_glossary_prompt(bbg.add_curated_terms({"terms": {}}), allowed_categories=BASE_GLOSSARY_PROMPT_CATEGORIES, source_lang="Chinese")
+    assert "Unlocks recruitment for" in prompt
+    assert "招募许可" in prompt

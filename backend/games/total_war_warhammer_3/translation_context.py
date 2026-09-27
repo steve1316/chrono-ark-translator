@@ -34,6 +34,11 @@ STYLE_EXAMPLES_BY_LANG: dict[str, list[tuple[str, str]]] = {
         ("[[col:yellow]]近卫军[[/col]]", "[[col:yellow]]Battleguard[[/col]]"),
         ("一支由凯薩之鸟召唤的精锐部队。", "An elite force summoned by the Cathayan Phoenix."),
         ("它们用毒匕攻击敌人, 拥有出色的护甲。", "They attack enemies with venomous daggers and have excellent armor."),
+        # Recruitment unlocks read "Unlocks recruitment for ...".
+        (
+            "获得『卫土戍卒(斩马剑)』『卫土戍卒(重型连弩)』招募许可",
+            "Unlocks recruitment for Frontier Guards (Zhan Ma Sword) and Frontier Guards (Heavy Repeater).",
+        ),
     ],
 }
 
