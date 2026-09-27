@@ -26,7 +26,8 @@ dist-ssr
 .claude
 .playwright-mcp
 /*.png
-docs
+docs/*
+!docs/screenshots/
 __pycache__
 
 backend/storage/
