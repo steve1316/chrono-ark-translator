@@ -38,8 +38,21 @@ def test_script_registry_has_expected_entries():
 def test_script_def_for_vanilla_mode():
     sd = SCRIPT_REGISTRY["update_dynamic_rors_vanilla"]
     assert isinstance(sd, ScriptDef)
-    assert sd.filename == "update_dynamic_rors.py"
+    assert sd.module == "generators.update_dynamic_rors"
     assert sd.args == ["--reset", "--vanilla"]
+
+
+def test_registry_launches_scripts_from_the_reorganized_layout():
+    """Generators and tools run as modules from the helper_scripts root. `update.py` still runs as a file."""
+    assert {script_id: sd.argv() for script_id, sd in SCRIPT_REGISTRY.items()} == {
+        "update_dynamic_rors": ["-m", "generators.update_dynamic_rors"],
+        "update_dynamic_rors_vanilla": ["-m", "generators.update_dynamic_rors"],
+        "update_double_unit_size": ["-m", "generators.update_double_unit_size"],
+        "update_modified_attribute_mods": ["-m", "generators.update_modified_attribute_mods"],
+        "process_main_units_tables": ["-m", "generators.process_main_units_tables"],
+        "glf_inner_join": ["-m", "tools.glf_inner_join"],
+        "update": ["update.py"],
+    }
 
 
 def _settings(helper=FIXTURES, rpfm=None, drive="F:"):
@@ -113,6 +126,21 @@ def test_start_run_executes_fixture_and_streams_lines():
     lines = [line.line for line in list(_log)]
     assert any("line 0" in l for l in lines)
     assert any("line 4" in l for l in lines)
+
+
+def test_start_run_runs_a_module_that_imports_a_sibling_package():
+    """A module entry runs with `python -m` from the helper_scripts root, so its `from _test_core...` import resolves."""
+    start_run("_test_module", _settings(), registry=_TEST_SCRIPT_REGISTRY)
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        h = current_run()
+        if h and h.exit_code is not None:
+            break
+        time.sleep(0.05)
+    h = current_run()
+    assert h is not None
+    assert h.exit_code == 0
+    assert any("hello from core" in line.line for line in list(_log))
 
 
 def test_start_run_raises_when_already_running():

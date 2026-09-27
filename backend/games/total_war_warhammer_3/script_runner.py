@@ -25,22 +25,36 @@ from typing import AsyncIterator
 
 @dataclass(frozen=True)
 class ScriptDef:
-    """A registered helper_scripts entry: filename + CLI args."""
+    """A registered helper_scripts entry: how to launch it plus its CLI args.
 
-    filename: str
-    """ The script filename within the helper_scripts directory. """
+    Set exactly one of `module` (run with `python -m` from the helper_scripts root, as the
+    reorganized generators and tools expect) or `filename` (a script file at the root, like `update.py`).
+    """
+
+    module: str = ""
+    """ Dotted module path run with `python -m`, e.g. `generators.update_dynamic_rors`. """
+    filename: str = ""
+    """ Script file within the helper_scripts directory, run directly. """
     args: list[str] = field(default_factory=list)
     """ CLI arguments passed to the script on each invocation. """
 
+    def argv(self) -> list[str]:
+        """Return the arguments that follow the Python executable to launch this script, without `args`.
+
+        Returns:
+            `["-m", module]` for a module entry, otherwise `[filename]`.
+        """
+        return ["-m", self.module] if self.module else [self.filename]
+
 
 SCRIPT_REGISTRY: dict[str, ScriptDef] = {
-    "update_dynamic_rors": ScriptDef("update_dynamic_rors.py", ["--reset"]),
-    "update_dynamic_rors_vanilla": ScriptDef("update_dynamic_rors.py", ["--reset", "--vanilla"]),
-    "update_double_unit_size": ScriptDef("update_double_unit_size.py", ["--reset"]),
-    "update_modified_attribute_mods": ScriptDef("update_modified_attribute_mods.py", ["--reset"]),
-    "process_main_units_tables": ScriptDef("process_main_units_tables.py", []),
-    "glf_inner_join": ScriptDef("glf_inner_join.py", []),
-    "update": ScriptDef("update.py", []),
+    "update_dynamic_rors": ScriptDef(module="generators.update_dynamic_rors", args=["--reset"]),
+    "update_dynamic_rors_vanilla": ScriptDef(module="generators.update_dynamic_rors", args=["--reset", "--vanilla"]),
+    "update_double_unit_size": ScriptDef(module="generators.update_double_unit_size", args=["--reset"]),
+    "update_modified_attribute_mods": ScriptDef(module="generators.update_modified_attribute_mods", args=["--reset"]),
+    "process_main_units_tables": ScriptDef(module="generators.process_main_units_tables"),
+    "glf_inner_join": ScriptDef(module="tools.glf_inner_join"),
+    "update": ScriptDef(filename="update.py"),
 }
 
 
@@ -116,8 +130,9 @@ _event_new_line = threading.Event()
 
 
 _TEST_SCRIPT_REGISTRY: dict[str, ScriptDef] = {
-    "_test_echo": ScriptDef("_test_echo.py", []),
-    "_test_sleep": ScriptDef("_test_sleep.py", []),
+    "_test_echo": ScriptDef(filename="_test_echo.py"),
+    "_test_sleep": ScriptDef(filename="_test_sleep.py"),
+    "_test_module": ScriptDef(module="_test_generators.echo_module"),
 }
 
 
@@ -229,7 +244,7 @@ def start_run(
             creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
 
         proc = subprocess.Popen(
-            [sys.executable, script_def.filename, *script_def.args],
+            [sys.executable, *script_def.argv(), *script_def.args],
             cwd=str(helper_path),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
