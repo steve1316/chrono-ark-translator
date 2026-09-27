@@ -22,6 +22,10 @@ interface GlossarySuggestionModalProps {
     batchProgress?: { current: number; total: number }
     /** Callback to continue to the next batch after reviewing suggestions. */
     onContinue?: () => void
+    /** Subtitle shown instead of the batch progress, e.g. the Translate Names stage. */
+    subtitle?: string
+    /** Label for the continue button. When set, the button shows even without `batchProgress`. */
+    continueLabel?: string
 }
 
 /**
@@ -44,9 +48,13 @@ interface GlossarySuggestionModalProps {
  * @param suggestions - Suggestions to display initially
  * @param onClose - Close handler for the modal
  * @param onUpdated - Refresh callback for the parent component
+ * @param batchProgress - Batch progress shown in batch mode
+ * @param onContinue - Continues the run after the review
+ * @param subtitle - Subtitle override
+ * @param continueLabel - Continue button label override
  * @returns The rendered suggestion review modal
  */
-const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ gameId, modId, suggestions, onClose, onUpdated, batchProgress, onContinue }) => {
+const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ gameId, modId, suggestions, onClose, onUpdated, batchProgress, onContinue, subtitle, continueLabel }) => {
     const isBatchMode = !!batchProgress
     const [pending, setPending] = useState<TermSuggestion[]>(suggestions)
     const [processing, setProcessing] = useState(false)
@@ -108,7 +116,7 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ gameI
     }
 
     return (
-        <Modal title="Suggested Glossary Terms" size="md" subtitle={isBatchMode ? `Batch ${batchProgress!.current} of ${batchProgress!.total}` : undefined} onClose={onClose}>
+        <Modal title="Suggested Glossary Terms" size="md" subtitle={subtitle ?? (isBatchMode ? `Batch ${batchProgress!.current} of ${batchProgress!.total}` : undefined)} onClose={onClose}>
             {pending.length === 0 ? (
                 // Empty state shown once all suggestions have been accepted or dismissed.
                 <p style={{ color: "var(--text-dim)", textAlign: "center", padding: "2rem" }}>No pending suggestions.</p>
@@ -200,10 +208,10 @@ const GlossarySuggestionModal: React.FC<GlossarySuggestionModalProps> = ({ gameI
             )}
 
             {/* Batch-mode: Continue to next batch / finish button */}
-            {isBatchMode && onContinue && (
+            {(isBatchMode || continueLabel) && onContinue && (
                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid var(--glass-border)" }}>
                     <button className="btn btn-primary" disabled={processing} onClick={onContinue} style={{ padding: "0.5rem 1.5rem", fontSize: "1rem" }}>
-                        {batchProgress!.current >= batchProgress!.total ? "Finish" : pending.length === 0 ? "Continue to Next Batch" : "Skip & Continue to Next Batch"}
+                        {continueLabel ?? (batchProgress!.current >= batchProgress!.total ? "Finish" : pending.length === 0 ? "Continue to Next Batch" : "Skip & Continue to Next Batch")}
                     </button>
                 </div>
             )}

@@ -44,4 +44,13 @@ describe("SplitButton", () => {
         expect(screen.getByRole("button", { name: "Translate" })).toBeDisabled()
         expect(screen.getByRole("button", { name: "More options" })).toBeDisabled()
     })
+
+    it("uses the outline style on both halves and the menu when variant is outline", async () => {
+        render(<SplitButton label="Translate Names" onClick={vi.fn()} items={[{ label: "Suggest", onSelect: vi.fn() }]} variant="outline" />)
+        expect(screen.getByRole("button", { name: "Translate Names" })).toHaveClass("btn-outline")
+        expect(screen.getByRole("button", { name: "More options" })).toHaveClass("btn-outline")
+        await userEvent.click(screen.getByRole("button", { name: "More options" }))
+        expect(screen.getByRole("menuitem", { name: "Suggest" })).toHaveClass("btn-outline")
+        expect(screen.getByRole("button", { name: "Translate Names" })).not.toHaveClass("btn-primary")
+    })
 })

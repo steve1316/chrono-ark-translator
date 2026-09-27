@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react"
-import type { ChangeEvent } from "react"
+import type { ChangeEvent, ReactNode } from "react"
 
 import Field from "../ui/Field"
 import Panel from "../ui/Panel"
@@ -26,6 +26,8 @@ interface ContextPanelProps {
     onSave: (next: ContextFields) => Promise<void>
     /** Per-field placeholder overrides. Fields left out keep Chrono Ark's examples. */
     placeholders?: Partial<ContextFields>
+    /** Game-specific controls shown at the start of the footer, next to Save Context. They save on their own. */
+    extra?: ReactNode
 }
 
 const DEFAULT_PLACEHOLDERS: ContextFields = {
@@ -52,6 +54,7 @@ function fieldsOf(value: ContextFields): ContextFields {
  * @param value Saved context.
  * @param onSave Persists the draft.
  * @param placeholders Per-field placeholder overrides.
+ * @param extra Game-specific footer controls.
  * @returns The panel.
  */
 export function ContextPanel({
@@ -60,6 +63,7 @@ export function ContextPanel({
     value,
     onSave,
     placeholders,
+    extra,
 }: ContextPanelProps) {
     const id = useId()
     const hints = { ...DEFAULT_PLACEHOLDERS, ...placeholders }
@@ -112,6 +116,7 @@ export function ContextPanel({
                 <textarea id={`${id}-background`} className="textarea" rows={4} placeholder={hints.background} value={draft.background} onChange={update("background")} />
             </Field>
             <div className="context-panel-footer">
+                {extra && <div className="context-panel-extra">{extra}</div>}
                 {error && <span className="context-panel-error">{error}</span>}
                 {saved && <span className="context-panel-saved">Saved!</span>}
                 <button type="button" className="btn btn-primary btn-soft-teal" onClick={handleSave}>

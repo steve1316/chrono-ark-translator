@@ -23,6 +23,8 @@ interface SplitButtonProps {
     disabled?: boolean
     /** Disables the chevron. Defaults to `disabled`. */
     menuDisabled?: boolean
+    /** Button style. Defaults to `primary`. Use `outline` for a secondary action next to a primary one. */
+    variant?: "primary" | "outline"
 }
 
 /**
@@ -34,9 +36,10 @@ interface SplitButtonProps {
  * @param menuLabel Chevron accessible name.
  * @param disabled Disables the main button.
  * @param menuDisabled Disables the chevron.
+ * @param variant Button style.
  * @returns The split button.
  */
-export default function SplitButton({ label, onClick, items, menuLabel = "More options", disabled = false, menuDisabled = disabled }: SplitButtonProps) {
+export default function SplitButton({ label, onClick, items, menuLabel = "More options", disabled = false, menuDisabled = disabled, variant = "primary" }: SplitButtonProps) {
     const [open, setOpen] = useState(false)
     const rootRef = useRef<HTMLDivElement>(null)
 
@@ -58,12 +61,12 @@ export default function SplitButton({ label, onClick, items, menuLabel = "More o
 
     return (
         <div className="split-button" ref={rootRef}>
-            <button type="button" className="btn btn-primary split-button-main" onClick={onClick} disabled={disabled}>
+            <button type="button" className={`btn btn-${variant} split-button-main`} onClick={onClick} disabled={disabled}>
                 {label}
             </button>
             <button
                 type="button"
-                className="btn btn-primary split-button-toggle"
+                className={`btn btn-${variant} split-button-toggle`}
                 aria-label={menuLabel}
                 aria-haspopup="menu"
                 aria-expanded={open}
@@ -79,7 +82,7 @@ export default function SplitButton({ label, onClick, items, menuLabel = "More o
                             key={item.label}
                             type="button"
                             role="menuitem"
-                            className="btn btn-primary split-button-item"
+                            className={`btn btn-${variant} split-button-item`}
                             onClick={() => {
                                 setOpen(false)
                                 item.onSelect()
