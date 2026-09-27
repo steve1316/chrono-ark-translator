@@ -132,4 +132,43 @@ describe("ModGlossaryModal", () => {
         })
         await waitFor(() => screen.getByText(/Replaced 5/))
     })
+
+    it("deletes every term after confirming, and shows the empty glossary", async () => {
+        let deleted = false
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+            if (init?.method === "DELETE" && String(input).endsWith("/translation/mods/123/glossary")) {
+                deleted = true
+                return Promise.resolve(mockJson({ status: "success", deleted: 3 }))
+            }
+            return Promise.resolve(mockJson(deleted ? {} : GLOSSARY))
+        })
+        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} onSuggestionsChanged={vi.fn()} />)
+        await screen.findByText("Phoenix")
+        fireEvent.click(screen.getByRole("button", { name: "Delete All" }))
+        const dialog = await screen.findByRole("dialog", { name: "Delete All Glossary Terms" })
+        expect(dialog).toHaveTextContent("Delete all 3 glossary term(s)?")
+        fireEvent.click(within(dialog).getByRole("button", { name: "Delete All" }))
+        await waitFor(() => expect(screen.queryByText("Phoenix")).not.toBeInTheDocument())
+        expect(screen.getByText("No glossary entries yet.")).toBeInTheDocument()
+        expect(fetchSpy.mock.calls.some(([url, init]) => String(url).endsWith("/translation/mods/123/glossary") && init?.method === "DELETE")).toBe(true)
+    })
+
+    it("keeps every term when Delete All is cancelled", async () => {
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => Promise.resolve(mockJson(GLOSSARY)))
+        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} onSuggestionsChanged={vi.fn()} />)
+        await screen.findByText("Phoenix")
+        fireEvent.click(screen.getByRole("button", { name: "Delete All" }))
+        const dialog = await screen.findByRole("dialog", { name: "Delete All Glossary Terms" })
+        fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }))
+        await waitFor(() => expect(screen.queryByRole("dialog", { name: "Delete All Glossary Terms" })).not.toBeInTheDocument())
+        expect(screen.getByText("Phoenix")).toBeInTheDocument()
+        expect(fetchSpy.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(false)
+    })
+
+    it("hides Delete All while the glossary is empty", async () => {
+        vi.spyOn(globalThis, "fetch").mockImplementation(() => Promise.resolve(mockJson({})))
+        render(<ModGlossaryModal workshopId="123" onClose={vi.fn()} onSuggestionsChanged={vi.fn()} />)
+        await screen.findByText("No glossary entries yet.")
+        expect(screen.queryByRole("button", { name: "Delete All" })).not.toBeInTheDocument()
+    })
 })

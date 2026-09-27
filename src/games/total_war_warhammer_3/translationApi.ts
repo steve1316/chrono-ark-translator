@@ -292,6 +292,19 @@ export async function deleteGlossaryTerm(workshopId: string, english: string): P
 }
 
 /**
+ * Delete every glossary entry for the mod. The backend saves a History snapshot first, so the terms can be restored.
+ *
+ * @param workshopId Steam Workshop ID of the translation mod.
+ * @returns How many terms were deleted.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function deleteAllGlossaryTerms(workshopId: string): Promise<{ status: string; deleted: number }> {
+    const res = await api.delete(`/translation/mods/${encodeURIComponent(workshopId)}/glossary`)
+    if (!res.ok) throw await registryError(res)
+    return res.json()
+}
+
+/**
  * Word-boundary find-and-replace `oldEnglish` -> `newEnglish` across all translations for the mod.
  *
  * @param workshopId Steam Workshop ID of the translation mod.

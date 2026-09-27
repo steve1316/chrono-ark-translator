@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react"
 
 import { GlossaryEditor, type GlossaryEditorTerm } from "../../../../translation/GlossaryEditor"
-import { addGlossaryTerm, deleteGlossaryTerm, glossaryApplyAll, glossarySuggestEdits, loadGlossary, updateGlossaryTerm } from "../../translationApi"
+import { addGlossaryTerm, deleteAllGlossaryTerms, deleteGlossaryTerm, glossaryApplyAll, glossarySuggestEdits, loadGlossary, updateGlossaryTerm } from "../../translationApi"
 import Modal from "../../../../ui/Modal"
 import { useConfirm } from "../../../../ui/useConfirm"
 
@@ -22,7 +22,7 @@ function sourceOf(term: GlossaryEditorTerm): string {
 
 /**
  * Per-mod glossary editor modal. A thin wrapper around the shared `GlossaryEditor` (single-source, grouped by category): it owns the glossary load,
- * Claude-powered Suggest Edits, and Apply All (word-boundary find-and-replace), wiring CRUD to the WH3 translation API.
+ * Claude-powered Suggest Edits, Apply All (word-boundary find-and-replace) and Delete All (restorable from History), wiring CRUD to the WH3 translation API.
  * @param workshopId - Steam Workshop ID whose glossary to edit.
  * @param onClose - Called when the modal is closed.
  * @param onSuggestionsChanged - Called with how many edit suggestions were saved.
@@ -81,6 +81,17 @@ const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose
         }
     }
 
+    const handleDeleteAll = async () => {
+        const ok = await confirm({ title: "Delete All Glossary Terms", message: `Delete all ${terms.length} glossary term(s)?`, confirmLabel: "Delete All", variant: "danger" })
+        if (!ok) return
+        try {
+            await deleteAllGlossaryTerms(workshopId)
+            await refresh()
+        } catch (e) {
+            setError((e as Error).message)
+        }
+    }
+
     const onSuggestEdits = async () => {
         setSuggesting(true)
         setNotice("")
@@ -115,6 +126,11 @@ const ModGlossaryModal: React.FC<ModGlossaryModalProps> = ({ workshopId, onClose
             <button type="button" className="btn btn-outline btn-xs tone-accent" onClick={() => setApplyAllOpen(!applyAllOpen)}>
                 Apply All
             </button>
+            {terms.length > 0 && (
+                <button type="button" className="btn btn-outline btn-xs tone-danger" onClick={handleDeleteAll}>
+                    Delete All
+                </button>
+            )}
         </>
     )
 

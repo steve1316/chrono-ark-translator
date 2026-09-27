@@ -343,8 +343,10 @@ const TranslationDetailsPage: React.FC = () => {
         const summary = await rescanMod(workshopId)
         setProgress(summary)
         await loadStrings()
+        // Snapshots include the glossary, and the History dialog stays open after a restore, so refresh the count now.
+        refreshGlossaryCount()
         setBanner({ type: "success", message: "Restored from snapshot" })
-    }, [workshopId, loadStrings])
+    }, [workshopId, loadStrings, refreshGlossaryCount])
 
     const saveSourceLanguage = useCallback(
         async (value: string) => {

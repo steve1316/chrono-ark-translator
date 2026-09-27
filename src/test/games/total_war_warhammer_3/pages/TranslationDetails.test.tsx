@@ -568,4 +568,40 @@ describe("TranslationDetails (Plan 3 layout)", () => {
             expect(JSON.parse(String((puts[1][1] as RequestInit).body))).toMatchObject({ background: "Cathay lore", source_language_override: "Korean" })
         })
     })
+
+    it("refreshes the Mod Glossary count when the glossary dialog closes", async () => {
+        let glossary: Record<string, unknown> = { Phoenix: { source: "x", category: "factions" }, Sky: { source: "y", category: "lore" } }
+        const spy = vi.mocked(globalThis.fetch)
+        const base = spy.getMockImplementation()!
+        spy.mockImplementation(async (input, init) => (String(input).endsWith("/glossary") ? mockJson(glossary) : base(input, init)))
+        render(wrap())
+        fireEvent.click(await screen.findByRole("button", { name: /Mod Glossary \(2\)/i }))
+        const dialog = await screen.findByRole("dialog", { name: "Mod Glossary" })
+        glossary = {}
+        fireEvent.click(within(dialog).getByRole("button", { name: "Close" }))
+        expect(await screen.findByRole("button", { name: /Mod Glossary \(0\)/i })).toBeInTheDocument()
+    })
+
+    it("refreshes the Mod Glossary count after a History restore", async () => {
+        let glossary: Record<string, unknown> = {}
+        const spy = vi.mocked(globalThis.fetch)
+        const base = spy.getMockImplementation()!
+        spy.mockImplementation(async (input, init) => {
+            const url = String(input)
+            if (url.endsWith("/glossary")) return mockJson(glossary)
+            if (url.endsWith("/snapshots")) return mockJson([{ ulid: "01J", created_at: "2026-09-27T01:00:00Z", label: "Before deleting all glossary terms", kind: "auto" }])
+            if (url.endsWith("/snapshots/01J/restore")) {
+                glossary = { Phoenix: { source: "x", category: "factions" }, Sky: { source: "y", category: "lore" } }
+                return mockJson({ status: "ok" })
+            }
+            return base(input, init)
+        })
+        render(wrap())
+        await screen.findByRole("button", { name: /Mod Glossary \(0\)/i })
+        fireEvent.click(screen.getByRole("button", { name: /History/i }))
+        fireEvent.click(await screen.findByRole("button", { name: "Restore" }))
+        const confirmDialog = await screen.findByRole("dialog", { name: "Restore snapshot" })
+        fireEvent.click(within(confirmDialog).getByRole("button", { name: "Restore" }))
+        expect(await screen.findByRole("button", { name: /Mod Glossary \(2\)/i })).toBeInTheDocument()
+    })
 })
