@@ -38,6 +38,15 @@ _NAME_PREFIX_CATEGORIES: dict[str, str] = {
     "rituals_display_name": "ritual",
 }
 
+# Order of the staged Translate Names pass. Each stage's names are reviewed into the glossary before the next stage runs, so skills are translated
+# with the unit names already known, and so on.
+NAME_STAGES: list[dict] = [
+    {"id": "units", "label": "Units & Lords", "categories": ["unit"]},
+    {"id": "skills", "label": "Skills & Abilities", "categories": ["skill"]},
+    {"id": "places", "label": "Buildings & Locations", "categories": ["building", "location"]},
+    {"id": "other", "label": "Items, Traits, Techs & Rituals", "categories": ["item", "trait", "tech", "ritual"]},
+]
+
 # Longest prefixes first so the most specific table wins (e.g. `battlefield_buildings_names_onscreen_name` before `battlefield_buildings_name`).
 _SORTED_PREFIXES: list[tuple[str, str]] = sorted(_NAME_PREFIX_CATEGORIES.items(), key=lambda kv: len(kv[0]), reverse=True)
 

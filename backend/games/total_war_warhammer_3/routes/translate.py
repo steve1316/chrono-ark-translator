@@ -11,10 +11,11 @@ import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from backend.data import suggestion_manager
 from backend.games.storage_paths import game_storage_path
-from backend.games.total_war_warhammer_3.name_keys import classify_name_key, is_name_key
+from backend.games.total_war_warhammer_3.name_keys import NAME_STAGES, classify_name_key, is_name_key
 from backend.games.total_war_warhammer_3.routes import translation as _t
 from backend.routes.models import BatchTranslationRequest, TranslationRequest
 from backend.translation.orchestrator import run_batch
@@ -23,19 +24,34 @@ GAME_ID = "total_war_warhammer_3"
 router = APIRouter(prefix="/translate", tags=["translate"])
 
 
-def _glossary_prompt(mod_id: str, source_lang: str, target_lang: str) -> str:
+class NameSuggestionsRequest(BaseModel):
+    """Body of `POST /translate/name-suggestions`."""
+
+    # Workshop ID of the translation mod.
+    mod_id: str
+    # Name categories to suggest (e.g. `["unit"]` for one stage's review). None suggests every category.
+    categories: list[str] | None = None
+
+
+def _glossary_prompt(mod_id: str, source_lang: str, target_lang: str, mod=None) -> str:
     """Build the combined base + mod glossary prompt section for a batch.
+
+    When `mod` is given and the mod's `include_translated_names` setting is on, translated names that are not in the glossary are sent as extra terms.
 
     Args:
         mod_id: Workshop ID of the translation mod.
         source_lang: Source language name.
         target_lang: Target language name.
+        mod: The resolved `WH3TranslationMod`, needed to read translated names. None leaves them out.
 
     Returns:
         The combined glossary prompt, or a placeholder when no terms apply.
     """
     base_glossary = _t.glossary_store.load_base_glossary()
     mod_terms = _t.glossary_store.mod_glossary_as_terms(mod_id, source_lang)
+    if mod is not None and _t.store.load_include_translated_names(mod_id):
+        for term in _translated_name_terms(mod, mod_id):
+            mod_terms["terms"][term["english"]] = {"english": term["english"], "category": term["category"], "key": "", "source_mappings": {source_lang: term["source"]}}
     prompt = _t.get_combined_glossary_prompt(
         base_glossary,
         mod_terms,
@@ -44,6 +60,62 @@ def _glossary_prompt(mod_id: str, source_lang: str, target_lang: str) -> str:
         allowed_categories=_t.tc.BASE_GLOSSARY_PROMPT_CATEGORIES,
     )
     return prompt or "No glossary available."
+
+
+def _overlaid_rows(mod, mod_id: str) -> tuple[list, dict[str, str]]:
+    """Return the mod's drift rows with translations.json overlaid, plus each key's parent source text.
+
+    Args:
+        mod: The resolved `WH3TranslationMod`.
+        mod_id: Workshop ID of the translation mod.
+
+    Returns:
+        The overlaid `DriftRow` list and a key -> parent source text map.
+    """
+    parent = _t._extract_all_parent_strings(mod)
+    translation = _t._extract_translation_strings(mod)
+    snapshot = _t.store.load_parent_snapshot(mod_id)
+    drift = _t.compute_drift(parent=parent, translation=translation, snapshot=snapshot)
+    overlaid = _t._overlay_translations(drift, _t.store.load_translations_raw(mod_id))
+
+    src_by_key: dict[str, str] = {}
+    for rows in parent.values():
+        for key, row in rows.items():
+            src_by_key[key] = row.text
+    return overlaid, src_by_key
+
+
+def _translated_name_terms(mod, mod_id: str, categories: list[str] | None = None) -> list[dict]:
+    """Return one term per translated name row that the mod glossary does not already cover.
+
+    A name is covered when its English is a glossary term or its source text is already a glossary term's source. Rows come from the translation pack with
+    translations.json overlaid, so names translated by hand or already in the pack count too. Each English name is returned once.
+
+    Args:
+        mod: The resolved `WH3TranslationMod`.
+        mod_id: Workshop ID of the translation mod.
+        categories: Only include these name categories. None includes every category.
+
+    Returns:
+        `{english, source, category}` dicts in parent order.
+    """
+    overlaid, src_by_key = _overlaid_rows(mod, mod_id)
+    glossary = _t.glossary_store.load_glossary(mod_id)
+    known_sources = {info.get("source") for info in glossary.values() if info.get("source")}
+
+    terms: list[dict] = []
+    seen: set[str] = set()
+    for row in overlaid:
+        category = classify_name_key(row.key)
+        english = (row.translation_text or "").strip()
+        source = src_by_key.get(row.key, "")
+        if category is None or not english or not source or (categories is not None and category not in categories):
+            continue
+        if english in glossary or english in seen or source in known_sources:
+            continue
+        terms.append({"english": english, "source": source, "category": category})
+        seen.add(english)
+    return terms
 
 
 def _untranslated_entries(mod, mod_id: str, key_filter=None) -> list[tuple[str, str]]:
@@ -57,17 +129,7 @@ def _untranslated_entries(mod, mod_id: str, key_filter=None) -> list[tuple[str, 
     Returns:
         (key, source_text) tuples for rows whose overlaid drift status is `untranslated` and which still have parent source text.
     """
-    parent = _t._extract_all_parent_strings(mod)
-    translation = _t._extract_translation_strings(mod)
-    snapshot = _t.store.load_parent_snapshot(mod_id)
-    drift = _t.compute_drift(parent=parent, translation=translation, snapshot=snapshot)
-    overlaid = _t._overlay_translations(drift, _t.store.load_translations_raw(mod_id))
-
-    src_by_key: dict[str, str] = {}
-    for rows in parent.values():
-        for key, row in rows.items():
-            src_by_key[key] = row.text
-
+    overlaid, src_by_key = _overlaid_rows(mod, mod_id)
     return [(r.key, src_by_key.get(r.key, "")) for r in overlaid if r.status == "untranslated" and src_by_key.get(r.key) and (key_filter is None or key_filter(r.key))]
 
 
@@ -110,7 +172,8 @@ async def preview(req: TranslationRequest) -> dict:
 
     Returns:
         `total_strings`, `total_batches`, `batch_size`, `provider`, `previews` (keyed by source language), `estimates` (keyed by source language), and
-        a flat `batch_plan` the frontend hook iterates over. When nothing is untranslated, returns `total_strings == 0` with an empty `previews`.
+        a flat `batch_plan` the frontend hook iterates over. A names preview also returns `stages`, each with its own `batch_plan`, in `NAME_STAGES` order.
+        When nothing is untranslated, returns `total_strings == 0` with an empty `previews`.
 
     Raises:
         HTTPException: 404 if `mod_id` is not registered.
@@ -125,19 +188,41 @@ async def preview(req: TranslationRequest) -> dict:
         message = "All names already translated" if names_only else "All strings already translated"
         return {"total_strings": 0, "message": message, "previews": {}}
 
+    batch_size = _t.config.BATCH_SIZE
+    chunks: list[list[tuple[str, str]]] = []
+    stages: list[dict] = []
+    if names_only:
+        # One stage at a time, so a batch never mixes two stages and the frontend can pause for review between them.
+        for stage in NAME_STAGES:
+            stage_entries = [e for e in entries if classify_name_key(e[0]) in stage["categories"]]
+            if not stage_entries:
+                continue
+            stage_chunks = [stage_entries[i : i + batch_size] for i in range(0, len(stage_entries), batch_size)]
+            chunks.extend(stage_chunks)
+            stages.append(
+                {
+                    "id": stage["id"],
+                    "label": stage["label"],
+                    "categories": stage["categories"],
+                    "total_strings": len(stage_entries),
+                    "batch_plan": [{"source_lang": source_lang, "keys": [k for k, _ in c], "size": len(c)} for c in stage_chunks],
+                }
+            )
+        entries = [e for c in chunks for e in c]
+    else:
+        chunks = [entries[i : i + batch_size] for i in range(0, len(entries), batch_size)]
+
     provider = _t.ClaudeProvider()
     adapter = _t.TotalWarWarhammer3Adapter()
-    glossary_prompt = _glossary_prompt(req.mod_id, source_lang, target_lang)
+    glossary_prompt = _glossary_prompt(req.mod_id, source_lang, target_lang, mod=mod)
     game_context = adapter.get_translation_context()
     format_rules = adapter.get_format_preservation_rules()
     style_examples = adapter.get_style_examples(source_lang)
-    batch_size = _t.config.BATCH_SIZE
 
-    num_batches = (len(entries) + batch_size - 1) // batch_size
+    num_batches = len(chunks)
     system_prompt = ""
     user_messages: list[str] = []
-    for i in range(0, len(entries), batch_size):
-        batch = entries[i : i + batch_size]
+    for batch in chunks:
         sp, um = provider.build_prompt(
             batch,
             source_lang,
@@ -165,9 +250,9 @@ async def preview(req: TranslationRequest) -> dict:
             target_lang=target_lang,
         )
     }
-    batch_plan = [{"source_lang": source_lang, "keys": [k for k, _ in entries[i : i + batch_size]], "size": len(entries[i : i + batch_size])} for i in range(0, len(entries), batch_size)]
+    batch_plan = [{"source_lang": source_lang, "keys": [k for k, _ in c], "size": len(c)} for c in chunks]
 
-    return {
+    result = {
         "total_strings": len(entries),
         "total_batches": num_batches,
         "batch_size": batch_size,
@@ -176,6 +261,9 @@ async def preview(req: TranslationRequest) -> dict:
         "estimates": estimates,
         "batch_plan": batch_plan,
     }
+    if names_only:
+        result["stages"] = stages
+    return result
 
 
 @router.post("/batch")
@@ -211,7 +299,7 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
         raise HTTPException(status_code=400, detail="No translatable text found for the provided keys")
 
     adapter = _t.TotalWarWarhammer3Adapter()
-    glossary_prompt = _glossary_prompt(req.mod_id, source_lang, target_lang)
+    glossary_prompt = _glossary_prompt(req.mod_id, source_lang, target_lang, mod=mod)
     provider = _t.ClaudeProvider()
 
     try:
@@ -262,15 +350,14 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
 
 
 @router.post("/name-suggestions")
-async def name_suggestions(req: TranslationRequest) -> dict:
-    """Build glossary suggestions from the mod's already-translated name rows and persist them for review.
+async def name_suggestions(req: NameSuggestionsRequest) -> dict:
+    """Turn the mod's translated name rows into glossary suggestions and persist them for review.
 
-    Called after the 'Translate Names' pass completes. Each translated name key (unit/skill/building/location/...) becomes a suggestion mapping its source
-    text to the new translation, tagged with its category. Terms already in the mod glossary are skipped. Results are persisted via the shared suggestion
-    store so the existing review modal + accept/dismiss endpoints handle them.
+    Called after each stage of the Translate Names pass (with that stage's `categories`) and by Suggest from Translated Names (with no filter). Names the
+    glossary already covers are skipped. Results go through the shared suggestion store, so the existing review modal and accept/dismiss endpoints handle them.
 
     Args:
-        req: Translation request carrying the mod id.
+        req: The mod id and an optional category filter.
 
     Returns:
         `{"suggestions": [...]}` - the newly persisted name suggestions (may be empty).
@@ -280,39 +367,9 @@ async def name_suggestions(req: TranslationRequest) -> dict:
     """
     mod = _t._require_mod(req.mod_id)
     source_lang = mod.source_language
-
-    parent = _t._extract_all_parent_strings(mod)
-    src_by_key: dict[str, str] = {}
-    for rows in parent.values():
-        for key, row in rows.items():
-            src_by_key[key] = row.text
-
-    raw = _t.store.load_translations_raw(req.mod_id)
-    existing_glossary = _t.glossary_store.load_glossary(req.mod_id)
-
-    suggestions: list[dict] = []
-    seen: set[str] = set()
-    for key, entry in raw.items():
-        english = entry.get("text") if isinstance(entry, dict) else None
-        if not english or english in existing_glossary or english in seen:
-            continue
-        category = classify_name_key(key)
-        if category is None:
-            continue
-        suggestions.append(
-            {
-                "english": english,
-                "source": src_by_key.get(key, ""),
-                "source_lang": source_lang,
-                "category": category,
-                "reason": f"{category} name translated in the names-first pass",
-            }
-        )
-        seen.add(english)
-
+    suggestions = [{**term, "source_lang": source_lang, "reason": f"Translated {term['category']} name"} for term in _translated_name_terms(mod, req.mod_id, req.categories)]
     if suggestions:
         suggestion_manager.add_suggestions(req.mod_id, suggestions, storage_path=game_storage_path(GAME_ID))
-
     return {"suggestions": suggestions}
 
 

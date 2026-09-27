@@ -251,6 +251,188 @@ def test_name_suggestions_skips_terms_already_in_glossary(client: TestClient, mo
     assert resp.json()["suggestions"] == []
 
 
+def _names_parent(mod):
+    """Parent strings with one name per stage (listed out of stage order) plus a description row."""
+    return {
+        "units.loc.tsv": {
+            "unit_abilities_onscreen_name_roar": LocRow("unit_abilities_onscreen_name_roar", "龙吼", True),
+            "rituals_display_name_rite": LocRow("rituals_display_name_rite", "仪式", True),
+            "land_units_onscreen_name_dragon": LocRow("land_units_onscreen_name_dragon", "龙卫", True),
+            "regions_battle_name_city": LocRow("regions_battle_name_city", "城", True),
+            "building_culture_variants_name_tower": LocRow("building_culture_variants_name_tower", "塔", True),
+            "unit_description_short_texts_text_dragon": LocRow("unit_description_short_texts_text_dragon", "描述", True),
+        }
+    }
+
+
+def _write_translations(tmp_path: Path, mod_id: str, entries: dict[str, str]) -> None:
+    """Write `translations.json` for a mod with the given key -> English text entries.
+
+    Args:
+        tmp_path: The isolated storage root.
+        mod_id: Workshop ID of the mod.
+        entries: Key -> English text.
+    """
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    (mod_dir / "translations.json").write_text(json.dumps({k: {"text": v, "provider": "claude"} for k, v in entries.items()}), encoding="utf-8")
+
+
+def test_preview_scope_names_orders_batches_by_stage(client: TestClient, monkeypatch):
+    """A names preview groups the batches into stages: units, then skills, then buildings and locations, then everything else."""
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", _names_parent)
+    monkeypatch.setattr(routes_module, "_extract_translation_strings", lambda mod: {})
+
+    body = client.post(f"{PREFIX}/preview", json={"mod_id": "3315737452", "scope": "names"}).json()
+    stages = body["stages"]
+    assert [s["id"] for s in stages] == ["units", "skills", "places", "other"]
+    assert [s["label"] for s in stages] == ["Units & Lords", "Skills & Abilities", "Buildings & Locations", "Items, Traits, Techs & Rituals"]
+    assert stages[0]["categories"] == ["unit"]
+    assert sorted(k for b in stages[2]["batch_plan"] for k in b["keys"]) == ["building_culture_variants_name_tower", "regions_battle_name_city"]
+    assert stages[3]["total_strings"] == 1
+    # The flat plan is the stages in order, and no batch mixes two stages.
+    flat = [k for b in body["batch_plan"] for k in b["keys"]]
+    assert flat[:2] == ["land_units_onscreen_name_dragon", "unit_abilities_onscreen_name_roar"]
+    assert body["total_batches"] == 4
+    assert body["total_strings"] == 5
+
+
+def test_preview_scope_names_leaves_out_empty_stages(client: TestClient, monkeypatch):
+    """Stages with no untranslated names are not returned."""
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", _names_parent)
+    monkeypatch.setattr(
+        routes_module,
+        "_extract_translation_strings",
+        lambda mod: {"units.loc.tsv": {"unit_abilities_onscreen_name_roar": LocRow("unit_abilities_onscreen_name_roar", "Dragon Roar", True)}},
+    )
+
+    body = client.post(f"{PREFIX}/preview", json={"mod_id": "3315737452", "scope": "names"}).json()
+    assert [s["id"] for s in body["stages"]] == ["units", "places", "other"]
+
+
+def test_preview_scope_all_has_no_stages(client: TestClient):
+    """A normal preview does not return stages."""
+    body = client.post(f"{PREFIX}/preview", json={"mod_id": "3315737452"}).json()
+    assert "stages" not in body
+
+
+def test_name_suggestions_filters_by_categories(client: TestClient, monkeypatch, tmp_path: Path):
+    """Passing `categories` limits the suggestions to those name categories, for the per-stage review."""
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", _names_parent)
+    _write_translations(tmp_path, "3315737452", {"land_units_onscreen_name_dragon": "Dragon Guard", "unit_abilities_onscreen_name_roar": "Dragon Roar"})
+
+    resp = client.post(f"{PREFIX}/name-suggestions", json={"mod_id": "3315737452", "categories": ["skill"]})
+    assert resp.status_code == 200
+    assert [s["english"] for s in resp.json()["suggestions"]] == ["Dragon Roar"]
+
+
+def test_name_suggestions_include_names_translated_in_the_pack(client: TestClient, monkeypatch):
+    """A name translated in the translation pack's `.loc.tsv` counts even when translations.json has no entry for it."""
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", _names_parent)
+    monkeypatch.setattr(
+        routes_module,
+        "_extract_translation_strings",
+        lambda mod: {"units.loc.tsv": {"land_units_onscreen_name_dragon": LocRow("land_units_onscreen_name_dragon", "Dragon Guard", True)}},
+    )
+
+    sugg = client.post(f"{PREFIX}/name-suggestions", json={"mod_id": "3315737452"}).json()["suggestions"]
+    assert [(s["english"], s["source"], s["category"]) for s in sugg] == [("Dragon Guard", "龙卫", "unit")]
+
+
+def test_name_suggestions_skip_names_whose_source_is_in_the_glossary(client: TestClient, monkeypatch, tmp_path: Path):
+    """A name whose source text already has a glossary term is not suggested again under a different English."""
+    from backend.games.total_war_warhammer_3 import glossary_store
+
+    glossary_store.add_term("3315737452", {"english": "Dragon Sentinel", "source": "龙卫", "category": "unit"})
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", _names_parent)
+    _write_translations(tmp_path, "3315737452", {"land_units_onscreen_name_dragon": "Dragon Guard"})
+
+    assert client.post(f"{PREFIX}/name-suggestions", json={"mod_id": "3315737452"}).json()["suggestions"] == []
+
+
+def test_mod_context_round_trips_include_translated_names(client: TestClient):
+    """`include_translated_names` defaults to False and is saved through the mod-context PUT."""
+    url = "/api/games/total_war_warhammer_3/translation/mods/3315737452/mod-context"
+    assert client.get(url).json()["include_translated_names"] is False
+    ctx = {"source_game": "", "character_name": "", "background": "", "include_translated_names": True}
+    assert client.put(url, json=ctx).status_code == 200
+    assert client.get(url).json()["include_translated_names"] is True
+
+
+def _capture_batch_prompt(client: TestClient, monkeypatch) -> str:
+    """Run one batch for `k2` with a fake provider and return the glossary prompt it was given.
+
+    Args:
+        client: The test client.
+        monkeypatch: Pytest monkeypatch fixture.
+
+    Returns:
+        The glossary prompt passed to the provider.
+    """
+    seen: dict[str, str] = {}
+
+    def fake_translate_batch(self, entries, source_lang, glossary_prompt, **kwargs):
+        seen["prompt"] = glossary_prompt
+        return ({"k2": "New"}, [])
+
+    monkeypatch.setattr("backend.translator.claude_provider.ClaudeProvider.translate_batch", fake_translate_batch)
+    parent = _names_parent(None)
+    parent["units.loc.tsv"]["k2"] = LocRow("k2", "新", True)
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", lambda mod: parent)
+    resp = client.post(f"{PREFIX}/batch", json={"mod_id": "3315737452", "keys": ["k2"], "source_lang": "Chinese", "is_first_batch": True})
+    assert resp.status_code == 200
+    return seen["prompt"]
+
+
+def _set_include_translated_names(client: TestClient, value: bool) -> None:
+    """Save the mod's `include_translated_names` setting.
+
+    Args:
+        client: The test client.
+        value: The setting to save.
+    """
+    ctx = {"source_game": "", "character_name": "", "background": "", "include_translated_names": value}
+    client.put("/api/games/total_war_warhammer_3/translation/mods/3315737452/mod-context", json=ctx)
+
+
+def test_batch_prompt_leaves_out_unaccepted_names_by_default(client: TestClient, monkeypatch, tmp_path: Path):
+    """Translated names that are not in the glossary stay out of the prompt while the setting is off."""
+    _write_translations(tmp_path, "3315737452", {"land_units_onscreen_name_dragon": "Dragon Guard"})
+    assert "Dragon Guard" not in _capture_batch_prompt(client, monkeypatch)
+
+
+def test_batch_prompt_includes_translated_names_when_enabled(client: TestClient, monkeypatch, tmp_path: Path):
+    """With the setting on, translated names that are not in the glossary are sent as glossary terms."""
+    _write_translations(tmp_path, "3315737452", {"land_units_onscreen_name_dragon": "Dragon Guard"})
+    _set_include_translated_names(client, True)
+    prompt = _capture_batch_prompt(client, monkeypatch)
+    assert "Dragon Guard" in prompt
+    assert "龙卫" in prompt
+
+
+def test_batch_prompt_prefers_the_glossary_over_a_translated_name(client: TestClient, monkeypatch, tmp_path: Path):
+    """When a translated name's source text already has a glossary term, only the glossary term is sent."""
+    from backend.games.total_war_warhammer_3 import glossary_store
+
+    glossary_store.add_term("3315737452", {"english": "Dragon Sentinel", "source": "龙卫", "category": "unit"})
+    _write_translations(tmp_path, "3315737452", {"land_units_onscreen_name_dragon": "Dragon Guard"})
+    _set_include_translated_names(client, True)
+    prompt = _capture_batch_prompt(client, monkeypatch)
+    assert "Dragon Sentinel" in prompt
+    assert "Dragon Guard" not in prompt
+
+
+def test_preview_prompt_includes_translated_names_when_enabled(client: TestClient, monkeypatch, tmp_path: Path):
+    """The preview's system prompt matches what the batches send, so the cost estimate includes the extra names."""
+    parent = _names_parent(None)
+    parent["units.loc.tsv"]["k2"] = LocRow("k2", "新", True)
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", lambda mod: parent)
+    _write_translations(tmp_path, "3315737452", {"land_units_onscreen_name_dragon": "Dragon Guard"})
+    _set_include_translated_names(client, True)
+    body = client.post(f"{PREFIX}/preview", json={"mod_id": "3315737452"}).json()
+    assert "Dragon Guard" in body["previews"]["Chinese"]["system_prompt"]
+
+
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # GET /translate/system-prompt

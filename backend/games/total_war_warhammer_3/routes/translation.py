@@ -355,6 +355,8 @@ class ModContext(BaseModel):
     source_language_override: str | None = None
     # Per-mod override for target language. None falls back to the registry default.
     target_language_override: str | None = None
+    # When True, translated names that are not in the glossary are also sent with every prompt.
+    include_translated_names: bool = False
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -535,8 +537,8 @@ def get_mod_context(mod_id: str) -> dict:
         mod_id: Steam Workshop ID of the translation mod.
 
     Returns:
-        Dict with mod context fields (`source_game`, `character_name`, `background`) plus the
-        per-mod language overrides (`source_language_override`, `target_language_override`).
+        Dict with mod context fields (`source_game`, `character_name`, `background`), the per-mod language overrides
+        (`source_language_override`, `target_language_override`), and `include_translated_names`.
 
     Raises:
         HTTPException: 404 if `mod_id` is not registered.
@@ -546,6 +548,7 @@ def get_mod_context(mod_id: str) -> dict:
     wh3_root = game_storage_path(store.GAME_ID)
     ctx["source_language_override"] = load_source_language_override(mod_id, storage_path=wh3_root)
     ctx["target_language_override"] = load_target_language_override(mod_id, storage_path=wh3_root)
+    ctx["include_translated_names"] = store.load_include_translated_names(mod_id)
     return ctx
 
 
@@ -660,6 +663,7 @@ def put_mod_context(mod_id: str, ctx: ModContext) -> dict:
     wh3_root = game_storage_path(store.GAME_ID)
     save_source_language_override(mod_id, ctx.source_language_override, storage_path=wh3_root)
     save_target_language_override(mod_id, ctx.target_language_override, storage_path=wh3_root)
+    store.save_include_translated_names(mod_id, ctx.include_translated_names)
     return {"status": "ok"}
 
 

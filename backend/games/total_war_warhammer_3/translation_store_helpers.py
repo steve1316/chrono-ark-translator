@@ -80,6 +80,38 @@ def save_character_context(mod_id: str, ctx: dict) -> None:
     cc.save_character_context(mod_id, ctx, storage_path=_root())
 
 
+def load_include_translated_names(mod_id: str) -> bool:
+    """Load whether translated names outside the glossary are sent with every prompt.
+
+    Args:
+        mod_id: The mod identifier.
+
+    Returns:
+        The saved setting, or False when it was never saved or the file is unreadable.
+    """
+    path = _root() / "mods" / mod_id / "prompt_options.json"
+    if not path.exists():
+        return False
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return bool(json.load(f).get("include_translated_names", False))
+    except (json.JSONDecodeError, OSError, AttributeError):
+        return False
+
+
+def save_include_translated_names(mod_id: str, value: bool) -> None:
+    """Save whether translated names outside the glossary are sent with every prompt.
+
+    Args:
+        mod_id: The mod identifier.
+        value: The setting to save.
+    """
+    path = _root() / "mods" / mod_id / "prompt_options.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump({"include_translated_names": value}, f, indent=2)
+
+
 def load_parent_snapshot(mod_id: str) -> dict[str, dict[str, str]]:
     """Load `{filename: {key: sha256_hex}}` snapshot, defaulting to empty.
 
