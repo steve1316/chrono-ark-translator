@@ -2,7 +2,7 @@
 
 import pytest
 
-from backend.games.total_war_warhammer_3.name_spacing import space_pinyin_names
+from backend.games.total_war_warhammer_3.name_spacing import glossary_words, space_pinyin_names
 
 
 @pytest.mark.parametrize(
@@ -23,6 +23,12 @@ def test_splits_the_users_examples(source: str, english: str, expected: str):
 def test_splits_names_inside_a_sentence_and_keeps_possessives():
     """A joined name in running text is split, and a possessive stays attached to the last syllable."""
     assert space_pinyin_names("南皋的火器胜过了妙影。", "Nangao's firearms outclassed Miaoying.") == "Nan Gao's firearms outclassed Miao Ying."
+
+
+def test_keeps_names_the_glossary_spells_joined():
+    """A joined word from a glossary term ("Fu Yuanshan") is not split, while other joined names in the row still are."""
+    keep = glossary_words(["[Dragon General] Fu Yuanshan", "Great Bastion"])
+    assert space_pinyin_names("傅远山与妙影", "Fu Yuanshan and Miaoying", keep=keep) == "Fu Yuanshan and Miao Ying"
 
 
 def test_uses_any_reading_of_a_character_with_several():

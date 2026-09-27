@@ -35,7 +35,7 @@ from backend.games.total_war_warhammer_3 import (
     translation_store_helpers as store,
 )
 from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
-from backend.games.total_war_warhammer_3.name_spacing import space_pinyin_names
+from backend.games.total_war_warhammer_3.name_spacing import glossary_words, space_pinyin_names
 from backend.games.total_war_warhammer_3.canonical_status import to_status_rows
 from backend.games.total_war_warhammer_3.loc_extractor import (
     LocRow,
@@ -620,11 +620,12 @@ def translate_batch(mod_id: str, req: TranslateBatchRequest) -> dict:
 
     raw = store.load_translations_raw(mod_id)
     now = datetime.now(timezone.utc).isoformat()
+    keep = glossary_words(mod_terms["terms"])
     for key, text in translations.items():
         existing = raw.get(key, {})
         raw[key] = {
-            # Split joined pinyin names ("Miaoying" -> "Miao Ying").
-            "text": space_pinyin_names(src.get(key, ""), text),
+            # Split joined pinyin names ("Miaoying" -> "Miao Ying"), keeping the glossary's spelling ("Fu Yuanshan").
+            "text": space_pinyin_names(src.get(key, ""), text, keep),
             "created_at": existing.get("created_at") or now,
             "updated_at": now,
             "provider": "claude",

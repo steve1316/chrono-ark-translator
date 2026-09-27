@@ -16,7 +16,7 @@ from backend.data import suggestion_manager
 from backend.games.storage_paths import game_storage_path
 from backend.games.total_war_warhammer_3 import api_responses_store, glossary_store, snapshot_store
 from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
-from backend.games.total_war_warhammer_3.name_spacing import space_pinyin_names
+from backend.games.total_war_warhammer_3.name_spacing import glossary_words, space_pinyin_names
 from backend.games.total_war_warhammer_3.routes import translation as _tr
 from backend.games.total_war_warhammer_3.routes.translation import _extract_all_parent_strings
 from backend.games.total_war_warhammer_3.translation_mods import get_translation_mod
@@ -196,11 +196,13 @@ def _save_new_suggestions(mod_id: str, suggestions: list[dict]) -> int:
         How many suggestions were newly saved.
     """
     storage_path = game_storage_path(GAME_ID)
-    glossary_keys = {k.lower() for k in glossary_store.load_glossary(mod_id)}
+    glossary = glossary_store.load_glossary(mod_id)
+    glossary_keys = {k.lower() for k in glossary}
+    keep = glossary_words(glossary)
     taken = {s.get("english", "").lower() for s in suggestion_manager.load_suggestions(mod_id, storage_path)}
     fresh: list[dict] = []
     for s in suggestions:
-        english = space_pinyin_names(s.get("source", ""), s.get("english", "")).strip()
+        english = space_pinyin_names(s.get("source", ""), s.get("english", ""), keep).strip()
         key = english.lower()
         if not english or key in taken or (key in glossary_keys and not s.get("edit_of")):
             continue

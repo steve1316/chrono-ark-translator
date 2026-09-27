@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from backend.data import suggestion_manager
 from backend.games.storage_paths import game_storage_path
 from backend.games.total_war_warhammer_3.name_keys import NAME_STAGES, classify_name_key, is_name_key
-from backend.games.total_war_warhammer_3.name_spacing import space_pinyin_names
+from backend.games.total_war_warhammer_3.name_spacing import glossary_words, space_pinyin_names
 from backend.games.total_war_warhammer_3.routes import translation as _t
 from backend.routes.models import BatchTranslationRequest, TranslationRequest
 from backend.translation.orchestrator import chunk_entries, run_batch
@@ -107,13 +107,14 @@ def _translated_name_terms(mod, mod_id: str, categories: list[str] | None = None
     overlaid, src_by_key = _overlaid_rows(mod, mod_id)
     glossary = _t.glossary_store.load_glossary(mod_id)
     known_sources = {info.get("source") for info in glossary.values() if info.get("source")}
+    keep = glossary_words(glossary)
 
     terms: list[dict] = []
     seen: set[str] = set()
     for row in overlaid:
         category = classify_name_key(row.key)
         source = _MARKUP_RE.sub("", src_by_key.get(row.key, "")).strip()
-        english = space_pinyin_names(source, _MARKUP_RE.sub("", row.translation_text or "").strip())
+        english = space_pinyin_names(source, _MARKUP_RE.sub("", row.translation_text or "").strip(), keep)
         if category is None or not english or not source or (categories is not None and category not in categories):
             continue
         if english in glossary or english in seen or source in known_sources:
@@ -349,13 +350,15 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
 
     # Split joined pinyin names ("Miaoying" -> "Miao Ying") in the translations and suggested terms before anything is saved. The API log keeps
     # Claude's raw output.
+    # Words the mod glossary spells joined ("Fu Yuanshan") are kept.
+    existing_glossary = _t.glossary_store.load_glossary(req.mod_id)
+    keep = glossary_words(existing_glossary)
     source_by_key = dict(entries)
-    spaced = {key: space_pinyin_names(source_by_key.get(key, ""), text) for key, text in translations.items()}
-    _suggestions = [{**s, "english": space_pinyin_names(s.get("source", ""), s["english"])} if s.get("english") else s for s in _suggestions]
+    spaced = {key: space_pinyin_names(source_by_key.get(key, ""), text, keep) for key, text in translations.items()}
+    _suggestions = [{**s, "english": space_pinyin_names(s.get("source", ""), s["english"], keep)} if s.get("english") else s for s in _suggestions]
 
     # Persist the provider's glossary suggestions so the shared review modal can accept/dismiss them between batches. Drop any term already in the mod
     # glossary so the user only reviews genuinely new terms (matching Chrono Ark's review behavior).
-    existing_glossary = _t.glossary_store.load_glossary(req.mod_id)
     suggestions = [s for s in _suggestions if s.get("english") and s["english"] not in existing_glossary]
     if suggestions:
         suggestion_manager.add_suggestions(req.mod_id, suggestions, storage_path=game_storage_path(GAME_ID))

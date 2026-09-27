@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import itertools
 import re
+from collections.abc import Iterable
 
 # Runs of Chinese characters in the source text.
 _HAN_RUN_RE = re.compile(r"[一-鿿]+")
@@ -45,7 +46,19 @@ def _spaced_forms(source: str) -> dict[str, str]:
     return forms
 
 
-def space_pinyin_names(source: str, english: str) -> str:
+def glossary_words(terms: Iterable[str]) -> frozenset[str]:
+    """Collect the lowercase capitalized words of glossary terms, to pass as `keep` to `space_pinyin_names`.
+
+    Args:
+        terms: English glossary terms, e.g. "[Dragon General] Fu Yuanshan".
+
+    Returns:
+        Lowercase words such as `yuanshan`, so a name the glossary spells joined stays joined.
+    """
+    return frozenset(word.lower() for term in terms for word in _WORD_RE.findall(term))
+
+
+def space_pinyin_names(source: str, english: str, keep: frozenset[str] = frozenset()) -> str:
     """Rewrite joined pinyin names in `english` with one capitalized word per syllable.
 
     Only a capitalized word that is exactly the joined pinyin of characters in this row's `source` changes, so ordinary English words, names from other
@@ -54,6 +67,7 @@ def space_pinyin_names(source: str, english: str) -> str:
     Args:
         source: The Chinese source text of the row.
         english: The English translation of the row.
+        keep: Lowercase words to never split, usually from `glossary_words` so the mod glossary's spelling wins (e.g. "Fu Yuanshan").
 
     Returns:
         The translation with joined names split, e.g. "[Lord of Raging Gale] Miaoying" -> "[Lord of Raging Gale] Miao Ying".
@@ -61,4 +75,4 @@ def space_pinyin_names(source: str, english: str) -> str:
     if not source or not english or not _HAN_RUN_RE.search(source):
         return english
     forms = _spaced_forms(source)
-    return _WORD_RE.sub(lambda m: forms.get(m.group(0).lower(), m.group(0)), english)
+    return _WORD_RE.sub(lambda m: m.group(0) if m.group(0).lower() in keep else forms.get(m.group(0).lower(), m.group(0)), english)
