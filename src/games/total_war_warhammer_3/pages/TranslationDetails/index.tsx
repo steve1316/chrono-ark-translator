@@ -44,7 +44,7 @@ import {
 } from "../../translationApi"
 import { useConfirm } from "../../../../ui/useConfirm"
 
-// Canonical status filter pills, identical to Chrono Ark. WH3 never emits "untouched"/"untranslatable", but the pill set matches for 1-to-1 parity.
+// Canonical status filter pills, identical to Chrono Ark. WH3 never emits "untouched", but the pill set matches for 1-to-1 parity.
 const STATUS_FILTERS: Array<{ value: RowStatus | "all"; label: string }> = [
     { value: "all", label: "All" },
     { value: "missing", label: "Missing" },

@@ -5,8 +5,8 @@ WH3's native drift model (translated/untranslated/stale/orphan) plus its
 page renders the same status chips as Chrono Ark. `synced` means the effective
 translation already matches what is written on disk in the `.loc.tsv` (no pending
 differing override). A source-text drift (`stale`) or any unsynced edit becomes
-`pending`. `orphan` and `untranslated` become `missing`. WH3 has no `untouched`
-or `untranslatable` states, so it never emits those.
+`pending`. `orphan` and `untranslated` become `missing`. A row whose parent source
+is blank becomes `untranslatable`. WH3 has no `untouched` state, so it never emits it.
 """
 
 from __future__ import annotations
@@ -40,11 +40,15 @@ def to_status_rows(drift: list[DriftRow], raw_translations: dict) -> list[Status
         else:
             provider = "manual" if loc_text else None
 
+        # A blank parent source has nothing to translate.
+        untranslatable_reason = "Source text is empty" if row.parent_text is not None and not row.parent_text.strip() else None
+
         if row.status == "orphan":
             status = "missing"
         else:
             is_synced = has_translation and (target_text or "") == loc_text
             status = classify_status(
+                untranslatable_reason=untranslatable_reason,
                 has_translation=has_translation,
                 is_synced=is_synced,
                 source_changed=row.status == "stale",
@@ -58,6 +62,7 @@ def to_status_rows(drift: list[DriftRow], raw_translations: dict) -> list[Status
                 target_text=target_text,
                 status=status,
                 provider=provider,
+                untranslatable_reason=untranslatable_reason,
             )
         )
     return rows

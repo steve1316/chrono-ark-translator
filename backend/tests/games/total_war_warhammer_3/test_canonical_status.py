@@ -16,6 +16,12 @@ def test_untranslated_maps_to_missing():
     assert rows[0].provider is None
 
 
+def test_blank_source_maps_to_untranslatable():
+    rows = to_status_rows([_drift("k1", "", "", "translated"), _drift("k2", "  ", None, "untranslated")], {})
+    assert [r.status for r in rows] == ["untranslatable", "untranslatable"]
+    assert rows[0].untranslatable_reason
+
+
 def test_orphan_maps_to_missing():
     rows = to_status_rows([_drift("k", None, "Hello", "orphan")], {})
     assert rows[0].status == "missing"
