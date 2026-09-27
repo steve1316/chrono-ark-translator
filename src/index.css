@@ -64,6 +64,19 @@ body {
     background-attachment: fixed;
 }
 
+/* Default link color so bare anchors stay readable on the dark background. Classed anchors (buttons, icon actions) keep their own styling. */
+a {
+    color: var(--accent-primary);
+}
+
+a:not([class]) {
+    text-decoration: none;
+}
+
+a:not([class]):hover {
+    text-decoration: underline;
+}
+
 #root {
     display: flex;
     min-height: 100vh;
