@@ -51,7 +51,7 @@ def test_accept_specific_term_adds_to_glossary_and_removes_pending(client: TestC
     _seed_pending(SUGGESTIONS)
     resp = client.post(f"/api/games/total_war_warhammer_3/mods/{MOD_ID}/glossary/suggestions/accept", json={"terms": ["Lord"]})
     assert resp.status_code == 200
-    assert resp.json() == {"status": "success", "accepted": 1}
+    assert resp.json() == {"status": "success", "accepted": 1, "replaced": 0}
     glossary = glossary_store.load_glossary(MOD_ID)
     assert glossary["Lord"] == {"source": "卿", "category": "title"}
     assert "Cathay" not in glossary
@@ -192,3 +192,93 @@ def test_suggest_edits_treats_a_new_name_for_the_same_source_as_a_rename(client:
     glossary = glossary_store.load_glossary(MOD_ID)
     assert "Chongtang" not in glossary
     assert glossary["Suitang"]["source"] == "祟唐"
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# Accept with an edited English
+
+
+NANGAO = {"english": "Nangao", "source": "南皋", "source_lang": "Chinese", "category": "location", "reason": "place"}
+ACCEPT_URL = f"/api/games/total_war_warhammer_3/mods/{MOD_ID}/glossary/suggestions/accept"
+
+
+def _seed_rows(monkeypatch, tmp_path: Path, parent: dict[str, str], saved: dict[str, str], pack: dict[str, str] | None = None) -> None:
+    """Stub the mod's parent and pack strings and write its translations.json.
+
+    Args:
+        monkeypatch: The pytest monkeypatch fixture.
+        tmp_path: The isolated storage root.
+        parent: Key -> source text.
+        saved: Key -> English saved in translations.json.
+        pack: Key -> English already in the translation pack's `.loc.tsv`.
+    """
+    import json
+
+    from backend.games.total_war_warhammer_3.loc_extractor import LocRow
+    from backend.games.total_war_warhammer_3.routes import translation as tr
+
+    monkeypatch.setattr(tr, "_extract_all_parent_strings", lambda mod: {"units.loc.tsv": {k: LocRow(k, v, True) for k, v in parent.items()}})
+    monkeypatch.setattr(tr, "_extract_translation_strings", lambda mod: {"units.loc.tsv": {k: LocRow(k, v, True) for k, v in (pack or {}).items()}})
+    mod_dir = tmp_path / "games" / GAME_ID / "mods" / MOD_ID
+    mod_dir.mkdir(parents=True, exist_ok=True)
+    (mod_dir / "translations.json").write_text(json.dumps({k: {"text": v, "provider": "claude"} for k, v in saved.items()}), encoding="utf-8")
+
+
+def _saved_english() -> dict[str, str]:
+    """Return the English saved in translations.json, keyed by loc key."""
+    from backend.games.total_war_warhammer_3 import translation_store_helpers as store
+
+    return {k: v["text"] for k, v in store.load_translations_raw(MOD_ID).items()}
+
+
+def test_accept_with_an_edited_english_saves_the_edit_and_renames_rows_with_that_source(client: TestClient, monkeypatch, tmp_path: Path):
+    """The edited English becomes the glossary term, and only translations whose source contains the term's source are renamed."""
+    _seed_pending([NANGAO])
+    _seed_rows(
+        monkeypatch,
+        tmp_path,
+        parent={"city": "南皋城", "hub": "南皋", "other": "北方"},
+        saved={"city": "Nangao City and the Nangaoese", "hub": "Nangao", "other": "Nangao is only mentioned here"},
+    )
+
+    resp = client.post(ACCEPT_URL, json={"terms": ["Nangao"], "renames": {"Nangao": "Nangau"}})
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "success", "accepted": 1, "replaced": 2}
+    glossary = glossary_store.load_glossary(MOD_ID)
+    assert glossary["Nangau"] == {"source": "南皋", "category": "location"}
+    assert "Nangao" not in glossary
+    assert _saved_english() == {"city": "Nangau City and the Nangaoese", "hub": "Nangau", "other": "Nangao is only mentioned here"}
+    assert _remaining_terms() == set()
+
+
+def test_accept_with_an_edited_english_renames_rows_only_in_the_pack(client: TestClient, monkeypatch, tmp_path: Path):
+    """A translation that exists only in the pack's `.loc.tsv` gets the renamed text saved to translations.json, ready to Sync."""
+    _seed_pending([NANGAO])
+    _seed_rows(monkeypatch, tmp_path, parent={"hub": "南皋"}, saved={}, pack={"hub": "Nangao"})
+
+    resp = client.post(ACCEPT_URL, json={"terms": ["Nangao"], "renames": {"Nangao": "Nangau"}})
+    assert resp.json()["replaced"] == 1
+    assert _saved_english() == {"hub": "Nangau"}
+
+
+def test_accept_all_applies_every_rename(client: TestClient, monkeypatch, tmp_path: Path):
+    """Accept All saves each edited English and leaves unedited suggestions as they were."""
+    _seed_pending([NANGAO, SUGGESTIONS[1]])
+    _seed_rows(monkeypatch, tmp_path, parent={"hub": "南皋", "land": "震旦"}, saved={"hub": "Nangao", "land": "Cathay"})
+
+    resp = client.post(ACCEPT_URL, json={"all": True, "renames": {"Nangao": "Nangau"}})
+    assert resp.json() == {"status": "success", "accepted": 2, "replaced": 1}
+    assert set(glossary_store.load_glossary(MOD_ID)) == {"Nangau", "Cathay"}
+    assert _saved_english() == {"hub": "Nangau", "land": "Cathay"}
+
+
+def test_accept_ignores_a_blank_rename(client: TestClient, monkeypatch, tmp_path: Path):
+    """A rename that is blank or unchanged keeps the suggested English and renames nothing."""
+    _seed_pending([NANGAO])
+    _seed_rows(monkeypatch, tmp_path, parent={"hub": "南皋"}, saved={"hub": "Nangao"})
+
+    resp = client.post(ACCEPT_URL, json={"terms": ["Nangao"], "renames": {"Nangao": "   "}})
+    assert resp.json()["replaced"] == 0
+    assert "Nangao" in glossary_store.load_glossary(MOD_ID)
+    assert _saved_english() == {"hub": "Nangao"}

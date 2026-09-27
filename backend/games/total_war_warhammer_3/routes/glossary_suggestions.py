@@ -13,9 +13,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 
 from backend.data import suggestion_manager
+from backend.data.glossary_manager import replace_whole_term
 from backend.games.storage_paths import game_storage_path
 from backend.games.total_war_warhammer_3 import api_responses_store, glossary_store, snapshot_store
 from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
+from backend.games.total_war_warhammer_3.routes import translation as _tr
 from backend.games.total_war_warhammer_3.routes.translation import _extract_all_parent_strings
 from backend.games.total_war_warhammer_3.translation_mods import get_translation_mod
 from backend.routes.models import SuggestionAction
@@ -43,18 +45,58 @@ def _require_mod(mod_id: str):
     return mod
 
 
+def _rename_in_translations(mod, mod_id: str, source: str, old_english: str, new_english: str) -> int:
+    """Rename `old_english` to `new_english` in every translation whose source text contains `source`.
+
+    Rows are read from the translation pack with translations.json overlaid, so a translation that is only in the pack is renamed too. Changed rows are
+    saved to translations.json and show as pending until the next Sync.
+
+    Args:
+        mod: The resolved `WH3TranslationMod`.
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+        source: The term's source text. Nothing is renamed when it is empty.
+        old_english: The English to replace, matched as a whole term.
+        new_english: The English to put in its place.
+
+    Returns:
+        The number of translations that changed.
+    """
+    if not source or old_english == new_english:
+        return 0
+    parent = _tr._extract_all_parent_strings(mod)
+    drift = _tr.compute_drift(parent=parent, translation=_tr._extract_translation_strings(mod), snapshot=_tr.store.load_parent_snapshot(mod_id))
+    raw = _tr.store.load_translations_raw(mod_id)
+
+    now = datetime.now(timezone.utc).isoformat()
+    changed = 0
+    for row in _tr._overlay_translations(drift, raw):
+        if not row.translation_text or source not in (row.parent_text or ""):
+            continue
+        new_text, count = replace_whole_term(row.translation_text, old_english, new_english)
+        if count == 0:
+            continue
+        existing = raw.get(row.key) if isinstance(raw.get(row.key), dict) else {}
+        raw[row.key] = {"text": new_text, "created_at": existing.get("created_at") or now, "updated_at": now, "provider": existing.get("provider") or row.provider or "manual"}
+        changed += 1
+    if changed:
+        _tr.store.save_translations_raw(mod_id, raw)
+    return changed
+
+
 @router.post("/mods/{mod_id}/glossary/suggestions/accept")
 def accept_suggestions(mod_id: str, action: SuggestionAction) -> dict:
     """Accept pending glossary suggestions into the mod glossary.
 
-    Moves the specified (or all) pending suggestions into the mod's glossary and removes them from the pending list. An auto-snapshot is taken first.
+    Moves the specified (or all) pending suggestions into the mod's glossary and removes them from the pending list. An auto-snapshot is taken first. A
+    suggestion with an entry in `action.renames` is saved under the edited English, which also replaces the suggested English in every translation whose
+    source contains the term's source.
 
     Args:
         mod_id: Steam Workshop ID of the WH3 translation mod.
-        action: Which suggestions to accept - explicit `terms` or `all`.
+        action: Which suggestions to accept - explicit `terms` or `all` - plus any edited English in `renames`.
 
     Returns:
-        `{"status": "success", "accepted": N}`.
+        `{"status": "success", "accepted": N, "replaced": M}`, where M counts the translations the renames changed.
 
     Raises:
         HTTPException: 404 when the mod is not registered.
@@ -64,19 +106,22 @@ def accept_suggestions(mod_id: str, action: SuggestionAction) -> dict:
     suggestions = suggestion_manager.load_suggestions(mod_id, storage_path)
     terms_to_accept = {s["english"] for s in suggestions if "english" in s} if action.all else set(action.terms)
 
+    replaced = 0
     if terms_to_accept:
         snapshot_store.create_snapshot(mod_id, label="pre-accept glossary suggestions", kind="auto", local_source_dir=mod.local_source_dir)
         for s in suggestions:
             if s.get("english") in terms_to_accept:
-                entry = {"english": s["english"], "source": s.get("source", ""), "category": s.get("category", "custom")}
+                english = (action.renames.get(s["english"]) or "").strip() or s["english"]
+                entry = {"english": english, "source": s.get("source", ""), "category": s.get("category", "custom")}
                 edit_of = s.get("edit_of")
                 if edit_of and edit_of in glossary_store.load_glossary(mod_id):
                     glossary_store.update_term(mod_id, edit_of, entry)
                 else:
                     glossary_store.add_term(mod_id, entry)
+                replaced += _rename_in_translations(mod, mod_id, s.get("source", ""), s["english"], english)
         suggestion_manager.remove_suggestions(mod_id, list(terms_to_accept), storage_path)
 
-    return {"status": "success", "accepted": len(terms_to_accept)}
+    return {"status": "success", "accepted": len(terms_to_accept), "replaced": replaced}
 
 
 @router.post("/mods/{mod_id}/glossary/suggestions/dismiss")

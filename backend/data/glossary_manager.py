@@ -698,3 +698,21 @@ def print_glossary(glossary: dict) -> None:
                 print(f"  {english}")
 
     print(f"\nTotal: {len(terms)} terms")
+
+
+def replace_whole_term(text: str, old_term: str, new_term: str) -> tuple[str, int]:
+    """Replace `old_term` with `new_term` wherever it stands alone in `text`.
+
+    A match must not touch a letter, digit or underscore on either side, so `Nangao` is not replaced inside `Nangaoese`. Unlike a plain `\\b` match, this
+    also works for terms that start or end with punctuation, such as `[Lord of Wind] Lidao`.
+
+    Args:
+        text: The text to search.
+        old_term: The term to replace.
+        new_term: The replacement, inserted literally.
+
+    Returns:
+        The new text and the number of replacements made.
+    """
+    pattern = re.compile(r"(?<!\w)" + re.escape(old_term) + r"(?!\w)")
+    return pattern.subn(lambda _match: new_term, text)

@@ -8,19 +8,20 @@ from backend.data.glossary_manager import (
     load_glossary,
     load_mod_glossary,
     merge_glossaries,
+    replace_whole_term,
     save_glossary,
     save_mod_glossary,
     suggest_glossary_edits,
 )
 from backend.data.history_manager import create_backup
-from backend.data.mod_settings import load_source_language_override
+from backend.data.mod_settings import load_source_language_override, load_target_language_override
 from backend.data.suggestion_manager import (
     add_suggestions,
     load_suggestions,
     remove_suggestions,
     save_suggestions,
 )
-from backend.data.translation_store import load_translations, replace_in_translations
+from backend.data.translation_store import load_translations, replace_in_translations, save_translations_bulk
 from backend.routes.helpers import chrono_ark_adapter, _find_mod_path, _merge_gdata_originals, resolve_source_language
 from backend.routes.models import (
     GlossaryReplacePreview,
@@ -241,20 +242,70 @@ async def get_suggestions(mod_id: str):
     return load_suggestions(mod_id)
 
 
+def _source_and_csv_english(mod_id: str) -> dict[str, tuple[str, str]]:
+    """Read each string's source text and the English in the mod's own files, the same way the Details page does.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+
+    Returns:
+        Key -> (source text, English from the mod's files).
+    """
+    strings, _ = chrono_ark_adapter().extract_strings(_find_mod_path(mod_id))
+    target_lang = load_target_language_override(mod_id) or "English"
+    _merge_gdata_originals(mod_id, strings, target_lang=target_lang)
+    override = load_source_language_override(mod_id)
+    rows: dict[str, tuple[str, str]] = {}
+    for key, loc_str in strings.items():
+        source_lang = resolve_source_language(loc_str, override)
+        rows[key] = (loc_str.translations.get(source_lang, "") if source_lang else "", loc_str.translations.get(target_lang, ""))
+    return rows
+
+
+def _rename_in_translations(mod_id: str, source: str, old_english: str, new_english: str) -> int:
+    """Rename `old_english` to `new_english` in every translation whose source text contains `source`.
+
+    A row with no saved translation uses the English in the mod's files, so it is renamed too and saved as an edit.
+
+    Args:
+        mod_id: The workshop identifier of the mod.
+        source: The term's source text. Nothing is renamed when it is empty.
+        old_english: The English to replace, matched as a whole term.
+        new_english: The English to put in its place.
+
+    Returns:
+        The number of translations that changed.
+    """
+    if not source or old_english == new_english:
+        return 0
+    saved = load_translations(mod_id)
+    changes: dict[str, str] = {}
+    for key, (source_text, csv_english) in _source_and_csv_english(mod_id).items():
+        if source not in source_text:
+            continue
+        new_text, count = replace_whole_term(saved.get(key, csv_english), old_english, new_english)
+        if count:
+            changes[key] = new_text
+    if changes:
+        save_translations_bulk(mod_id, changes)
+    return len(changes)
+
+
 @router.post("/mods/{mod_id}/glossary/suggestions/accept")
 async def accept_suggestions(mod_id: str, action: SuggestionAction):
     """Accept suggestions into the mod glossary.
 
     Moves the specified (or all) pending suggestions into the mod's
-    glossary and removes them from the suggestions list.
+    glossary and removes them from the suggestions list. A suggestion with an entry in `action.renames` is saved under the edited English, which also
+    replaces the suggested English in every translation whose source contains the term's source.
 
     Args:
         mod_id: The workshop identifier of the mod.
         action: Specifies which suggestions to accept, either by listing
-            specific terms or setting `all` to `True`.
+            specific terms or setting `all` to `True`, plus any edited English in `renames`.
 
     Returns:
-        A dict with `status` and the count of `accepted` terms.
+        A dict with `status`, the count of `accepted` terms, and the count of translations the renames `replaced`.
     """
     suggestions = load_suggestions(mod_id)
     glossary = load_mod_glossary(mod_id)
@@ -264,6 +315,7 @@ async def accept_suggestions(mod_id: str, action: SuggestionAction):
     if terms_to_accept:
         create_backup(mod_id, "Before accepting glossary suggestions")
 
+    replaced = 0
     for suggestion in suggestions:
         if suggestion.get("english") in terms_to_accept:
             # If this is an edit suggestion, remove the old term first.
@@ -271,16 +323,18 @@ async def accept_suggestions(mod_id: str, action: SuggestionAction):
             if edit_of and edit_of in glossary.get("terms", {}):
                 del glossary["terms"][edit_of]
 
+            english = (action.renames.get(suggestion["english"]) or "").strip() or suggestion["english"]
             add_glossary_term(
                 glossary,
-                suggestion["english"],
+                english,
                 {suggestion.get("source_lang", "unknown"): suggestion.get("source", "")},
                 suggestion.get("category", "custom"),
             )
+            replaced += _rename_in_translations(mod_id, suggestion.get("source", ""), suggestion["english"], english)
 
     save_mod_glossary(mod_id, glossary)
     remove_suggestions(mod_id, list(terms_to_accept))
-    return {"status": "success", "accepted": len(terms_to_accept)}
+    return {"status": "success", "accepted": len(terms_to_accept), "replaced": replaced}
 
 
 @router.post("/mods/{mod_id}/glossary/suggestions/dismiss")

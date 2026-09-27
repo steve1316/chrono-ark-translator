@@ -38,10 +38,13 @@ class SuggestionAction(BaseModel):
         terms: List of specific English term strings to act on.
         all: If `True`, the action applies to every pending suggestion
             regardless of `terms`.
+        renames: Accept only. Maps a suggestion's English to the edited English to save
+            instead, which is also renamed in translations whose source contains the term.
     """
 
     terms: list[str] = []
     all: bool = False
+    renames: dict[str, str] = {}
 
 
 class TranslationRequest(BaseModel):
