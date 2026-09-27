@@ -605,3 +605,154 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         expect(await screen.findByRole("button", { name: /Mod Glossary \(2\)/i })).toBeInTheDocument()
     })
 })
+
+describe("TranslationDetails Translate Names", () => {
+    const DRAGON = { english: "Dragon Guard", source: "龙卫", source_lang: "Chinese", category: "unit", reason: "Translated unit name" }
+    const ROAR = { english: "Dragon Roar", source: "龙吼", source_lang: "Chinese", category: "skill", reason: "Translated skill name" }
+    const STAGED_PREVIEW = {
+        ...PREVIEW,
+        total_strings: 2,
+        total_batches: 2,
+        batch_plan: [
+            { source_lang: "Chinese", keys: ["n1"], size: 1 },
+            { source_lang: "Chinese", keys: ["n2"], size: 1 },
+        ],
+        stages: [
+            { id: "units", label: "Units & Lords", categories: ["unit"], total_strings: 1, batch_plan: [{ source_lang: "Chinese", keys: ["n1"], size: 1 }] },
+            { id: "skills", label: "Skills & Abilities", categories: ["skill"], total_strings: 1, batch_plan: [{ source_lang: "Chinese", keys: ["n2"], size: 1 }] },
+        ],
+    }
+
+    /**
+     * Route the names flow: the staged preview, batches that echo their keys, and name suggestions keyed by category.
+     *
+     * @param byCategory Suggestions returned for each requested category, and under "all" when no category is sent.
+     * @returns The keys of every batch sent and the body of every name-suggestions request.
+     */
+    function mockNamesFlow(byCategory: Record<string, unknown[]>) {
+        const batches: string[][] = []
+        const suggestionBodies: Array<{ mod_id: string; categories?: string[] }> = []
+        const spy = vi.mocked(globalThis.fetch)
+        const base = spy.getMockImplementation()!
+        spy.mockImplementation(async (input, init) => {
+            const url = String(input)
+            if (url.endsWith("/translate/preview")) return mockJson(STAGED_PREVIEW)
+            if (url.endsWith("/translate/batch")) {
+                const keys = JSON.parse(String(init?.body)).keys as string[]
+                batches.push(keys)
+                return mockJson({ status: "success", translated: keys.length, translations: Object.fromEntries(keys.map((k) => [k, `EN ${k}`])), suggestions: [] })
+            }
+            if (url.endsWith("/translate/name-suggestions")) {
+                const body = JSON.parse(String(init?.body))
+                suggestionBodies.push(body)
+                return mockJson({ suggestions: byCategory[body.categories?.[0] ?? "all"] ?? [] })
+            }
+            return base(input, init)
+        })
+        return { batches, suggestionBodies }
+    }
+
+    /** Click Translate Names and confirm the run. */
+    async function startNamesRun() {
+        fireEvent.click(await screen.findByRole("button", { name: "Translate Names" }))
+        fireEvent.click(await screen.findByRole("button", { name: /^Translate \d+ strings?$/i }))
+    }
+
+    it("translates one stage at a time and reviews each stage's names before the next", async () => {
+        const { batches, suggestionBodies } = mockNamesFlow({ unit: [DRAGON], skill: [ROAR] })
+        render(wrap())
+        await startNamesRun()
+
+        const first = await screen.findByRole("dialog", { name: "Suggested Glossary Terms" })
+        expect(first).toHaveTextContent("Stage 1 of 2: Units & Lords")
+        expect(first).toHaveTextContent("Dragon Guard")
+        expect(batches).toEqual([["n1"]])
+        expect(suggestionBodies[0].categories).toEqual(["unit"])
+
+        fireEvent.click(within(first).getByRole("button", { name: "Continue to Skills & Abilities" }))
+        await waitFor(() => expect(screen.getByRole("dialog", { name: "Suggested Glossary Terms" })).toHaveTextContent("Dragon Roar"))
+        const second = screen.getByRole("dialog", { name: "Suggested Glossary Terms" })
+        expect(second).toHaveTextContent("Stage 2 of 2: Skills & Abilities")
+        expect(batches).toEqual([["n1"], ["n2"]])
+        expect(suggestionBodies[1].categories).toEqual(["skill"])
+
+        fireEvent.click(within(second).getByRole("button", { name: "Finish" }))
+        expect(await screen.findByText("Translated 2 names.")).toBeInTheDocument()
+        expect(screen.queryByRole("dialog", { name: "Suggested Glossary Terms" })).not.toBeInTheDocument()
+    })
+
+    it("pauses when a stage review is closed, and the banner resumes the next stage", async () => {
+        const { batches } = mockNamesFlow({ unit: [DRAGON], skill: [ROAR] })
+        render(wrap())
+        await startNamesRun()
+        const first = await screen.findByRole("dialog", { name: "Suggested Glossary Terms" })
+        fireEvent.click(within(first).getByRole("button", { name: "Close" }))
+
+        expect(await screen.findByText("Names paused after Units & Lords.")).toBeInTheDocument()
+        expect(batches).toEqual([["n1"]])
+        fireEvent.click(screen.getByRole("button", { name: "Continue to Skills & Abilities" }))
+        await waitFor(() => expect(batches).toEqual([["n1"], ["n2"]]))
+    })
+
+    it("stops a paused names run from the banner", async () => {
+        const { batches } = mockNamesFlow({ unit: [DRAGON], skill: [ROAR] })
+        render(wrap())
+        await startNamesRun()
+        const first = await screen.findByRole("dialog", { name: "Suggested Glossary Terms" })
+        fireEvent.click(within(first).getByRole("button", { name: "Close" }))
+        fireEvent.click(await screen.findByRole("button", { name: "Stop" }))
+
+        expect(await screen.findByText("Translated 1 name. Stopped before Skills & Abilities.")).toBeInTheDocument()
+        expect(screen.queryByText("Names paused after Units & Lords.")).not.toBeInTheDocument()
+        expect(batches).toEqual([["n1"]])
+    })
+
+    it("moves straight to the next stage when a stage has no new names", async () => {
+        const { batches } = mockNamesFlow({ unit: [], skill: [ROAR] })
+        render(wrap())
+        await startNamesRun()
+
+        const review = await screen.findByRole("dialog", { name: "Suggested Glossary Terms" })
+        expect(review).toHaveTextContent("Stage 2 of 2: Skills & Abilities")
+        expect(batches).toEqual([["n1"], ["n2"]])
+    })
+
+    it("suggests glossary terms from already translated names without translating anything", async () => {
+        const { batches, suggestionBodies } = mockNamesFlow({ all: [DRAGON] })
+        render(wrap())
+        fireEvent.click(await screen.findByRole("button", { name: "Translate Names menu" }))
+        fireEvent.click(screen.getByRole("menuitem", { name: "Suggest from Translated Names" }))
+
+        expect(await screen.findByRole("dialog", { name: "Suggested Glossary Terms" })).toHaveTextContent("Dragon Guard")
+        expect(suggestionBodies).toEqual([{ mod_id: MOD.workshop_id }])
+        expect(batches).toEqual([])
+    })
+
+    it("says so when there are no new translated names to suggest", async () => {
+        mockNamesFlow({ all: [] })
+        render(wrap())
+        fireEvent.click(await screen.findByRole("button", { name: "Translate Names menu" }))
+        fireEvent.click(screen.getByRole("menuitem", { name: "Suggest from Translated Names" }))
+
+        expect(await screen.findByText("No new name terms found.")).toBeInTheDocument()
+        expect(screen.queryByRole("dialog", { name: "Suggested Glossary Terms" })).not.toBeInTheDocument()
+    })
+
+    it("saves the translated-names prompt setting from the Mod Context panel", async () => {
+        const spy = vi.mocked(globalThis.fetch)
+        render(wrap())
+        const contextButton = await screen.findByRole("button", { name: /^Mod Context$/ })
+        await act(async () => {
+            fireEvent.click(contextButton)
+        })
+        const checkbox = screen.getByRole("checkbox", { name: "Also send translated names that aren't in the glossary" })
+        expect(checkbox).not.toBeChecked()
+        await act(async () => {
+            fireEvent.click(checkbox)
+        })
+
+        expect(checkbox).toBeChecked()
+        const put = spy.mock.calls.find(([u, i]) => String(u).endsWith("/mod-context") && (i as RequestInit | undefined)?.method === "PUT")
+        expect(JSON.parse(String((put![1] as RequestInit).body))).toMatchObject({ include_translated_names: true, background: "" })
+    })
+})

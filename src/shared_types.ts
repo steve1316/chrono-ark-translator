@@ -244,6 +244,8 @@ export interface WH3ModContext {
     source_language_override: string | null
     /** Per-mod override for target language. `null` falls back to the registry default. */
     target_language_override: string | null
+    /** When true, translated names that are not in the glossary are also sent with every prompt. Missing on older backends. */
+    include_translated_names?: boolean
 }
 
 /** One row in `GET /translation/mods/{id}/glossary` response (also used in POST/PUT bodies). */

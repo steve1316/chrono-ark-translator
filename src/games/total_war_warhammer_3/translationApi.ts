@@ -24,6 +24,22 @@ export type WH3TranslationPreview = TranslationPreview & {
     batch_plan: BatchDescriptor[]
     /** Present only when `total_strings` is 0 (e.g. "All strings already translated"). */
     message?: string
+    /** Translate Names previews only: the run split into stages, in the order they run. */
+    stages?: WH3NameStage[]
+}
+
+/** One stage of the Translate Names pass. Its names are reviewed into the glossary before the next stage runs. */
+export type WH3NameStage = {
+    /** Stable stage id, e.g. `units`. */
+    id: string
+    /** Display name, e.g. "Units & Lords". */
+    label: string
+    /** Name categories this stage covers, used to fetch only its names for review. */
+    categories: string[]
+    /** Untranslated names in this stage. */
+    total_strings: number
+    /** This stage's batches, in the order the iterative hook runs them. */
+    batch_plan: BatchDescriptor[]
 }
 
 const api = gameApi("total_war_warhammer_3")
@@ -140,13 +156,14 @@ export async function previewTranslation(workshopId: string, provider?: string, 
 }
 
 /**
- * Build glossary suggestions from the mod's already-translated name rows (called after the Translate-Names pass) and persist them for review.
+ * Build glossary suggestions from the mod's translated name rows that the glossary does not cover yet, and persist them for review.
  * @param workshopId - Steam Workshop ID of the translation mod.
+ * @param categories - Only suggest these name categories (one Translate Names stage). Leave out to suggest every category.
  * @returns The newly persisted name suggestions (may be empty).
  * @throws `RegistryError` On any non-2xx response.
  */
-export async function loadNameSuggestions(workshopId: string): Promise<TermSuggestion[]> {
-    const res = await api.post("/translate/name-suggestions", { mod_id: workshopId })
+export async function loadNameSuggestions(workshopId: string, categories?: string[]): Promise<TermSuggestion[]> {
+    const res = await api.post("/translate/name-suggestions", categories ? { mod_id: workshopId, categories } : { mod_id: workshopId })
     if (!res.ok) throw await registryError(res)
     const body = await res.json()
     return body.suggestions ?? []

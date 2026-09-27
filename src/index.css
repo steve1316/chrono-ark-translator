@@ -1120,6 +1120,13 @@ fieldset.panel {
     margin-top: 0.75rem;
 }
 
+/* Game-specific footer controls sit on the left, with the save status and button on the right. */
+.context-panel-extra {
+    margin-right: auto;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+}
+
 .context-panel-saved {
     color: var(--tone-success);
     font-size: 0.85rem;
