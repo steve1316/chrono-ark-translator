@@ -263,8 +263,46 @@ describe("TranslationDetails (Plan 3 layout)", () => {
 
     it("renders the inline 'X / Y total strings translated' counter", async () => {
         render(wrap())
-        // SUMMARY has translated=5, stale=1, untranslated=3; done=6, total=9.
-        await waitFor(() => expect(screen.getByText(/6\s*\/\s*9\s*total strings translated/i)).toBeInTheDocument())
+        // Counted from the table rows: synced k1 + pending k3 are done, missing k2 is not.
+        await waitFor(() => expect(screen.getByText(/2\s*\/\s*3\s*total strings translated/i)).toBeInTheDocument())
+    })
+
+    it("updates the counter after each batch while the translation is still running", async () => {
+        const rows: WH3DriftRow[] = [
+            ...STRINGS,
+            { source_filename: "units.loc.tsv", key: "k4", parent_text: "原四", translation_text: null, status: "untranslated", provider: null, canonical_status: "missing", previous_text: null },
+        ]
+        const twoBatches = {
+            ...PREVIEW,
+            total_strings: 2,
+            total_batches: 2,
+            batch_plan: [
+                { source_lang: "Chinese", keys: ["k2"], size: 1 },
+                { source_lang: "Chinese", keys: ["k4"], size: 1 },
+            ],
+        }
+        const spy = vi.spyOn(globalThis, "fetch")
+        spy.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url = typeof input === "string" ? input : input.toString()
+            if (url.endsWith("/translate/preview")) return mockJson(twoBatches)
+            if (url.endsWith("/translate/batch")) {
+                // The first batch returns and the second never does, so the run stays in progress.
+                const keys: string[] = JSON.parse(String(init?.body ?? "{}")).keys ?? []
+                return keys.includes("k2") ? mockJson({ status: "success", translated: 1, translations: { k2: "EN k2" }, suggestions: [] }) : new Promise<Response>(() => undefined)
+            }
+            if (url.endsWith("/translation/mods")) return mockJson([MOD])
+            if (url.endsWith("/rescan")) return mockJson(SUMMARY)
+            if (url.endsWith("/strings")) return mockJson(rows)
+            if (url.endsWith("/mod-context")) return mockJson({ source_game: "", character_name: "", background: "", source_language_override: null, target_language_override: null })
+            return mockJson({ status: "ok" })
+        })
+
+        render(wrap())
+        await waitFor(() => expect(screen.getByText(/2\s*\/\s*4\s*total strings translated/i)).toBeInTheDocument())
+        fireEvent.click(await screen.findByRole("button", { name: /^Translate \(Claude\)/i }))
+        fireEvent.click(await screen.findByRole("button", { name: /^Translate \d+ strings?$/i }))
+        await waitFor(() => expect(screen.getByText(/3\s*\/\s*4\s*total strings translated/i)).toBeInTheDocument())
+        expect(screen.getByText(/Translating batch/i)).toBeInTheDocument()
     })
 
     it("no longer renders the standalone progress-bar glass-card", async () => {
