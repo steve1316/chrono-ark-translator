@@ -350,6 +350,23 @@ def test_name_suggestions_skip_names_whose_source_is_in_the_glossary(client: Tes
     assert client.post(f"{PREFIX}/name-suggestions", json={"mod_id": "3315737452"}).json()["suggestions"] == []
 
 
+def test_name_suggestions_strip_game_markup(client: TestClient, monkeypatch, tmp_path: Path):
+    """Colour and icon tags around a name are left out of the suggested term, and a name that is only tags is skipped."""
+    tagged = "special_ability_phases_onscreen_name_smoke"
+    icon_only = "special_ability_phases_onscreen_name_icon"
+    parent = {
+        "units.loc.tsv": {
+            tagged: LocRow(tagged, "[[col:red]][[img:ui/smoke.png]][[/img]]浓烟[[/col]]", True),
+            icon_only: LocRow(icon_only, "[[img:ui/icon.png]][[/img]]", True),
+        }
+    }
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", lambda mod: parent)
+    _write_translations(tmp_path, "3315737452", {tagged: "[[col:red]][[img:ui/smoke.png]][[/img]]Dense Smoke[[/col]]", icon_only: "[[img:ui/icon.png]][[/img]]"})
+
+    sugg = client.post(f"{PREFIX}/name-suggestions", json={"mod_id": "3315737452"}).json()["suggestions"]
+    assert [(s["english"], s["source"]) for s in sugg] == [("Dense Smoke", "浓烟")]
+
+
 def test_mod_context_round_trips_include_translated_names(client: TestClient):
     """`include_translated_names` defaults to False and is saved through the mod-context PUT."""
     url = "/api/games/total_war_warhammer_3/translation/mods/3315737452/mod-context"

@@ -8,6 +8,7 @@ so monkeypatched test fakes and any future changes stay in one place. The provid
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
@@ -21,6 +22,9 @@ from backend.routes.models import BatchTranslationRequest, TranslationRequest
 from backend.translation.orchestrator import run_batch
 
 GAME_ID = "total_war_warhammer_3"
+
+# WH3 colour and icon tags such as `[[col:red]]` and `[[img:ui/x.png]][[/img]]`, left out of name terms.
+_MARKUP_RE = re.compile(r"\[\[[^\]]*\]\]")
 router = APIRouter(prefix="/translate", tags=["translate"])
 
 
@@ -89,7 +93,8 @@ def _translated_name_terms(mod, mod_id: str, categories: list[str] | None = None
     """Return one term per translated name row that the mod glossary does not already cover.
 
     A name is covered when its English is a glossary term or its source text is already a glossary term's source. Rows come from the translation pack with
-    translations.json overlaid, so names translated by hand or already in the pack count too. Each English name is returned once.
+    translations.json overlaid, so names translated by hand or already in the pack count too. Colour and icon tags are stripped, and each English name is
+    returned once.
 
     Args:
         mod: The resolved `WH3TranslationMod`.
@@ -107,8 +112,8 @@ def _translated_name_terms(mod, mod_id: str, categories: list[str] | None = None
     seen: set[str] = set()
     for row in overlaid:
         category = classify_name_key(row.key)
-        english = (row.translation_text or "").strip()
-        source = src_by_key.get(row.key, "")
+        english = _MARKUP_RE.sub("", row.translation_text or "").strip()
+        source = _MARKUP_RE.sub("", src_by_key.get(row.key, "")).strip()
         if category is None or not english or not source or (categories is not None and category not in categories):
             continue
         if english in glossary or english in seen or source in known_sources:
