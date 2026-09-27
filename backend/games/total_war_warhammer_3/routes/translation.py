@@ -440,8 +440,11 @@ def rescan(mod_id: str) -> RescanSummary:
     # Count from the overlaid rows (not raw drift) so empty-string clears and in-flight overrides match the strings view exactly.
     raw_translations = store.load_translations_raw(mod_id)
     overlaid = _overlay_translations(drift, raw_translations)
+    # Rows with a blank parent source have nothing to translate, so they are left out of the progress counts like Chrono Ark does.
     counts: dict[str, int] = {"translated": 0, "untranslated": 0, "stale": 0, "orphan": 0}
     for row in overlaid:
+        if row.parent_text is not None and not row.parent_text.strip():
+            continue
         counts[row.status] += 1
 
     # Canonical five-state tally for the shared status pills. Zero-filled so the dict always carries every state, matching Chrono Ark. Orphan rows are

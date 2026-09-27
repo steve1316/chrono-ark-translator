@@ -74,6 +74,22 @@ def test_rescan_returns_drift_summary(client: TestClient):
     assert summary["counts"]["orphan"] == 0
 
 
+def test_rescan_counts_skip_blank_source_rows(client: TestClient, monkeypatch):
+    # A key whose parent source is blank has nothing to translate, so it must not inflate the progress counts.
+    def fake_parent(mod) -> dict[str, dict[str, LocRow]]:
+        return {"a.loc.tsv": {"k1": LocRow("k1", "原文", True), "k2": LocRow("k2", "新文本", True), "k3": LocRow("k3", "", True)}}
+
+    def fake_translation(mod) -> dict[str, dict[str, LocRow]]:
+        return {"a.loc.tsv": {"k1": LocRow("k1", "Old translation", True), "k3": LocRow("k3", "", True)}}
+
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", fake_parent)
+    monkeypatch.setattr(routes_module, "_extract_translation_strings", fake_translation)
+
+    summary = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/rescan").json()
+    assert summary["counts"]["translated"] == 1
+    assert summary["counts"]["untranslated"] == 1
+
+
 def test_get_strings_filters_by_status(client: TestClient):
     client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/rescan")
     resp = client.get("/api/games/total_war_warhammer_3/translation/mods/3315737452/strings?status=untranslated")
