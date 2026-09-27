@@ -36,6 +36,7 @@ from backend.games.total_war_warhammer_3 import (
     translation_store_helpers as store,
 )
 from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
+from backend.games.total_war_warhammer_3.name_spacing import space_pinyin_names
 from backend.games.total_war_warhammer_3.canonical_status import to_status_rows
 from backend.games.total_war_warhammer_3.loc_extractor import (
     LocRow,
@@ -619,7 +620,8 @@ def translate_batch(mod_id: str, req: TranslateBatchRequest) -> dict:
     for key, text in translations.items():
         existing = raw.get(key, {})
         raw[key] = {
-            "text": text,
+            # Split joined pinyin names ("Miaoying" -> "Miao Ying").
+            "text": space_pinyin_names(src.get(key, ""), text),
             "created_at": existing.get("created_at") or now,
             "updated_at": now,
             "provider": "claude",

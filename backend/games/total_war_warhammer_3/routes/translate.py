@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from backend.data import suggestion_manager
 from backend.games.storage_paths import game_storage_path
 from backend.games.total_war_warhammer_3.name_keys import NAME_STAGES, classify_name_key, is_name_key
+from backend.games.total_war_warhammer_3.name_spacing import space_pinyin_names
 from backend.games.total_war_warhammer_3.routes import translation as _t
 from backend.routes.models import BatchTranslationRequest, TranslationRequest
 from backend.translation.orchestrator import run_batch
@@ -112,8 +113,8 @@ def _translated_name_terms(mod, mod_id: str, categories: list[str] | None = None
     seen: set[str] = set()
     for row in overlaid:
         category = classify_name_key(row.key)
-        english = _MARKUP_RE.sub("", row.translation_text or "").strip()
         source = _MARKUP_RE.sub("", src_by_key.get(row.key, "")).strip()
+        english = space_pinyin_names(source, _MARKUP_RE.sub("", row.translation_text or "").strip())
         if category is None or not english or not source or (categories is not None and category not in categories):
             continue
         if english in glossary or english in seen or source in known_sources:
@@ -322,6 +323,12 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
 
+    # Split joined pinyin names ("Miaoying" -> "Miao Ying") in the translations and suggested terms before anything is saved. The API log keeps
+    # Claude's raw output.
+    source_by_key = dict(entries)
+    spaced = {key: space_pinyin_names(source_by_key.get(key, ""), text) for key, text in translations.items()}
+    _suggestions = [{**s, "english": space_pinyin_names(s.get("source", ""), s["english"])} if s.get("english") else s for s in _suggestions]
+
     # Persist the provider's glossary suggestions so the shared review modal can accept/dismiss them between batches. Drop any term already in the mod
     # glossary so the user only reviews genuinely new terms (matching Chrono Ark's review behavior).
     existing_glossary = _t.glossary_store.load_glossary(req.mod_id)
@@ -331,7 +338,7 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
 
     raw = _t.store.load_translations_raw(req.mod_id)
     now = datetime.now(timezone.utc).isoformat()
-    for key, text in translations.items():
+    for key, text in spaced.items():
         existing = raw.get(key, {})
         raw[key] = {"text": text, "created_at": existing.get("created_at") or now, "updated_at": now, "provider": "claude"}
     _t.store.save_translations_raw(req.mod_id, raw)
@@ -351,7 +358,7 @@ async def translate_batch(req: BatchTranslationRequest) -> dict:
         },
     )
 
-    return {"status": "success", "translated": len(translations), "translations": translations, "suggestions": suggestions}
+    return {"status": "success", "translated": len(spaced), "translations": spaced, "suggestions": suggestions}
 
 
 @router.post("/name-suggestions")

@@ -474,3 +474,40 @@ def test_system_prompt_asks_for_one_word_per_name_syllable(client):
     assert "Miao Ying" in prompt
     assert "[Sentinel] Sui Tang" in prompt
     assert "Suitang" not in prompt
+
+
+def test_batch_splits_joined_names_in_translations_and_suggested_terms(client: TestClient, monkeypatch, tmp_path: Path):
+    """A joined pinyin name from Claude is saved and returned with spaced syllables, in the translation and in its suggested glossary term."""
+    from backend.data import suggestion_manager
+    from backend.games.storage_paths import game_storage_path
+
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", lambda mod: {"units.loc.tsv": {"lord": LocRow("lord", "『狂飙烈风之主』妙影与烛龙", True)}})
+
+    def fake_translate_batch(self, entries, source_lang, glossary_prompt, **kwargs):
+        return (
+            {"lord": "[Lord of Raging Gale] Miaoying and Zhulong"},
+            [{"english": "Zhulong", "source": "烛龙", "source_lang": "Chinese", "category": "unit", "reason": "dragon"}],
+        )
+
+    monkeypatch.setattr("backend.translator.claude_provider.ClaudeProvider.translate_batch", fake_translate_batch)
+    resp = client.post(f"{PREFIX}/batch", json={"mod_id": "3315737452", "keys": ["lord"], "source_lang": "Chinese", "is_first_batch": True})
+
+    body = resp.json()
+    assert body["translations"] == {"lord": "[Lord of Raging Gale] Miao Ying and Zhu Long"}
+    assert [s["english"] for s in body["suggestions"]] == ["Zhu Long"]
+    raw = json.loads((tmp_path / "games" / "total_war_warhammer_3" / "mods" / "3315737452" / "translations.json").read_text(encoding="utf-8"))
+    assert raw["lord"]["text"] == "[Lord of Raging Gale] Miao Ying and Zhu Long"
+    persisted = [s["english"] for s in suggestion_manager.load_suggestions("3315737452", storage_path=game_storage_path("total_war_warhammer_3"))]
+    assert persisted == ["Zhu Long"]
+
+
+def test_name_suggestions_split_joined_names(client: TestClient, monkeypatch, tmp_path: Path):
+    """A name saved earlier with joined syllables is suggested with spaced syllables, and the saved row is left as it was."""
+    key = "land_units_onscreen_name_zhulong"
+    monkeypatch.setattr(routes_module, "_extract_all_parent_strings", lambda mod: {"units.loc.tsv": {key: LocRow(key, "烛龙", True)}})
+    _write_translations(tmp_path, "3315737452", {key: "Zhulong"})
+
+    sugg = client.post(f"{PREFIX}/name-suggestions", json={"mod_id": "3315737452"}).json()["suggestions"]
+    assert [s["english"] for s in sugg] == ["Zhu Long"]
+    raw = json.loads((tmp_path / "games" / "total_war_warhammer_3" / "mods" / "3315737452" / "translations.json").read_text(encoding="utf-8"))
+    assert raw[key]["text"] == "Zhulong"

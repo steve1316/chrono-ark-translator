@@ -17,6 +17,7 @@ from backend.data.glossary_manager import replace_whole_term
 from backend.games.storage_paths import game_storage_path
 from backend.games.total_war_warhammer_3 import api_responses_store, glossary_store, snapshot_store
 from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
+from backend.games.total_war_warhammer_3.name_spacing import space_pinyin_names
 from backend.games.total_war_warhammer_3.routes import translation as _tr
 from backend.games.total_war_warhammer_3.routes.translation import _extract_all_parent_strings
 from backend.games.total_war_warhammer_3.translation_mods import get_translation_mod
@@ -223,7 +224,8 @@ def _log_call(mod_id: str, kind: str, keys: list[str], suggestions: list[dict]) 
 def _save_new_suggestions(mod_id: str, suggestions: list[dict]) -> int:
     """Save the suggestions that are not already pending or already in the glossary.
 
-    Edit suggestions (those with `edit_of`) are kept even when their English matches a glossary term.
+    Edit suggestions (those with `edit_of`) are kept even when their English matches a glossary term. Joined pinyin names are split first
+    ("Miaoying" -> "Miao Ying").
 
     Args:
         mod_id: Steam Workshop ID of the WH3 translation mod.
@@ -237,12 +239,12 @@ def _save_new_suggestions(mod_id: str, suggestions: list[dict]) -> int:
     taken = {s.get("english", "").lower() for s in suggestion_manager.load_suggestions(mod_id, storage_path)}
     fresh: list[dict] = []
     for s in suggestions:
-        english = s.get("english", "").strip()
+        english = space_pinyin_names(s.get("source", ""), s.get("english", "")).strip()
         key = english.lower()
         if not english or key in taken or (key in glossary_keys and not s.get("edit_of")):
             continue
         taken.add(key)
-        fresh.append(s)
+        fresh.append({**s, "english": english})
     if fresh:
         suggestion_manager.add_suggestions(mod_id, fresh, storage_path)
     return len(fresh)

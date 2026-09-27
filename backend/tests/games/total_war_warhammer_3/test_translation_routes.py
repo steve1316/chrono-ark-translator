@@ -364,3 +364,11 @@ def test_translate_injects_base_glossary_and_excludes_regions(client: TestClient
     assert resp.status_code == 200
     assert "Armour" in captured["prompt"]
     assert "Black Pit" not in captured["prompt"]
+
+
+def test_legacy_translate_splits_joined_names(client: TestClient, monkeypatch):
+    """The older per-mod translate route also saves joined pinyin names with spaced syllables."""
+    monkeypatch.setattr("backend.translator.claude_provider.ClaudeProvider.translate_batch", lambda self, entries, *a, **k: ({"k2": "Xinwen"}, []))
+    resp = client.post("/api/games/total_war_warhammer_3/translation/mods/3315737452/translate", json={"keys": ["k2"]})
+    assert resp.status_code == 200
+    assert load_translations("3315737452")["k2"] == "Xin Wen"

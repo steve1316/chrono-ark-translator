@@ -157,7 +157,8 @@ def test_suggest_edits_saves_suggestions_for_review(client: TestClient, fake_cla
     resp = client.post(f"{BASE}/glossary/suggest-edits")
     assert resp.status_code == 200
     assert resp.json() == {"status": "success", "new": 1}
-    assert _remaining_terms() == {"[Sentinel] Suitang"}
+    # Claude joined the name, and it is saved with spaced syllables.
+    assert _remaining_terms() == {"[Sentinel] Sui Tang"}
     assert any(e["kind"] == "suggest-edits" for e in list_entries(MOD_ID))
 
 
@@ -191,7 +192,7 @@ def test_suggest_edits_treats_a_new_name_for_the_same_source_as_a_rename(client:
     client.post(f"{BASE}/glossary/suggestions/accept", json={"all": True})
     glossary = glossary_store.load_glossary(MOD_ID)
     assert "Chongtang" not in glossary
-    assert glossary["Suitang"]["source"] == "祟唐"
+    assert glossary["Sui Tang"]["source"] == "祟唐"
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -282,3 +283,11 @@ def test_accept_ignores_a_blank_rename(client: TestClient, monkeypatch, tmp_path
     assert resp.json()["replaced"] == 0
     assert "Nangao" in glossary_store.load_glossary(MOD_ID)
     assert _saved_english() == {"hub": "Nangao"}
+
+
+def test_scan_splits_joined_names_in_suggested_terms(client: TestClient, fake_claude):
+    """Scan for Terms saves a joined pinyin name with spaced syllables."""
+    fake_claude.suggestions = [{"english": "Miaoying", "source": "妙影", "source_lang": "Chinese", "category": "character", "reason": "lord"}]
+    resp = client.post(f"{BASE}/glossary/suggestions/scan")
+    assert resp.json() == {"status": "success", "new": 1}
+    assert _remaining_terms() == {"Miao Ying"}
