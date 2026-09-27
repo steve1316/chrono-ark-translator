@@ -39,6 +39,12 @@ const SCRIPTS: ScriptEntry[] = [
         description: "Run the one-off TSV inner-join helper that copies combat attributes for the [GLF] Battle Mage mod.",
     },
     {
+        id: "update_ttc_compat",
+        label: "Tabletop Caps Compat",
+        description:
+            "Regenerate the Yet Another Tabletop Caps compat pack. Classifies every recruitable modded unit and writes the auto lists, with low-confidence picks listed in reports/ttc_review.md.",
+    },
+    {
         id: "update",
         label: "Update",
         description: "Top-level pipeline that runs every other update script in sequence.",

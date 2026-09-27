@@ -31,6 +31,7 @@ def test_script_registry_has_expected_entries():
         "update_modified_attribute_mods",
         "process_main_units_tables",
         "glf_inner_join",
+        "update_ttc_compat",
         "update",
     }
 
@@ -51,6 +52,7 @@ def test_registry_launches_scripts_from_the_reorganized_layout():
         "update_modified_attribute_mods": ["-m", "generators.update_modified_attribute_mods"],
         "process_main_units_tables": ["-m", "generators.process_main_units_tables"],
         "glf_inner_join": ["-m", "tools.glf_inner_join"],
+        "update_ttc_compat": ["-m", "generators.update_ttc_compat"],
         "update": ["update.py"],
     }
 

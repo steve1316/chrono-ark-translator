@@ -26,7 +26,7 @@ const PACKS: PackEntry[] = [
     { title: "Land Encounters And Points Of Interest + MCT Support + IEE", workshopId: "3397481450", scriptId: "process_main_units_tables" },
     { title: "Kadons Scrolls of Binding", workshopId: "3398096688" },
     { title: "[GLF] Battle Mage", workshopId: "3387635246", scriptId: "glf_inner_join" },
-    { title: "Tabletop Caps - Yet Another Compatibility Megapack", workshopId: "3310629727" },
+    { title: "Tabletop Caps - Yet Another Compatibility Megapack", workshopId: "3310629727", scriptId: "update_ttc_compat" },
 ]
 
 /**

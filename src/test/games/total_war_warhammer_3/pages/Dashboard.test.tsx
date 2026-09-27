@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react"
+import { act, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -233,5 +233,12 @@ describe("Dashboard page", () => {
         render(wrap(<DashboardPage />))
         expect(await screen.findByText("Could not rescan 1 translation mod.")).toBeInTheDocument()
         expect(screen.getByRole("heading", { name: "Zerooz Cathy translation" })).toBeInTheDocument()
+    })
+
+    it("lets the Tabletop Caps compat pack be rebuilt from its card", async () => {
+        mockListOnly(() => new Promise<Response>(() => {}))
+        render(wrap(<DashboardPage />))
+        const card = screen.getByRole("heading", { name: "Tabletop Caps - Yet Another Compatibility Megapack" }).closest(".mod-card") as HTMLElement
+        await waitFor(() => expect(within(card).getByRole("button", { name: "Rebuild" })).toBeEnabled())
     })
 })

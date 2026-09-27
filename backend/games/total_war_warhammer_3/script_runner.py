@@ -54,6 +54,7 @@ SCRIPT_REGISTRY: dict[str, ScriptDef] = {
     "update_modified_attribute_mods": ScriptDef(module="generators.update_modified_attribute_mods", args=["--reset"]),
     "process_main_units_tables": ScriptDef(module="generators.process_main_units_tables"),
     "glf_inner_join": ScriptDef(module="tools.glf_inner_join"),
+    "update_ttc_compat": ScriptDef(module="generators.update_ttc_compat"),
     "update": ScriptDef(filename="update.py"),
 }
 
