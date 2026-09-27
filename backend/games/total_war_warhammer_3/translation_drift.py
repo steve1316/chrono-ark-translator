@@ -3,7 +3,7 @@
 The drift snapshot stores SHA-256 hashes of parent source text per
 `(filename, key)`. On rescan, a key is `stale` if the current parent text
 hashes to a value different from the snapshot. Keys present only in the
-translation are `orphan`; keys present only in the parent are `untranslated`.
+translation are `orphan`; keys present only in the parent, or with empty translation text, are `untranslated`.
 """
 
 from __future__ import annotations
@@ -88,6 +88,11 @@ def compute_drift(
 
             if t_row is None:
                 rows.append(DriftRow(filename, key, p_row.text, None, "untranslated"))
+                continue
+
+            # An empty .loc.tsv entry is a placeholder, not a translation.
+            if not t_row.text:
+                rows.append(DriftRow(filename, key, p_row.text, t_row.text, "untranslated"))
                 continue
 
             current_hash = hash_text(p_row.text)

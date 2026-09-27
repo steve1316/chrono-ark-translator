@@ -31,6 +31,17 @@ def test_compute_drift_marks_missing_translation_as_untranslated():
     assert result[0].translation_text is None
 
 
+def test_compute_drift_marks_empty_translation_text_as_untranslated():
+    # An empty .loc.tsv entry is not a translation, even when the parent source changed since the snapshot.
+    parent = {"units.loc.tsv": {"k1": _row("k1", "原始"), "k2": _row("k2", "新文本")}}
+    translation = {"units.loc.tsv": {"k1": _row("k1", ""), "k2": _row("k2", "")}}
+    snapshot = {"units.loc.tsv": {"k1": hash_text("原始"), "k2": hash_text("")}}
+
+    result = compute_drift(parent=parent, translation=translation, snapshot=snapshot)
+
+    assert [r.status for r in result] == ["untranslated", "untranslated"]
+
+
 def test_compute_drift_marks_unchanged_parent_as_translated():
     parent = {"units.loc.tsv": {"k1": _row("k1", "原始")}}
     translation = {"units.loc.tsv": {"k1": _row("k1", "Original")}}
