@@ -1,8 +1,8 @@
 """Full-state snapshots for WH3 translation mods.
 
 Each snapshot captures translations.json, parent_snapshot.json,
-api_responses.json, and the entire contents of every `.loc.tsv` under
-the mod's local source dir at the time of the snapshot. Snapshots are
+api_responses.json, the mod glossary (glossary.json), and the entire contents
+of every `.loc.tsv` under the mod's local source dir at the time of the snapshot. Snapshots are
 stored per-mod under `<root>/mods/{id}/snapshots/`. The store keeps the
 last 20 entries per mod; older ones are pruned automatically.
 
@@ -109,6 +109,7 @@ def create_snapshot(mod_id: str, *, label: str, kind: str, local_source_dir: Pat
         "translations_raw": _read_file_or_default(mod_dir / "translations.json", {}),
         "parent_snapshot": _read_file_or_default(mod_dir / "parent_snapshot.json", {}),
         "api_responses": _read_file_or_default(mod_dir / "api_responses.json", []),
+        "glossary": _read_file_or_default(mod_dir / "glossary.json", {"terms": {}}),
         "loc_tsv_files": _gather_loc_tsv_files(local_source_dir),
     }
 
@@ -163,8 +164,9 @@ def delete_snapshot(mod_id: str, sid: str) -> None:
 def restore_snapshot(mod_id: str, sid: str, *, local_source_dir: Path | None = None) -> None:
     """Restore a mod's state from a snapshot, taking an auto pre-restore snapshot first.
 
-    Writes translations.json, parent_snapshot.json, api_responses.json, and
-    every captured `.loc.tsv` file back to disk verbatim.
+    Writes translations.json, parent_snapshot.json, api_responses.json, the glossary, and
+    every captured `.loc.tsv` file back to disk verbatim. Snapshots taken before glossaries were
+    captured have no `glossary` key, so restoring one leaves the current glossary as it is.
 
     Args:
         mod_id: Steam Workshop ID of the WH3 translation mod.
@@ -191,6 +193,9 @@ def restore_snapshot(mod_id: str, sid: str, *, local_source_dir: Path | None = N
         json.dump(snapshot.get("parent_snapshot", {}), f, indent=2, ensure_ascii=False)
     with (mod_dir / "api_responses.json").open("w", encoding="utf-8") as f:
         json.dump(snapshot.get("api_responses", []), f, indent=2, ensure_ascii=False)
+    if "glossary" in snapshot:
+        with (mod_dir / "glossary.json").open("w", encoding="utf-8") as f:
+            json.dump(snapshot["glossary"], f, indent=2, ensure_ascii=False)
 
     for path_str, body in snapshot.get("loc_tsv_files", {}).items():
         p = Path(path_str)

@@ -91,6 +91,20 @@ def delete_term(mod_id: str, english: str) -> None:
     _save(mod_id, glossary)
 
 
+def delete_all_terms(mod_id: str) -> int:
+    """Remove every entry from the per-mod glossary.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+
+    Returns:
+        The number of terms removed.
+    """
+    count = len(load_glossary(mod_id))
+    _save(mod_id, {})
+    return count
+
+
 def apply_term_rename(mod_id: str, old_english: str, new_english: str) -> int:
     """Word-boundary find-and-replace `old_english` -> `new_english` across all translations.
 

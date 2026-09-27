@@ -306,6 +306,30 @@ def test_glossary_crud(client: TestClient):
     assert client.get(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/glossary").json() == {}
 
 
+def test_glossary_delete_all_empties_it_after_a_restorable_snapshot(client: TestClient):
+    mod_id = "3315737452"
+    base = f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}"
+    client.post(f"{base}/glossary", json={"english": "Phoenix", "source": "凤", "category": "factions"})
+    client.post(f"{base}/glossary", json={"english": "Suitang", "source": "祟唐", "category": "lords_heroes"})
+
+    resp = client.delete(f"{base}/glossary")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "success", "deleted": 2}
+    assert client.get(f"{base}/glossary").json() == {}
+
+    snaps = list_snapshots(mod_id)
+    assert snaps[0]["label"] == "Before deleting all glossary terms"
+    assert client.post(f"{base}/snapshots/{snaps[0]['ulid']}/restore").status_code == 200
+    assert set(client.get(f"{base}/glossary").json()) == {"Phoenix", "Suitang"}
+
+
+def test_glossary_delete_all_on_an_empty_glossary_takes_no_snapshot(client: TestClient):
+    mod_id = "3315737452"
+    resp = client.delete(f"/api/games/total_war_warhammer_3/translation/mods/{mod_id}/glossary")
+    assert resp.json() == {"status": "success", "deleted": 0}
+    assert list_snapshots(mod_id) == []
+
+
 def test_glossary_apply_all_renames_existing_translations(client: TestClient, tmp_path: Path):
     mod_id = "3315737452"
     mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id

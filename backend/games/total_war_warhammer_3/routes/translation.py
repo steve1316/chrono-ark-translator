@@ -917,6 +917,23 @@ def put_glossary_term(mod_id: str, english: str, entry: GlossaryEntry) -> dict:
     return {"status": "ok"}
 
 
+@router.delete("/mods/{mod_id}/glossary")
+def delete_all_glossary_terms(mod_id: str) -> dict:
+    """Remove every term from a mod's glossary, taking a restorable snapshot first when there is anything to delete.
+
+    Args:
+        mod_id: Steam Workshop ID of the WH3 translation mod.
+
+    Returns:
+        `{"status": "success", "deleted": N}` with the number of terms removed.
+    """
+    mod = _require_mod(mod_id)
+    if glossary_store.load_glossary(mod_id):
+        snapshot_store.create_snapshot(mod_id, label="Before deleting all glossary terms", kind="auto", local_source_dir=mod.local_source_dir)
+    deleted = glossary_store.delete_all_terms(mod_id)
+    return {"status": "success", "deleted": deleted}
+
+
 @router.delete("/mods/{mod_id}/glossary/{english}")
 def delete_glossary_term(mod_id: str, english: str) -> dict:
     """Delete a glossary entry by English term.

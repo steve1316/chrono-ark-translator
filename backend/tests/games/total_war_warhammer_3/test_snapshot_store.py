@@ -89,3 +89,41 @@ def test_restore_creates_pre_restore_snapshot(monkeypatch, tmp_path: Path):
     pre_restore = metas[0]
     assert pre_restore["kind"] == "auto"
     assert "pre-restore" in pre_restore["label"].lower()
+
+
+def _write_glossary(tmp_path: Path, mod_id: str, terms: dict) -> None:
+    import json
+
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
+    (mod_dir / "glossary.json").write_text(json.dumps({"terms": terms}), encoding="utf-8")
+
+
+def _read_glossary_terms(tmp_path: Path, mod_id: str) -> dict:
+    import json
+
+    mod_dir = tmp_path / "games" / "total_war_warhammer_3" / "mods" / mod_id
+    return json.loads((mod_dir / "glossary.json").read_text(encoding="utf-8"))["terms"]
+
+
+def test_restore_brings_back_the_glossary(monkeypatch, tmp_path: Path):
+    _seed_translations(monkeypatch, tmp_path, "abc", {})
+    _write_glossary(tmp_path, "abc", {"Phoenix": {"source": "凤", "category": "factions"}})
+    sid = create_snapshot("abc", label="before wipe", kind="auto")
+    _write_glossary(tmp_path, "abc", {})
+    restore_snapshot("abc", sid)
+    assert _read_glossary_terms(tmp_path, "abc") == {"Phoenix": {"source": "凤", "category": "factions"}}
+
+
+def test_restoring_a_snapshot_without_a_glossary_keeps_the_current_glossary(monkeypatch, tmp_path: Path):
+    """Snapshots taken before glossaries were captured have no `glossary` key. Restoring one must not wipe the glossary."""
+    import json
+
+    _seed_translations(monkeypatch, tmp_path, "abc", {})
+    sid = create_snapshot("abc", label="old snapshot", kind="auto")
+    snap_path = tmp_path / "games" / "total_war_warhammer_3" / "mods" / "abc" / "snapshots" / f"{sid}.json"
+    snap = json.loads(snap_path.read_text(encoding="utf-8"))
+    snap.pop("glossary", None)
+    snap_path.write_text(json.dumps(snap), encoding="utf-8")
+    _write_glossary(tmp_path, "abc", {"Phoenix": {"source": "凤", "category": "factions"}})
+    restore_snapshot("abc", sid)
+    assert _read_glossary_terms(tmp_path, "abc") == {"Phoenix": {"source": "凤", "category": "factions"}}
