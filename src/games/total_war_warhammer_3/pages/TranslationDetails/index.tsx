@@ -538,8 +538,9 @@ const TranslationDetailsPage: React.FC = () => {
     }, [filteredRows, sortConfig])
 
     const translateCount = useMemo(() => progress?.counts.untranslated ?? 0, [progress])
-    const total = useMemo(() => (progress ? progress.counts.translated + progress.counts.untranslated + progress.counts.stale : 0), [progress])
-    const done = useMemo(() => (progress ? progress.counts.translated + progress.counts.stale : 0), [progress])
+    // Same statuses as the table and the dashboard card: done = synced + pending + untouched, total adds missing.
+    const done = useMemo(() => (progress ? progress.canonical_counts.synced + progress.canonical_counts.pending + progress.canonical_counts.untouched : 0), [progress])
+    const total = useMemo(() => (progress ? done + progress.canonical_counts.missing : 0), [progress, done])
 
     const sourceLang = modContext.source_language_override ?? mod?.source_language ?? "Chinese"
     const targetLang = sourceLang === "English" ? (modContext.target_language_override ?? mod?.target_language ?? "Chinese") : "English"

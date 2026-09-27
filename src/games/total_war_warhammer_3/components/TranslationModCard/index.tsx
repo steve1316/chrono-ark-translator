@@ -23,7 +23,7 @@ export interface TranslationModCardProps {
 /**
  * Dashboard card for a single WH3 translation mod. Renders via the shared `ModCard` shell so
  * the layout matches Chrono Ark's mod card exactly: preview image, title + workshop-id badge,
- * optional parent-mod-link subtitle, tri-color progress bar (translated gradient + stale amber),
+ * optional parent-mod-link subtitle, progress bar (translated gradient + untouched gray, from the same statuses as the strings table),
  * stat boxes (`Remaining` + `Format`), optional `Needs Sync` badge, and an action row with a
  * `View Strings` button (warning color when untranslated rows remain), the parent mod's Steam
  * link, and a rescan icon button.
@@ -38,12 +38,13 @@ const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, 
     const navigate = useNavigate()
     const slug = useGameSlug()
     const parents = mod.parent_workshop_ids
-    const counts = progress?.counts ?? null
-    const translated = counts?.translated ?? 0
-    const stale = counts?.stale ?? 0
-    const untranslated = counts?.untranslated ?? 0
-    const total = counts ? translated + untranslated + stale : 0
-    const done = counts ? translated + stale : 0
+    // Use the strings table's statuses so the card never shows a count the table has no filter for.
+    const counts = progress?.canonical_counts ?? null
+    const translated = counts ? counts.synced + counts.pending : 0
+    const untouched = counts?.untouched ?? 0
+    const untranslated = counts?.missing ?? 0
+    const done = translated + untouched
+    const total = done + untranslated
     const percent = total > 0 ? Math.round((done / total) * 100) : 0
 
     const singleParent = parents.length === 1 ? parents[0] : null
@@ -56,14 +57,14 @@ const TranslationModCard: React.FC<TranslationModCardProps> = ({ mod, progress, 
             segments.push({
                 widthPercent: (translated / total) * 100,
                 background: "var(--accent-gradient)",
-                title: `${translated} fresh translations`,
+                title: `${translated} translated by you`,
             })
         }
-        if (stale > 0) {
+        if (untouched > 0) {
             segments.push({
-                widthPercent: (stale / total) * 100,
-                background: "rgba(251, 191, 36, 0.5)",
-                title: `${stale} stale translations`,
+                widthPercent: (untouched / total) * 100,
+                background: "rgba(148, 163, 184, 0.5)",
+                title: `${untouched} untouched (pre-existing English)`,
             })
         }
     }

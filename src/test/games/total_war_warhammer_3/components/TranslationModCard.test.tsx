@@ -67,14 +67,16 @@ describe("TranslationModCard", () => {
         const progress: WH3RescanSummary = {
             mod_id: MOD.workshop_id,
             counts: { translated: 12, untranslated: 5, stale: 3, orphan: 1 },
-            canonical_counts: { synced: 12, untouched: 0, pending: 3, missing: 6, untranslatable: 0 },
+            canonical_counts: { synced: 12, untouched: 2, pending: 3, missing: 5, untranslatable: 4 },
             scanned_at: "2026-05-24T00:00:00Z",
             has_unsynced_changes: false,
             has_mod_context: false,
         }
-        render(wrap(<TranslationModCard mod={MOD} progress={progress} onRescan={vi.fn()} />))
-        // total = translated + untranslated + stale = 20 (orphan excluded).
-        expect(screen.getByText(/15\s*\/\s*20\s*strings/)).toBeInTheDocument()
+        const { container } = render(wrap(<TranslationModCard mod={MOD} progress={progress} onRescan={vi.fn()} />))
+        // Counts come from the table's statuses: done = synced + pending + untouched, total adds missing (untranslatable excluded).
+        expect(screen.getByText(/17\s*\/\s*22\s*strings/)).toBeInTheDocument()
+        const titles = [...container.querySelectorAll(".progress-bar-bg [title]")].map((el) => el.getAttribute("title"))
+        expect(titles).toEqual(["15 translated by you", "2 untouched (pre-existing English)"])
         // Chrono-Ark-style stat boxes.
         expect(screen.getByText("Remaining")).toBeInTheDocument()
         const remainingStat = screen.getByText("Remaining").previousElementSibling
