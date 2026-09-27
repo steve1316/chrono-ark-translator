@@ -466,3 +466,11 @@ def test_system_prompt_is_built_from_the_wh3_context_rules_and_claude(client):
     assert "Total War: Warhammer III" in prompt
     assert "[Title] Name" in prompt
     assert "Chrono Ark" not in prompt
+
+
+def test_system_prompt_asks_for_one_word_per_name_syllable(client):
+    """The WH3 prompt tells Claude to write each syllable of a romanized name as its own word, and its title example follows that rule."""
+    prompt = client.get("/api/games/total_war_warhammer_3/translate/system-prompt", params={"source_lang": "Chinese"}).json()["system_prompt"]
+    assert "Miao Ying" in prompt
+    assert "[Sentinel] Sui Tang" in prompt
+    assert "Suitang" not in prompt

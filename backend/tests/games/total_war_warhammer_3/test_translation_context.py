@@ -19,7 +19,7 @@ def _title_name_rule(rules: list[str]) -> str:
 def test_title_before_name_rule_uses_bracket_title_then_name():
     rule = _title_name_rule(TotalWarWarhammer3Adapter().get_format_preservation_rules())
     assert rule, "WH3 rules should cover a 『title』 written before a name"
-    assert "[Sentinel] Suitang" in rule
+    assert "[Sentinel] Sui Tang" in rule
     assert "glossary" in rule.lower()
 
 

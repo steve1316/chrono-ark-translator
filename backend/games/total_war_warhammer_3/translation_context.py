@@ -22,8 +22,11 @@ FORMAT_PRESERVATION_RULES: list[str] = [
     "Preserve literal `\\n` line breaks; do not insert or remove them.",
     "Preserve leading/trailing whitespace exactly as it appears in the source string.",
     "Do not translate game-internal keys or identifiers that appear in the text.",
-    "Render a 『title』 written before a character name as `[Title] Name` (e.g. 『戍望』祟唐 -> `[Sentinel] Suitang`), both in translated text "
+    "Render a 『title』 written before a character name as `[Title] Name` (e.g. 『戍望』祟唐 -> `[Sentinel] Sui Tang`), both in translated text "
     "and in suggested glossary terms. Do not use `Name / 'Title'` or `the 'Title,' Name`.",
+    "Romanize Chinese names of characters, creatures and places in pinyin with each syllable as its own capitalized word, as the official game "
+    "does (Miao Ying, Yuan Bo): 妙影 -> `Miao Ying`, 昭明 -> `Zhao Ming`, 烛龙 -> `Zhu Long`, 『狂飙烈风之主』妙影 -> `[Lord of Raging Gale] Miao Ying`. "
+    "Never join the syllables (`Miaoying`). Use the same form in suggested glossary terms.",
 ]
 
 STYLE_EXAMPLES_BY_LANG: dict[str, list[tuple[str, str]]] = {
