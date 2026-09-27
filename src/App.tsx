@@ -6,7 +6,7 @@ import LoadingState from "./ui/LoadingState"
 import { getBranding } from "./components/GameSwitcher/branding"
 import SettingsPage from "./pages/Settings"
 import { API_BASE } from "./config"
-import { getGameBySlug, slugForId } from "./games/registry"
+import { getGame, getGameBySlug, slugForId } from "./games/registry"
 import "./games/chrono_ark" // side-effect: registers manifest
 import "./games/total_war_warhammer_3" // side-effect: registers manifest
 import "./index.css"
@@ -61,6 +61,12 @@ function App() {
         root.setProperty("--game-accent", branding.accent)
         root.setProperty("--game-accent-gradient", branding.gradient)
     }, [branding.accent, branding.gradient])
+
+    // The browser tab is named after the active game, e.g. "Warhammer III Translator".
+    const gameName = getGame(activeGameId)?.displayName ?? "Chrono Ark"
+    useEffect(() => {
+        document.title = `${gameName} Translator`
+    }, [gameName])
 
     return (
         <>

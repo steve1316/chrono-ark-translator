@@ -102,4 +102,18 @@ describe("App game accent", () => {
         renderAt("/settings")
         await waitFor(() => expect(document.documentElement.style.getPropertyValue("--game-accent-gradient")).toContain("#38bdf8"))
     })
+
+    it("titles the browser tab after the game in the URL, and keeps it on Settings", async () => {
+        renderAt("/warhammer_3/dashboard")
+        await waitFor(() => expect(document.title).toBe("Warhammer III Translator"))
+        await userEvent.click(screen.getByRole("link", { name: /Settings/ }))
+        await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument())
+        expect(document.title).toBe("Warhammer III Translator")
+    })
+
+    it("titles the browser tab Chrono Ark Translator on Chrono Ark pages", async () => {
+        document.title = "Warhammer III Translator"
+        renderAt("/chrono_ark/dashboard")
+        await waitFor(() => expect(document.title).toBe("Chrono Ark Translator"))
+    })
 })
