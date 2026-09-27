@@ -2,7 +2,7 @@
 
 import asyncio
 
-from backend.translation.orchestrator import fill_duplicate_translations, run_batch
+from backend.translation.orchestrator import chunk_entries, fill_duplicate_translations, run_batch
 
 
 def test_fill_duplicate_translations_copies_to_keys_with_shared_source():
@@ -51,3 +51,24 @@ def test_run_batch_invokes_provider_then_fills_duplicates():
     assert provider.called_with["source_lang"] == "Chinese"
     assert provider.called_with["glossary_prompt"] == "GLOSSARY"
     assert provider.called_with["target_lang"] == "English"
+
+
+def test_chunk_entries_caps_each_chunk_by_key_count():
+    entries = [(f"k{i}", "x") for i in range(5)]
+    assert [len(c) for c in chunk_entries(entries, max_keys=2, max_chars=1000)] == [2, 2, 1]
+
+
+def test_chunk_entries_starts_a_new_chunk_before_the_char_budget_is_exceeded():
+    entries = [("k1", "a" * 40), ("k2", "b" * 40), ("k3", "c" * 40)]
+    chunks = chunk_entries(entries, max_keys=100, max_chars=100)
+    assert [[k for k, _ in c] for c in chunks] == [["k1", "k2"], ["k3"]]
+
+
+def test_chunk_entries_gives_an_oversized_entry_its_own_chunk():
+    entries = [("k1", "a" * 10), ("k2", "b" * 500), ("k3", "c" * 10)]
+    chunks = chunk_entries(entries, max_keys=100, max_chars=100)
+    assert [[k for k, _ in c] for c in chunks] == [["k1"], ["k2"], ["k3"]]
+
+
+def test_chunk_entries_returns_no_chunks_for_no_entries():
+    assert chunk_entries([], max_keys=10, max_chars=100) == []

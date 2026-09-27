@@ -39,6 +39,35 @@ def fill_duplicate_translations(translations: dict[str, str], entries: list[tupl
     return translations
 
 
+def chunk_entries(entries: list[tuple[str, str]], max_keys: int, max_chars: int) -> list[list[tuple[str, str]]]:
+    """Split entries into batches capped by key count and by total source characters.
+
+    The character cap keeps batches of long strings small enough that the model's reply fits its output token limit. An entry longer than
+    `max_chars` on its own still gets a batch of its own.
+
+    Args:
+        entries: (key, source_text) tuples in translation order.
+        max_keys: Most entries allowed in one batch.
+        max_chars: Most source characters allowed in one batch.
+
+    Returns:
+        The batches, in order.
+    """
+    chunks: list[list[tuple[str, str]]] = []
+    current: list[tuple[str, str]] = []
+    current_chars = 0
+    for key, text in entries:
+        size = len(text or "")
+        if current and (len(current) >= max_keys or current_chars + size > max_chars):
+            chunks.append(current)
+            current, current_chars = [], 0
+        current.append((key, text))
+        current_chars += size
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 async def run_batch(
     provider: Any,
     entries: list[tuple[str, str]],

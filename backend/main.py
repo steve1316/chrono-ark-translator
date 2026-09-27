@@ -20,6 +20,7 @@ import json
 import sys
 from pathlib import Path
 from backend import config
+from backend.translation.orchestrator import chunk_entries
 from backend.data.glossary_manager import (
     add_glossary_term,
     build_glossary_from_base_game,
@@ -276,10 +277,10 @@ def cmd_translate(args: argparse.Namespace, adapter: GameAdapter) -> None:
 
         batch_size = config.BATCH_SIZE
         batch_num = 1
-        total_batches = (len(entries) + batch_size - 1) // batch_size
+        batches = chunk_entries(entries, batch_size, config.BATCH_MAX_CHARS)
+        total_batches = len(batches)
 
-        for i in range(0, len(entries), batch_size):
-            batch = entries[i : i + batch_size]
+        for batch in batches:
             print(f"    Batch {batch_num}/{total_batches} ({len(batch)} strings)...")
 
             glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang)

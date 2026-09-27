@@ -69,6 +69,9 @@ TRANSLATION_PROVIDER = os.environ.get("CATL_TRANSLATION_PROVIDER", "claude")
 # Claude Sonnet 4 supports 64K output tokens.
 BATCH_SIZE = int(os.environ.get("CATL_BATCH_SIZE", "100"))
 
+# Most source characters per batch, so batches of long strings get fewer keys and the reply fits the output token cap.
+BATCH_MAX_CHARS = int(os.environ.get("CATL_BATCH_MAX_CHARS", "6000"))
+
 # Glossary categories to include in the translation prompt.
 # Only these categories from the base glossary are sent to the LLM.
 GLOSSARY_CATEGORIES = os.environ.get("CATL_GLOSSARY_CATEGORIES", "characters,mechanics").split(",")

@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from backend import config
 from backend.translation.game_storage import GameStorage
-from backend.translation.orchestrator import run_batch
+from backend.translation.orchestrator import chunk_entries, run_batch
 from backend.data.character_context import load_character_context
 from backend.data.glossary_manager import (
     get_combined_glossary_prompt,
@@ -262,12 +262,12 @@ async def preview_translation(req: TranslationRequest):
     for lang, entries in by_lang.items():
         glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang, target_lang=target_lang)
         style_examples = chrono_ark_adapter().get_style_examples(lang)
-        num_batches = (len(entries) + batch_size - 1) // batch_size
+        batches = chunk_entries(entries, batch_size, config.BATCH_MAX_CHARS)
+        num_batches = len(batches)
         total_batches += num_batches
         user_messages: list[str] = []
         system_prompt = ""
-        for i in range(0, len(entries), batch_size):
-            batch = entries[i : i + batch_size]
+        for batch in batches:
             sp, um = provider.build_prompt(
                 batch,
                 lang,
@@ -301,8 +301,7 @@ async def preview_translation(req: TranslationRequest):
     # Build a flat batch plan the frontend can iterate over.
     batch_plan = []
     for lang, entries in by_lang.items():
-        for i in range(0, len(entries), batch_size):
-            batch = entries[i : i + batch_size]
+        for batch in chunk_entries(entries, batch_size, config.BATCH_MAX_CHARS):
             batch_plan.append(
                 {
                     "source_lang": lang,
@@ -434,8 +433,7 @@ async def translate_mod(req: TranslationRequest):
         for lang, entries in by_lang.items():
             glossary_prompt = get_combined_glossary_prompt(base_glossary, mod_glossary, source_lang=lang, target_lang=target_lang)
             style_examples = chrono_ark_adapter().get_style_examples(lang)
-            for i in range(0, len(entries), batch_size):
-                batch = entries[i : i + batch_size]
+            for batch in chunk_entries(entries, batch_size, config.BATCH_MAX_CHARS):
                 translations, suggestions = await loop.run_in_executor(
                     None,
                     lambda batch=batch, lang=lang, glossary_prompt=glossary_prompt: provider.translate_batch(
