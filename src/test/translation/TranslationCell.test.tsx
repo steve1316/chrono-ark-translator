@@ -19,4 +19,9 @@ describe("TranslationCell", () => {
         render(<TranslationCell value="" previous="" synced={false} untranslatableReason="binary asset" onSave={vi.fn()} />)
         expect(screen.getByText("binary asset")).toBeInTheDocument()
     })
+
+    it("highlights the search query in the displayed translation", () => {
+        const { container } = render(<TranslationCell value="Summon a dragon" synced={false} highlight="DRAGON" onSave={vi.fn()} />)
+        expect(container.querySelector("mark.search-highlight")?.textContent).toBe("dragon")
+    })
 })

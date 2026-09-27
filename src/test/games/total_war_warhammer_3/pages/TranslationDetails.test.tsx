@@ -131,7 +131,9 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         await waitFor(() => screen.getByText("Original 1"))
         fireEvent.change(screen.getByPlaceholderText(/search keys or text/i), { target: { value: "Stale" } })
         await waitFor(() => expect(screen.queryByText("Original 1")).not.toBeInTheDocument())
-        expect(screen.getByText("Stale text")).toBeInTheDocument()
+        // The match is wrapped in a highlight, so the cell text is split across elements.
+        const mark = screen.getAllByText("Stale", { selector: "mark.search-highlight" }).find((m) => m.parentElement?.textContent === "Stale text")
+        expect(mark).toBeDefined()
     })
 
     it("shows the previous on-disk translation struck through on a pending (edited) row", async () => {

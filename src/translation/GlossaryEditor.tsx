@@ -1,4 +1,7 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { Fragment, useMemo, useState, type ReactNode } from "react"
+
+import HighlightText from "../ui/HighlightText"
+import SearchInput from "../ui/SearchInput"
 
 /** One glossary term in the shared editor's normalized shape. */
 export interface GlossaryEditorTerm {
@@ -49,12 +52,32 @@ function singleSource(t: GlossaryEditorTerm): string {
     return Object.values(t.sourceMappings)[0] ?? ""
 }
 
-/** Summarize a term's source mappings for display. */
-function sourceSummary(t: GlossaryEditorTerm, perLanguage: boolean): string {
-    if (!perLanguage) return singleSource(t)
-    return Object.entries(t.sourceMappings)
-        .map(([lang, text]) => `${lang}: ${text}`)
-        .join(", ")
+/**
+ * Render a term's source mappings for display, with the search query highlighted in the source text.
+ * @param t - The term.
+ * @param perLanguage - Whether to prefix each mapping with its language.
+ * @param query - Search query to highlight.
+ * @returns The rendered summary.
+ */
+function sourceSummary(t: GlossaryEditorTerm, perLanguage: boolean, query: string): ReactNode {
+    if (!perLanguage) return <HighlightText text={singleSource(t)} query={query} />
+    return Object.entries(t.sourceMappings).map(([lang, text], i) => (
+        <Fragment key={lang}>
+            {i > 0 && ", "}
+            {lang}: <HighlightText text={text} query={query} />
+        </Fragment>
+    ))
+}
+
+/**
+ * Check whether a term matches a search query by English text, any source text, or category (case-insensitive).
+ * @param t - The term.
+ * @param query - Lowercased, trimmed search query.
+ * @returns True when the term matches or the query is empty.
+ */
+function matchesSearch(t: GlossaryEditorTerm, query: string): boolean {
+    if (!query) return true
+    return t.english.toLowerCase().includes(query) || t.category.toLowerCase().includes(query) || Object.values(t.sourceMappings).some((v) => v.toLowerCase().includes(query))
 }
 
 /**
@@ -89,8 +112,12 @@ export function GlossaryEditor({
     const [editSource, setEditSource] = useState("")
     const [editLang, setEditLang] = useState(languages[0] ?? "Chinese")
     const [editCategory, setEditCategory] = useState(defaultCategory)
+    const [search, setSearch] = useState("")
 
-    const sorted = useMemo(() => [...terms].sort((a, b) => a.english.localeCompare(b.english)), [terms])
+    const sorted = useMemo(() => {
+        const q = search.trim().toLowerCase()
+        return terms.filter((t) => matchesSearch(t, q)).sort((a, b) => a.english.localeCompare(b.english))
+    }, [terms, search])
     const groups = useMemo(() => {
         if (!groupByCategory) return null
         const out = new Map<string, GlossaryEditorTerm[]>()
@@ -174,10 +201,10 @@ export function GlossaryEditor({
                 <>
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ fontWeight: 500 }} className="glossary-english">
-                            {t.english}
+                            <HighlightText text={t.english} query={search} />
                         </span>
                         <span style={{ color: "var(--text-dim)", marginLeft: "0.75rem", fontSize: "0.85rem" }} className="glossary-source">
-                            {sourceSummary(t, perLanguage)}
+                            {sourceSummary(t, perLanguage, search)}
                         </span>
                         {!groupByCategory && t.category && (
                             <span
@@ -191,7 +218,7 @@ export function GlossaryEditor({
                                     textTransform: "capitalize",
                                 }}
                             >
-                                {t.category}
+                                <HighlightText text={t.category} query={search} />
                             </span>
                         )}
                     </div>
@@ -236,14 +263,22 @@ export function GlossaryEditor({
                 </button>
             </div>
 
+            {terms.length > 0 && (
+                <div style={{ marginBottom: "0.75rem" }}>
+                    <SearchInput value={search} onChange={setSearch} placeholder="Search terms..." />
+                </div>
+            )}
+
             {terms.length === 0 ? (
                 <p style={{ color: "var(--text-dim)", textAlign: "center" }}>{emptyMessage}</p>
+            ) : sorted.length === 0 ? (
+                <p style={{ color: "var(--text-dim)", textAlign: "center" }}>No terms match "{search.trim()}".</p>
             ) : groups ? (
                 <div className="glossary-editor-list">
                     {groups.map(([cat, items]) => (
                         <div key={cat}>
                             <div className="glossary-group-header" style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--text-dim)", marginTop: "0.5rem" }}>
-                                {cat || "uncategorized"}
+                                <HighlightText text={cat || "uncategorized"} query={search} />
                             </div>
                             {items.map(renderRow)}
                         </div>

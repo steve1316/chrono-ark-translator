@@ -12,6 +12,8 @@ interface TranslationCellProps {
     untranslatableReason?: string
     /** Placeholder for the editor when empty. */
     placeholder?: string
+    /** Search query to highlight in the displayed translation. */
+    highlight?: string
     /** Persist a new value. */
     onSave: (value: string) => void
 }
@@ -23,10 +25,11 @@ interface TranslationCellProps {
  * @param synced - Whether the row is synced (greens the strikethrough).
  * @param untranslatableReason - When set, shown instead of the editor.
  * @param placeholder - Editor placeholder when empty.
+ * @param highlight - Search query to highlight in the displayed translation.
  * @param onSave - Persist a new value.
  * @returns The cell element.
  */
-export function TranslationCell({ value, previous, synced, untranslatableReason, placeholder, onSave }: TranslationCellProps) {
+export function TranslationCell({ value, previous, synced, untranslatableReason, placeholder, highlight, onSave }: TranslationCellProps) {
     if (untranslatableReason) {
         return (
             <span className="untranslatable-hint" title={untranslatableReason}>
@@ -41,7 +44,7 @@ export function TranslationCell({ value, previous, synced, untranslatableReason,
                     {previous}
                 </div>
             )}
-            <EditableCell value={value} onSave={onSave} placeholder={placeholder ?? ""} />
+            <EditableCell value={value} onSave={onSave} placeholder={placeholder ?? ""} highlight={highlight} />
         </>
     )
 }

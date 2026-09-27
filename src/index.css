@@ -2296,3 +2296,11 @@ th {
     padding: 0.25rem;
     line-height: 1;
 }
+
+/* Search match highlight (src/ui/HighlightText.tsx) */
+.search-highlight {
+    background: #facc15;
+    color: #111827;
+    border-radius: 2px;
+    padding: 0 1px;
+}

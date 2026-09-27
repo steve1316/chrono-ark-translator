@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
 
+import HighlightText from "../../ui/HighlightText"
+
 /**
  * Props for the EditableCell component.
  */
@@ -10,6 +12,8 @@ interface EditableCellProps {
     onSave: (val: string) => void
     /** Placeholder text shown in dim italic when the value is empty. */
     placeholder?: string
+    /** Search query to highlight in display mode. */
+    highlight?: string
 }
 
 /**
@@ -26,9 +30,10 @@ interface EditableCellProps {
  * @param value - The current persisted value displayed in the cell.
  * @param onSave - Callback invoked when the user commits a change.
  * @param placeholder - Placeholder text when the value is empty.
+ * @param highlight - Search query to highlight in display mode.
  * @returns The rendered editable cell JSX.
  */
-const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, placeholder }) => {
+const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, placeholder, highlight = "" }) => {
     const [isEditing, setIsEditing] = useState(false)
     const [tempValue, setTempValue] = useState(value)
     const [cellHeight, setCellHeight] = useState<number | undefined>(undefined)
@@ -103,7 +108,13 @@ const EditableCell: React.FC<EditableCellProps> = ({ value, onSave, placeholder 
             className="clickable-cell"
             style={{ minHeight: "1.2em", cursor: "text", whiteSpace: "pre-wrap" }}
         >
-            {value ? <span>{value}</span> : <span style={{ color: "var(--text-dim)", fontStyle: "italic" }}>{placeholder}</span>}
+            {value ? (
+                <span>
+                    <HighlightText text={value} query={highlight} />
+                </span>
+            ) : (
+                <span style={{ color: "var(--text-dim)", fontStyle: "italic" }}>{placeholder}</span>
+            )}
         </div>
     )
 }

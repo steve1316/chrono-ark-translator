@@ -59,4 +59,24 @@ describe("GlossaryEditor", () => {
         expect(container.firstChild).toHaveClass("glossary-editor", "glossary-editor-fill")
         expect(container.querySelector(".glossary-editor-list")).not.toBeNull()
     })
+
+    it("filters terms by English text and highlights the match", () => {
+        const { container } = render(<GlossaryEditor terms={TERMS} perLanguage onAdd={vi.fn()} onUpdate={vi.fn()} onRemove={vi.fn()} />)
+        fireEvent.change(screen.getByPlaceholderText("Search terms..."), { target: { value: "drag" } })
+        expect(screen.queryByText("Fireball")).toBeNull()
+        expect(container.querySelector("mark.search-highlight")?.textContent).toBe("Drag")
+    })
+
+    it("filters terms by source text", () => {
+        render(<GlossaryEditor terms={TERMS} perLanguage onAdd={vi.fn()} onUpdate={vi.fn()} onRemove={vi.fn()} />)
+        fireEvent.change(screen.getByPlaceholderText("Search terms..."), { target: { value: "火球" } })
+        expect(screen.getByText("Fireball")).toBeInTheDocument()
+        expect(screen.queryByText("Dragon")).toBeNull()
+    })
+
+    it("shows a no-match message when the search matches nothing", () => {
+        render(<GlossaryEditor terms={TERMS} perLanguage onAdd={vi.fn()} onUpdate={vi.fn()} onRemove={vi.fn()} />)
+        fireEvent.change(screen.getByPlaceholderText("Search terms..."), { target: { value: "zzz" } })
+        expect(screen.getByText('No terms match "zzz".')).toBeInTheDocument()
+    })
 })

@@ -27,6 +27,7 @@ import { StatusBadge } from "../../../../translation/StatusBadge"
 import { TranslationCell } from "../../../../translation/TranslationCell"
 import { canonicalRowStyle } from "../../../../translation/rowStyle"
 import { translationColumns } from "../../../../translation/columns"
+import HighlightText from "../../../../ui/HighlightText"
 import { useIterativeTranslation } from "../../../../hooks/useIterativeTranslation"
 import type { BatchDescriptor } from "../../../../hooks/useIterativeTranslation"
 
@@ -545,12 +546,19 @@ const ModDetail: React.FC = () => {
                             gameApi("chrono_ark").post(`/mods/${modId}/open-source-file/${encodeURIComponent(s.source_file)}`)
                         }}
                     >
-                        {s.source_file}
+                        <HighlightText text={s.source_file} query={search} />
                     </a>
                 ),
             },
-            key: { field: "key", render: (s) => <span title={s.key}>{s.key}</span> },
-            original: { field: "source", render: (s) => s.source },
+            key: {
+                field: "key",
+                render: (s) => (
+                    <span title={s.key}>
+                        <HighlightText text={s.key} query={search} />
+                    </span>
+                ),
+            },
+            original: { field: "source", render: (s) => <HighlightText text={s.source} query={search} /> },
             translation: {
                 field: "english",
                 render: (s) => (
@@ -560,6 +568,7 @@ const ModDetail: React.FC = () => {
                         synced={s.is_synced}
                         untranslatableReason={getRowStatus(s) === "untranslatable" ? s.untranslatable_reason : undefined}
                         placeholder={!s.source ? "" : s.is_translated ? "" : "Pending translation..."}
+                        highlight={search}
                         onSave={(val) => handleSaveString(s.key, val)}
                     />
                 ),

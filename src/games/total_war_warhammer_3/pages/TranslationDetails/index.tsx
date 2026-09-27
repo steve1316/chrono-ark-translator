@@ -19,6 +19,7 @@ import { OpenFolderButton, PendingSyncPill, SteamLink } from "../../../../transl
 import { TranslationCell } from "../../../../translation/TranslationCell"
 import { canonicalRowStyle } from "../../../../translation/rowStyle"
 import { TRANSLATION_COLUMN_WIDTHS, translationColumns } from "../../../../translation/columns"
+import HighlightText from "../../../../ui/HighlightText"
 import LoadingState from "../../../../ui/LoadingState"
 import type { RowStatus } from "../../../../utils/stringFilters"
 import type { TermSuggestion, WH3DriftRow, WH3ModContext, WH3RescanSummary, WH3TranslationModSummary } from "../../../../shared_types"
@@ -559,12 +560,12 @@ const TranslationDetailsPage: React.FC = () => {
                             openSourceFile(workshopId, r.source_filename).catch(() => {})
                         }}
                     >
-                        {r.source_filename}
+                        <HighlightText text={r.source_filename} query={search} />
                     </a>
                 ),
             },
-            key: { field: "key", render: (r) => r.key },
-            original: { field: "parent_text", render: (r) => r.parent_text ?? <em style={{ color: "var(--text-dim)" }}>orphan</em> },
+            key: { field: "key", render: (r) => <HighlightText text={r.key} query={search} /> },
+            original: { field: "parent_text", render: (r) => (r.parent_text != null ? <HighlightText text={r.parent_text} query={search} /> : <em style={{ color: "var(--text-dim)" }}>orphan</em>) },
             translation: {
                 field: "translation_text",
                 render: (r) => (
@@ -573,6 +574,7 @@ const TranslationDetailsPage: React.FC = () => {
                         previous={r.previous_text}
                         synced={r.canonical_status === "synced"}
                         placeholder="(untranslated)"
+                        highlight={search}
                         onSave={(text) => onRowSave(r.key, text)}
                     />
                 ),
