@@ -550,6 +550,39 @@ describe("TranslationDetails (Plan 3 layout)", () => {
         expect(await screen.findByRole("dialog", { name: "Suggested Glossary Terms" })).toHaveTextContent("Cathay")
     })
 
+    it("reloads the strings after accepting a suggestion under an edited English renames translations", async () => {
+        const SUGGESTION = { english: "Nangao", source: "南皋", source_lang: "Chinese", category: "location", reason: "place" }
+        let rows = STRINGS
+        const spy = mockRouteFlow()
+        const base = spy.getMockImplementation()!
+        spy.mockImplementation(async (input, init) => {
+            const url = String(input)
+            if (url.endsWith("/glossary/suggestions")) return mockJson([SUGGESTION])
+            if (url.endsWith("/glossary/suggestions/accept")) {
+                rows = STRINGS.map((r) => (r.key === "k1" ? { ...r, translation_text: "Nangau Gate", canonical_status: "pending" } : r))
+                return mockJson({ status: "success", accepted: 1, replaced: 1 })
+            }
+            if (url.endsWith("/strings")) return mockJson(rows)
+            return base(input, init)
+        })
+        render(wrap())
+        const suggestionsButton = await screen.findByRole("button", { name: /Suggestions/ })
+        await act(async () => {
+            fireEvent.click(suggestionsButton)
+        })
+        const dialog = await screen.findByRole("dialog", { name: "Suggested Glossary Terms" })
+        fireEvent.click(within(dialog).getByRole("button", { name: "Edit Nangao" }))
+        const box = within(dialog).getByRole("textbox", { name: "English for 南皋" })
+        fireEvent.change(box, { target: { value: "Nangau" } })
+        fireEvent.keyDown(box, { key: "Enter" })
+        await act(async () => {
+            fireEvent.click(within(dialog).getByRole("button", { name: /^Accept$/ }))
+        })
+
+        expect(await within(dialog).findByText("Nangau: updated 1 translation.")).toBeInTheDocument()
+        expect(await screen.findByText("Nangau Gate")).toBeInTheDocument()
+    })
+
     it("keeps saved Mod Context when the source language changes afterwards", async () => {
         const spy = mockRouteFlow()
         render(wrap())

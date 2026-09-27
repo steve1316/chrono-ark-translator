@@ -669,6 +669,7 @@ const ModDetail: React.FC = () => {
                     {showSuggestionModal && (
                         <GlossarySuggestionModal
                             gameId="chrono_ark"
+                            onTranslationsChanged={() => fetchModDetail(true)}
                             modId={modId!}
                             suggestions={suggestions}
                             onClose={() => setShowSuggestionModal(false)}
@@ -725,6 +726,7 @@ const ModDetail: React.FC = () => {
                     {batchState.phase === "reviewing" && showReviewModal && (
                         <GlossarySuggestionModal
                             gameId="chrono_ark"
+                            onTranslationsChanged={() => fetchModDetail(true)}
                             modId={modId!}
                             suggestions={batchState.suggestions}
                             onClose={() => setShowReviewModal(false)}

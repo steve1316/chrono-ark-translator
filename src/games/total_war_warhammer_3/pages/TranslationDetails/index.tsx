@@ -193,6 +193,16 @@ const TranslationDetailsPage: React.FC = () => {
         setStrings(rows)
     }, [workshopId])
 
+    // Reload counts and rows after accepting a glossary suggestion under an edited English renamed existing translations.
+    const reloadAfterRename = useCallback(async () => {
+        try {
+            setProgress(await rescanMod(workshopId))
+            await loadStrings()
+        } catch {
+            /* keep the current table */
+        }
+    }, [workshopId, loadStrings])
+
     useEffect(() => {
         let cancelled = false
         ;(async () => {
@@ -632,6 +642,7 @@ const TranslationDetailsPage: React.FC = () => {
             {showSuggestions && (
                 <GlossarySuggestionModal
                     gameId="total_war_warhammer_3"
+                    onTranslationsChanged={reloadAfterRename}
                     modId={workshopId}
                     suggestions={suggestions}
                     onClose={() => setShowSuggestions(false)}
@@ -653,6 +664,7 @@ const TranslationDetailsPage: React.FC = () => {
                 <GlossarySuggestionModal
                     key={stageReview.step.index}
                     gameId="total_war_warhammer_3"
+                    onTranslationsChanged={reloadAfterRename}
                     modId={workshopId}
                     suggestions={stageReview.suggestions}
                     subtitle={`Stage ${stageReview.step.index + 1} of ${stageReview.step.total}: ${stageReview.step.label}`}
@@ -678,6 +690,7 @@ const TranslationDetailsPage: React.FC = () => {
             {nameReviewSuggestions && (
                 <GlossarySuggestionModal
                     gameId="total_war_warhammer_3"
+                    onTranslationsChanged={reloadAfterRename}
                     modId={workshopId}
                     suggestions={nameReviewSuggestions}
                     onClose={() => setNameReviewSuggestions(null)}
@@ -692,6 +705,7 @@ const TranslationDetailsPage: React.FC = () => {
             {batchState.phase === "reviewing" && showReviewModal && !namesRunRef.current && (
                 <GlossarySuggestionModal
                     gameId="total_war_warhammer_3"
+                    onTranslationsChanged={reloadAfterRename}
                     modId={workshopId}
                     suggestions={batchState.suggestions}
                     onClose={() => setShowReviewModal(false)}
