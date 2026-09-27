@@ -1,8 +1,8 @@
-# Game Mod Translator
+# Steam Workshop Mod Translator
 
 A game-agnostic translation workbench for Steam Workshop mods. A single app hosts several games side by side. Each game plugs in through a backend adapter and a frontend manifest. They all share one translation pipeline, glossary system, provider layer and UI framework. It translates mod localization strings from their source languages into English using AI providers, with glossary enforcement, iterative batch review, manual editing, history snapshots and write-back to mod-ready files.
 
-The project started as a Chrono Ark-only tool (hence the repository name `chrono-ark-translator`) and has since been generalized. It currently supports:
+The project started as a Chrono Ark-only tool (originally named `chrono-ark-translator`) and has since been generalized. It currently supports:
 
 | Game | Slug | Source → Target | What it covers |
 | --- | --- | --- | --- |
@@ -149,7 +149,7 @@ Both games use the same pipeline. Only the extraction, prompt content and write-
 
 ### 1. Preview and cost estimation
 
-Clicking Translate calls the game's `POST /translate/preview`. The backend gathers the strings that need translating, splits them into batches of `CATL_BATCH_SIZE`, and estimates the cost with the provider's pricing. It also builds the full system prompt and per-batch user messages. The confirmation modal shows these in tabs before anything is sent.
+Clicking Translate calls the game's `POST /translate/preview`. The backend gathers the strings that need translating, splits them into batches of `SWMT_BATCH_SIZE`, and estimates the cost with the provider's pricing. It also builds the full system prompt and per-batch user messages. The confirmation modal shows these in tabs before anything is sent.
 
 ### 2. Iterative batch processing
 
@@ -262,7 +262,7 @@ A card grid of every installed mod. Each card shows:
 - the mod's format (CSV or DLL)
 - a "Needs sync" badge when there is unsynced work
 
-**Refresh** rescans the Workshop folder and streams progress. **Estimate Total Cost** prices a full translation of every mod with the current provider. Mods listed in `CATL_IGNORED_MODS` are hidden.
+**Refresh** rescans the Workshop folder and streams progress. **Estimate Total Cost** prices a full translation of every mod with the current provider. Mods listed in `SWMT_IGNORED_MODS` are hidden.
 
 ![Chrono Ark dashboard](docs/screenshots/chrono-ark-dashboard.png)
 
@@ -408,32 +408,32 @@ You can also save labeled snapshots. The last 20 are kept per mod, and restoring
 
 ## Configuration
 
-Settings are environment variables with a `CATL_` prefix, stored in `backend/.env`. Most of them can be changed at runtime on the Settings page, which writes them back to `.env`.
+Settings are environment variables with a `SWMT_` prefix, stored in `backend/.env`. Most of them can be changed at runtime on the Settings page, which writes them back to `.env`.
 
 ### General and providers
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `CATL_API_PORT` | `8008` | Backend port (Vite reads it too) |
-| `CATL_STORAGE_PATH` | `backend/storage` | Root data directory |
-| `CATL_ACTIVE_GAME` | `chrono_ark` | Game the app opens to |
-| `CATL_TRANSLATION_PROVIDER` | `claude` | `claude`, `openai`, `deepl`, `ollama`, `llamacpp` or `manual` |
-| `CATL_BATCH_SIZE` | `100` | Strings per translation batch |
-| `CATL_ANTHROPIC_API_KEY` | | Claude API key |
-| `CATL_OPENAI_API_KEY` | | OpenAI API key |
-| `CATL_DEEPL_API_KEY` | | DeepL API key |
-| `CATL_CLAUDE_MODEL` | `claude-sonnet-5` | Claude model |
-| `CATL_OPENAI_MODEL` | `gpt-4.1` | OpenAI model |
-| `CATL_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
-| `CATL_OLLAMA_MODEL` | `qwen2.5:7b` | Ollama model |
-| `CATL_LLAMACPP_BASE_URL` | `http://localhost:8080` | llama-server URL |
-| `CATL_LLAMACPP_BINARY_PATH` | `llama-server` | llama-server binary (falls back to the managed install, then `PATH`) |
-| `CATL_LLAMACPP_MODEL_PATH` | | GGUF file to load |
-| `CATL_LLAMACPP_MODELS_DIR` | `backend/storage/models` | GGUF download directory |
-| `CATL_LLAMACPP_GPU_LAYERS` | `-1` | GPU layers to offload (`-1` = all) |
-| `CATL_LLAMACPP_CTX_SIZE` | `8192` | Context window size |
-| `CATL_GLOSSARY_CATEGORIES` | `characters,mechanics` | Chrono Ark base-glossary categories sent in prompts |
-| `CATL_IGNORED_MODS` | | Comma-separated mod IDs to hide from the dashboard |
+| `SWMT_API_PORT` | `8008` | Backend port (Vite reads it too) |
+| `SWMT_STORAGE_PATH` | `backend/storage` | Root data directory |
+| `SWMT_ACTIVE_GAME` | `chrono_ark` | Game the app opens to |
+| `SWMT_TRANSLATION_PROVIDER` | `claude` | `claude`, `openai`, `deepl`, `ollama`, `llamacpp` or `manual` |
+| `SWMT_BATCH_SIZE` | `100` | Strings per translation batch |
+| `SWMT_ANTHROPIC_API_KEY` | | Claude API key |
+| `SWMT_OPENAI_API_KEY` | | OpenAI API key |
+| `SWMT_DEEPL_API_KEY` | | DeepL API key |
+| `SWMT_CLAUDE_MODEL` | `claude-sonnet-5` | Claude model |
+| `SWMT_OPENAI_MODEL` | `gpt-4.1` | OpenAI model |
+| `SWMT_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
+| `SWMT_OLLAMA_MODEL` | `qwen2.5:7b` | Ollama model |
+| `SWMT_LLAMACPP_BASE_URL` | `http://localhost:8080` | llama-server URL |
+| `SWMT_LLAMACPP_BINARY_PATH` | `llama-server` | llama-server binary (falls back to the managed install, then `PATH`) |
+| `SWMT_LLAMACPP_MODEL_PATH` | | GGUF file to load |
+| `SWMT_LLAMACPP_MODELS_DIR` | `backend/storage/models` | GGUF download directory |
+| `SWMT_LLAMACPP_GPU_LAYERS` | `-1` | GPU layers to offload (`-1` = all) |
+| `SWMT_LLAMACPP_CTX_SIZE` | `8192` | Context window size |
+| `SWMT_GLOSSARY_CATEGORIES` | `characters,mechanics` | Chrono Ark base-glossary categories sent in prompts |
+| `SWMT_IGNORED_MODS` | | Comma-separated mod IDs to hide from the dashboard |
 
 ### Chrono Ark
 
@@ -441,18 +441,18 @@ These are read from `.env` only. They are not on the Settings page.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `CATL_BASE_GAME_PATH` | `F:\SteamLibrary\steamapps\common\Chrono Ark\ChronoArk_Data\StreamingAssets` | Base game data |
-| `CATL_WORKSHOP_PATH` | `F:\SteamLibrary\steamapps\workshop\content\1188930` | Chrono Ark Workshop content |
+| `SWMT_BASE_GAME_PATH` | `F:\SteamLibrary\steamapps\common\Chrono Ark\ChronoArk_Data\StreamingAssets` | Base game data |
+| `SWMT_WORKSHOP_PATH` | `F:\SteamLibrary\steamapps\workshop\content\1188930` | Chrono Ark Workshop content |
 
 ### Total War: Warhammer III and Steam
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `CATL_TW3_HELPER_PATH` | | Path to `totalwar-modding/helper_scripts` |
-| `CATL_TW3_RPFM_CLI_PATH` | | `rpfm_cli.exe`. Defaults to `<helper_scripts>/rpfm_cli.exe`, and the `schemas/` folder must sit next to it. |
-| `CATL_TW3_STEAM_LIBRARY_DRIVE` | | Drive that holds `SteamLibrary`, e.g. `F:` |
-| `CATL_STEAMCMD_PATH` | | `steamcmd.exe`. Leave it empty to disable publishing, or use "Install SteamCMD" in Settings. |
-| `CATL_STEAM_USERNAME` | | Steam account for publishing (no password stored) |
+| `SWMT_TW3_HELPER_PATH` | | Path to `totalwar-modding/helper_scripts` |
+| `SWMT_TW3_RPFM_CLI_PATH` | | `rpfm_cli.exe`. Defaults to `<helper_scripts>/rpfm_cli.exe`, and the `schemas/` folder must sit next to it. |
+| `SWMT_TW3_STEAM_LIBRARY_DRIVE` | | Drive that holds `SteamLibrary`, e.g. `F:` |
+| `SWMT_STEAMCMD_PATH` | | `steamcmd.exe`. Leave it empty to disable publishing, or use "Install SteamCMD" in Settings. |
+| `SWMT_STEAM_USERNAME` | | Steam account for publishing (no password stored) |
 
 ## Getting Started
 
@@ -467,8 +467,8 @@ These are read from `.env` only. They are not on the Settings page.
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/steve1316/chrono-ark-translator.git
-   cd chrono-ark-translator
+   git clone https://github.com/steve1316/steam-workshop-mod-translator.git
+   cd steam-workshop-mod-translator
    ```
 
 2. Install frontend dependencies:
@@ -483,15 +483,15 @@ These are read from `.env` only. They are not on the Settings page.
 
 4. Create `backend/.env` with the paths and keys for the games you use:
    ```env
-   CATL_ANTHROPIC_API_KEY=your-key-here
+   SWMT_ANTHROPIC_API_KEY=your-key-here
 
    # Chrono Ark
-   CATL_BASE_GAME_PATH=C:\path\to\SteamLibrary\steamapps\common\Chrono Ark\ChronoArk_Data\StreamingAssets
-   CATL_WORKSHOP_PATH=C:\path\to\SteamLibrary\steamapps\workshop\content\1188930
+   SWMT_BASE_GAME_PATH=C:\path\to\SteamLibrary\steamapps\common\Chrono Ark\ChronoArk_Data\StreamingAssets
+   SWMT_WORKSHOP_PATH=C:\path\to\SteamLibrary\steamapps\workshop\content\1188930
 
    # Total War: Warhammer III (can also be set on the Settings page)
-   CATL_TW3_HELPER_PATH=C:\path\to\totalwar-modding\helper_scripts
-   CATL_TW3_STEAM_LIBRARY_DRIVE=F:
+   SWMT_TW3_HELPER_PATH=C:\path\to\totalwar-modding\helper_scripts
+   SWMT_TW3_STEAM_LIBRARY_DRIVE=F:
    ```
 
 5. Start the frontend and backend together:

@@ -1,5 +1,5 @@
 """
-FastAPI backend for Chrono Ark Mod Translation Dashboard.
+FastAPI backend for the Steam Workshop Mod Translator.
 
 Provides REST APIs for mod discovery, string extraction, translation status,
 glossary management, and triggering translation jobs. Routes are organized
@@ -31,7 +31,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="Chrono Ark Translator API", lifespan=lifespan)
+app = FastAPI(title="Steam Workshop Mod Translator API", lifespan=lifespan)
 
 
 # Enable CORS for Vite development server.

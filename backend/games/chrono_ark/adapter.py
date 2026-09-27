@@ -112,9 +112,9 @@ class ChronoArkAdapter(GameAdapter, TranslationCapability):
 
     Attributes:
         _BASE_GAME_PATH: Default path to the base game's StreamingAssets
-            directory. Overridable via the `CATL_BASE_GAME_PATH` env var.
+            directory. Overridable via the `SWMT_BASE_GAME_PATH` env var.
         _WORKSHOP_PATH: Default path to the Steam Workshop content directory.
-            Overridable via the `CATL_WORKSHOP_PATH` env var.
+            Overridable via the `SWMT_WORKSHOP_PATH` env var.
         _CSV_FILES: Canonical CSV filenames for Chrono Ark localization.
         _CSV_COLUMNS: Ordered column names for the localization CSV format.
         _SOURCE_LANGUAGES: Source languages to check, in priority order.
@@ -128,8 +128,8 @@ class ChronoArkAdapter(GameAdapter, TranslationCapability):
     """
 
     # Game-specific constants (moved from config.py).
-    _BASE_GAME_PATH = Path(os.environ.get("CATL_BASE_GAME_PATH", r"F:\SteamLibrary\steamapps\common\Chrono Ark\ChronoArk_Data\StreamingAssets"))
-    _WORKSHOP_PATH = Path(os.environ.get("CATL_WORKSHOP_PATH", r"F:\SteamLibrary\steamapps\workshop\content\1188930"))
+    _BASE_GAME_PATH = Path(os.environ.get("SWMT_BASE_GAME_PATH", r"F:\SteamLibrary\steamapps\common\Chrono Ark\ChronoArk_Data\StreamingAssets"))
+    _WORKSHOP_PATH = Path(os.environ.get("SWMT_WORKSHOP_PATH", r"F:\SteamLibrary\steamapps\workshop\content\1188930"))
     _CSV_FILES = [
         "LangDataDB.csv",
         "LangDialogueDB.csv",

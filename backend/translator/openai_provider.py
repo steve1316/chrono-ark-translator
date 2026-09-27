@@ -90,7 +90,7 @@ class OpenAIProvider(TranslationProvider):
         from openai import OpenAI, RateLimitError, APIError
 
         if not self._api_key:
-            raise ValueError("OpenAI API key not set. Set CATL_OPENAI_API_KEY env var.")
+            raise ValueError("OpenAI API key not set. Set SWMT_OPENAI_API_KEY env var.")
 
         client = OpenAI(api_key=self._api_key)
 

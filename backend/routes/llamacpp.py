@@ -1,4 +1,4 @@
-"""llama.cpp-related API endpoints for the Chrono Ark Translator."""
+"""llama.cpp-related API endpoints for the Steam Workshop Mod Translator."""
 
 import asyncio
 import json
@@ -236,7 +236,7 @@ async def install_llamacpp(req: LlamaCppInstallRequest):
             # Update config to point to the installed binary
             binary_path = str(bin_dir / "llama-server.exe")
             config.LLAMACPP_BINARY_PATH = binary_path
-            _update_env_file({"CATL_LLAMACPP_BINARY_PATH": binary_path})
+            _update_env_file({"SWMT_LLAMACPP_BINARY_PATH": binary_path})
 
             print(f"[llamacpp] Installed {tag} ({backend_info['label']}) to {bin_dir}")
             yield f'data: {json.dumps({"status": "done", "tag": tag, "binary_path": binary_path})}\n\n'

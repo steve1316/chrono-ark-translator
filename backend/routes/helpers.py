@@ -468,7 +468,7 @@ def _recalculate_mod_progress(mod_id: str, mod_path: Path) -> None:
 
 
 def _update_env_file(updates: dict[str, str]) -> None:
-    """Write updated CATL_* values to the .env file and os.environ.
+    """Write updated SWMT_* values to the .env file and os.environ.
 
     Reads the existing .env line-by-line, replacing matching keys in place
     to preserve comments and ordering. Keys not already present are appended
@@ -476,7 +476,7 @@ def _update_env_file(updates: dict[str, str]) -> None:
     new values immediately.
 
     Args:
-        updates: Mapping of env-var names (e.g. `CATL_BATCH_SIZE`) to their
+        updates: Mapping of env-var names (e.g. `SWMT_BATCH_SIZE`) to their
             new string values.
     """
     lines: list[str] = []

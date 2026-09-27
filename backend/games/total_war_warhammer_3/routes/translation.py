@@ -114,7 +114,7 @@ def _extract_all_parent_strings(mod: WH3TranslationMod) -> dict[str, dict[str, L
         helper_str = config.TW3_HELPER_PATH or ""
         rpfm = Path(helper_str) / "rpfm_cli.exe" if helper_str else None
     if rpfm is None or not rpfm.is_file():
-        raise HTTPException(500, f"rpfm_cli not found (tried {rpfm or 'TW3_RPFM_CLI_PATH'}); set CATL_TW3_RPFM_CLI_PATH or place rpfm_cli.exe in CATL_TW3_HELPER_PATH")
+        raise HTTPException(500, f"rpfm_cli not found (tried {rpfm or 'TW3_RPFM_CLI_PATH'}); set SWMT_TW3_RPFM_CLI_PATH or place rpfm_cli.exe in SWMT_TW3_HELPER_PATH")
 
     merged: dict[str, dict[str, LocRow]] = {}
     for parent_id in mod.parent_workshop_ids:
@@ -785,7 +785,7 @@ def sync_changes(mod_id: str) -> dict:
         try:
             rpfm = resolve_rpfm_cli_path()
             if rpfm is None:
-                raise RpfmNotConfiguredError("RPFM not configured; set CATL_TW3_RPFM_CLI_PATH or place rpfm_cli.exe in CATL_TW3_HELPER_PATH")
+                raise RpfmNotConfiguredError("RPFM not configured; set SWMT_TW3_RPFM_CLI_PATH or place rpfm_cli.exe in SWMT_TW3_HELPER_PATH")
             content_dir = tw3_workshop_content_dir(mod_id)
             if content_dir is None:
                 raise PackBuildError("TW3 Steam library drive is not configured")

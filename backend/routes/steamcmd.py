@@ -33,5 +33,5 @@ async def post_steamcmd_install():
 
     path_str = str(steamcmd_exe)
     config.STEAMCMD_PATH = path_str
-    _update_env_file({"CATL_STEAMCMD_PATH": path_str})
+    _update_env_file({"SWMT_STEAMCMD_PATH": path_str})
     return {"path": path_str}

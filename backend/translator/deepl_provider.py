@@ -88,7 +88,7 @@ class DeepLProvider(TranslationProvider):
         import deepl
 
         if not self._api_key:
-            raise ValueError("DeepL API key not set. Set CATL_DEEPL_API_KEY env var.")
+            raise ValueError("DeepL API key not set. Set SWMT_DEEPL_API_KEY env var.")
 
         translator = deepl.Translator(self._api_key)
 

@@ -1,5 +1,5 @@
 """
-Shared data models for the Chrono Ark Translator.
+Shared data models for the Steam Workshop Mod Translator.
 
 Contains domain objects used across extractors, translators, and the web UI.
 """

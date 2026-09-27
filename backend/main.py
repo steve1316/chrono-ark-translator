@@ -1,5 +1,5 @@
 """
-Chrono Ark Mod Translation Tool — CLI Entry Point.
+Steam Workshop Mod Translator - CLI entry point.
 
 Provides subcommands for extracting, translating, and managing
 localization strings for Chrono Ark Steam Workshop mods.
@@ -500,7 +500,7 @@ def cmd_export(args: argparse.Namespace, adapter: GameAdapter) -> None:
 def main() -> None:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description="Chrono Ark Mod Translation Tool",
+        description="Steam Workshop Mod Translator",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(

@@ -130,8 +130,8 @@ def _preflight(steamcmd_path: str, steam_username: str, content_folder: Path) ->
     """Validate publisher settings and resolve the SteamCMD executable path.
 
     Args:
-        steamcmd_path: Configured `CATL_STEAMCMD_PATH` value.
-        steam_username: Configured `CATL_STEAM_USERNAME` value.
+        steamcmd_path: Configured `SWMT_STEAMCMD_PATH` value.
+        steam_username: Configured `SWMT_STEAM_USERNAME` value.
         content_folder: Local Steam Workshop folder for the mod being published.
 
     Raises:

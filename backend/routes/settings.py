@@ -1,4 +1,4 @@
-"""Settings and stats API endpoints for the Chrono Ark Translator."""
+"""Settings and stats API endpoints for the Steam Workshop Mod Translator."""
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
@@ -88,104 +88,104 @@ async def update_settings(payload: SettingsUpdate):
         if payload.provider not in ("claude", "openai", "deepl", "ollama", "llamacpp", "manual"):
             raise HTTPException(400, f"Invalid provider: {payload.provider}")
         config.TRANSLATION_PROVIDER = payload.provider
-        env_updates["CATL_TRANSLATION_PROVIDER"] = payload.provider
+        env_updates["SWMT_TRANSLATION_PROVIDER"] = payload.provider
 
     if payload.batch_size is not None:
         if payload.batch_size < 1:
             raise HTTPException(400, "Batch size must be >= 1")
         config.BATCH_SIZE = payload.batch_size
-        env_updates["CATL_BATCH_SIZE"] = str(payload.batch_size)
+        env_updates["SWMT_BATCH_SIZE"] = str(payload.batch_size)
 
     if payload.anthropic_api_key is not None:
         config.ANTHROPIC_API_KEY = payload.anthropic_api_key
-        env_updates["CATL_ANTHROPIC_API_KEY"] = payload.anthropic_api_key
+        env_updates["SWMT_ANTHROPIC_API_KEY"] = payload.anthropic_api_key
 
     if payload.openai_api_key is not None:
         config.OPENAI_API_KEY = payload.openai_api_key
-        env_updates["CATL_OPENAI_API_KEY"] = payload.openai_api_key
+        env_updates["SWMT_OPENAI_API_KEY"] = payload.openai_api_key
 
     if payload.deepl_api_key is not None:
         config.DEEPL_API_KEY = payload.deepl_api_key
-        env_updates["CATL_DEEPL_API_KEY"] = payload.deepl_api_key
+        env_updates["SWMT_DEEPL_API_KEY"] = payload.deepl_api_key
 
     if payload.claude_model is not None:
         config.CLAUDE_MODEL = payload.claude_model
-        env_updates["CATL_CLAUDE_MODEL"] = payload.claude_model
+        env_updates["SWMT_CLAUDE_MODEL"] = payload.claude_model
 
     if payload.openai_model is not None:
         config.OPENAI_MODEL = payload.openai_model
-        env_updates["CATL_OPENAI_MODEL"] = payload.openai_model
+        env_updates["SWMT_OPENAI_MODEL"] = payload.openai_model
 
     if payload.ollama_base_url is not None:
         config.OLLAMA_BASE_URL = payload.ollama_base_url
-        env_updates["CATL_OLLAMA_BASE_URL"] = payload.ollama_base_url
+        env_updates["SWMT_OLLAMA_BASE_URL"] = payload.ollama_base_url
 
     if payload.ollama_model is not None:
         config.OLLAMA_MODEL = payload.ollama_model
-        env_updates["CATL_OLLAMA_MODEL"] = payload.ollama_model
+        env_updates["SWMT_OLLAMA_MODEL"] = payload.ollama_model
 
     if payload.ollama_vram_tier is not None:
         config.OLLAMA_VRAM_TIER = payload.ollama_vram_tier
-        env_updates["CATL_OLLAMA_VRAM_TIER"] = payload.ollama_vram_tier
+        env_updates["SWMT_OLLAMA_VRAM_TIER"] = payload.ollama_vram_tier
 
     if payload.llamacpp_base_url is not None:
         config.LLAMACPP_BASE_URL = payload.llamacpp_base_url
-        env_updates["CATL_LLAMACPP_BASE_URL"] = payload.llamacpp_base_url
+        env_updates["SWMT_LLAMACPP_BASE_URL"] = payload.llamacpp_base_url
 
     if payload.llamacpp_model is not None:
         config.LLAMACPP_MODEL = payload.llamacpp_model
-        env_updates["CATL_LLAMACPP_MODEL"] = payload.llamacpp_model
+        env_updates["SWMT_LLAMACPP_MODEL"] = payload.llamacpp_model
 
     if payload.llamacpp_binary_path is not None:
         config.LLAMACPP_BINARY_PATH = payload.llamacpp_binary_path
-        env_updates["CATL_LLAMACPP_BINARY_PATH"] = payload.llamacpp_binary_path
+        env_updates["SWMT_LLAMACPP_BINARY_PATH"] = payload.llamacpp_binary_path
 
     if payload.llamacpp_model_path is not None:
         config.LLAMACPP_MODEL_PATH = payload.llamacpp_model_path
-        env_updates["CATL_LLAMACPP_MODEL_PATH"] = payload.llamacpp_model_path
+        env_updates["SWMT_LLAMACPP_MODEL_PATH"] = payload.llamacpp_model_path
 
     if payload.llamacpp_gpu_layers is not None:
         config.LLAMACPP_GPU_LAYERS = payload.llamacpp_gpu_layers
-        env_updates["CATL_LLAMACPP_GPU_LAYERS"] = str(payload.llamacpp_gpu_layers)
+        env_updates["SWMT_LLAMACPP_GPU_LAYERS"] = str(payload.llamacpp_gpu_layers)
 
     if payload.llamacpp_ctx_size is not None:
         config.LLAMACPP_CTX_SIZE = payload.llamacpp_ctx_size
-        env_updates["CATL_LLAMACPP_CTX_SIZE"] = str(payload.llamacpp_ctx_size)
+        env_updates["SWMT_LLAMACPP_CTX_SIZE"] = str(payload.llamacpp_ctx_size)
 
     if payload.llamacpp_vram_tier is not None:
         config.LLAMACPP_VRAM_TIER = payload.llamacpp_vram_tier
-        env_updates["CATL_LLAMACPP_VRAM_TIER"] = payload.llamacpp_vram_tier
+        env_updates["SWMT_LLAMACPP_VRAM_TIER"] = payload.llamacpp_vram_tier
 
     if payload.ignored_mods is not None:
         config.IGNORED_MODS = payload.ignored_mods
-        env_updates["CATL_IGNORED_MODS"] = ",".join(payload.ignored_mods)
+        env_updates["SWMT_IGNORED_MODS"] = ",".join(payload.ignored_mods)
 
     if payload.active_game is not None:
         try:
             set_active_game(payload.active_game)
         except ValueError as exc:
             raise HTTPException(400, str(exc))
-        env_updates["CATL_ACTIVE_GAME"] = payload.active_game
+        env_updates["SWMT_ACTIVE_GAME"] = payload.active_game
 
     if payload.tw3_helper_path is not None:
         config.TW3_HELPER_PATH = payload.tw3_helper_path
-        env_updates["CATL_TW3_HELPER_PATH"] = payload.tw3_helper_path
+        env_updates["SWMT_TW3_HELPER_PATH"] = payload.tw3_helper_path
 
     if payload.tw3_rpfm_cli_path is not None:
         config.TW3_RPFM_CLI_PATH = payload.tw3_rpfm_cli_path
-        env_updates["CATL_TW3_RPFM_CLI_PATH"] = payload.tw3_rpfm_cli_path
+        env_updates["SWMT_TW3_RPFM_CLI_PATH"] = payload.tw3_rpfm_cli_path
 
     if payload.tw3_steam_library_drive is not None:
         config.TW3_STEAM_LIBRARY_DRIVE = payload.tw3_steam_library_drive
-        env_updates["CATL_TW3_STEAM_LIBRARY_DRIVE"] = payload.tw3_steam_library_drive
+        env_updates["SWMT_TW3_STEAM_LIBRARY_DRIVE"] = payload.tw3_steam_library_drive
 
     if payload.steamcmd_path is not None:
         config.STEAMCMD_PATH = payload.steamcmd_path
-        env_updates["CATL_STEAMCMD_PATH"] = payload.steamcmd_path
+        env_updates["SWMT_STEAMCMD_PATH"] = payload.steamcmd_path
 
     if payload.steam_username is not None:
         config.STEAM_USERNAME = payload.steam_username
-        env_updates["CATL_STEAM_USERNAME"] = payload.steam_username
+        env_updates["SWMT_STEAM_USERNAME"] = payload.steam_username
 
     if env_updates:
         _update_env_file(env_updates)

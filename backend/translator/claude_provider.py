@@ -166,7 +166,7 @@ class ClaudeProvider(TranslationProvider):
         import anthropic
 
         if not self._api_key:
-            raise ValueError("Anthropic API key not set. Set CATL_ANTHROPIC_API_KEY env var.")
+            raise ValueError("Anthropic API key not set. Set SWMT_ANTHROPIC_API_KEY env var.")
 
         client = anthropic.Anthropic(api_key=self._api_key)
 

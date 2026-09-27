@@ -1,4 +1,4 @@
-"""Ollama-related API endpoints for the Chrono Ark Translator."""
+"""Ollama-related API endpoints for the Steam Workshop Mod Translator."""
 
 import asyncio
 import os
