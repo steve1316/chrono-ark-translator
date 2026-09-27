@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -53,11 +54,12 @@ describe("App game accent", () => {
      * Render the app at a URL with every endpoint returning an empty payload.
      *
      * @param path Initial URL to render.
+     * @param activeGame The saved `active_game` setting.
      */
-    function renderAt(path: string) {
+    function renderAt(path: string, activeGame = "chrono_ark") {
         vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
             const url = String(input)
-            if (url.endsWith("/settings")) return Promise.resolve(jsonResponse({ active_game: "chrono_ark" }))
+            if (url.endsWith("/settings")) return Promise.resolve(jsonResponse({ active_game: activeGame }))
             return Promise.resolve(jsonResponse([]))
         })
         render(
@@ -79,9 +81,25 @@ describe("App game accent", () => {
         await waitFor(() => expect(document.documentElement.style.getPropertyValue("--game-accent-gradient")).toContain("#38bdf8"))
     })
 
-    it("clears a previous game's accent on /settings so the CSS default applies", async () => {
+    it("keeps the WH3 sidebar and accent when Settings is opened from a WH3 page", async () => {
+        renderAt("/warhammer_3/dashboard")
+        await waitFor(() => expect(screen.getByTestId("sidebar-game-title")).toHaveTextContent("Warhammer III"))
+        await userEvent.click(screen.getByRole("link", { name: /Settings/ }))
+        await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument())
+        expect(screen.getByTestId("sidebar-game-title")).toHaveTextContent("Warhammer III")
+        expect(document.documentElement.style.getPropertyValue("--game-accent")).toBe("#dc2626")
+    })
+
+    it("uses the saved game's sidebar and accent when /settings is opened directly", async () => {
+        document.documentElement.style.setProperty("--game-accent-gradient", "linear-gradient(#38bdf8, #818cf8)")
+        renderAt("/settings", "total_war_warhammer_3")
+        await waitFor(() => expect(screen.getByTestId("sidebar-game-title")).toHaveTextContent("Warhammer III"))
+        await waitFor(() => expect(document.documentElement.style.getPropertyValue("--game-accent")).toBe("#dc2626"))
+    })
+
+    it("does not carry a previous game's accent into a Chrono Ark Settings visit", async () => {
         document.documentElement.style.setProperty("--game-accent-gradient", "linear-gradient(#dc2626, #f97316)")
         renderAt("/settings")
-        await waitFor(() => expect(document.documentElement.style.getPropertyValue("--game-accent-gradient")).toBe(""))
+        await waitFor(() => expect(document.documentElement.style.getPropertyValue("--game-accent-gradient")).toContain("#38bdf8"))
     })
 })

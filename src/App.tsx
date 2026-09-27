@@ -23,13 +23,15 @@ function GameSubtree() {
 }
 
 /**
- * App shell: a persistent sidebar plus the routed page area. The active game is the `:gameSlug` URL segment (source of truth); the persisted
- * `active_game` setting only seeds the default redirect for `/`.
+ * App shell: a persistent sidebar plus the routed page area. The active game is the `:gameSlug` URL segment (source of truth). Off-game routes
+ * such as `/settings` keep the last game visited, and fall back to the persisted `active_game` setting on a direct visit.
  * @returns The application shell.
  */
 function App() {
     const [defaultGameId, setDefaultGameId] = useState<string>("chrono_ark")
     const [loading, setLoading] = useState(true)
+    // The game of the last game route visited, so /settings stays in the game the user came from.
+    const [lastGameId, setLastGameId] = useState<string | null>(null)
     const location = useLocation()
 
     // The persisted game id only picks the default redirect target for "/". The URL is the source of truth thereafter.
@@ -41,27 +43,24 @@ function App() {
             .finally(() => setLoading(false))
     }, [])
 
-    // Active game for the sidebar comes from the URL slug; fall back to the persisted default off-slug (e.g. /settings).
+    // Active game comes from the URL slug. Off-slug (e.g. /settings) it is the last game visited, then the persisted default.
     const match = useMatch("/:gameSlug/*")
     const activeSlug = match?.params.gameSlug
-    const activeGameId = (activeSlug && getGameBySlug(activeSlug)?.id) || defaultGameId
+    const routeGameId = activeSlug ? getGameBySlug(activeSlug)?.id : undefined
+    // Remember the route's game while rendering (React's derived-state pattern), so the first /settings render already uses it.
+    if (routeGameId && routeGameId !== lastGameId) setLastGameId(routeGameId)
+    const activeGameId = routeGameId || lastGameId || defaultGameId
     const isDetailPage = !!useMatch("/:gameSlug/translation/*")
     const defaultSlug = slugForId(defaultGameId) ?? "chrono_ark"
 
-    // Page titles and active filter pills follow the game in the URL. The variables live on <html> so portaled dialogs inherit them too.
-    // Off-game routes (e.g. /settings) remove them so the CSS default applies.
-    const onGameRoute = !!(activeSlug && getGameBySlug(activeSlug))
+    // Page titles and active filter pills follow the active game, including on /settings. The variables live on <html> so portaled dialogs
+    // inherit them too.
     const branding = getBranding(activeGameId)
     useEffect(() => {
         const root = document.documentElement.style
-        if (onGameRoute) {
-            root.setProperty("--game-accent", branding.accent)
-            root.setProperty("--game-accent-gradient", branding.gradient)
-        } else {
-            root.removeProperty("--game-accent")
-            root.removeProperty("--game-accent-gradient")
-        }
-    }, [onGameRoute, branding.accent, branding.gradient])
+        root.setProperty("--game-accent", branding.accent)
+        root.setProperty("--game-accent-gradient", branding.gradient)
+    }, [branding.accent, branding.gradient])
 
     return (
         <>
