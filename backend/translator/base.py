@@ -26,7 +26,17 @@ _SYSTEM_PROMPT_TEMPLATE = """You are a professional game translator specializing
 
 ## Output Format
 
-Return a valid JSON object with this structure:
+{output_format_section}
+
+For suggested_terms: identify any recurring proper nouns, character names, skill names, status effects, or game-specific terms that should be added to the glossary for consistency. Only suggest terms that:
+- Appear in multiple strings or are clearly important named entities
+- Are NOT already in the glossary above
+- Are proper nouns, skill/buff/item names, or game mechanics
+
+If no terms to suggest, return an empty array."""
+
+# Output format section with translations as a key -> text object. Formatted with `source_lang`.
+DICT_OUTPUT_FORMAT = """Return a valid JSON object with this structure:
 ```json
 {{
   "translations": {{
@@ -45,14 +55,29 @@ Return a valid JSON object with this structure:
 }}
 ```
 
-Translate ONLY the values. Keys must remain unchanged.
+Translate ONLY the values. Keys must remain unchanged."""
 
-For suggested_terms: identify any recurring proper nouns, character names, skill names, status effects, or game-specific terms that should be added to the glossary for consistency. Only suggest terms that:
-- Appear in multiple strings or are clearly important named entities
-- Are NOT already in the glossary above
-- Are proper nouns, skill/buff/item names, or game mechanics
+# Output format section with translations as a list of key/text items, for providers whose JSON schema cannot hold arbitrary keys.
+ITEMS_OUTPUT_FORMAT = """Return a valid JSON object with this structure:
+```json
+{{
+  "translations": [
+    {{"key": "Buff/B_Example_Name", "text": "Example Buff"}},
+    {{"key": "Buff/B_Example_Description", "text": "Deals &a damage to all enemies."}}
+  ],
+  "suggested_terms": [
+    {{
+      "english": "Term Name",
+      "source": "원본 텍스트",
+      "source_lang": "{source_lang}",
+      "category": "characters|skills|buffs|items|mechanics",
+      "reason": "Brief reason why this should be a glossary term"
+    }}
+  ]
+}}
+```
 
-If no terms to suggest, return an empty array."""
+Give one translations item per string. Copy each key exactly into `key` and put the translation in `text`."""
 
 
 def build_style_examples_section(examples: dict[str, list[tuple[str, str]]]) -> str:
@@ -139,6 +164,9 @@ class TranslationProvider(ABC):
     English and return {key: english_translation} mappings.
     """
 
+    # Output format section shown in the system prompt. Providers that request a JSON schema override it to match.
+    output_format_template: str = DICT_OUTPUT_FORMAT
+
     @property
     @abstractmethod
     def name(self) -> str:
@@ -223,6 +251,7 @@ class TranslationProvider(ABC):
             style_examples_section=style_examples_section,
             glossary_section=glossary_section,
             character_context_section=character_context_section,
+            output_format_section=self.output_format_template.format(source_lang=source_lang),
         )
         # Collapse runs of blank lines left by empty template sections.
         while "\n\n\n" in system_prompt:
@@ -302,8 +331,9 @@ class TranslationProvider(ABC):
         """Parse a JSON response from the LLM into translations and suggestions.
 
         Strips markdown code fences, then extracts the translations dict and
-        suggested_terms list. Supports both the structured format
-        (`{"translations": {...}, "suggested_terms": [...]}`) and the legacy
+        suggested_terms list. Supports the structured format
+        (`{"translations": {...}, "suggested_terms": [...]}`), its item-list
+        form (`"translations": [{"key": ..., "text": ...}]`), and the legacy
         flat format (`{"key": "translation", ...}`).
 
         Args:
@@ -329,8 +359,12 @@ class TranslationProvider(ABC):
             if isinstance(result, dict):
                 expected_keys = {k for k, _ in entries}
 
-                if "translations" in result and isinstance(result["translations"], dict):
-                    translations = {k: v.replace("\\n", "\n") for k, v in result["translations"].items() if k in expected_keys and isinstance(v, str)}
+                items = result.get("translations")
+                if isinstance(items, list):
+                    # Structured-output form: a list of {"key", "text"} items.
+                    items = {i.get("key"): i.get("text") for i in items if isinstance(i, dict)}
+                if isinstance(items, dict):
+                    translations = {k: v.replace("\\n", "\n") for k, v in items.items() if k in expected_keys and isinstance(v, str)}
                     suggestions = result.get("suggested_terms", [])
                     if not isinstance(suggestions, list):
                         suggestions = []

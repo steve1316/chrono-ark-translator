@@ -167,21 +167,45 @@ def test_translate_batch_reads_the_text_block_after_a_thinking_block(monkeypatch
 def test_translate_batch_disables_thinking_for_sonnet_5(monkeypatch):
     text = json.dumps({"translations": {"k1": "Test"}, "suggested_terms": []})
     _run_batch(monkeypatch, "claude-sonnet-5", [_Block("text", text=text)])
-    assert _FakeAnthropic.last_kwargs["extra_body"] == {"thinking": {"type": "disabled"}}
+    assert _FakeAnthropic.last_kwargs["extra_body"]["thinking"] == {"type": "disabled"}
 
 
 def test_translate_batch_uses_low_effort_for_opus_5_models(monkeypatch):
     text = json.dumps({"translations": {"k1": "Test"}, "suggested_terms": []})
     for model in ("claude-opus-5", "claude-opus-5-5"):
         _run_batch(monkeypatch, model, [_Block("text", text=text)])
-        assert _FakeAnthropic.last_kwargs["extra_body"] == {"output_config": {"effort": "low"}}
+        assert _FakeAnthropic.last_kwargs["extra_body"]["output_config"]["effort"] == "low"
+        assert _FakeAnthropic.last_kwargs["extra_body"]["output_config"]["format"]["type"] == "json_schema"
 
 
-def test_translate_batch_sends_no_extra_options_for_older_models(monkeypatch):
+def test_translate_batch_sends_only_the_output_format_for_older_models(monkeypatch):
     text = json.dumps({"translations": {"k1": "Test"}, "suggested_terms": []})
     for model in ("claude-sonnet-4-6", "claude-haiku-4-5"):
         _run_batch(monkeypatch, model, [_Block("text", text=text)])
-        assert "extra_body" not in _FakeAnthropic.last_kwargs
+        assert list(_FakeAnthropic.last_kwargs["extra_body"]) == ["output_config"]
+        assert list(_FakeAnthropic.last_kwargs["extra_body"]["output_config"]) == ["format"]
+
+
+def test_translate_batch_requests_a_json_schema_with_translations_as_key_text_items(monkeypatch):
+    text = json.dumps({"translations": [{"key": "k1", "text": "Test"}], "suggested_terms": []})
+    translations, _ = _run_batch(monkeypatch, "claude-sonnet-5", [_Block("text", text=text)])
+    schema = _FakeAnthropic.last_kwargs["extra_body"]["output_config"]["format"]["schema"]
+    item = schema["properties"]["translations"]["items"]
+    assert item["required"] == ["key", "text"] and item["additionalProperties"] is False
+    assert translations == {"k1": "Test"}
+
+
+def test_claude_system_prompt_shows_translations_as_key_text_items():
+    system_prompt, _ = ClaudeProvider(api_key="x").build_prompt([("k1", "a")], "Chinese", "")
+    assert '"key":' in system_prompt and '"text":' in system_prompt
+
+
+def test_parse_response_accepts_translations_as_key_text_items():
+    provider = ClaudeProvider.__new__(ClaudeProvider)
+    response = json.dumps({"translations": [{"key": "k1", "text": "Line one\\nLine two"}, {"key": "stray", "text": "x"}], "suggested_terms": [{"english": "Cathay"}]})
+    translations, suggestions = provider._parse_response(response, [("k1", "a")])
+    assert translations == {"k1": "Line one\nLine two"}
+    assert suggestions == [{"english": "Cathay"}]
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////

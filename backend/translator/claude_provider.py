@@ -9,7 +9,7 @@ import time
 from typing import Optional
 from backend import config
 from backend.translation.orchestrator import chunk_entries
-from backend.translator.base import TranslationProvider
+from backend.translator.base import ITEMS_OUTPUT_FORMAT, TranslationProvider
 
 
 CLAUDE_MODELS: dict[str, dict] = {
@@ -25,6 +25,33 @@ _DEFAULT_PRICING = CLAUDE_MODELS["claude-sonnet-5"]
 # Output token cap per request. A batch whose reply hits it is split in half and retried.
 MAX_OUTPUT_TOKENS = 16384
 
+
+def _object_schema(properties: dict) -> dict:
+    """Build a closed JSON-schema object whose properties are all required.
+
+    Args:
+        properties: Property name -> schema.
+
+    Returns:
+        The object schema.
+    """
+    return {"type": "object", "properties": properties, "required": list(properties), "additionalProperties": False}
+
+
+_STRING = {"type": "string"}
+
+# Structured-output schema for translation replies. The API guarantees the reply parses and matches it, so a stray quote in a translation cannot break
+# the JSON. Objects must be closed, so translations are key/text items instead of a key -> text object.
+TRANSLATION_SCHEMA = _object_schema(
+    {
+        "translations": {"type": "array", "items": _object_schema({"key": _STRING, "text": _STRING})},
+        "suggested_terms": {
+            "type": "array",
+            "items": _object_schema({"english": _STRING, "source": _STRING, "source_lang": _STRING, "category": _STRING, "reason": _STRING}),
+        },
+    }
+)
+
 # Extra request fields per model, sent via `extra_body` so they work on SDK versions that predate them. Translation does not need
 # thinking and thinking tokens bill as output. Sonnet 5 can turn it off. The Opus 5 models think by default (Opus 5.5 cannot disable it),
 # so they run at low effort instead. Older models do not think unless asked, so they need nothing.
@@ -33,6 +60,20 @@ _MODEL_REQUEST_OPTIONS: dict[str, dict] = {
     "claude-opus-5": {"output_config": {"effort": "low"}},
     "claude-opus-5-5": {"output_config": {"effort": "low"}},
 }
+
+
+def _request_extra_body(model: str) -> dict:
+    """Build the `extra_body` fields for a translation request: the model's options plus the structured-output format.
+
+    Args:
+        model: Claude model id.
+
+    Returns:
+        Dict to send as `extra_body`.
+    """
+    options = _MODEL_REQUEST_OPTIONS.get(model, {})
+    output_config = {**options.get("output_config", {}), "format": {"type": "json_schema", "schema": TRANSLATION_SCHEMA}}
+    return {**options, "output_config": output_config}
 
 
 def _response_text(response) -> str:
@@ -66,6 +107,8 @@ class ClaudeProvider(TranslationProvider):
         _api_key: Anthropic API key for authentication.
         _model: Claude model identifier to use for requests.
     """
+
+    output_format_template = ITEMS_OUTPUT_FORMAT
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         """Initialize the Claude translation provider.
@@ -144,8 +187,7 @@ class ClaudeProvider(TranslationProvider):
             "system": system_prompt,
             "messages": [{"role": "user", "content": user_message}],
         }
-        if self._model in _MODEL_REQUEST_OPTIONS:
-            request["extra_body"] = _MODEL_REQUEST_OPTIONS[self._model]
+        request["extra_body"] = _request_extra_body(self._model)
         response = self._create_with_retries(client, request)
         raw_text = _response_text(response)
         stop_reason = getattr(response, "stop_reason", None)
