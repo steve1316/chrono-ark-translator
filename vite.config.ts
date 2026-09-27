@@ -19,6 +19,12 @@ export default defineConfig({
   define: {
     __API_PORT__: JSON.stringify(apiPort),
   },
+  server: {
+    watch: {
+      // steamcmd writes locked temp files under backend/storage that crash the watcher with EBUSY on Windows.
+      ignored: ["**/backend/**", "**/vanilla_text_*/**"],
+    },
+  },
   test: {
     globals: true,
     environment: "jsdom",
