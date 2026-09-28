@@ -50,6 +50,13 @@ describe("PublishWorkshopDialog changenote", () => {
         expect(screen.getByRole("textbox")).toHaveValue("")
     })
 
+    it("shows a neutral message when no note is generated and there are no errors", async () => {
+        mockChangeNotes({ notes: { "999": null }, errors: [] })
+        renderDialog()
+        expect(await screen.findByText("No generated changenote for this pack.")).toBeInTheDocument()
+        expect(screen.getByRole("textbox")).toHaveValue("")
+    })
+
     it("shows a warning when the change-notes request fails", async () => {
         mockChangeNotes({ detail: "boom" }, 500)
         renderDialog()

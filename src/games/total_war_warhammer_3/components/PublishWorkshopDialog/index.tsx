@@ -72,7 +72,7 @@ const PublishWorkshopDialog = ({ workshopId, title, onClose, prepare }: PublishW
                 const result = notes[workshopId]
                 if (!result) {
                     setNoteState("error")
-                    setNoteMessage(`Couldn't generate a changenote: ${errors[0] ?? "no note is available for this item"}`)
+                    setNoteMessage(errors.length > 0 ? `Couldn't generate a changenote: ${errors[0]}` : "No generated changenote for this pack.")
                 } else if (!result.pending) {
                     setNoteState("unchanged")
                     setNoteMessage("No changes since the last recorded upload.")
