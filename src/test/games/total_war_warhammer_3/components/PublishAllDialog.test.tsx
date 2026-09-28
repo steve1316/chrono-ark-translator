@@ -135,6 +135,21 @@ describe("PublishAllDialog", () => {
         expect(screen.getByRole("button", { name: "Edit changenote for Mod Beta" })).toHaveTextContent("No changes")
     })
 
+    it("keeps the generated note for an unchanged row so re-checking it enables Publish All and sends that note", async () => {
+        mockFetch({ notes: { "111": NOTES.notes["111"], "222": { note: "Beta unchanged note", pending: false, kind: "compat" } }, errors: [] })
+        render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
+        await waitFor(() => expect(screen.getAllByRole("checkbox")[1]).not.toBeChecked())
+
+        fireEvent.click(screen.getAllByRole("checkbox")[1])
+        expect(screen.getByRole("button", { name: /publish all/i })).not.toBeDisabled()
+
+        fireEvent.click(screen.getByRole("button", { name: /publish all/i }))
+        await waitFor(() => {
+            const body = publishAllBody()
+            expect(body?.items).toContainEqual({ workshop_id: "222", title: "Mod Beta", changenote: "Beta unchanged note" })
+        })
+    })
+
     it("opens an empty editor and blocks publishing when a note could not be generated", async () => {
         mockFetch({ notes: { "111": NOTES.notes["111"], "222": null }, errors: ["helper_scripts path is not configured"] })
         render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)

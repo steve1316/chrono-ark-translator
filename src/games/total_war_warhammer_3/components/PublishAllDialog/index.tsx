@@ -82,7 +82,8 @@ interface LogEntry {
 }
 
 /**
- * Fold one generated changenote into a row. Changed mods get the note, unchanged ones start unchecked, and failures open an empty editor.
+ * Fold one generated changenote into a row. Changed mods get the note, unchanged ones start unchecked but keep the note so re-checking them
+ * still has text to send, and failures open an empty editor.
  *
  * @param row The row to update.
  * @param result The generated note for the row, or null/undefined when none could be generated.
@@ -91,7 +92,7 @@ interface LogEntry {
 function applyNote(row: ModRow, result: ChangeNote | null | undefined): ModRow {
     if (row.noteState !== "loading") return row
     if (!result) return { ...row, noteState: "error", expanded: true }
-    if (!result.pending) return { ...row, noteState: "unchanged", selected: false }
+    if (!result.pending) return { ...row, noteState: "unchanged", selected: false, note: row.note || result.note }
     return { ...row, noteState: "ready", note: row.note || result.note }
 }
 
