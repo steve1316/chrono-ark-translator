@@ -16,8 +16,10 @@ from pathlib import Path
 from backend import config
 from backend.games.total_war_warhammer_3.routes._paths import helper_scripts_path
 
-# `preview` hashes each pack, which can take a while for large packs.
+# `preview` hashes each pack, which can take a while for large packs. Publish All sends every pack in one call,
+# so the timeout scales with how many ids are requested instead of a single fixed budget.
 PREVIEW_TIMEOUT_SECONDS = 60
+PER_PACK_SECONDS = 15
 RECORD_TIMEOUT_SECONDS = 30
 
 
@@ -78,7 +80,8 @@ def preview(ids: list[str]) -> dict[str, dict | None]:
     """
     if not ids:
         return {}
-    stdout = _run_cli(["preview", *ids], PREVIEW_TIMEOUT_SECONDS)
+    timeout = PREVIEW_TIMEOUT_SECONDS + PER_PACK_SECONDS * len(ids)
+    stdout = _run_cli(["preview", *ids], timeout)
     # Helper imports may print before the JSON, so only the last non-empty line is parsed.
     lines = [line for line in stdout.splitlines() if line.strip()]
     try:

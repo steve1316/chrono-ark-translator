@@ -58,6 +58,18 @@ def test_preview_with_no_ids_skips_the_cli(helper_dir, monkeypatch):
     assert calls == []
 
 
+def test_preview_timeout_grows_with_the_number_of_ids(helper_dir, monkeypatch):
+    calls: list = []
+    _fake_run(monkeypatch, stdout='{"1": null}\n', calls=calls)
+    ccn.preview(["1"])
+
+    calls.clear()
+    _fake_run(monkeypatch, stdout='{"1": null, "2": null, "3": null}\n', calls=calls)
+    ccn.preview(["1", "2", "3"])
+
+    assert calls[0]["timeout"] == ccn.PREVIEW_TIMEOUT_SECONDS + ccn.PER_PACK_SECONDS * 3
+
+
 def test_preview_raises_when_helper_path_unset(monkeypatch):
     monkeypatch.setattr(config, "TW3_HELPER_PATH", "")
 
