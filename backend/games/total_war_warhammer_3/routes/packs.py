@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from backend import config
+from backend.games.total_war_warhammer_3 import publish_notes
 from backend.games.total_war_warhammer_3 import workshop_batch_publisher as wbp
 from backend.games.total_war_warhammer_3 import workshop_publisher as wp
 from backend.games.total_war_warhammer_3.routes._paths import tw3_workshop_content_dir
@@ -120,6 +121,27 @@ def open_pack_folder(workshop_id: str):
         return {"status": "success"}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to open folder: {exc}")
+
+
+class ChangeNotesBody(BaseModel):
+    """Request body for POST /packs/change-notes."""
+
+    ids: list[str]
+    """ Workshop ids to generate changenotes for. Non-numeric and duplicate ids are ignored. """
+
+
+@router.post("/packs/change-notes")
+def post_change_notes(body: ChangeNotesBody):
+    """Generate a Workshop changenote for each requested item from what changed since its last recorded upload.
+
+    Args:
+        body: Request body with the Workshop `ids`.
+
+    Returns:
+        `{"notes": {id: {"note", "pending", "kind"} | None}, "errors": [str]}`. Builder failures land in `errors` and map their ids to None.
+    """
+    ids = [wid for wid in dict.fromkeys(body.ids) if _WORKSHOP_ID_RE.fullmatch(wid)]
+    return publish_notes.change_notes_for(ids)
 
 
 class PublishBody(BaseModel):
