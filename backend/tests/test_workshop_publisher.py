@@ -7,6 +7,7 @@ the real `steamcmd.exe`.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -95,3 +96,63 @@ def test_preflight_returns_steamcmd_path_when_all_set(tmp_path):
     fake_steamcmd.write_text("")
     result = wp._preflight(str(fake_steamcmd), "user", folder)
     assert result == fake_steamcmd
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# on_exit hook
+
+
+class _FakeProc:
+    """Stand-in for `subprocess.Popen` with canned stdout lines and a fixed return code."""
+
+    def __init__(self, lines: list[str], returncode: int):
+        self.stdout = iter(lines)
+        self.returncode = returncode
+
+    def wait(self) -> int:
+        return self.returncode
+
+
+def _handle() -> wp.PublishHandle:
+    """Build a fresh publish handle for reader-thread tests."""
+    return wp.PublishHandle(publish_id="p", workshop_id="1", started_at=datetime.now(timezone.utc))
+
+
+def test_reader_thread_runs_on_exit_before_the_exit_code_is_published(tmp_path):
+    handle = _handle()
+    seen: list = []
+
+    wp._reader_thread(_FakeProc(["uploading\n"], 0), handle, tmp_path / "x.vdf", lambda code: seen.append((code, handle.exit_code)))
+
+    assert seen == [(0, None)]
+    assert handle.exit_code == 0
+
+
+def test_reader_thread_passes_failed_exit_codes_to_on_exit(tmp_path):
+    seen: list = []
+
+    wp._reader_thread(_FakeProc([], 7), _handle(), tmp_path / "x.vdf", seen.append)
+
+    assert seen == [7]
+
+
+def test_reader_thread_logs_a_failed_recording_as_a_line(tmp_path):
+    wp._log.clear()
+    handle = _handle()
+
+    def on_exit(code):
+        raise RuntimeError("disk full")
+
+    wp._reader_thread(_FakeProc(["uploading\n"], 0), handle, tmp_path / "x.vdf", on_exit)
+
+    assert [entry.line for entry in wp._log] == ["uploading", "Published, but recording the upload failed: disk full"]
+    assert handle.exit_code == 0
+
+
+def test_reader_thread_without_on_exit_still_finishes(tmp_path):
+    handle = _handle()
+
+    wp._reader_thread(_FakeProc([], 0), handle, tmp_path / "x.vdf", None)
+
+    assert handle.exit_code == 0

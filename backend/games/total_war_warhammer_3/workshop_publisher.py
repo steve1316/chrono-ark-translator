@@ -22,7 +22,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncIterator, Callable
 
 from backend.games.total_war_warhammer_3.routes._paths import TW3_APPID
 
@@ -193,6 +193,7 @@ def start_publish(
     steamcmd_path: str,
     steam_username: str,
     appid: str = TW3_APPID,
+    on_exit: Callable[[int | None], None] | None = None,
 ) -> PublishHandle:
     """Spawn `steamcmd +workshop_build_item` for an existing Workshop item. Single-flight.
 
@@ -207,6 +208,7 @@ def start_publish(
         steamcmd_path: Path to `steamcmd.exe` (from `config.STEAMCMD_PATH`).
         steam_username: Steam account username (from `config.STEAM_USERNAME`).
         appid: Steam app id; defaults to TW3.
+        on_exit: Called with SteamCMD's return code once it exits, before the publish is reported as done. Used to record the upload.
 
     Raises:
         PublisherPreflightError: When required settings/paths are missing.
@@ -257,17 +259,18 @@ def start_publish(
         _log.clear()
         _event_new_line.clear()
 
-    threading.Thread(target=_reader_thread, args=(proc, handle, vdf_path), daemon=True).start()
+    threading.Thread(target=_reader_thread, args=(proc, handle, vdf_path, on_exit), daemon=True).start()
     return handle
 
 
-def _reader_thread(proc: subprocess.Popen, handle: PublishHandle, vdf_path: Path) -> None:
-    """Daemon thread: read stdout into `_log`, notify SSE consumers, clean up the VDF file.
+def _reader_thread(proc: subprocess.Popen, handle: PublishHandle, vdf_path: Path, on_exit: Callable[[int | None], None] | None = None) -> None:
+    """Daemon thread: read stdout into `_log`, notify SSE consumers, run `on_exit`, clean up the VDF file.
 
     Args:
         proc: The Popen object whose stdout to drain.
         handle: The `PublishHandle` to update on exit.
         vdf_path: Tempfile path to delete once SteamCMD has exited.
+        on_exit: Optional hook called with SteamCMD's return code. A failure inside it is logged as a line instead of failing the publish.
     """
     assert proc.stdout is not None
     for raw in proc.stdout:
@@ -275,6 +278,12 @@ def _reader_thread(proc: subprocess.Popen, handle: PublishHandle, vdf_path: Path
         _log.append(_LogLine(line=line, ts=datetime.now(timezone.utc)))
         _event_new_line.set()
     proc.wait()
+    # Run the hook before exit_code is set, since `stream_lines` ends the stream as soon as it sees exit_code.
+    if on_exit is not None:
+        try:
+            on_exit(proc.returncode)
+        except Exception as exc:
+            _log.append(_LogLine(line=f"Published, but recording the upload failed: {exc}", ts=datetime.now(timezone.utc)))
     handle.exit_code = proc.returncode
     handle.ended_at = datetime.now(timezone.utc)
     _event_new_line.set()

@@ -180,6 +180,8 @@ def post_pack_publish(workshop_id: str, body: PublishBody):
     if folder is None or not folder.is_dir():
         raise HTTPException(status_code=404, detail="workshop folder not found")
 
+    # Capture what is about to be uploaded so a successful publish can be recorded for the next changenote.
+    on_exit = publish_notes.make_recorder(workshop_id, body.changenote)
     try:
         handle = wp.start_publish(
             workshop_id,
@@ -187,6 +189,7 @@ def post_pack_publish(workshop_id: str, body: PublishBody):
             body.changenote,
             steamcmd_path=config.STEAMCMD_PATH,
             steam_username=config.STEAM_USERNAME,
+            on_exit=on_exit,
         )
     except wp.PublisherPreflightError as exc:
         raise HTTPException(status_code=400, detail={"missing": exc.missing})

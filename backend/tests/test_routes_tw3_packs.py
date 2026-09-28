@@ -4,11 +4,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend import config
+from backend.games.total_war_warhammer_3 import publish_notes
 from backend.games.total_war_warhammer_3.routes._paths import tw3_workshop_content_dir
 from backend.web_server import app
+
+
+@pytest.fixture(autouse=True)
+def _no_real_recorders(monkeypatch):
+    """Keep publish routes from running the real change note CLI or touching translation baselines."""
+    monkeypatch.setattr(publish_notes, "make_recorder", lambda workshop_id, changenote: None)
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -255,7 +263,7 @@ def test_publish_returns_handle_on_success(monkeypatch, tmp_path):
 
     captured: dict = {}
 
-    def fake_start_publish(workshop_id, content_folder, changenote, *, steamcmd_path, steam_username):
+    def fake_start_publish(workshop_id, content_folder, changenote, *, steamcmd_path, steam_username, **_kw):
         captured["workshop_id"] = workshop_id
         captured["changenote"] = changenote
         captured["content_folder"] = content_folder
@@ -274,6 +282,34 @@ def test_publish_returns_handle_on_success(monkeypatch, tmp_path):
 def test_publish_stream_returns_400_when_workshop_id_non_numeric():
     res = TestClient(app).get("/api/games/total_war_warhammer_3/packs/abc/publish/stream")
     assert res.status_code == 400
+
+
+def test_publish_hands_the_recorder_to_start_publish(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    (parent / "999").mkdir()
+    made: list = []
+
+    def recorder(exit_code):
+        pass
+
+    def fake_make_recorder(workshop_id, changenote):
+        made.append((workshop_id, changenote))
+        return recorder
+
+    captured: dict = {}
+
+    def fake_start_publish(workshop_id, content_folder, changenote, *, steamcmd_path, steam_username, on_exit=None, **_kw):
+        captured["on_exit"] = on_exit
+        return _make_handle(workshop_id)
+
+    monkeypatch.setattr(publish_notes, "make_recorder", fake_make_recorder)
+    monkeypatch.setattr(wp, "start_publish", fake_start_publish)
+
+    res = TestClient(app).post("/api/games/total_war_warhammer_3/packs/999/publish", json={"changenote": "fix typo"})
+
+    assert res.status_code == 200
+    assert made == [("999", "fix typo")]
+    assert captured["on_exit"] is recorder
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////
