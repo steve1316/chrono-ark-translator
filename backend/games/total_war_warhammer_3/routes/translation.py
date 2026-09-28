@@ -34,6 +34,7 @@ from backend.games.total_war_warhammer_3 import (
     snapshot_store,
     translation_store_helpers as store,
 )
+from backend.games.total_war_warhammer_3 import translation_change_notes as tcn
 from backend.games.total_war_warhammer_3.adapter import TotalWarWarhammer3Adapter
 from backend.games.total_war_warhammer_3.name_spacing import glossary_words, space_pinyin_names
 from backend.games.total_war_warhammer_3.canonical_status import to_status_rows
@@ -465,6 +466,25 @@ def rescan(mod_id: str) -> RescanSummary:
     )
 
 
+def _drift_and_overlay(mod_id: str, mod: WH3TranslationMod) -> tuple[list[DriftRow], dict, list[DriftRow]]:
+    """Compute a mod's drift rows and overlay `translations.json` onto them.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+        mod: The registered translation mod.
+
+    Returns:
+        `(drift, raw_translations, overlaid)`, where `overlaid` has `translations.json` applied and orphan rows removed.
+    """
+    parent = _extract_all_parent_strings(mod)
+    translation = _extract_translation_strings(mod)
+    drift = compute_drift(parent=parent, translation=translation, snapshot=store.load_parent_snapshot(mod_id))
+    raw_translations = store.load_translations_raw(mod_id)
+    # Orphan strings (translated keys whose parent source no longer exists) are hidden from the table; they are pruned from disk on the next sync.
+    overlaid = [r for r in _overlay_translations(drift, raw_translations) if r.status != "orphan"]
+    return drift, raw_translations, overlaid
+
+
 @router.get("/mods/{mod_id}/strings")
 def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stale", "orphan"] | None = None) -> list[dict]:
     """Return drift rows for a mod, optionally filtered by status.
@@ -484,23 +504,34 @@ def get_strings(mod_id: str, status: Literal["translated", "untranslated", "stal
         HTTPException: 404 if `mod_id` is not registered.
     """
     mod = _require_mod(mod_id)
-    parent = _extract_all_parent_strings(mod)
-    translation = _extract_translation_strings(mod)
-    snapshot = store.load_parent_snapshot(mod_id)
-
-    drift = compute_drift(parent=parent, translation=translation, snapshot=snapshot)
-
-    raw_translations = store.load_translations_raw(mod_id)
+    drift, raw_translations, overlaid = _drift_and_overlay(mod_id, mod)
     # Pre-overlay translation_text is the on-disk .loc.tsv value - the "previous" translation (analogous to Chrono Ark's original_english).
     previous_by_key = {r.key: r.translation_text for r in drift}
-    # Orphan strings (translated keys whose parent source no longer exists) are hidden from the table; they are pruned from disk on the next sync.
-    overlaid = [r for r in _overlay_translations(drift, raw_translations) if r.status != "orphan"]
     canonical = {(r.source_file, r.key): r.status for r in to_status_rows(drift, raw_translations)}
 
     if status:
         overlaid = [r for r in overlaid if r.status == status]
 
     return [{**_serialize_drift_row(r), "canonical_status": canonical.get((r.source_filename, r.key)), "previous_text": previous_by_key.get(r.key)} for r in overlaid]
+
+
+def current_shipped_strings(mod_id: str) -> dict[str, dict[str, str]]:
+    """Return what the next publish of a mod will ship, hashed for changenote diffing.
+
+    Uses the same overlaid rows as `get_strings`, which are what Sync writes, so the result is already right before the sync-first step has run.
+
+    Args:
+        mod_id: Steam Workshop ID of the translation mod.
+
+    Returns:
+        `{source_filename: {key: hash}}` from `translation_change_notes.shipped_strings`.
+
+    Raises:
+        HTTPException: 404 if `mod_id` is not registered.
+    """
+    mod = _require_mod(mod_id)
+    _, _, overlaid = _drift_and_overlay(mod_id, mod)
+    return tcn.shipped_strings(overlaid)
 
 
 @router.put("/mods/{mod_id}/strings/{key}")
