@@ -164,6 +164,38 @@ export function publishStreamUrl(workshopId: string): string {
     return api.url(`/packs/${encodeURIComponent(workshopId)}/publish/stream`)
 }
 
+/** One generated Workshop changenote returned by `fetchChangeNotes`. */
+export interface ChangeNote {
+    /** Generated note text in Steam BBCode, ready to edit or send. */
+    note: string
+    /** Whether the item changed since its last recorded upload. False means there is nothing new to publish. */
+    pending: boolean
+    /** Which generator produced the note: totalwar-modding's compat notes or the translation baseline diff. */
+    kind: "compat" | "translation"
+}
+
+/** Response of `fetchChangeNotes`. */
+export interface ChangeNotesResponse {
+    /** Workshop id mapped to its generated note, or null when none could be generated. */
+    notes: Record<string, ChangeNote | null>
+    /** Messages from generators that failed, e.g. an unconfigured helper_scripts path. */
+    errors: string[]
+}
+
+/**
+ * Generate a changenote for each Workshop item from what changed since its last recorded upload.
+ *
+ * @param ids Workshop ids of compat packs and/or translation mods.
+ * @returns The generated notes plus any generator errors. Missing fields in the response default to empty.
+ * @throws `RegistryError` On any non-2xx response.
+ */
+export async function fetchChangeNotes(ids: string[]): Promise<ChangeNotesResponse> {
+    const res = await api.post("/packs/change-notes", { ids })
+    if (!res.ok) throw await registryError(res)
+    const body = (await res.json()) as Partial<ChangeNotesResponse>
+    return { notes: body.notes ?? {}, errors: body.errors ?? [] }
+}
+
 /** One mod entry sent in a batch publish request. */
 export interface BatchPublishItem {
     /** Steam Workshop item id. Empty or non-numeric values are filtered server-side into the skipped list. */

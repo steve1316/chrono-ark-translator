@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { fetchSupportedMods, getCurrentRun, publishAllPacks, publishAllStreamUrl, runStreamUrl, startRun } from "../../../games/total_war_warhammer_3/api"
+import { fetchChangeNotes, fetchSupportedMods, getCurrentRun, publishAllPacks, publishAllStreamUrl, runStreamUrl, startRun } from "../../../games/total_war_warhammer_3/api"
 
 afterEach(() => {
     vi.restoreAllMocks()
@@ -56,5 +56,20 @@ describe("tw3 api wrappers", () => {
     it("publishAllStreamUrl returns the per-batch SSE endpoint", () => {
         const url = publishAllStreamUrl("batch-123")
         expect(url).toContain("/api/games/total_war_warhammer_3/packs/publish-all/stream/batch-123")
+    })
+
+    it("fetchChangeNotes POSTs the ids to /packs/change-notes", async () => {
+        const responseBody = { notes: { "111": { note: "n", pending: true, kind: "compat" } }, errors: [] }
+        const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(responseBody), { status: 200 }))
+        const result = await fetchChangeNotes(["111"])
+        const [url, init] = fetchMock.mock.calls[0]
+        expect(String(url)).toContain("/api/games/total_war_warhammer_3/packs/change-notes")
+        expect(JSON.parse(String(init?.body))).toEqual({ ids: ["111"] })
+        expect(result).toEqual(responseBody)
+    })
+
+    it("fetchChangeNotes tolerates a response without notes or errors", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }))
+        expect(await fetchChangeNotes(["111"])).toEqual({ notes: {}, errors: [] })
     })
 })

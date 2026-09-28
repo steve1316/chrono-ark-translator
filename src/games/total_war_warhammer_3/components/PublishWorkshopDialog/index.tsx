@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { publishPack, publishStreamUrl, RegistryError } from "../../api"
+import { fetchChangeNotes, publishPack, publishStreamUrl, RegistryError } from "../../api"
 import Modal from "../../../../ui/Modal"
 
 /** A step the dialog runs before spawning SteamCMD, such as syncing a translation mod. */
@@ -37,6 +37,9 @@ interface LogEntry {
 /** Lifecycle of the publish dialog. */
 type Phase = "idle" | "publishing" | "done" | "error"
 
+/** Lifecycle of the generated changenote: fetching, filled in, nothing changed since the last upload, or could not be generated. */
+type NoteState = "loading" | "ready" | "unchanged" | "error"
+
 /**
  * Modal dialog for pushing a TW3 compat pack update to the Steam Workshop. Collects a changenote, calls the backend `publishPack` endpoint, then opens an `EventSource` to the publish stream and renders each SteamCMD stdout line in a terminal-styled log panel until the run completes. Reuses the styling pattern of `ConfirmModal` and `RunnerLogTerminal`.
  *
@@ -55,6 +58,38 @@ const PublishWorkshopDialog = ({ workshopId, title, onClose, prepare }: PublishW
     const seqRef = useRef(0)
     const sourceRef = useRef<EventSource | null>(null)
     const scrollRef = useRef<HTMLPreElement | null>(null)
+
+    const [noteState, setNoteState] = useState<NoteState>("loading")
+    const [noteMessage, setNoteMessage] = useState<string | null>(null)
+    // Set once the user edits the textarea, so a note that arrives late never overwrites their text.
+    const touchedRef = useRef(false)
+
+    useEffect(() => {
+        let cancelled = false
+        fetchChangeNotes([workshopId])
+            .then(({ notes, errors }) => {
+                if (cancelled) return
+                const result = notes[workshopId]
+                if (!result) {
+                    setNoteState("error")
+                    setNoteMessage(`Couldn't generate a changenote: ${errors[0] ?? "no note is available for this item"}`)
+                } else if (!result.pending) {
+                    setNoteState("unchanged")
+                    setNoteMessage("No changes since the last recorded upload.")
+                } else {
+                    setNoteState("ready")
+                    if (!touchedRef.current) setChangenote(result.note)
+                }
+            })
+            .catch((err: unknown) => {
+                if (cancelled) return
+                setNoteState("error")
+                setNoteMessage(`Couldn't generate a changenote: ${(err as RegistryError).detail || (err as Error).message || "request failed"}`)
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [workshopId])
 
     const append = (line: string, status = false) => {
         seqRef.current += 1
@@ -157,9 +192,12 @@ const PublishWorkshopDialog = ({ workshopId, title, onClose, prepare }: PublishW
                 <span style={{ display: "block", marginBottom: "0.4rem", color: "var(--text-main)" }}>Changenote (shown in the Workshop changelog)</span>
                 <textarea
                     value={changenote}
-                    onChange={(e) => setChangenote(e.target.value)}
+                    onChange={(e) => {
+                        touchedRef.current = true
+                        setChangenote(e.target.value)
+                    }}
                     disabled={phase !== "idle" && phase !== "error"}
-                    rows={3}
+                    rows={6}
                     style={{
                         width: "100%",
                         padding: "0.5rem",
@@ -172,9 +210,10 @@ const PublishWorkshopDialog = ({ workshopId, title, onClose, prepare }: PublishW
                         resize: "vertical",
                         boxSizing: "border-box",
                     }}
-                    placeholder="e.g. Resync against latest game patch"
+                    placeholder={noteState === "loading" ? "Generating changenote..." : "e.g. Resync against latest game patch"}
                 />
             </label>
+            {noteMessage && <p style={{ color: "var(--text-dim)", marginTop: "-0.5rem", marginBottom: "1rem", fontSize: "0.85rem", lineHeight: 1.4 }}>{noteMessage}</p>}
 
             {errorMessage && (
                 <div
