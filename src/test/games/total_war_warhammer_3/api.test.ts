@@ -30,27 +30,26 @@ describe("tw3 api wrappers", () => {
         expect(runStreamUrl()).toContain("/api/games/total_war_warhammer_3/run/stream")
     })
 
-    it("publishAllPacks POSTs /packs/publish-all with changenote and items", async () => {
+    it("publishAllPacks POSTs /packs/publish-all with a changenote per item", async () => {
         const responseBody = { batch_id: "abc", started_at: "2026-05-27T00:00:00Z", queued: 2, skipped: [] }
         const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(responseBody), { status: 200 }))
         const items = [
-            { workshop_id: "111", title: "Mod A" },
-            { workshop_id: "222", title: "Mod B" },
+            { workshop_id: "111", title: "Mod A", changenote: "note A" },
+            { workshop_id: "222", title: "Mod B", changenote: "note B" },
         ]
-        const result = await publishAllPacks("shared changelog", items)
+        const result = await publishAllPacks(items)
         const [url, init] = fetchMock.mock.calls[0]
         expect(String(url)).toContain("/api/games/total_war_warhammer_3/packs/publish-all")
         expect(init?.method).toBe("POST")
         const body = JSON.parse(String(init?.body))
-        expect(body.changenote).toBe("shared changelog")
-        expect(body.items).toEqual(items)
+        expect(body).toEqual({ items })
         expect(result.batch_id).toBe("abc")
         expect(result.queued).toBe(2)
     })
 
     it("publishAllPacks throws RegistryError when the backend returns a non-2xx response", async () => {
         vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ detail: "boom" }), { status: 409 }))
-        await expect(publishAllPacks("notes", [{ workshop_id: "111", title: "X" }])).rejects.toThrow()
+        await expect(publishAllPacks([{ workshop_id: "111", title: "X", changenote: "notes" }])).rejects.toThrow()
     })
 
     it("publishAllStreamUrl returns the per-batch SSE endpoint", () => {

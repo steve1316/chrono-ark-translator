@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 
-import { publishAllPacks, publishAllStreamUrl, RegistryError, type BatchPublishHandle, type BatchPublishItem } from "../../api"
+import { fetchChangeNotes, publishAllPacks, publishAllStreamUrl, RegistryError, type BatchPublishHandle, type BatchPublishItem, type ChangeNote } from "../../api"
 import Modal from "../../../../ui/Modal"
 
 /** One pack entry as the Dashboard hands them in. */
@@ -29,6 +29,32 @@ type ModStatus = "pending" | "publishing" | "done" | "failed" | "skipped"
 /** Three-phase lifecycle: pre-batch confirmation, in-flight, all-done summary. */
 type Phase = "confirming" | "running" | "done"
 
+/** Lifecycle of a row's generated changenote: fetching, filled in, nothing changed since the last upload, or could not be generated. */
+type NoteState = "loading" | "ready" | "unchanged" | "error"
+
+/** Label on each row's note button for every note state. */
+const NOTE_LABELS: Record<NoteState, string> = {
+    loading: "Generating...",
+    ready: "Note",
+    unchanged: "No changes",
+    error: "Needs note",
+}
+
+/** Shared look of the per-row changenote editors. */
+const TEXTAREA_STYLE: CSSProperties = {
+    width: "100%",
+    marginTop: "0.5rem",
+    padding: "0.5rem",
+    background: "rgba(0,0,0,0.25)",
+    color: "var(--text-main)",
+    border: "1px solid var(--border-dim, rgba(255,255,255,0.15))",
+    borderRadius: 6,
+    fontFamily: "inherit",
+    fontSize: "0.85rem",
+    resize: "vertical",
+    boxSizing: "border-box",
+}
+
 /** One row in the per-mod status list rendered while a batch is running. */
 interface ModRow {
     workshopId: string
@@ -40,6 +66,12 @@ interface ModRow {
     reason: string | null
     /** Whether the user has this row checked for inclusion in the batch. Ignored for pre-skipped rows. */
     selected: boolean
+    /** Changenote sent with this mod's upload. Pre-filled from the generated note and editable before publishing. */
+    note: string
+    /** Where this row's generated note stands. Rows without a workshop id never load one. */
+    noteState: NoteState
+    /** Whether this row's changenote editor is open. */
+    expanded: boolean
 }
 
 /** One line of streamed SteamCMD output, scoped to the mod that emitted it. */
@@ -50,16 +82,29 @@ interface LogEntry {
 }
 
 /**
- * Modal dialog that batches a single changelog across many Workshop publishes. The user enters one changelog, confirms
- * the eligible mod list, and clicks Publish All. The dialog POSTs `/packs/publish-all`, opens an SSE stream against the
- * returned `batch_id`, and surfaces per-mod status badges plus a live SteamCMD log for the currently uploading mod.
+ * Fold one generated changenote into a row. Changed mods get the note, unchanged ones start unchecked, and failures open an empty editor.
+ *
+ * @param row The row to update.
+ * @param result The generated note for the row, or null/undefined when none could be generated.
+ * @returns The updated row. Rows that are not waiting on a note are returned unchanged.
+ */
+function applyNote(row: ModRow, result: ChangeNote | null | undefined): ModRow {
+    if (row.noteState !== "loading") return row
+    if (!result) return { ...row, noteState: "error", expanded: true }
+    if (!result.pending) return { ...row, noteState: "unchanged", selected: false }
+    return { ...row, noteState: "ready", note: row.note || result.note }
+}
+
+/**
+ * Modal dialog that publishes many compat packs to the Workshop, each with its own generated changelog the user can review and edit.
+ * The dialog fetches a generated note per mod, POSTs `/packs/publish-all`, opens an SSE stream against the returned `batch_id`, and
+ * surfaces per-mod status badges plus a live SteamCMD log for the currently uploading mod.
  *
  * @param packs Pack entries to consider. Empty-workshopId entries are pre-marked as skipped.
  * @param onClose Called when the user dismisses the dialog.
  * @returns The rendered modal overlay.
  */
 const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
-    const [changenote, setChangenote] = useState("")
     const [phase, setPhase] = useState<Phase>("confirming")
     const [rows, setRows] = useState<ModRow[]>(() =>
         packs.map((p) => ({
@@ -71,11 +116,15 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
             durationSeconds: null,
             reason: p.workshopId ? null : "no workshopId",
             selected: Boolean(p.workshopId),
+            note: "",
+            noteState: p.workshopId ? "loading" : "ready",
+            expanded: false,
         }))
     )
     const [currentId, setCurrentId] = useState<string | null>(null)
     const [currentLog, setCurrentLog] = useState<LogEntry[]>([])
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
+    const [noteWarning, setNoteWarning] = useState<string | null>(null)
     const seqRef = useRef(0)
     const sourceRef = useRef<EventSource | null>(null)
     const scrollRef = useRef<HTMLPreElement | null>(null)
@@ -84,6 +133,34 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
     const selectedEligible = useMemo(() => eligible.filter((r) => r.selected), [eligible])
     const isRunning = phase === "running"
     const isDone = phase === "done"
+
+    const notesLoading = eligible.some((r) => r.noteState === "loading")
+    const canPublish = !notesLoading && selectedEligible.length > 0 && selectedEligible.every((r) => r.note.trim().length > 0)
+
+    // Generate every eligible mod's note once. Keyed on the ids so a parent re-render passing a new array does not refetch.
+    const idsKey = packs
+        .map((p) => p.workshopId)
+        .filter(Boolean)
+        .join(",")
+    useEffect(() => {
+        const ids = idsKey ? idsKey.split(",") : []
+        if (ids.length === 0) return
+        let cancelled = false
+        fetchChangeNotes(ids)
+            .then(({ notes, errors }) => {
+                if (cancelled) return
+                if (errors.length > 0) setNoteWarning(`Some changenotes could not be generated: ${errors.join("; ")}`)
+                setRows((prev) => prev.map((r) => applyNote(r, notes[r.workshopId])))
+            })
+            .catch((err: unknown) => {
+                if (cancelled) return
+                setNoteWarning(`Couldn't generate changenotes: ${(err as RegistryError).detail || (err as Error).message || "request failed"}`)
+                setRows((prev) => prev.map((r) => applyNote(r, null)))
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [idsKey])
 
     useEffect(() => {
         const el = scrollRef.current
@@ -103,6 +180,10 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
 
     const toggleSelected = (workshopId: string) => {
         setRows((prev) => prev.map((r) => (r.workshopId === workshopId ? { ...r, selected: !r.selected } : r)))
+    }
+
+    const toggleExpanded = (workshopId: string) => {
+        setRows((prev) => prev.map((r) => (r.workshopId === workshopId ? { ...r, expanded: !r.expanded } : r)))
     }
 
     const subscribeToBatch = (batchId: string) => {
@@ -176,7 +257,7 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
     }
 
     const handlePublishAll = async () => {
-        if (changenote.trim().length === 0 || selectedEligible.length === 0) return
+        if (!canPublish) return
         setErrorMessage(null)
 
         // Mark every eligible row the user unchecked as skipped before kicking off so the running view shows them.
@@ -185,11 +266,11 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
             setRows((prev) => prev.map((r) => (deselectedIds.has(r.workshopId) ? { ...r, status: "skipped", reason: "not selected" } : r)))
         }
 
-        const items: BatchPublishItem[] = selectedEligible.map((r) => ({ workshop_id: r.workshopId, title: r.title }))
+        const items: BatchPublishItem[] = selectedEligible.map((r) => ({ workshop_id: r.workshopId, title: r.title, changenote: r.note }))
 
         let handle: BatchPublishHandle
         try {
-            handle = await publishAllPacks(changenote, items)
+            handle = await publishAllPacks(items)
         } catch (err) {
             const reg = err as RegistryError
             if (reg.status === 409) {
@@ -223,60 +304,59 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
 
     return (
         <Modal title="Publish All to Workshop" size="md" onClose={handleClose} closeDisabled={isRunning} closeDisabledReason="Batch publish in progress">
-            <label style={{ display: "block", marginBottom: "1rem" }}>
-                <span style={{ display: "block", marginBottom: "0.4rem", color: "var(--text-main)" }}>Changenote (required - applied to every mod in the batch)</span>
-                <textarea
-                    value={changenote}
-                    onChange={(e) => setChangenote(e.target.value)}
-                    disabled={isRunning || isDone}
-                    rows={3}
-                    style={{
-                        width: "100%",
-                        padding: "0.5rem",
-                        background: "rgba(0,0,0,0.25)",
-                        color: "var(--text-main)",
-                        border: "1px solid var(--border-dim, rgba(255,255,255,0.15))",
-                        borderRadius: 6,
-                        fontFamily: "inherit",
-                        fontSize: "0.9rem",
-                        resize: "vertical",
-                        boxSizing: "border-box",
-                    }}
-                    placeholder="e.g. Resync against latest game patch"
-                />
-            </label>
+            {noteWarning && <p style={{ marginTop: 0, marginBottom: "0.75rem", color: "#fbbf24", fontSize: "0.85rem", lineHeight: 1.4 }}>{noteWarning}</p>}
 
             <p style={{ marginTop: 0, marginBottom: "0.5rem", color: "var(--text-dim)" }}>
-                This will publish {selectedEligible.length} {selectedEligible.length === 1 ? "mod" : "mods"} to the Steam Workshop sharing this changelog:
+                This will publish {selectedEligible.length} {selectedEligible.length === 1 ? "mod" : "mods"} to the Steam Workshop, each with its own changenote:
             </p>
             <ul style={{ listStyle: "none", padding: 0, margin: "0 0 1rem 0", borderRadius: 6, border: "1px solid var(--border-dim, rgba(255,255,255,0.12))" }}>
                 {rows.map((row) => (
                     <li
                         key={row.workshopId || `skip-${row.title}`}
                         style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
                             padding: "0.5rem 0.85rem",
                             borderTop: "1px solid rgba(255,255,255,0.05)",
-                            gap: "1rem",
                             opacity: row.status === "skipped" ? 0.55 : 1,
                         }}
                     >
-                        {phase === "confirming" && row.workshopId && row.status !== "skipped" && (
-                            <input
-                                type="checkbox"
-                                checked={row.selected}
-                                onChange={() => toggleSelected(row.workshopId)}
-                                aria-label={`Include ${row.title} in the batch`}
-                                style={{ cursor: "pointer", flexShrink: 0 }}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
+                            {phase === "confirming" && row.workshopId && row.status !== "skipped" && (
+                                <input
+                                    type="checkbox"
+                                    checked={row.selected}
+                                    onChange={() => toggleSelected(row.workshopId)}
+                                    aria-label={`Include ${row.title} in the batch`}
+                                    style={{ cursor: "pointer", flexShrink: 0 }}
+                                />
+                            )}
+                            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {row.title}
+                                {row.workshopId && <code style={{ marginLeft: "0.5rem", color: "var(--text-dim)" }}>{row.workshopId}</code>}
+                            </span>
+                            {phase === "confirming" && row.workshopId && row.status !== "skipped" && (
+                                <button
+                                    type="button"
+                                    className="btn btn-outline btn-compact"
+                                    onClick={() => toggleExpanded(row.workshopId)}
+                                    disabled={row.noteState === "loading"}
+                                    aria-label={`Edit changenote for ${row.title}`}
+                                    aria-expanded={row.expanded}
+                                >
+                                    {NOTE_LABELS[row.noteState]}
+                                </button>
+                            )}
+                            <StatusBadge row={row} />
+                        </div>
+                        {phase === "confirming" && row.expanded && row.status !== "skipped" && (
+                            <textarea
+                                aria-label={`Changenote for ${row.title}`}
+                                value={row.note}
+                                onChange={(e) => updateRow(row.workshopId, { note: e.target.value })}
+                                rows={5}
+                                style={TEXTAREA_STYLE}
+                                placeholder="Changenote shown in the Workshop changelog"
                             />
                         )}
-                        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {row.title}
-                            {row.workshopId && <code style={{ marginLeft: "0.5rem", color: "var(--text-dim)" }}>{row.workshopId}</code>}
-                        </span>
-                        <StatusBadge row={row} />
                     </li>
                 ))}
             </ul>
@@ -331,7 +411,7 @@ const PublishAllDialog = ({ packs, onClose }: PublishAllDialogProps) => {
                         <button onClick={handleClose} className="btn btn-outline">
                             Cancel
                         </button>
-                        <button onClick={handlePublishAll} disabled={changenote.trim().length === 0 || selectedEligible.length === 0} className="btn btn-primary">
+                        <button onClick={handlePublishAll} disabled={!canPublish} className="btn btn-primary">
                             Publish All
                         </button>
                     </>

@@ -41,20 +41,42 @@ class MockEventSource {
 
 const ORIGINAL_EVENT_SOURCE = (globalThis as unknown as { EventSource: typeof EventSource }).EventSource
 
+const NOTES = {
+    notes: {
+        "111": { note: "Note Alpha", pending: true, kind: "compat" },
+        "222": { note: "Note Beta", pending: true, kind: "compat" },
+    },
+    errors: [],
+}
+
+const BATCH = { batch_id: "batch-1", started_at: "2026-05-27T00:00:00Z", queued: 2, skipped: [] }
+
+/**
+ * Answer the change-notes request with `notes` and every other request with the batch handle.
+ *
+ * @param notes JSON body returned for `/packs/change-notes`.
+ * @returns The fetch spy.
+ */
+const mockFetch = (notes: unknown = NOTES) =>
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => new Response(JSON.stringify(String(input).includes("/packs/change-notes") ? notes : BATCH), { status: 200 }))
+
+/**
+ * Read the JSON body the dialog POSTed to `/packs/publish-all`.
+ *
+ * @returns The parsed body, or null when no publish-all request was made.
+ */
+const publishAllBody = () => {
+    const call = vi.mocked(globalThis.fetch).mock.calls.find(([url]) => String(url).includes("/packs/publish-all"))
+    return call ? JSON.parse(String((call[1] as RequestInit).body)) : null
+}
+
+/** Wait until the generated notes have arrived and Publish All is clickable. */
+const waitForNotes = () => waitFor(() => expect(screen.getByRole("button", { name: /publish all/i })).not.toBeDisabled())
+
 beforeEach(() => {
     MockEventSource.instances.length = 0
     ;(globalThis as unknown as { EventSource: typeof MockEventSource }).EventSource = MockEventSource
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(
-            JSON.stringify({
-                batch_id: "batch-1",
-                started_at: "2026-05-27T00:00:00Z",
-                queued: 2,
-                skipped: [],
-            }),
-            { status: 200 }
-        )
-    )
+    mockFetch()
 })
 
 afterEach(() => {
@@ -73,16 +95,54 @@ const PACKS_WITH_SKIPPED = [
 ]
 
 describe("PublishAllDialog", () => {
-    it("disables the Publish All button when the changenote is empty", () => {
+    it("disables Publish All while the changenotes are generating", () => {
+        vi.spyOn(globalThis, "fetch").mockImplementation(() => new Promise<Response>(() => {}))
         render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
-        const btn = screen.getByRole("button", { name: /publish all/i })
-        expect(btn).toBeDisabled()
+        expect(screen.getByRole("button", { name: /publish all/i })).toBeDisabled()
+        expect(screen.getAllByText("Generating...")).toHaveLength(2)
     })
 
-    it("enables Publish All once the changenote has non-whitespace content", () => {
+    it("enables Publish All once every selected mod has a generated note", async () => {
         render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
-        const textarea = screen.getByRole("textbox")
-        fireEvent.change(textarea, { target: { value: "shipping notes" } })
+        await waitForNotes()
+        expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
+    })
+
+    it("requests notes only for mods with a workshop id", async () => {
+        render(<PublishAllDialog packs={PACKS_WITH_SKIPPED} onClose={() => {}} />)
+        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled())
+        const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0] as [string, RequestInit]
+        expect(String(url)).toContain("/packs/change-notes")
+        expect(JSON.parse(String(init.body))).toEqual({ ids: ["111"] })
+    })
+
+    it("lets the user edit a mod's note before publishing", async () => {
+        render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
+        await waitForNotes()
+        fireEvent.click(screen.getByRole("button", { name: "Edit changenote for Mod Alpha" }))
+        const editor = screen.getByRole("textbox", { name: "Changenote for Mod Alpha" })
+        expect(editor).toHaveValue("Note Alpha")
+        fireEvent.change(editor, { target: { value: "Edited" } })
+        fireEvent.click(screen.getByRole("button", { name: /publish all/i }))
+        await waitFor(() => expect(publishAllBody()?.items[0].changenote).toBe("Edited"))
+    })
+
+    it("starts mods with no changes since their last upload unchecked", async () => {
+        mockFetch({ notes: { "111": NOTES.notes["111"], "222": { note: "x", pending: false, kind: "compat" } }, errors: [] })
+        render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
+        await waitFor(() => expect(screen.getAllByRole("checkbox")[1]).not.toBeChecked())
+        expect(screen.getAllByRole("checkbox")[0]).toBeChecked()
+        expect(screen.getByRole("button", { name: "Edit changenote for Mod Beta" })).toHaveTextContent("No changes")
+    })
+
+    it("opens an empty editor and blocks publishing when a note could not be generated", async () => {
+        mockFetch({ notes: { "111": NOTES.notes["111"], "222": null }, errors: ["helper_scripts path is not configured"] })
+        render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
+        expect(await screen.findByText(/helper_scripts path is not configured/)).toBeInTheDocument()
+        const editor = screen.getByRole("textbox", { name: "Changenote for Mod Beta" })
+        expect(editor).toHaveValue("")
+        expect(screen.getByRole("button", { name: /publish all/i })).toBeDisabled()
+        fireEvent.change(editor, { target: { value: "manual note" } })
         expect(screen.getByRole("button", { name: /publish all/i })).not.toBeDisabled()
     })
 
@@ -98,16 +158,17 @@ describe("PublishAllDialog", () => {
 
     it("POSTs to /packs/publish-all and opens an EventSource on the returned batch_id", async () => {
         render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
-        fireEvent.change(screen.getByRole("textbox"), { target: { value: "release v2" } })
+        await waitForNotes()
         fireEvent.click(screen.getByRole("button", { name: /publish all/i }))
 
         await waitFor(() => {
-            const [url, init] = (globalThis.fetch as ReturnType<typeof vi.spyOn>).mock.calls[0] as [string, RequestInit]
-            expect(String(url)).toContain("/packs/publish-all")
-            expect(init.method).toBe("POST")
-            const body = JSON.parse(String(init.body))
-            expect(body.changenote).toBe("release v2")
-            expect(body.items).toEqual(ELIGIBLE_PACKS.map((p) => ({ workshop_id: p.workshopId, title: p.title })))
+            const body = publishAllBody()
+            expect(body).not.toBeNull()
+            expect(body.changenote).toBeUndefined()
+            expect(body.items).toEqual([
+                { workshop_id: "111", title: "Mod Alpha", changenote: "Note Alpha" },
+                { workshop_id: "222", title: "Mod Beta", changenote: "Note Beta" },
+            ])
         })
 
         await waitFor(() => expect(MockEventSource.instances.length).toBe(1))
@@ -116,7 +177,7 @@ describe("PublishAllDialog", () => {
 
     it("flips a row from pending to publishing to done as mod_started and mod_finished events arrive", async () => {
         render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
-        fireEvent.change(screen.getByRole("textbox"), { target: { value: "notes" } })
+        await waitForNotes()
         fireEvent.click(screen.getByRole("button", { name: /publish all/i }))
         await waitFor(() => expect(MockEventSource.instances.length).toBe(1))
         const es = MockEventSource.instances[0]
@@ -142,7 +203,7 @@ describe("PublishAllDialog", () => {
 
     it("marks a row failed when mod_finished reports a non-zero exit and still updates the next mod_started", async () => {
         render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
-        fireEvent.change(screen.getByRole("textbox"), { target: { value: "notes" } })
+        await waitForNotes()
         fireEvent.click(screen.getByRole("button", { name: /publish all/i }))
         await waitFor(() => expect(MockEventSource.instances.length).toBe(1))
         const es = MockEventSource.instances[0]
@@ -177,24 +238,19 @@ describe("PublishAllDialog", () => {
 
     it("excludes deselected mods from the POST body and the count text", async () => {
         render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
+        await waitForNotes()
         const checkboxes = screen.getAllByRole("checkbox")
         expect(checkboxes).toHaveLength(2)
         fireEvent.click(checkboxes[1])
-        // After unchecking Beta the count drops to 1.
         expect(screen.getByText(/1 mod/i)).toBeInTheDocument()
 
-        fireEvent.change(screen.getByRole("textbox"), { target: { value: "notes" } })
         fireEvent.click(screen.getByRole("button", { name: /publish all/i }))
-        await waitFor(() => {
-            const [, init] = (globalThis.fetch as ReturnType<typeof vi.spyOn>).mock.calls[0] as [string, RequestInit]
-            const body = JSON.parse(String(init.body))
-            expect(body.items).toEqual([{ workshop_id: "111", title: "Mod Alpha" }])
-        })
+        await waitFor(() => expect(publishAllBody()?.items).toEqual([{ workshop_id: "111", title: "Mod Alpha", changenote: "Note Alpha" }]))
     })
 
-    it("disables Publish All when every eligible row is deselected", () => {
+    it("disables Publish All when every eligible row is deselected", async () => {
         render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
-        fireEvent.change(screen.getByRole("textbox"), { target: { value: "notes" } })
+        await waitForNotes()
         const checkboxes = screen.getAllByRole("checkbox")
         fireEvent.click(checkboxes[0])
         fireEvent.click(checkboxes[1])
@@ -203,9 +259,9 @@ describe("PublishAllDialog", () => {
 
     it("marks deselected eligible rows as skipped once the batch starts", async () => {
         render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
+        await waitForNotes()
         const checkboxes = screen.getAllByRole("checkbox")
         fireEvent.click(checkboxes[1])
-        fireEvent.change(screen.getByRole("textbox"), { target: { value: "notes" } })
         fireEvent.click(screen.getByRole("button", { name: /publish all/i }))
         await waitFor(() => expect(MockEventSource.instances.length).toBe(1))
         // Beta should now show a skipped badge with the "not selected" reason.
@@ -214,7 +270,7 @@ describe("PublishAllDialog", () => {
 
     it("enables Close once batch_done arrives", async () => {
         render(<PublishAllDialog packs={ELIGIBLE_PACKS} onClose={() => {}} />)
-        fireEvent.change(screen.getByRole("textbox"), { target: { value: "notes" } })
+        await waitForNotes()
         fireEvent.click(screen.getByRole("button", { name: /publish all/i }))
         await waitFor(() => expect(MockEventSource.instances.length).toBe(1))
         const es = MockEventSource.instances[0]

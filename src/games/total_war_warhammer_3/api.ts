@@ -202,6 +202,8 @@ export interface BatchPublishItem {
     workshop_id: string
     /** Human-readable mod title carried through the SSE stream for UI display. */
     title: string
+    /** Steam Workshop changelog sent with this mod's upload. Must be non-empty. */
+    changenote: string
 }
 
 /** Per-mod skip record returned alongside the batch handle when the backend filtered out an item up front. */
@@ -227,14 +229,13 @@ export interface BatchPublishHandle {
 }
 
 /**
- * Queue a batch that publishes every supplied mod to the Steam Workshop sharing one changelog.
+ * Queue a batch that publishes every supplied mod to the Steam Workshop, each with its own changelog.
  *
- * @param changenote Shared Steam Workshop changelog applied to every mod. Must be non-empty.
- * @param items Per-mod entries in run order. Empty/invalid workshop_ids are filtered server-side.
+ * @param items Per-mod entries in run order, each with a non-empty `changenote`. Empty/invalid workshop_ids are filtered server-side.
  * @returns The created batch handle (use `publishAllStreamUrl` with `batch_id` to subscribe to progress).
  */
-export async function publishAllPacks(changenote: string, items: BatchPublishItem[]): Promise<BatchPublishHandle> {
-    const res = await api.post("/packs/publish-all", { changenote, items })
+export async function publishAllPacks(items: BatchPublishItem[]): Promise<BatchPublishHandle> {
+    const res = await api.post("/packs/publish-all", { items })
     if (!res.ok) throw await registryError(res)
     return res.json()
 }
