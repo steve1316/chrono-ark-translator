@@ -1,6 +1,7 @@
 """Bridge to totalwar-modding's Workshop change notes for WH3 compat packs.
 
-Runs `python -m publish.change_notes` inside the helper_scripts directory, because its publish state paths are relative to that folder. The note logic stays in totalwar-modding so `update.py` and the app always agree.
+Runs `python -m publish.change_notes` inside the helper_scripts directory, because its publish state paths are relative to that folder.
+The note logic stays in totalwar-modding so `update.py` and the app always agree.
 """
 
 from __future__ import annotations

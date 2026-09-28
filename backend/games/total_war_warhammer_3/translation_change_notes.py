@@ -122,8 +122,7 @@ def build_note(baseline: dict | None, shipped: dict[str, dict[str, str]]) -> tup
         shipped: The shipped set about to be published.
 
     Returns:
-        `(note, pending)`. Without a baseline the note is `GENERIC_NOTE` and pending. With a baseline and no differences it is `GENERIC_NOTE` and
-        not pending.
+        `(note, pending)`. Without a baseline the note is `GENERIC_NOTE` and pending. With a baseline and no differences it is `GENERIC_NOTE` and not pending.
     """
     if baseline is None:
         return GENERIC_NOTE, True
