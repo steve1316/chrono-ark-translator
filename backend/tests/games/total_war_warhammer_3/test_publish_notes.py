@@ -96,10 +96,10 @@ def test_make_recorder_translation_saves_baseline_only_on_exit_0(monkeypatch):
     # The shipped set is captured when the upload starts, not when SteamCMD exits.
     monkeypatch.setattr(pn, "current_shipped_strings", lambda wid: {"changed": {}})
 
-    on_exit(1)
-    on_exit(None)
+    assert on_exit(1) is None
+    assert on_exit(None) is None
     assert saved == []
-    on_exit(0)
+    assert on_exit(0) == "Recorded this upload for the next changenote."
     assert saved == [(TRANSLATION_ID, SHIPPED, "the note")]
 
 
@@ -111,9 +111,9 @@ def test_make_recorder_compat_records_only_on_exit_0(monkeypatch):
 
     on_exit = pn.make_recorder("20", "the note")
 
-    on_exit(2)
+    assert on_exit(2) is None
     assert recorded == []
-    on_exit(0)
+    assert on_exit(0) == "Recorded this upload for the next changenote."
     assert recorded == [("20", "captured", "the note")]
 
 
@@ -132,7 +132,11 @@ def test_make_recorder_never_raises(monkeypatch):
 
     monkeypatch.setattr(pn.ccn, "preview", failing_preview)
 
-    assert pn.make_recorder("20", "note") is None
+    on_exit = pn.make_recorder("20", "note")
+
+    assert on_exit is not None
+    assert on_exit(1) is None
+    assert on_exit(0) == "This upload was not recorded, so the next changenote may repeat these changes: helper_scripts path is not configured"
 
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////

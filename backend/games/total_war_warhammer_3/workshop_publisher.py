@@ -197,7 +197,7 @@ def start_publish(
     steamcmd_path: str,
     steam_username: str,
     appid: str = TW3_APPID,
-    on_exit: Callable[[int | None], None] | None = None,
+    on_exit: Callable[[int | None], str | None] | None = None,
 ) -> PublishHandle:
     """Spawn `steamcmd +workshop_build_item` for an existing Workshop item. Single-flight.
 
@@ -213,6 +213,7 @@ def start_publish(
         steam_username: Steam account username (from `config.STEAM_USERNAME`).
         appid: Steam app id; defaults to TW3.
         on_exit: Called with SteamCMD's return code once it exits, before the publish is reported as done. Used to record the upload.
+            May return a status line to log, or None to log nothing.
 
     Raises:
         PublisherPreflightError: When required settings/paths are missing.
@@ -269,14 +270,15 @@ def start_publish(
     return handle
 
 
-def _reader_thread(proc: subprocess.Popen, handle: PublishHandle, vdf_path: Path, on_exit: Callable[[int | None], None] | None = None) -> None:
+def _reader_thread(proc: subprocess.Popen, handle: PublishHandle, vdf_path: Path, on_exit: Callable[[int | None], str | None] | None = None) -> None:
     """Daemon thread: read stdout into `_log`, notify SSE consumers, run `on_exit`, clean up the VDF file.
 
     Args:
         proc: The Popen object whose stdout to drain.
         handle: The `PublishHandle` to update on exit.
         vdf_path: Tempfile path to delete once SteamCMD has exited.
-        on_exit: Optional hook called with SteamCMD's return code. A failure inside it is logged as a line instead of failing the publish.
+        on_exit: Optional hook called with SteamCMD's return code. May return a status line, which is appended to `_log`.
+            A failure inside it is logged as a line instead of failing the publish.
     """
     assert proc.stdout is not None
     for raw in proc.stdout:
@@ -287,7 +289,9 @@ def _reader_thread(proc: subprocess.Popen, handle: PublishHandle, vdf_path: Path
     # Run the hook before exit_code is set, since `stream_lines` ends the stream as soon as it sees exit_code.
     if on_exit is not None:
         try:
-            on_exit(proc.returncode)
+            result = on_exit(proc.returncode)
+            if result:
+                _log.append(_LogLine(line=result, ts=datetime.now(timezone.utc)))
         except Exception as exc:
             _log.append(_LogLine(line=f"Published, but recording the upload failed: {exc}", ts=datetime.now(timezone.utc)))
     handle.exit_code = proc.returncode

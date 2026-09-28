@@ -158,6 +158,26 @@ def test_reader_thread_without_on_exit_still_finishes(tmp_path):
     assert handle.exit_code == 0
 
 
+def test_reader_thread_appends_the_on_exit_returned_line(tmp_path):
+    wp._log.clear()
+    handle = _handle()
+
+    wp._reader_thread(_FakeProc(["uploading\n"], 0), handle, tmp_path / "x.vdf", lambda code: "Recorded this upload for the next changenote.")
+
+    assert [entry.line for entry in wp._log] == ["uploading", "Recorded this upload for the next changenote."]
+    assert handle.exit_code == 0
+
+
+def test_reader_thread_does_not_append_a_line_when_on_exit_returns_none(tmp_path):
+    wp._log.clear()
+    handle = _handle()
+
+    wp._reader_thread(_FakeProc(["uploading\n"], 1), handle, tmp_path / "x.vdf", lambda code: None)
+
+    assert [entry.line for entry in wp._log] == ["uploading"]
+    assert handle.exit_code == 1
+
+
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # is_idle / start_publish single-flight while on_exit is still running
@@ -191,3 +211,13 @@ def test_is_idle_true_once_exit_code_is_set(monkeypatch):
 
 
 def test_start_publish_raises_in_progress_while_previous_handle_has_no_exit_code(monkeypatch, tmp_path):
+    folder = tmp_path / "mod"
+    folder.mkdir()
+    steamcmd = tmp_path / "steamcmd.exe"
+    steamcmd.write_text("")
+    handle = _handle()
+    monkeypatch.setattr(wp, "_current", handle)
+    monkeypatch.setattr(wp, "_proc", _FakePopen(0))
+
+    with pytest.raises(wp.PublishInProgressError):
+        wp.start_publish("2", folder, "note", steamcmd_path=str(steamcmd), steam_username="user")

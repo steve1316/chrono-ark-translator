@@ -16,7 +16,7 @@ from backend.games.total_war_warhammer_3.translation_mods import get_translation
 
 logger = logging.getLogger(__name__)
 
-OnExit = Callable[[int | None], None]
+OnExit = Callable[[int | None], str | None]
 
 
 def change_notes_for(ids: list[str]) -> dict:
@@ -67,20 +67,25 @@ def make_recorder(workshop_id: str, changenote: str) -> OnExit | None:
         changenote: The changenote sent with the upload.
 
     Returns:
-        The `on_exit` hook, or None when nothing can be recorded for this item.
+        The `on_exit` hook, or None when there is nothing to record for this item (it is not a generated pack).
     """
     try:
         if get_translation_mod(workshop_id) is not None:
             shipped = current_shipped_strings(workshop_id)
 
-            def record_translation(exit_code: int | None) -> None:
+            def record_translation(exit_code: int | None) -> str | None:
                 """Save the captured strings as the mod's published baseline after a successful upload.
 
                 Args:
                     exit_code: SteamCMD's exit code.
+
+                Returns:
+                    A status line on a successful record, or None otherwise.
                 """
                 if exit_code == 0:
                     tcn.save_baseline(workshop_id, shipped, changenote)
+                    return "Recorded this upload for the next changenote."
+                return None
 
             return record_translation
 
@@ -89,16 +94,36 @@ def make_recorder(workshop_id: str, changenote: str) -> OnExit | None:
             return None
         pack_sha = preview["pack_sha"]
 
-        def record_compat(exit_code: int | None) -> None:
+        def record_compat(exit_code: int | None) -> str | None:
             """Record the captured pack hash in totalwar-modding's publish state after a successful upload.
 
             Args:
                 exit_code: SteamCMD's exit code.
+
+            Returns:
+                A status line on a successful record, or None otherwise.
             """
             if exit_code == 0:
                 ccn.record(workshop_id, pack_sha, changenote)
+                return "Recorded this upload for the next changenote."
+            return None
 
         return record_compat
     except Exception as exc:
         logger.warning("Could not capture the upload state for %s, so this publish will not be recorded: %s", workshop_id, exc)
-        return None
+        reason = str(exc)
+
+        def record_capture_failed(exit_code: int | None) -> str | None:
+            """Report that the upload was not recorded, since its state could not be captured when it started.
+
+            Args:
+                exit_code: SteamCMD's exit code.
+
+            Returns:
+                A status line on a successful upload, or None otherwise.
+            """
+            if exit_code == 0:
+                return f"This upload was not recorded, so the next changenote may repeat these changes: {reason}"
+            return None
+
+        return record_capture_failed
