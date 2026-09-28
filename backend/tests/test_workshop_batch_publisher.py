@@ -30,14 +30,20 @@ def _reset_state():
     wbp._reset_state()
 
 
+@pytest.fixture(autouse=True)
+def _no_real_recorders(monkeypatch):
+    """Keep the orchestrator from running the real change note CLI or touching translation baselines."""
+    monkeypatch.setattr(wbp.publish_notes, "make_recorder", lambda workshop_id, changenote: None)
+
+
 def _run(coro: Awaitable):
     """Run a coroutine to completion using a fresh event loop per test."""
     return asyncio.new_event_loop().run_until_complete(coro)
 
 
 def _make_items(*workshop_ids: str) -> list[dict]:
-    """Build the `items` list start_batch accepts (one entry per workshop id)."""
-    return [{"workshop_id": wid, "title": f"Mod {wid}"} for wid in workshop_ids]
+    """Build the `items` list start_batch accepts (one entry per workshop id, each with its own note)."""
+    return [{"workshop_id": wid, "title": f"Mod {wid}", "changenote": f"note {wid}"} for wid in workshop_ids]
 
 
 def _stub_folder_resolver(monkeypatch, tmp_path: Path, workshop_ids: list[str]) -> dict[str, Path]:
@@ -92,9 +98,9 @@ def _stub_publisher_success(monkeypatch, stream_events_per_mod: dict[str, list[d
     return call_log
 
 
-async def _start_and_wait(items, changenote="notes"):
+async def _start_and_wait(items):
     """Helper: start a batch inside an event loop and await completion."""
-    handle = wbp.start_batch(items, changenote, steamcmd_path="steamcmd", steam_username="user")
+    handle = wbp.start_batch(items, steamcmd_path="steamcmd", steam_username="user")
     await handle.done_event.wait()
     return handle
 
@@ -104,13 +110,14 @@ async def _start_and_wait(items, changenote="notes"):
 # start_batch validation
 
 
-def test_start_batch_rejects_empty_changenote(tmp_path, monkeypatch):
+def test_start_batch_rejects_an_item_with_a_blank_changenote(tmp_path, monkeypatch):
     _stub_folder_resolver(monkeypatch, tmp_path, ["1"])
     _stub_publisher_success(monkeypatch, {})
+    items = [{"workshop_id": "1", "title": "Mod 1", "changenote": "   "}]
 
     async def go():
-        with pytest.raises(ValueError, match="changenote"):
-            wbp.start_batch(_make_items("1"), "   ", steamcmd_path="steamcmd", steam_username="user")
+        with pytest.raises(ValueError, match="changenote must not be empty for Mod 1"):
+            wbp.start_batch(items, steamcmd_path="steamcmd", steam_username="user")
 
     _run(go())
 
@@ -120,7 +127,7 @@ def test_start_batch_rejects_empty_items_list(monkeypatch):
 
     async def go():
         with pytest.raises(ValueError, match="items"):
-            wbp.start_batch([], "notes", steamcmd_path="steamcmd", steam_username="user")
+            wbp.start_batch([], steamcmd_path="steamcmd", steam_username="user")
 
     _run(go())
 
@@ -131,7 +138,7 @@ def test_start_batch_rejects_when_single_publish_in_progress(tmp_path, monkeypat
 
     async def go():
         with pytest.raises(wbp.BatchInProgressError):
-            wbp.start_batch(_make_items("1"), "notes", steamcmd_path="steamcmd", steam_username="user")
+            wbp.start_batch(_make_items("1"), steamcmd_path="steamcmd", steam_username="user")
 
     _run(go())
 
@@ -146,9 +153,9 @@ def test_start_batch_rejects_when_another_batch_in_progress(tmp_path, monkeypatc
     )
 
     async def go():
-        handle = wbp.start_batch(_make_items("1"), "notes", steamcmd_path="steamcmd", steam_username="user")
+        handle = wbp.start_batch(_make_items("1"), steamcmd_path="steamcmd", steam_username="user")
         with pytest.raises(wbp.BatchInProgressError):
-            wbp.start_batch(_make_items("2"), "notes", steamcmd_path="steamcmd", steam_username="user")
+            wbp.start_batch(_make_items("2"), steamcmd_path="steamcmd", steam_username="user")
         await handle.done_event.wait()
 
     _run(go())
@@ -357,7 +364,7 @@ def test_current_batch_returns_active_batch(tmp_path, monkeypatch):
 
     async def go():
         assert wbp.current_batch() is None
-        handle = wbp.start_batch(_make_items("10"), "notes", steamcmd_path="steamcmd", steam_username="user")
+        handle = wbp.start_batch(_make_items("10"), steamcmd_path="steamcmd", steam_username="user")
         assert wbp.current_batch() is handle
         await handle.done_event.wait()
         assert wbp.current_batch() is None
@@ -367,3 +374,35 @@ def test_current_batch_returns_active_batch(tmp_path, monkeypatch):
 
 def test_get_batch_returns_none_for_unknown_id():
     assert wbp.get_batch("does-not-exist") is None
+
+
+def test_each_item_publishes_with_its_own_changenote_and_recorder(tmp_path, monkeypatch):
+    _stub_folder_resolver(monkeypatch, tmp_path, ["10", "20"])
+    call_log = _stub_publisher_success(monkeypatch, {})
+    recorders: dict = {}
+
+    def fake_make_recorder(workshop_id, changenote):
+        def recorder(exit_code):
+            pass
+
+        recorders[workshop_id] = (changenote, recorder)
+        return recorder
+
+    monkeypatch.setattr(wbp.publish_notes, "make_recorder", fake_make_recorder)
+    passed_on_exit: dict = {}
+    real_fake = wp.start_publish
+
+    def capturing_start_publish(workshop_id, content_folder, changenote, *, on_exit=None, **kwargs):
+        passed_on_exit[workshop_id] = on_exit
+        return real_fake(workshop_id, content_folder, changenote, **kwargs)
+
+    monkeypatch.setattr(wp, "start_publish", capturing_start_publish)
+
+    async def go():
+        return await _start_and_wait(_make_items("10", "20"))
+
+    _run(go())
+
+    assert [c["changenote"] for c in call_log] == ["note 10", "note 20"]
+    assert recorders["10"][0] == "note 10"
+    assert passed_on_exit == {"10": recorders["10"][1], "20": recorders["20"][1]}

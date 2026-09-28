@@ -1,8 +1,8 @@
 """Serialized batch orchestrator on top of `workshop_publisher` for pushing many TW3 mods at once.
 
-Wraps the single-flight per-mod publisher in a background task that runs items one at a time, sharing a single changelog
-across the batch. Surfaces per-mod status (pending/running/done/failed) and a unified event stream the SSE route can fan
-out to one or more subscribers, including late-joining ones that reconnect mid-batch.
+Wraps the single-flight per-mod publisher in a background task that runs items one at a time, each with its own changelog. Surfaces per-mod status
+(pending/running/done/failed) and a unified event stream the SSE route can fan out to one or more subscribers, including late-joining ones that
+reconnect mid-batch.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import AsyncIterator, Literal
 
+from backend.games.total_war_warhammer_3 import publish_notes
 from backend.games.total_war_warhammer_3 import workshop_publisher as wp
 from backend.games.total_war_warhammer_3.routes._paths import tw3_workshop_content_dir
 
@@ -33,6 +34,8 @@ class BatchItem:
     """ Steam Workshop item id being updated. """
     title: str
     """ Human-readable mod title carried along for UI display. """
+    changenote: str = ""
+    """ Steam Workshop changelog sent with this mod's upload. """
     status: ItemStatus = "pending"
     """ Current lifecycle state. Transitions: pending -> running -> done|failed. """
     exit_code: int | None = None
@@ -51,8 +54,6 @@ class BatchHandle:
 
     batch_id: str
     """ Unique identifier for this batch, generated at start time. """
-    changenote: str
-    """ Shared changelog applied to every mod in the batch. """
     items: list[BatchItem]
     """ Per-mod slots in the order they will run. """
     started_at: datetime
@@ -97,7 +98,6 @@ def _reset_state() -> None:
 
 def start_batch(
     items: list[dict],
-    changenote: str,
     *,
     steamcmd_path: str,
     steam_username: str,
@@ -108,13 +108,12 @@ def start_batch(
     look up the batch id, subscribe to the event stream, or await `done_event` for completion.
 
     Args:
-        items: list of `{"workshop_id": str, "title": str}` dicts in run order.
-        changenote: shared Steam Workshop changelog applied to every mod.
+        items: list of `{"workshop_id": str, "title": str, "changenote": str}` dicts in run order.
         steamcmd_path: path to `steamcmd.exe` forwarded to `workshop_publisher.start_publish`.
         steam_username: Steam account username forwarded to `workshop_publisher.start_publish`.
 
     Raises:
-        ValueError: when `changenote` is blank or `items` is empty.
+        ValueError: when `items` is empty or any item's `changenote` is blank.
         BatchInProgressError: when another batch is active or a single-mod publish is in progress.
 
     Returns:
@@ -122,10 +121,11 @@ def start_batch(
     """
     global _current_batch_id
 
-    if not changenote or not changenote.strip():
-        raise ValueError("changenote must not be empty")
     if not items:
         raise ValueError("items must not be empty")
+    for it in items:
+        if not str(it.get("changenote") or "").strip():
+            raise ValueError(f"changenote must not be empty for {it.get('title') or it.get('workshop_id')}")
 
     if _current_batch_id is not None:
         active = _batches.get(_current_batch_id)
@@ -138,8 +138,7 @@ def start_batch(
     batch_id = uuid.uuid4().hex
     handle = BatchHandle(
         batch_id=batch_id,
-        changenote=changenote,
-        items=[BatchItem(workshop_id=str(it["workshop_id"]), title=str(it.get("title", ""))) for it in items],
+        items=[BatchItem(workshop_id=str(it["workshop_id"]), title=str(it.get("title", "")), changenote=str(it["changenote"])) for it in items],
         started_at=datetime.now(timezone.utc),
     )
     _batches[batch_id] = handle
@@ -288,13 +287,16 @@ async def _run_batch(handle: BatchHandle, *, steamcmd_path: str, steam_username:
                 failed += 1
                 continue
 
+            # Capture what is about to be uploaded off the event loop, since the compat capture runs a subprocess.
+            on_exit = await asyncio.to_thread(publish_notes.make_recorder, item.workshop_id, item.changenote)
             try:
                 wp.start_publish(
                     item.workshop_id,
                     folder,
-                    handle.changenote,
+                    item.changenote,
                     steamcmd_path=steamcmd_path,
                     steam_username=steam_username,
+                    on_exit=on_exit,
                 )
             except wp.PublisherPreflightError as exc:
                 _finalize_item(item, status="failed", exit_code=None, error=f"preflight failed: {exc.missing}")

@@ -243,7 +243,7 @@ async def get_pack_publish_stream(workshop_id: str):
 
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # //////////////////////////////////////////////////////////////////////////////////////////////////
-# POST /packs/publish-all - sequential batch publish across many mods sharing one changelog
+# POST /packs/publish-all - sequential batch publish across many mods, each with its own changelog
 
 
 class PublishAllItem(BaseModel):
@@ -253,37 +253,35 @@ class PublishAllItem(BaseModel):
     """ Steam Workshop item id. Empty or non-numeric values are filtered into the skipped list. """
     title: str = ""
     """ Human-readable mod title carried through the SSE stream for UI display. """
+    changenote: str = ""
+    """ Steam Workshop changelog for this mod. Must be non-empty for every item that is not skipped. """
 
 
 class PublishAllBody(BaseModel):
     """Request body for POST /packs/publish-all."""
 
-    changenote: str
-    """ Shared Steam Workshop changelog applied to every mod in the batch. Must be non-empty. """
     items: list[PublishAllItem]
     """ Per-mod entries in run order. Empty/invalid workshop_ids are filtered into the skipped list. """
 
 
 @router.post("/packs/publish-all")
 async def post_publish_all(body: PublishAllBody):
-    """Start a serialized batch that publishes every eligible mod with the shared `changenote`.
+    """Start a serialized batch that publishes every eligible mod with its own changenote.
 
     Pre-filters items whose `workshop_id` is blank or non-numeric; those appear only in the response's `skipped` list and
     in the SSE `mod_skipped` events. The batch runs as a detached background task so the modal can close and reconnect
     via the stream endpoint.
 
     Args:
-        body: Request body with `changenote` and `items`.
+        body: Request body with the per-mod items.
 
     Returns:
         `{"batch_id", "started_at", "queued", "skipped"}` on success.
 
     Raises:
-        HTTPException(400): empty changenote, empty items list, or no items had a valid workshop_id.
+        HTTPException(400): empty items list, an eligible item with a blank changenote, or no items had a valid workshop_id.
         HTTPException(409): another batch (or a single-mod publish) is already in progress.
     """
-    if not body.changenote or not body.changenote.strip():
-        raise HTTPException(status_code=400, detail="changenote must not be empty")
     if not body.items:
         raise HTTPException(status_code=400, detail="items must not be empty")
 
@@ -297,7 +295,9 @@ async def post_publish_all(body: PublishAllBody):
         if not _WORKSHOP_ID_RE.fullmatch(wid):
             skipped.append({"workshop_id": item.workshop_id, "title": item.title, "reason": "invalid workshopId"})
             continue
-        eligible.append({"workshop_id": wid, "title": item.title})
+        if not item.changenote.strip():
+            raise HTTPException(status_code=400, detail=f"changenote must not be empty for {item.title or wid}")
+        eligible.append({"workshop_id": wid, "title": item.title, "changenote": item.changenote})
 
     if not eligible:
         raise HTTPException(status_code=400, detail="no items with a valid workshop_id")
@@ -305,7 +305,6 @@ async def post_publish_all(body: PublishAllBody):
     try:
         handle = wbp.start_batch(
             eligible,
-            body.changenote,
             steamcmd_path=config.STEAMCMD_PATH,
             steam_username=config.STEAM_USERNAME,
         )

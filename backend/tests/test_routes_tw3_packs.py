@@ -346,18 +346,19 @@ def _stub_batch_publisher(monkeypatch, parent: Path, workshop_ids: list[str], ex
     monkeypatch.setattr(wp, "is_idle", lambda: True)
 
 
-def test_publish_all_returns_400_when_changenote_empty(monkeypatch, tmp_path):
+def test_publish_all_returns_400_naming_an_item_with_a_blank_changenote(monkeypatch, tmp_path):
     parent = _set_drive(monkeypatch, tmp_path)
     wbp._reset_state()
     _stub_batch_publisher(monkeypatch, parent, ["999"])
-    res = TestClient(app).post(_PUBLISH_ALL, json={"changenote": "", "items": [{"workshop_id": "999", "title": "Mod"}]})
+    res = TestClient(app).post(_PUBLISH_ALL, json={"items": [{"workshop_id": "999", "title": "Mod", "changenote": "  "}]})
     assert res.status_code == 400
+    assert "Mod" in res.json()["detail"]
 
 
 def test_publish_all_returns_400_when_items_empty(monkeypatch):
     wbp._reset_state()
     monkeypatch.setattr(wp, "is_idle", lambda: True)
-    res = TestClient(app).post(_PUBLISH_ALL, json={"changenote": "notes", "items": []})
+    res = TestClient(app).post(_PUBLISH_ALL, json={"items": []})
     assert res.status_code == 400
 
 
@@ -366,7 +367,12 @@ def test_publish_all_returns_400_when_no_valid_workshop_ids(monkeypatch):
     monkeypatch.setattr(wp, "is_idle", lambda: True)
     res = TestClient(app).post(
         _PUBLISH_ALL,
-        json={"changenote": "notes", "items": [{"workshop_id": "", "title": "A"}, {"workshop_id": "abc", "title": "B"}]},
+        json={
+            "items": [
+                {"workshop_id": "", "title": "A", "changenote": "notes"},
+                {"workshop_id": "abc", "title": "B", "changenote": "notes"},
+            ]
+        },
     )
     assert res.status_code == 400
 
@@ -378,11 +384,10 @@ def test_publish_all_filters_invalid_workshop_ids_and_returns_skipped_list(monke
     res = TestClient(app).post(
         _PUBLISH_ALL,
         json={
-            "changenote": "notes",
             "items": [
-                {"workshop_id": "999", "title": "Valid"},
-                {"workshop_id": "", "title": "Empty"},
-                {"workshop_id": "abc", "title": "Bad"},
+                {"workshop_id": "999", "title": "Valid", "changenote": "notes"},
+                {"workshop_id": "", "title": "Empty", "changenote": "notes"},
+                {"workshop_id": "abc", "title": "Bad", "changenote": "notes"},
             ],
         },
     )
@@ -400,7 +405,7 @@ def test_publish_all_returns_409_when_single_publish_in_progress(monkeypatch, tm
     wbp._reset_state()
     (parent / "999").mkdir()
     monkeypatch.setattr(wp, "is_idle", lambda: False)
-    res = TestClient(app).post(_PUBLISH_ALL, json={"changenote": "notes", "items": [{"workshop_id": "999", "title": "Mod"}]})
+    res = TestClient(app).post(_PUBLISH_ALL, json={"items": [{"workshop_id": "999", "title": "Mod", "changenote": "notes"}]})
     assert res.status_code == 409
 
 
@@ -414,7 +419,7 @@ def test_publish_all_stream_returns_event_stream_with_batch_started_first(monkey
     parent = _set_drive(monkeypatch, tmp_path)
     wbp._reset_state()
     _stub_batch_publisher(monkeypatch, parent, ["999"])
-    post = TestClient(app).post(_PUBLISH_ALL, json={"changenote": "notes", "items": [{"workshop_id": "999", "title": "Mod"}]})
+    post = TestClient(app).post(_PUBLISH_ALL, json={"items": [{"workshop_id": "999", "title": "Mod", "changenote": "notes"}]})
     assert post.status_code == 200
     batch_id = post.json()["batch_id"]
 
@@ -425,3 +430,15 @@ def test_publish_all_stream_returns_event_stream_with_batch_started_first(monkey
         text = res.text
         assert "event: batch_started" in text
         assert "event: batch_done" in text
+
+
+def test_publish_all_skipped_items_do_not_need_a_changenote(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    wbp._reset_state()
+    _stub_batch_publisher(monkeypatch, parent, ["999"])
+    res = TestClient(app).post(
+        _PUBLISH_ALL,
+        json={"items": [{"workshop_id": "999", "title": "Valid", "changenote": "notes"}, {"workshop_id": "", "title": "Empty"}]},
+    )
+    assert res.status_code == 200
+    assert res.json()["queued"] == 1
