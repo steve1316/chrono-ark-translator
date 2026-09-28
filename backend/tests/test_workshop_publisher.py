@@ -41,14 +41,24 @@ def test_build_vdf_normalises_backslashes_in_content_folder():
     assert "C:\\\\mods" not in text
 
 
-def test_build_vdf_escapes_quotes_in_changenote():
-    text = wp.build_vdf("1142710", "12345", Path("C:/mods/foo"), 'release "v2"')
-    assert '"changenote"      "release \\"v2\\""' in text
+def test_build_vdf_swaps_double_quotes_in_changenote_for_single_quotes():
+    # SteamCMD does not honor \" escapes, so a double quote would end the value early and break the parse.
+    text = wp.build_vdf("1142710", "12345", Path("C:/mods/foo"), '- Fixed a startup crash ("The first invalid database record").')
+    assert "\t\"changenote\"      \"- Fixed a startup crash ('The first invalid database record').\"\n" in text
 
 
-def test_build_vdf_escapes_backslashes_in_changenote():
+def test_build_vdf_keeps_backslashes_in_changenote_literal():
     text = wp.build_vdf("1142710", "12345", Path("C:/mods/foo"), "path C:\\foo")
-    assert '"changenote"      "path C:\\\\foo"' in text
+    assert '"changenote"      "path C:\\foo"' in text
+
+
+def test_build_vdf_changenote_with_quotes_parses_as_one_value():
+    # Tokenise the way SteamCMD's KeyValues parser does with escapes off: a quoted token runs to the next double quote.
+    text = wp.build_vdf("1142710", "12345", Path("C:/mods/foo"), 'crash ("record is x in table y").')
+    body = text[text.index("{") + 1 : text.rindex("}")]
+    tokens = body.split('"')[1::2]
+    assert len(tokens) == 8
+    assert tokens[-2:] == ["changenote", "crash ('record is x in table y')."]
 
 
 def test_build_vdf_wraps_in_workshopitem_block():

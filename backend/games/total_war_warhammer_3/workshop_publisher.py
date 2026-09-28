@@ -84,15 +84,18 @@ _active_vdf: Path | None = None
 
 
 def _vdf_escape(value: str) -> str:
-    """Escape a string for embedding inside a double-quoted VDF value.
+    """Make a string safe to embed inside a double-quoted VDF value.
+
+    SteamCMD parses build VDFs with escape sequences off, so `\\"` is not an escaped quote and a double quote always ends the value.
+    Double quotes become single quotes and backslashes are left literal.
 
     Args:
         value: The raw string value (may contain backslashes or double quotes).
 
     Returns:
-        The value with `\\` and `"` escaped per VDF/KeyValues quoting rules.
+        The value with every `"` replaced by `'`.
     """
-    return value.replace("\\", "\\\\").replace('"', '\\"')
+    return value.replace('"', "'")
 
 
 def build_vdf(appid: str, workshop_id: str, content_folder: Path, changenote: str) -> str:
