@@ -170,16 +170,20 @@ def current_publish() -> PublishHandle | None:
 def is_idle() -> bool:
     """Return True when no publish is active.
 
-    Acquires `_lock` so the check is consistent with `start_publish` writes.
+    Acquires `_lock` so the check is consistent with `start_publish` writes. A publish stays active until its handle's
+    `exit_code` is set, which happens after `on_exit` runs, so a slow recording hook still blocks a second publish
+    even though the SteamCMD subprocess itself has already exited.
 
     Returns:
-        True when there is no current publish, or the current publish's subprocess has exited.
+        True when there is no current publish, or the current publish's handle has `exit_code` set and its subprocess has exited.
     """
     with _lock:
         proc = _proc
         handle = _current
     if handle is None:
         return True
+    if handle.exit_code is None:
+        return False
     if proc is None:
         return True
     return proc.poll() is not None
@@ -221,6 +225,8 @@ def start_publish(
     steamcmd = _preflight(steamcmd_path, steam_username, content_folder)
 
     with _lock:
+        if _current is not None and _current.exit_code is None:
+            raise PublishInProgressError(workshop_id)
         if _proc is not None and _proc.poll() is None:
             raise PublishInProgressError(workshop_id)
 

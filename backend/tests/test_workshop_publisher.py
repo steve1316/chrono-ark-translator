@@ -156,3 +156,38 @@ def test_reader_thread_without_on_exit_still_finishes(tmp_path):
     wp._reader_thread(_FakeProc([], 0), handle, tmp_path / "x.vdf", None)
 
     assert handle.exit_code == 0
+
+
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# //////////////////////////////////////////////////////////////////////////////////////////////////
+# is_idle / start_publish single-flight while on_exit is still running
+
+
+class _FakePopen:
+    """Stand-in for `subprocess.Popen` exposing only `.poll()`, whose subprocess has already exited."""
+
+    def __init__(self, returncode: int):
+        self.returncode = returncode
+
+    def poll(self) -> int:
+        return self.returncode
+
+
+def test_is_idle_false_while_handle_has_no_exit_code_even_after_proc_exits(monkeypatch):
+    handle = _handle()
+    monkeypatch.setattr(wp, "_current", handle)
+    monkeypatch.setattr(wp, "_proc", _FakePopen(0))
+
+    assert wp.is_idle() is False
+
+
+def test_is_idle_true_once_exit_code_is_set(monkeypatch):
+    handle = _handle()
+    handle.exit_code = 0
+    monkeypatch.setattr(wp, "_current", handle)
+    monkeypatch.setattr(wp, "_proc", _FakePopen(0))
+
+    assert wp.is_idle() is True
+
+
+def test_start_publish_raises_in_progress_while_previous_handle_has_no_exit_code(monkeypatch, tmp_path):

@@ -312,6 +312,44 @@ def test_publish_hands_the_recorder_to_start_publish(monkeypatch, tmp_path):
     assert captured["on_exit"] is recorder
 
 
+def test_publish_returns_409_when_a_batch_is_in_progress(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    (parent / "999").mkdir()
+    monkeypatch.setattr(wbp, "current_batch", lambda: object())
+
+    res = TestClient(app).post("/api/games/total_war_warhammer_3/packs/999/publish", json={"changenote": ""})
+
+    assert res.status_code == 409
+
+
+def test_publish_returns_409_when_wp_is_not_idle(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    (parent / "999").mkdir()
+    monkeypatch.setattr(wp, "is_idle", lambda: False)
+
+    res = TestClient(app).post("/api/games/total_war_warhammer_3/packs/999/publish", json={"changenote": ""})
+
+    assert res.status_code == 409
+
+
+def test_publish_does_not_call_make_recorder_when_a_publish_is_already_active(monkeypatch, tmp_path):
+    parent = _set_drive(monkeypatch, tmp_path)
+    (parent / "999").mkdir()
+    called: list = []
+
+    def fake_make_recorder(workshop_id, changenote):
+        called.append(workshop_id)
+        return None
+
+    monkeypatch.setattr(publish_notes, "make_recorder", fake_make_recorder)
+    monkeypatch.setattr(wp, "is_idle", lambda: False)
+
+    res = TestClient(app).post("/api/games/total_war_warhammer_3/packs/999/publish", json={"changenote": ""})
+
+    assert res.status_code == 409
+    assert called == []
+
+
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # //////////////////////////////////////////////////////////////////////////////////////////////////
 # POST /packs/publish-all

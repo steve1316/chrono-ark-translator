@@ -180,6 +180,11 @@ def post_pack_publish(workshop_id: str, body: PublishBody):
     if folder is None or not folder.is_dir():
         raise HTTPException(status_code=404, detail="workshop folder not found")
 
+    # Check before make_recorder, since its pack-hashing preview can take up to 60s and would otherwise
+    # delay reporting that a publish (single or batch) is already in progress.
+    if wbp.current_batch() is not None or not wp.is_idle():
+        raise HTTPException(status_code=409, detail="a publish is already in progress")
+
     # Capture what is about to be uploaded so a successful publish can be recorded for the next changenote.
     on_exit = publish_notes.make_recorder(workshop_id, body.changenote)
     try:
